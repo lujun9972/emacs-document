@@ -1,0 +1,51 @@
+#+TITLE: 更好的compile命令
+#+URL: http://endlessparentheses.com/better-compile-command.html
+#+AUTHOR: lujun9972
+#+CATEGORY: emacs-common
+#+DATE: [2016-06-18 六 22:38]
+#+OPTIONS: ^:{}
+
+运行compile之前都要确认是否保存未保存的buffer,以及没有为compile分配一个默认的快捷键,这两个设定简直让人无语. 下面这段代码能够修正这两个问题,并且还能使得编译窗口遵照预定的大小显示,同时光标还会随着输出的增加而下移.
+#+BEGIN_SRC emacs-lisp
+  ;; This gives a regular `compile-command' prompt.
+  (define-key prog-mode-map [C-f9] #'compile)
+  ;; This just compiles immediately.
+  (define-key prog-mode-map [f9]
+    #'endless/compile-please)
+
+  ;; I'm not scared of saving everything.
+  (setq compilation-ask-about-save nil)
+  ;; Stop on the first error.
+  (setq compilation-scroll-output 'next-error)
+  ;; Don't stop on info or warnings.
+  (setq compilation-skip-threshold 2)
+
+  (defcustom endless/compile-window-size 105
+    "Width given to the non-compilation window."
+    :type 'integer
+    :group 'endless)
+
+  (defun endless/compile-please (comint)
+    "Compile without confirmation.
+  With a prefix argument, use comint-mode."
+    (interactive "P")
+    ;; Do the command without a prompt.
+    (save-window-excursion
+      (compile (eval compile-command) (and comint t)))
+    ;; Create a compile window of the desired width.
+    (pop-to-buffer (get-buffer "*compilation*"))
+    (enlarge-window
+     (- (frame-width)
+        endless/compile-window-size
+        (window-width))
+     'horizontal))
+#+END_SRC
+ 
+
+* Update 16 Jun 2015
+
+感谢Clément及abo-abo的宝贵意见:他们都告诉我有个叫 =compilation-skip-threshold= 的变量. 通常情况下Warnings也是需要修复的,但是再某些语言中,很可能你根本无法修复那些warning, 因此编译窗口最好不要因为出现warnning就停止滚动.
+
+* Update 17 Jun 2016
+
+修改 =endless/compile-please= 为会传递prefix参数到 =compile= 函数,  这样若使用prefix参数调用该函数,则会再comint-mode下编译(这样你可以与编译buffer进行交互了). 详情请参见[[http://endlessparentheses.com/provide-input-to-the-compilation-buffer.html][这篇博文]] 的UPDATE部分.
