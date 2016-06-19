@@ -1,0 +1,85 @@
+#+TITLE: 通过-daemon参数让Emacs在后台运行,这样即使X崩溃也没有问题
+#+AUTHOR: lujun9972
+#+CATEGORY: emacs-common
+#+DATE: [2016-06-19 日 08:47]
+#+OPTIONS: ^:{}
+
+I periodically have to kill and restart my X server when it freezes. I probably have the wrong configuration, since it starts off in low-graphics mode until I manually restart the graphical login manager (I’m using sddm). Anyway, since it’s been hard to debug and fix that issue, I figured I’d address the part that really bugs me when I restart X: dealing with ungraceful Emacs exits. =M-x recover-session= does a decent job of restoring my modified files and I usually remember to call it from the scratch screen, but sometimes I forget, and then I end up losing changes.
+
+I started taking advantage of the fact that I used =(server-start)= to enable other Emacs clients to connect to the same process. Whenever I needed to restart X, I’d first switch to a console, use =emacsclient -c= to connect to Emacs, and use =M-x save-buffers-kill-emacs= to close my Emacs neatly. Still, starting my Emacs from X meant that I had to restart Emacs each time I restarted X.
+
+It turns out that you can run Emacs as a background process with =emacs --daemon= and then connect to it with =emacsclient -c=. When I did that, though, the emacsclient frame didn’t have my color theme applied. This =after-make-frame-functions= addition fixes that:
+#+BEGIN_SRC emacs-lisp
+  (defun my/setup-color-theme ()
+    (interactive)
+    (color-theme-solarized-dark)
+    (set-face-foreground 'secondary-selection "darkblue")
+    (set-face-background 'secondary-selection "lightblue")
+    (set-face-background 'font-lock-doc-face "black")
+    (set-face-foreground 'font-lock-doc-face "wheat")
+    (set-face-background 'font-lock-string-face "black")
+    (set-face-foreground 'org-todo "green")
+    (set-face-background 'org-todo "black"))
+  (add-hook 'after-make-frame-functions
+            (lambda (frame)
+              (select-frame frame)
+              (my/setup-color-theme)))
+#+END_SRC
+
+Once I got =emacs --daemon= and =emacsclient -c= working to my satisfaction, I decided to go one step further and get it to run automatically when I start my computer. I tried the init script at https://www.emacswiki.org/emacs/EmacsAsDaemon . My Linux install uses systemd, so enabling the init script resulted in a message about a missing service file. I removed the init script and created this =~/.config/systemd/user/emacs.service= instead:
+#+BEGIN_SRC conf
+  [Unit]
+  Description=Emacs: the extensible, self-documenting text editor
+
+  [Service]
+  Type=forking
+  ExecStart=/usr/local/bin/emacs --daemon
+  ExecStop=/usr/local/bin/emacsclient --eval "(progn (setq kill-emacs-hook 'nil) (kill-emacs))"
+  Restart=always
+  TimeoutStartSec=0
+
+  [Install]
+  WantedBy=default.target
+#+END_SRC
+
+and then I ran these commands as my regular user account:
+#+BEGIN_SRC sh
+  systemctl --user enable emacs
+  systemctl --user start emacs
+#+END_SRC
+
+Then I changed the =emacs= in my =~/.xsession= to =emacsclient -c=, so that a new X session would connect to the existing session instead of starting a new one. That way, Emacs automatically started as my user whenever I restarted the computer, and I connected to that process when I started X.
+
+Still, restarting X caused the Emacs daemon to crash. This is a GTK-related bug which =emacs --daemon= warns you about. I recompiled Emacs using =./configure --with-x-toolkit=lucid; make; make install=. It seems to work fine now; I can ungracefully restart X, and my Emacs stays the same. Bonus: because Emacs gets initialized when I start my computer and all I need to do is connect to that process, when I log in, it feels like Emacs starts up really quickly.
+
+Final touches: I noticed that TRAMP couldn’t find my SSH keyring, so it got stuck waiting for my passphrase when I tried running remote scripts in Org Babel like so:
+#+BEGIN_SRC org
+  ,#+begin_src sh :dir [email protected]:~
+  perl library-new.pl Business
+  ,#+end_src
+#+END_SRC
+
+Because my SSH socket looks like =/tmp/ssh-BLAHBLAHBLAH/agent.PROCESSID=, the SSH_AUTH_SOCK setting (Environment=SSH_AUTH_SOCK=%t/keyring/ssh) described on EmacsWiki didn’t work for me. This snippet from https://github.com/nhoffman/.emacs.d/blob/master/init.org worked, though.
+
+#+BEGIN_SRC emacs-lisp
+  (defun my/ssh-refresh ()
+    "Reset the environment variable SSH_AUTH_SOCK"
+    (interactive)
+    (let (ssh-auth-sock-old (getenv "SSH_AUTH_SOCK"))
+      (setenv "SSH_AUTH_SOCK"
+              (car (split-string
+                    (shell-command-to-string
+                     "ls -t $(find /tmp/ssh-* -user $USER -name 'agent.*' 2> /dev/null)"))))
+      (message
+       (format "SSH_AUTH_SOCK %s --> %s"
+               ssh-auth-sock-old (getenv "SSH_AUTH_SOCK")))))
+  (my/ssh-refresh)
+#+END_SRC
+
+Also, =emacs --daemon= didn’t pick up the default browser I’d configured in KDE. Opening URL links from Org Mode started a separate Chromium process instead of using Google Chrome. I fixed that by switching from =browse-url-default-browser= to =browse-url-generic=, like so:
+#+BEGIN_SRC emacs-lisp
+  (setq browse-url-generic-program "google-chrome")
+  (setq browse-url-browser-function 'browse-url-generic)
+#+END_SRC
+
+Let’s see how this works!
