@@ -1,0 +1,193 @@
+*  R.I.P. del.icio.us
+(You can skip this section if you are not interested in what I've used before.)
+
+For years, [[https://delicious.com/vk/][I was using delicious]] for storing, managing, and retrieving web bookmarks. Its Firefox plugin was a perfectly crafted piece of software, where storing, tagging, annotating, and "gardening" was very easily accomplished.
+
+Unfortunately, [[https://en.wikipedia.org/wiki/Delicious_%2528website%2529][delicious was sold]] to Yahoo and later on to AVOS. They decided to transform the perfectly working social bookmark web service to something different. The beloved Firefox plugin stopped working some day. The new delicious did not please me at all, ruining my perfectly functioning work-flows I enjoyed for years.
+
+Therefore, I began to think of an alternative method to manage my bookmarks. Meanwhile, I started to use Org-mode for almost everything. And this is why [[https://lists.gnu.org/archive/html/emacs-orgmode/2012-06/msg00640.html][I wanted to manage bookmarks within Org-mode]], losing social bookmark features like RSS-feeds for bookmarks or tags. Once more, the cloud ruined a part of my digital life. Better stay independent.
+
+* My Requirements
+Before I go into the implementation details, I want to describe, what work-flows I want to get handled.
+
+As I described above, I wanted to have a solution within Org-mode and I was prepared to lose any kind of social features such as feeds.
+
+I need to save bookmarks on my Android phone, within my desktop browsers, and within GNU/Emacs.
+
+Additionally, I want to be able to tag bookmarks and add notes to them.
+
+Within Org-mode, I am able to navigate, search, filter, open, and modify the stored bookmarks.
+
+* Implementation
+In my notes.org file, I collect all kind of snippets, knowledge, ideas, how-tos, and such stuff. At the bottom of it, I created a new main headline "Bookmarks". Within this headline, I collect bookmarks as ordinary Org-mode entries such as: 
+#+BEGIN_SRC org
+  ,** [[http://usesthis.com/interviews/][What do people use to get stuff done?]] :pim:diy:hardware:software:
+   :PROPERTIES:
+   :CREATED: [2014-08-09 Sat 10:41]
+   :END:
+#+END_SRC
+
+Great source of inspiration for hardware, software, working
+ environments, visionary ideas, and so forth!
+
+ I stumbled across this URL from a heise forum post.
+
+ See also my [[http://karl-voit.at/2014/08/10/what-do-people-use][blog entry]].
+
+** Capture on desktop computers
+
+Capturing on my desktop computers is easy. Each of them is running GNU/Emacs with Org-mode when I work with them. Therefore, I added a capture template for bookmarks: 
+#+BEGIN_SRC emacs-lisp
+  (setq org-capture-templates
+        '(
+          ;; many more capture templates
+          ("b" "Bookmark" entry (file+headline "~/share/all/org-mode/notes.org" "Bookmarks")
+           "* %?\n:PROPERTIES:\n:CREATED: %U\n:END:\n\n" :empty-lines 1)
+          ;; many more capture templates
+          )
+        )
+#+END_SRC
+
+I tried to set-up [[http://orgmode.org/worg/org-contrib/org-protocol.html][org-protocol]] but failed so far. This thing is able to capture from external sources such as your web browser directly to Org-mode.
+
+However, I guess it would not save me much effort, since I can add a bookmark by following steps: within the browser I press C-l to go to and select the URL of the current page. Then I add it to the clipboard with C-c. I switch to Emacs/Org-mode (usually one virtual desktop to the left) and invoke the capture shortcut for bookmarks: C-c c b. After adding tasks, I can add an URL description either by working my-url-linkify (see below) or manually.
+
+** Capture on Android
+ Most bookmarks get saved when I read Atom/RSS feeds on my phone. Fortunately, I can easily "share" any URLs with MobileOrg. This app syncs with my desktop Org-mode. By convention, I add "Bookmark" in front of the URL. That way, I can differ other inbox-entries from bookmark URLs I want to save.
+
+After synchronizing, bookmarks in MobileOrg result in inbox.org entries like: 
+#+BEGIN_SRC org
+  ,* NEXT Bookmark [[http://Karl-Voit.at][Homepage of Karl Voit]]
+   [2014-08-10 Sun 16:24]   
+#+END_SRC
+
+ With the Elisp function my-save-bookmark, I am quickly able to move the bookmark from inbox.org to corresponding heading in notes.org. Additionally, the tagging process is invoked. Thus, I only apply the keyboard shortcut on a bookmark, enter the tags, and I am done with this bookmark.
+
+This Elisp funktion is one of my very first Elisp functions. So please do send me improvements if you see room for some: 
+#+BEGIN_SRC emacs-lisp
+  ;; ######################################################
+  ;; smart moving bookmark headings from inbox to notes.org
+  ;; see id:2014-03-09-inbox-to-bookmarks
+  (defun my-save-bookmark()
+    "removes NEXT/Bookmark, (NOT YET: FIXXME: retrieves title),
+  move time-stamp to CREATED, re-file to bookmarks, invoke Org-mode tagging process"
+    (interactive)
+    (save-excursion
+      ;; get myself to the beginning of the current heading:
+      ;;(outline-previous-visible-heading 1)  ;; jump to previous heading
+      ;;(outline-next-visible-heading 1)      ;; jumps to beginning of the current (interesting) heading
+      (beginning-of-line)                   ;; jump to beginning of line
+      (let ((mybegin (point)))              ;; mark beginning of line as start point
+        (outline-next-visible-heading 1)    ;; jumps to EOF if it is the last entry
+        (save-restriction
+          (narrow-to-region mybegin (point))  ;; ignore everything outside of region
+          ;; search/replace unwanted keywords at the beginning:
+          (goto-char (point-min))
+          (while (search-forward "* NEXT Bookmark " nil t) (replace-match "* " nil t))
+          (goto-char (point-min))
+          (while (search-forward "* NEXT " nil t) (replace-match "* " nil t))
+          (goto-char (point-min))
+          (while (search-forward "* Bookmark " nil t) (replace-match "* " nil t))
+          (goto-char (point-min))
+          (while (search-forward "//m.heise.de" nil t) (replace-match "//heise.de" nil t));; remove mobile heise URL
+          (goto-char (point-min))
+          (while (search-forward "/from/atom10?wt_mc=rss.ho.beitrag.atom" nil t);; remove heise RSS tags
+            (replace-match "" nil t)
+            )
+          (goto-char (point-min))
+          ;; insert second asterisk (modify to second level heading)
+          (insert "*")
+          ;; move time-stamp to properties-drawer:
+          (search-forward-regexp "^\\[20")  ;; jump to second line (with time-stamp) via search
+          (beginning-of-line)
+          (insert ":PROPERTIES:\n:CREATED:  ")
+          (end-of-line)
+          (newline)
+          (insert ":END:\n")
+          ;; move region to end of notes.org
+          (kill-region mybegin (point)) ;; kill region to kill-ring
+          (switch-to-buffer "notes.org")
+          (end-of-buffer)
+          (newline)
+          (yank)
+          ;; add tags
+          (outline-previous-visible-heading 1)  ;; jump to heading
+          (org-set-tags-command)
+          )
+        )
+      )
+    )
+#+END_SRC
+
+When I store an URL without any description, it might look like this: 
+#+BEGIN_SRC org
+  ,* NEXT Bookmark http://Karl-Voit.at
+   [2014-08-10 Sun 16:24]
+#+END_SRC
+
+To add the web page title to the link, I looked up code in the web and adopted it to my needs: 
+#+BEGIN_SRC emacs-lisp
+  ;; ######################################################
+  ;; replaces URL with Org-mode link including description
+  ;; see id:2014-03-09-inbox-to-bookmarks
+  (defun my-www-get-page-title (url)
+    "retrieve title of web page.
+  from: http://www.opensubscriber.com/message/help-gnu-emacs@gnu.org/14332449.html"
+    (let ((title))
+      (with-current-buffer (url-retrieve-synchronously url)
+        (goto-char (point-min))
+        (re-search-forward "" nil t 1)
+        (setq title (match-string 1))
+        (goto-char (point-min))
+        (re-search-forward "charset=\\([-0-9a-zA-Z]*\\)" nil t 1)
+        (decode-coding-string title (intern (match-string 1)))))
+    )
+
+  (defun my-url-linkify ()
+    "Make URL at cursor point into an Org-mode link.
+  If there's a text selection, use the text selection as input.
+
+  Example: http://example.com/xyz.htm
+  becomes
+  \[\[http://example.com/xyz.htm\]\[Source example.com\]\]
+
+  Adapted code from: http://ergoemacs.org/emacs/elisp_html-linkify.html"
+    (interactive)
+    (let (resultLinkStr bds p1 p2 domainName)
+      ;; get the boundary of URL or text selection
+      (if (region-active-p)
+          (setq bds (cons (region-beginning) (region-end)) )
+        (setq bds (bounds-of-thing-at-point 'url))
+        )
+      ;; set URL
+      (setq p1 (car bds))
+      (setq p2 (cdr bds))
+      (let (
+            (url (buffer-substring-no-properties p1 p2))
+            )
+        ;; retrieve title
+        (let ((title (my-www-get-page-title url)))
+          (message (concat "title is: " title))
+          ;;(setq url (replace-regexp-in-string "&" "&" url))
+          (let ((resultLinkStr (concat "[[" url "][" title "]]")))
+            ;; delete url and insert the link
+            (delete-region p1 p2)
+            (insert resultLinkStr)
+            )
+          )
+        )
+      )
+    )
+#+END_SRC
+
+Unfortunately, this does only work in some cases. Most of the time, I get save-current-buffer: Invalid coding system: UTF-8 which I do not understand. Drop me a line, if you've got an idea how to fix this issue. 
+
+Note: current versions of my Elisp functions can be found at: https://github.com/novoid/dot-emacs
+
+** Future plans: going social (again)
+
+This method works pretty satisfying to me.
+
+For the future, I plan to integrate selected bookmarks to my web blog using my web blog software [[https://github.com/novoid/lazyblorg][lazyblorg]]. Adding a bookmark to my blog should not take more than adding a "blog"-tag to it while saving.
+
+Such rather small entries will get a special auto-tag such as "small" or "bookmark". You will be able to follow them using a dedicated [[https://en.wikipedia.org/wiki/Atom_feed][Atom feed]] I will provide which holds only small/bookmark entries. This way, I get the social sharing aspect once more. This time, under my control. 
