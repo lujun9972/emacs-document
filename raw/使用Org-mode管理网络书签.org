@@ -1,0 +1,199 @@
+#+TITLE: 使用Org-mode管理网络书签
+#+URL: http://karl-voit.at/2014/08/10/bookmarks-with-orgmode/
+#+AUTHOR: lujun9972
+#+CATEGORY: raw
+#+DATE: [2016-06-20 周一 15:52]
+#+OPTIONS: ^:{}
+
+* 安息吧,del.icio.us
+(若你对我之前所使用的方案不感兴趣的话，可以跳过此章)
+
+我使用[[https://delicious.com/vk/][delicious]] 来存储，管理，访问网络书签已经有几年的历史了. delicious的Firefox插件实在太好用了, 用它来存储，贴标签，加注释,管理书签实在很方便.
+
+不幸的是, [[https://en.wikipedia.org/wiki/Delicious_%2528website%2529][delicious]]先是被卖给了yahoo ,随后又被卖给了AVOS. 他们决定对原本完美的社交化书签网络服务(social bookmark web service )作出一些改变. 我喜爱的firefox插件也在某一天停止工作了. 我一点也不喜欢新的delicious,它完全毁了我使用多年的完美工作流程.
+
+因此, 我开始寻找管理书签的替代方法. 同时,我也开始尝试使用Org-mode来完成尽可能多的工作. 这也是为什么[[https://lists.gnu.org/archive/html/emacs-orgmode/2012-06/msg00640.html][我想使用Org-mode来管理书签的原因]], 虽然这样一来会丢失像为书签和标签导出RSS-feeds这一类的社交化书签方面的功能(social bookmark features). 再说,云服务已经毁了我的数字化生活一次了. 我想这次还是独立一些比较好.
+
+* 我的需求
+在我说明实现的具体细节之前,我先描述一下我想象中理想的工作流程吧.
+
+我上面提到过的, 我希望使用Org-mode来解决我的需求,为此我可以付出缺失任何社交化功能(例如feeds)的代价.
+
+我需要在Android手机,桌面浏览器以及GNU/Emacs上都能保存书签.
+
+并且,我还需要能够为这些书签打标签以及添加注释.
+
+我需要在Org-mode中导航,搜索,过滤,打开以及修正这些已存储的书签.
+
+* 实现方案
+我有一个名为 =notes.org= 的文件,用于收集各种片段,知识,想法,指南之类的东西. 在文件最后,我创建了一个新的主标题,名为"Bookmarks". 在该主标题下存放的是我收集的网络书签,其格式与普通的Org-mode事项一样: 
+#+BEGIN_SRC org
+  ,** [[http://usesthis.com/interviews/][What do people use to get stuff done?]] :pim:diy:hardware:software:
+   :PROPERTIES:
+   :CREATED: [2014-08-09 Sat 10:41]
+   :END:
+#+END_SRC
+
+该书签带给了我关于硬件,软件,工作环境,有远见的想法等主题的源源不断的灵感!
+
+该URL是我从heise论坛中偶尔发现的.
+
+参见 [[http://karl-voit.at/2014/08/10/what-do-people-use][我的博客]].
+
+** 台式电脑上捕获
+
+在我的台式电脑上捕获书签很简单. 我是用的每台电脑上运行有GNU/Emacs及Org-mode. 我使用以下捕获模板来创建书签:
+#+BEGIN_SRC emacs-lisp
+  (setq org-capture-templates
+        '(
+          ;; many more capture templates
+          ("b" "Bookmark" entry (file+headline "~/share/all/org-mode/notes.org" "Bookmarks")
+           "* %?\n:PROPERTIES:\n:CREATED: %U\n:END:\n\n" :empty-lines 1)
+          ;; many more capture templates
+          )
+        )
+#+END_SRC
+
+我曾经试验过[[http://orgmode.org/worg/org-contrib/org-protocol.html][org-protocol]] 但是失败了. org-protocol允许从外部软件(例如你的网络浏览器)中直接捕获书签到Org-mode中.
+
+虽然实验org-protocol失败了,但是我并不觉得现在方案就会很繁杂,我只要准照下面几个步骤就能添加一个书签了: 首先,在浏览器中按下 =C-l= 跳转到地址栏并选中当前页面的URL. 然后我按下 =C-c= 拷贝URL到粘贴版,切换到Emacs/Org-mode(通常位于左边的虚拟桌面中) 并按下捕获书签的快捷键: =C-c c b=. 最后,我通过手工或者通过函数 =my-url-linkify= (函数定义在下面)来插入URL及其描述即可.
+
+** 在Android手机上捕获
+大多数的书签都是我在手机上阅读Atom/RSS feeder时保存下来的. 幸运的是,我可以很容易地将URL分享給MobileOrg. MobileOrg可以与我的桌面环境的Org-mode相互同步. 按照惯例,我需要在URL前面加上"Bookmark"说明. 这样的话,我就能将其他事项与要保存的书签URL区分开了.
+
+同步之后,MobileOrg中的书签会在inbox.org中产生类似下面的一条记录: 
+#+BEGIN_SRC org
+  ,* NEXT Bookmark [[http://Karl-Voit.at][Homepage of Karl Voit]]
+   [2014-08-10 Sun 16:24]   
+#+END_SRC
+
+通过Elisp函数 =my-save-bookmark=, 我能将inbox.org中的书签快速迁移到对应的note.org中对应的标题下. 而且还能自动触发打标签的动作. 总结来说,我只需要在书签上按一个快捷键,然后输入标签就行了.
+
+下面这个Elisp函数是我刚开始学习Elisp时写得. 因此若觉得还有改进的空间,请发我补丁: 
+#+BEGIN_SRC emacs-lisp
+  ;; ######################################################
+  ;; smart moving bookmark headings from inbox to notes.org
+  ;; see id:2014-03-09-inbox-to-bookmarks
+  (defun my-save-bookmark()
+    "removes NEXT/Bookmark, (NOT YET: FIXXME: retrieves title),
+  move time-stamp to CREATED, re-file to bookmarks, invoke Org-mode tagging process"
+    (interactive)
+    (save-excursion
+      ;; get myself to the beginning of the current heading:
+      ;;(outline-previous-visible-heading 1)  ;; jump to previous heading
+      ;;(outline-next-visible-heading 1)      ;; jumps to beginning of the current (interesting) heading
+      (beginning-of-line)                   ;; jump to beginning of line
+      (let ((mybegin (point)))              ;; mark beginning of line as start point
+        (outline-next-visible-heading 1)    ;; jumps to EOF if it is the last entry
+        (save-restriction
+          (narrow-to-region mybegin (point))  ;; ignore everything outside of region
+          ;; search/replace unwanted keywords at the beginning:
+          (goto-char (point-min))
+          (while (search-forward "* NEXT Bookmark " nil t) (replace-match "* " nil t))
+          (goto-char (point-min))
+          (while (search-forward "* NEXT " nil t) (replace-match "* " nil t))
+          (goto-char (point-min))
+          (while (search-forward "* Bookmark " nil t) (replace-match "* " nil t))
+          (goto-char (point-min))
+          (while (search-forward "//m.heise.de" nil t) (replace-match "//heise.de" nil t));; remove mobile heise URL
+          (goto-char (point-min))
+          (while (search-forward "/from/atom10?wt_mc=rss.ho.beitrag.atom" nil t);; remove heise RSS tags
+            (replace-match "" nil t)
+            )
+          (goto-char (point-min))
+          ;; insert second asterisk (modify to second level heading)
+          (insert "*")
+          ;; move time-stamp to properties-drawer:
+          (search-forward-regexp "^\\[20")  ;; jump to second line (with time-stamp) via search
+          (beginning-of-line)
+          (insert ":PROPERTIES:\n:CREATED:  ")
+          (end-of-line)
+          (newline)
+          (insert ":END:\n")
+          ;; move region to end of notes.org
+          (kill-region mybegin (point)) ;; kill region to kill-ring
+          (switch-to-buffer "notes.org")
+          (end-of-buffer)
+          (newline)
+          (yank)
+          ;; add tags
+          (outline-previous-visible-heading 1)  ;; jump to heading
+          (org-set-tags-command)
+          )
+        )
+      )
+    )
+#+END_SRC
+
+若我存储URL时没有输入描述,则结果可能像下面这样: 
+#+BEGIN_SRC org
+  ,* NEXT Bookmark http://Karl-Voit.at
+   [2014-08-10 Sun 16:24]
+#+END_SRC
+
+为了給链接加上对应网页上的标题, 我在网上找到一段代码并改造了它以使之符合我的需求: 
+#+BEGIN_SRC emacs-lisp
+  ;; ######################################################
+  ;; replaces URL with Org-mode link including description
+  ;; see id:2014-03-09-inbox-to-bookmarks
+  (defun my-www-get-page-title (url)
+    "retrieve title of web page.
+  from: http://www.opensubscriber.com/message/help-gnu-emacs@gnu.org/14332449.html"
+    (let ((title))
+      (with-current-buffer (url-retrieve-synchronously url)
+        (goto-char (point-min))
+        (re-search-forward "" nil t 1)
+        (setq title (match-string 1))
+        (goto-char (point-min))
+        (re-search-forward "charset=\\([-0-9a-zA-Z]*\\)" nil t 1)
+        (decode-coding-string title (intern (match-string 1)))))
+    )
+
+  (defun my-url-linkify ()
+    "Make URL at cursor point into an Org-mode link.
+  If there's a text selection, use the text selection as input.
+
+  Example: http://example.com/xyz.htm
+  becomes
+  \[\[http://example.com/xyz.htm\]\[Source example.com\]\]
+
+  Adapted code from: http://ergoemacs.org/emacs/elisp_html-linkify.html"
+    (interactive)
+    (let (resultLinkStr bds p1 p2 domainName)
+      ;; get the boundary of URL or text selection
+      (if (region-active-p)
+          (setq bds (cons (region-beginning) (region-end)) )
+        (setq bds (bounds-of-thing-at-point 'url))
+        )
+      ;; set URL
+      (setq p1 (car bds))
+      (setq p2 (cdr bds))
+      (let (
+            (url (buffer-substring-no-properties p1 p2))
+            )
+        ;; retrieve title
+        (let ((title (my-www-get-page-title url)))
+          (message (concat "title is: " title))
+          ;;(setq url (replace-regexp-in-string "&" "&" url))
+          (let ((resultLinkStr (concat "[[" url "][" title "]]")))
+            ;; delete url and insert the link
+            (delete-region p1 p2)
+            (insert resultLinkStr)
+            )
+          )
+        )
+      )
+    )
+#+END_SRC
+
+很不幸,这段代码并不时常有效. 大多数时候我会得到一个报错信息 =save-current-buffer: Invalid coding system: UTF-8=,我也看不懂这个错误是什么意思. 若你知道如何修复这个问题,请给我留言. 
+
+注意: 想看我当前版本的Elis函数,请参见: https://github.com/novoid/dot-emacs
+
+** 未来的计划: (再次)社交化
+
+目前我对该方案还蛮满意的.
+
+未来,我想通过博客软件 [[https://github.com/novoid/lazyblorg][lazyblorg]] 来将选中的书签整合进我的博客中去,而所需要的步骤应该仅仅是为书签添加"blog"标签.
+
+(像书签)这样简短的条目应该能够自动被加上"small"或"bookmark"标签. 我会将这些条目发布成一个[[https://en.wikipedia.org/wiki/Atom_feed][Atom feed]],这样你也能看到这些书签了. 通过这种方式,我将又一次具有社交分享功能,只不过这一次该功能完全由我自己掌控. 
