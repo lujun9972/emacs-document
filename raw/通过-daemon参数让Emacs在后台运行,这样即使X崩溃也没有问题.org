@@ -4,11 +4,11 @@
 #+DATE: [2016-06-19 日 08:47]
 #+OPTIONS: ^:{}
 
-I periodically have to kill and restart my X server when it freezes. I probably have the wrong configuration, since it starts off in low-graphics mode until I manually restart the graphical login manager (I’m using sddm). Anyway, since it’s been hard to debug and fix that issue, I figured I’d address the part that really bugs me when I restart X: dealing with ungraceful Emacs exits. =M-x recover-session= does a decent job of restoring my modified files and I usually remember to call it from the scratch screen, but sometimes I forget, and then I end up losing changes.
+我的X server有时会停止响应,这时我不得不将之杀掉再重启. 也许是我的配置有问题,每次X server启动时,一开始分辨率总是很低(since it starts off in low-graphics mode ). 直到我手工重启图形登录管理器之后(我用的是sddm)才恢复正常. 总之,由于很难调试和修复这个问题, 我决定将注意力放在重启X时真正对我造成困扰的事情上:X退出时,Emacs也会退出. =M-x recover-session= 能够很好的恢复我修改过的文件,而且一般来说我也会记得一打开Emacs就调用该命令来恢复上次的修改,但若有时候我忘了这样做,则结果是我丢失了之前做出的那些更改.
 
-I started taking advantage of the fact that I used =(server-start)= to enable other Emacs clients to connect to the same process. Whenever I needed to restart X, I’d first switch to a console, use =emacsclient -c= to connect to Emacs, and use =M-x save-buffers-kill-emacs= to close my Emacs neatly. Still, starting my Emacs from X meant that I had to restart Emacs each time I restarted X.
+由于我调用了 =(server-start)= 以便允许不同的Emacs客户端连接到同一进程. 因此每次我需要重启X时,我首先需要切换到控制台,使用 =emacsclient -c= 连接上Emacs, 然后使用 =M-x save-buffers-kill-emacs= 来关闭Emacs. 但是我依然需要在重启X后重启Emacs.
 
-It turns out that you can run Emacs as a background process with =emacs --daemon= and then connect to it with =emacsclient -c=. When I did that, though, the emacsclient frame didn’t have my color theme applied. This =after-make-frame-functions= addition fixes that:
+使用 =emacs --daemon= 可以将Emacs作为后台进程运行,然后使用 =emacsclient -c= 连接上它. 然而,当我这么操作时,emacsclient frame并未应用我设置的主题. 需要为 =after-make-frame-functions= 变量添加下面函数才能修复这个问题:
 #+BEGIN_SRC emacs-lisp
   (defun my/setup-color-theme ()
     (interactive)
@@ -26,7 +26,7 @@ It turns out that you can run Emacs as a background process with =emacs --daemon
               (my/setup-color-theme)))
 #+END_SRC
 
-Once I got =emacs --daemon= and =emacsclient -c= working to my satisfaction, I decided to go one step further and get it to run automatically when I start my computer. I tried the init script at https://www.emacswiki.org/emacs/EmacsAsDaemon . My Linux install uses systemd, so enabling the init script resulted in a message about a missing service file. I removed the init script and created this =~/.config/systemd/user/emacs.service= instead:
+我对 =emacs --daemon= 和 =emacsclient -c= 这种方式很满意,因此我决定更进一步,让它在我开启电脑时就自动运行. 我试过使用 https://www.emacswiki.org/emacs/EmacsAsDaemon 中的init脚本. 但是由于我的Linux版本使用的是systemd,因此启动该init脚本会导致一个缺少service文件的错误信息. 所以我删除了这个init脚本然后创建了自己的脚本作为代替 =~/.config/systemd/user/emacs.service= :
 #+BEGIN_SRC conf
   [Unit]
   Description=Emacs: the extensible, self-documenting text editor
@@ -42,24 +42,24 @@ Once I got =emacs --daemon= and =emacsclient -c= working to my satisfaction, I d
   WantedBy=default.target
 #+END_SRC
 
-and then I ran these commands as my regular user account:
+然后我用自己的一般用户账号来运行下面这些命令:
 #+BEGIN_SRC sh
   systemctl --user enable emacs
   systemctl --user start emacs
 #+END_SRC
 
-Then I changed the =emacs= in my =~/.xsession= to =emacsclient -c=, so that a new X session would connect to the existing session instead of starting a new one. That way, Emacs automatically started as my user whenever I restarted the computer, and I connected to that process when I started X.
+再然后,我将 =~/.xsession= 中的 =emacs= 修改为 =emacsclient -c=, 这样新产生的X session会连接上已有的session而不是重新创建一个新session. 这样一来,每次我重启电脑时,Emacs都会以我用户的权限启动,当我启动X时,都会有一个emacsclient连接上这个Emacs.
 
-Still, restarting X caused the Emacs daemon to crash. This is a GTK-related bug which =emacs --daemon= warns you about. I recompiled Emacs using =./configure --with-x-toolkit=lucid; make; make install=. It seems to work fine now; I can ungracefully restart X, and my Emacs stays the same. Bonus: because Emacs gets initialized when I start my computer and all I need to do is connect to that process, when I log in, it feels like Emacs starts up really quickly.
+然而,我发现,重启X依然会倒是Emacs daemon崩溃掉. 这个bug =emacs --daemon= 中有相关警告,它可能跟GTK有关. 我使用 =./configure --with-x-toolkit=lucid; make; make install= 重新编译Emacs后,似乎就没什么问题了; 我可以随意重启X而不会影响Emacs了. 这样还带来一个好处: 由于Emacs实在我启动计算机时进行的初始化,而我所需要作的仅仅是连接上那个进程而已,因此当我登录用户后,给人的感觉Emacs启动真的很快.
 
-Final touches: I noticed that TRAMP couldn’t find my SSH keyring, so it got stuck waiting for my passphrase when I tried running remote scripts in Org Babel like so:
+最后一点: 我注意到TRAMP无法找到我的SSH keyring,因此当我用Org Babel运行远程服务器上的代码(就像下面这段代码一样)时,TRAMP会卡住等待我输入passphrass:
 #+BEGIN_SRC org
   ,#+begin_src sh :dir [email protected]:~
   perl library-new.pl Business
   ,#+end_src
 #+END_SRC
 
-Because my SSH socket looks like =/tmp/ssh-BLAHBLAHBLAH/agent.PROCESSID=, the SSH_AUTH_SOCK setting (Environment=SSH_AUTH_SOCK=%t/keyring/ssh) described on EmacsWiki didn’t work for me. This snippet from https://github.com/nhoffman/.emacs.d/blob/master/init.org worked, though.
+由于我的SSH socket看起来就像 =/tmp/ssh-BLAHBLAHBLAH/agent.PROCESSID= 一样, EmacsWiki中所描述的SSH_AUTH_SOCK设置方法(Environment=SSH_AUTH_SOCK=%t/keyring/ssh)不适用于我. 好在 https://github.com/nhoffman/.emacs.d/blob/master/init.org 中的脚本适用于我.
 
 #+BEGIN_SRC emacs-lisp
   (defun my/ssh-refresh ()
@@ -76,10 +76,10 @@ Because my SSH socket looks like =/tmp/ssh-BLAHBLAHBLAH/agent.PROCESSID=, the SS
   (my/ssh-refresh)
 #+END_SRC
 
-Also, =emacs --daemon= didn’t pick up the default browser I’d configured in KDE. Opening URL links from Org Mode started a separate Chromium process instead of using Google Chrome. I fixed that by switching from =browse-url-default-browser= to =browse-url-generic=, like so:
+另外, =emacs --daemon= 并不会使用我在KDE中配置的默认浏览器. 当我打开Org mode中的URL链接时会打开一个新的Chromium进程,而不是使用Google Chrome浏览器. 我通过将 =browse-url-browser-function= 的值从 =browse-url-default-browser= 改为 =browse-url-generic= 从而解决这个问题:
 #+BEGIN_SRC emacs-lisp
   (setq browse-url-generic-program "google-chrome")
   (setq browse-url-browser-function 'browse-url-generic)
 #+END_SRC
 
-Let’s see how this works!
+让我们来看看这样设置后的效果如何吧!
