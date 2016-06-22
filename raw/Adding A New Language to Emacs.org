@@ -1,0 +1,112 @@
+#+URL: http://www.wilfred.me.uk/blog/2015/03/19/adding-a-new-language-to-emacs/
+
+Writing a major mode is a rite of passage for elisp hackers. Sooner or later, you will find a programming language or configuration format that is too new or obscure to have Emacs support.
+
+You decide to roll up your sleeves and plug this hole in the Emacs ecosystem. How do you write a major mode? What will make your major mode great?
+
+* Getting Started
+
+The bare minimum for a major mode is a syntax table. If you can highlight comments and strings, your mode is useful.
+
+Here’s how we’d write a minimal JS mode:
+#+BEGIN_SRC emacs-lisp
+  (defconst my-js-mode-syntax-table
+    (let ((table (make-syntax-table)))
+      ;; ' is a string delimiter
+      (modify-syntax-entry ?' "\"" table)
+      ;; " is a string delimiter too
+      (modify-syntax-entry ?\" "\"" table)
+
+      ;; / is punctuation, but // is a comment starter
+      (modify-syntax-entry ?/ ". 12" table)
+      ;; \n is a comment ender
+      (modify-syntax-entry ?\n ">" table)
+      table))
+
+  (define-derived-mode my-js-mode prog-mode "Simple JS Mode"
+    :syntax-table my-js-mode-syntax-table
+    (font-lock-fontify-buffer))
+#+END_SRC
+
+Here’s the result:
+[[http://www.wilfred.me.uk/assets/simple_js_mode.png]]
+
+This might not seem like much, but it’s often sufficient for config file formats.
+
+Congratulations, you’re an elisp hacker! Add your major mode to MELPA so others can use and contribute to your new mode.
+
+*  Full syntax highlighting
+
+From here, there’s huge scope to expand. You’ll want to look at [[http://www.wilfred.me.uk/blog/2014/09/27/the-definitive-guide-to-syntax-highlighting/][sophisticated syntax highlighting]] to cover the entire syntax of the language.
+
+As your major mode becomes more sophisticated, you should think about testing it. Many major modes have no tests, but a self-respecting hacker like you likes bugs to stay fixed.
+
+The first step is to create a sample file of syntax corner-cases and just open it. This becomes repetitive, so you will eventually want programmatic tests. Fortunately, [[https://github.com/lunaryorn/puppet-mode/blob/1813c7bc46f178aeab5d78d5268dda0dd756c305/test/puppet-mode-test.el#L107][puppet-mode has some great examples]].
+
+* Indentation
+
+Next, you’ll want to tackle indentation. Users expect Emacs to indent code correctly regardless of its current state. You’ll need to examine the syntax around point to calculate the current nesting level.
+
+This is usually a matter of searching the buffer backwards from point, counting instances of { (or equivalent scope delimiter). You then adjust the current line to be indented (* my-mode-tab-width count). Provided you’re careful with { in strings and comments, this works.
+
+Alternatively, Emacs provides the [[https://www.gnu.org/software/emacs/manual/html_node/elisp/SMIE.html][Simple Minded Indentation Engine (SMIE).]] You write a BNF grammar and you get basic indentation and movement commands for free.
+#+BEGIN_QUOTE
+    You could be a total lunatic, and Emacs has to make you happy.
+
+    – Steve Yegge on indentation
+
+#+END_QUOTE
+
+In practice, users will disagree on what the ‘correct’ indentation is, so you will have to provide settings for different styles. If you get it right, you should be able to open a large file from an existing project, run (indent-region (point-min) (point-max)) and nothing should change.
+
+Indentation logic is very easy to test, and you can see some examples in [[https://github.com/JuliaLang/julia/blob/76df7f48b3956de7d2eb07a15c995c9304d5361f/contrib/julia-mode.el#L441][julia-mode]]. You will also need to test that indentation is quick in large files, because it’s easy to end up with a slow algorithm.
+
+* Flycheck
+
+You’ll want probably want to set up a linter with flycheck. Even if there aren’t any sophisticated lint tools available, highlighting syntax errors as-you-type is very helpful.
+
+[[https://github.com/Wilfred/flycheck-pyflakes][flycheck-pyflakes]] showing an unused variable :
+[[http://www.wilfred.me.uk/assets/flycheck_python.png]]
+
+* Completion
+
+Great major modes provide autocompletion. You can provide completion by writing a [[http://company-mode.github.io/][company]] backend. Here are some examples to inspire you:
+
+company-clang (part of company) uses Clang to discover struct members:
+[[http://www.wilfred.me.uk/assets/c_member_completion.png]]
+
+[[https://github.com/randomphrase/company-c-headers][company-c-headers]] inspects the local filesystem to suggest C headers
+[[http://www.wilfred.me.uk/assets/c_header_completion.png]]
+
+[[https://github.com/Wilfred/pip-requirements.el][pip-requirements]] accesses the internet to find out what packages are available 
+[[http://www.wilfred.me.uk/assets/pip_library_completion.png]]
+
+* Eldoc
+
+[[http://www.gnu.org/software/emacs/manual/html_node/emacs/Lisp-Doc.html][Eldoc]] is a minor mode that displays information in the minibuffer about the thing at point. It’s typically used for function signatures or types, but you can use it for anything.
+
+Assuming you have some sort of static analysis available for your major mode, eldoc provides a great way of providing relevant contextual information.
+
+eldoc showing docstrings in elisp:
+[[http://www.wilfred.me.uk/assets/elisp_eldoc.png]]
+
+[[https://github.com/nflath/c-eldoc][c-eldoc]] showing the function prototype for the function at point:
+[[http://www.wilfred.me.uk/assets/c_eldoc.png]]
+
+* REPL integration
+
+Finally, the best major modes let you run code interactively from inside Emacs.
+
+Emacs provides comint-mode, which allows you to define your interpreter and start interacting with it. Many major modes, especially inside Emacs core, derive from comint-mode.
+
+Projects like [[https://github.com/clojure-emacs/cider][cider]] and [[https://github.com/capitaomorte/sly][sly]] offer even more sophisticated REPL integration. They allow allowing you to query the interpreter process for docstrings, autocompletion, macroexpansion, and much more.
+
+cider offers deep integration between Emacs and a Clojure REPL: 
+[[http://www.wilfred.me.uk/assets/cider.png]]
+
+* Polish
+
+Emacs core has supported programming in C since the beginning, yet [[https://github.com/emacs-mirror/emacs/commits/master/lisp/progmodes/cc-mode.el][it’s still being improved in 2015]]! Release early, release often, and you’ll create something wonderful.
+
+
+
