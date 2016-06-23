@@ -1,0 +1,98 @@
+#+TITLE: Org as a Word Processor
+#+URL: http://www.howardism.org/Technical/Emacs/orgmode-wordprocessor.html                                  
+#+AUTHOR: lujun9972
+#+CATEGORY: raw
+#+DATE: [2016-06-23 四 10:35]
+#+OPTIONS: ^:{}
+
+I’ve been asked this question a few times:
+
+    Hi, First of all thanks for you good work, I saw on youtube, I would like to ask you two questions:
+   
+     1. How did you manage to display images on org-mode in [[https://www.youtube.com/watch?v=vQO7F2Q9DwA][this presentation]]?
+     2. How to make org-mode titles with big font sizes and color like yours in this presentation.
+   
+    Again thanks.
+   
+While I never intended to make Org Mode look or behave like a word processor, but with slight tweaks every now
+and then, that is my end result. Although all my code is in my [[http://github.com/howardabrams/dot-files][dot-files]] repository, I figured I better
+highlight just the applicable code.
+
+* Just the Italics, Thanks
+
+Sure =/org italic/= characters look kinda like slanted words, but with the added baggage of having regular
+expression characters in your prose. Hide them with a simple setting:
+
+#+BEGIN_SRC emacs-lisp
+  (setq org-hide-emphasis-markers t)
+#+END_SRC
+
+Keep in mind that the slash characters (and asterisks for bold, etc) are still there, but aren’t displayed.
+Want to change them? No big deal, just backspace over them.
+
+* Better Bullets
+
+Asterisks and dashes for bullet lists are fine, but having an actual circular bullet, is just nice:
+
+#+BEGIN_SRC emacs-lisp
+  (font-lock-add-keywords 'org-mode
+                          '(("^ +\\([-*]\\) "
+                             (0 (prog1 () (compose-region (match-beginning 1) (match-end 1) "•"))))))
+#+END_SRC
+
+This code uses a regular expression of lines with initial spaces, followed by either a dash or asterisks and a
+single space into a Unicode bullet.
+
+* Better Header Bullets
+
+When I started my switch from Markdown to org-mode, the visual annoyance was how headers looked. Top-level
+with a single bullet was fine (just not really a header), but sub-bullets with more bullets seemed wrong. This
+is why I liked the [[https://github.com/sabof/org-bullets][org-bullets]] project.
+
+Once installed from MELPA, just add the following to your .emacs init file:
+
+#+BEGIN_SRC emacs-lisp
+  (require 'org-bullets)
+  (add-hook 'org-mode-hook (lambda () (org-bullets-mode 1)))
+#+END_SRC
+
+* Better Headers
+
+I like some of the ideas in the [[https://github.com/jonnay/emagicians-starter-kit/blob/master/themes/org-beautify-theme.org][EMagicians Starter Kit]], particularly how the headers are larger, instead of
+different colors. My code in this case is particular nasty and needs a major simplification, but here is the
+gist for you:
+
+#+BEGIN_SRC emacs-lisp
+  (let* ((variable-tuple (cond ((x-list-fonts "Source Sans Pro") '(:font "Source Sans Pro"))
+                               ((x-list-fonts "Lucida Grande")   '(:font "Lucida Grande"))
+                               ((x-list-fonts "Verdana")         '(:font "Verdana"))
+                               ((x-family-fonts "Sans Serif")    '(:family "Sans Serif"))
+                               (nil (warn "Cannot find a Sans Serif Font.  Install Source Sans Pro."))))
+         (base-font-color     (face-foreground 'default nil 'default))
+         (headline           `(:inherit default :weight bold :foreground ,base-font-color)))
+
+    (custom-theme-set-faces 'user
+                            `(org-level-8 ((t (,@headline ,@variable-tuple))))
+                            `(org-level-7 ((t (,@headline ,@variable-tuple))))
+                            `(org-level-6 ((t (,@headline ,@variable-tuple))))
+                            `(org-level-5 ((t (,@headline ,@variable-tuple))))
+                            `(org-level-4 ((t (,@headline ,@variable-tuple :height 1.1))))
+                            `(org-level-3 ((t (,@headline ,@variable-tuple :height 1.25))))
+                            `(org-level-2 ((t (,@headline ,@variable-tuple :height 1.5))))
+                            `(org-level-1 ((t (,@headline ,@variable-tuple :height 1.75))))
+                            `(org-document-title ((t (,@headline ,@variable-tuple :height 1.5 :underline nil))))))
+#+END_SRC
+
+First step in the above code decides on a font. You should probably trim this down to your favorite variable
+space font.
+
+* Summary
+
+Let’s get Emacs out of full-screen mode, and load a file that demonstrates these settings to view the end
+result:
+
+[[http://www.howardism.org/Technical/Emacs/orgmode-wordprocessor.png]]
+
+Notice the light-blue is the code settings (I change it to a different color since I’m already using a fixed
+width font for default). Also, I’m using Tomorrow theme, and in this screen shot, I’m using the Hasklig font.
+Let me know if I’ve missed anything, or if you have any particularly good tips!
