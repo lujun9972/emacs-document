@@ -1,0 +1,159 @@
+#+URL: http://www.lakshminp.com/publishing-book-using-org-mode
+
+I’ve been flirting with org-mode lately and writing a book at Leanpub. Why not use org mode to do it, I thought, and this is the result. There is already an awesome org-mode exporter for leanpub. Go ahead and download it. This post builds upon it.
+
+Before we dive into the org-mode side of things, let’s look at how Leanpub publishing works.
+
+Leanpub follows the KISS principle to write books. You can use Github or Dropbox to sync your book. We will be using Dropbox in this post. When you opt to create a book using the Dropbox sync method, you will get a sharing invite to your Dropbox account from “Leanpub Bookbot”. This will create 2 folders called manuscript and convert_html. The manuscript is your sandbox directory where you add your book chapters in markdown(or [[http://markua.com][markua]]). The chapters which need to be in the book will be added to a Book.txt file in the same directory and the chapters that form a part of your book sample will be put up in a Sample.txt file. More info can be found [[https://leanpub.com/help/getting_started_sync_dropbox][here]].
+
+* But why org-mode?
+
+Firstly, because I find it super convenient to edit all the chapters and move them around in a single file. This works great in org-mode if each chapter is a top level heading in an org file. Also, I can add a lot of metadata about a section/chapter as notes. These are things to keep track, but not meant to be published. For example, I use an org drawer to store the last published date of the book, and I clock the time spent in writing each chapter. That’s something org-mode helps you do seamlessly. In fact, I store my entire work log of the book in the book’s org file. The best part is, I can do version control of the book(a single org file) using git. Org-mode also has this ability to add code blocks, which can be executed and the results be stored alongside the code blocks in the same file(though I don’t use the results feature for my book). That’s a LOT of excuses to use org-mode to write your next Leanpub book(or any other book). Lastly, you can export your .org file to loads of formats. There’s one plugin which exports to twitter bootstrap flavoured HTML as well!
+
+* How it works
+The underlying idea is to map each top level heading in an org-file to a chapter in your Leanpub book. If you want to exclude a specific section(called a sub-tree in org-mode lingo) or an entire chapter from getting exported into the book, just add the “noexport” tag to that heading.
+
+Org helps you set certain file-level properties, like indentation, collapsing and unfolding of parts of text in your buffer and generating table of contents. This can be set by adding:
+
+#+BEGIN_SRC org
+  ,#+STARTUP: indent showeverything
+#+END_SRC
+
+at the beginning of the file.
+
+It’s useful to preset the tags your org-file can contain using the TAGS property.
+
+#+BEGIN_SRC org
+  ,#+TAGS: noexport sample
+#+END_SRC
+
+We don’t want org-mode to generate the table of contents for us, it will be automatically done by Leanpub. So, we quieten that setting.
+
+#+BEGIN_SRC org
+  ,#+OPTIONS: toc:nil
+#+END_SRC
+
+You can set custom workflow states to each heading using the following property:
+
+#+BEGIN_SRC org
+  ,#+TODO: TODO(t) DRAFT(f@/!) IN-THE-BOOK(i!) | DONE(d!) CANCELED(c)
+#+END_SRC
+
+The states to the left of the “|” indicates that the task in in some form of progress and the ones to the right of ‘|’ indicates some form of closure of the item. The ‘!’ implies that when the workflow state changes, a timestamp will be recorded beneath the entry. The ‘@’ indicates that the timestamp will be recorded along with a note when there is a workflow change. When I was initially fiddling with it, this metadata was also getting exported along with the actual book contents.
+
+For example, here’s how a typical chapter looked in my org file:
+
+#+BEGIN_SRC org
+  ,* DRAFT Routing and controllers :sample: 
+  - State "DRAFT" from "30%" [2016-05-30 Mon 21:08]
+  - State "30%" from "TODO" [2016-05-26 Thu 17:05]
+  Routing is responsible for matching a URL path with a custom content or functionality in your site.
+#+END_SRC
+
+To avoid this, I needed to add another property called logdrawer,
+
+#+BEGIN_SRC org
+  ,#+STARTUP: indent showeverything logdrawer
+#+END_SRC
+
+so that state changes are logged under a property drawer called LOGBOOK.
+
+#+BEGIN_SRC org
+  ,* DRAFT Routing and controllers :sample:
+  :LOGBOOK:
+  - State "DRAFT" from "30%" [2016-05-30 Mon 21:08]
+  - State "30%" from "TODO" [2016-05-26 Thu 17:05]
+  :END:
+  Routing is responsible for matching a URL path with a custom content or functionality in your site.
+#+END_SRC
+
+The filename of each exported top-level heading can be specified by an EXPORT_FILE_NAME property, as in:
+
+#+BEGIN_SRC org
+  ,* Drupal permissions and users
+  :PROPERTIES:
+  :EXPORT_FILE_NAME: permissions-and-users.txt
+  :END:
+#+END_SRC
+
+Chapters to be included as part of the sample book should have the “sample” tag.
+
+Here’s the complete function to export an org-buffer into a Leanpub book.
+
+#+BEGIN_SRC emacs-lisp
+  (defun leanpub-export ()
+    "Export buffer to a Leanpub book."
+    (interactive)
+    (if (file-exists-p "./Book.txt")
+    (delete-file "./Book.txt"))
+    (if (file-exists-p "./Sample.txt")
+    (delete-file "./Sample.txt"))
+    (org-map-entries
+     (lambda ()
+       (let* ((level (nth 1 (org-heading-components)))
+              (tags (org-get-tags))
+             (title (or (nth 4 (org-heading-components)) ""))
+             (book-slug (org-entry-get (point) "TITLE"))
+             (filename
+              (or (org-entry-get (point) "EXPORT_FILE_NAME") (concat (replace-regexp-in-string " " "-" (downcase title)) ".md"))))
+         (when (= level 1) ;; export only first level entries
+           ;; add to Sample book if "sample" tag is found.
+           (when (or (member "sample" tags) (string-prefix-p "frontmatter" filename) (string-prefix-p "mainmatter" filename))
+             (append-to-file (concat filename "\n\n") nil "./Sample.txt"))
+           (append-to-file (concat filename "\n\n") nil "./Book.txt")
+           ;; set filename only if the property is missing
+           (or (org-entry-get (point) "EXPORT_FILE_NAME")  (org-entry-put (point) "EXPORT_FILE_NAME" filename))
+           (org-leanpub-export-to-markdown nil 1 nil)))) "-noexport") (org-save-all-org-buffers)
+     nil nil)
+#+END_SRC
+
+*NOTE* you should have org-leanpub exporter installed to run this function.
+
+Let’s dissect this function a bit. The main API called here is [[http://orgmode.org/manual/Using-the-mapping-API.html][org-map-entries]], which maps every org element in the buffer to a function. This function checks if the element is a top level element, in which case it calls org-leanpub exporter for that sub-tree. org-map-entries accepts an optional match parameter. In our case, we want to apply the function only if it does not have the “noexport” tag, indicated by a -noexport argument.
+
+Leanpub requires a set of special {mainmatter}, {frontmatter} and {backmatter} files to indicate various portions of the book, like Appendix, for example. This is indicated by the following org-mode headlines in appropriate places in your file.
+#+BEGIN_SRC org
+  ,* Frontmatter
+  :PROPERTIES:
+  :EXPORT_FILE_NAME: frontmatter.md
+  :END:
+  {frontmatter}
+
+  ,* Mainmatter
+  :PROPERTIES:
+  :EXPORT_FILE_NAME: mainmatter.md
+  :END:
+  {mainmatter}
+
+  ,* Backmatter
+  :PROPERTIES:
+  :EXPORT_FILE_NAME: backmatter.md
+  :END:
+  {backmatter}
+#+END_SRC
+
+* Bonus — generate your book’s preview from emacs
+Leanpub has an API endpoint for generating your book preview, which means you can issue a POST call to Leanpub to trigger book generation for preview. To do this,
+
+    You need to generate an API key. The Leanpub site has [[https://leanpub.com/help/api][instructions]]on how to do this.
+
+    Install the emacs [[https://github.com/tkf/emacs-request][request]] library to issue API requests.
+
+
+Here’s the preview generation function:
+#+BEGIN_SRC emacs-lisp
+  (defun leanpub-preview ()
+    "Generate a preview of your book @ Leanpub."
+    (interactive)
+    (request
+     "https://leanpub.com/<YOUR-BOOK-SLUG>/preview.json" ;; or better yet, get the book slug from the buffer
+     :type "POST"                                        ;; and construct the URL
+     :data '(("api_key" . "53cr3t"))
+     :parser 'json-read
+     :success (function*
+               (lambda (&key data &allow-other-keys)
+                 (message "Preview generation queued at leanpub.com."))))
+    )
+#+END_SRC
+
+Have fun writing your next book entirely in org-mode!
