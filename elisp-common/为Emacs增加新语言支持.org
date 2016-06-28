@@ -1,0 +1,117 @@
+#+TITLE: 为Emacs增加新语言支持
+#+URL: http://www.wilfred.me.uk/blog/2015/03/19/adding-a-new-language-to-emacs/
+#+AUTHOR: lujun9972
+#+CATEGORY: elisp-common
+#+DATE: [2016-06-28 周二 12:33]
+#+OPTIONS: ^:{}
+
+能否编写一个major mode是是否能称为elisp hacker的分水岭. 你早晚都会遇到一种编程语言或者一种配置格式是Emacs尚不支持的. 原因可能是它们是才出现不久,也可能是因为它们太小众了.
+
+最终,你会决定卷起袖子开始填坑. 那么你该如何编写一个major mode呢? 怎样才算是一个好的major mode呢?
+
+* 入门
+
+创建一个最少功能的major mode,你只需要设置syntax table即可. 只要你的mode能高亮出注释和字符串,那就是有用的
+
+下面是一个最简化的JS mode:
+#+BEGIN_SRC emacs-lisp
+  (defconst my-js-mode-syntax-table
+    (let ((table (make-syntax-table)))
+      ;; ' is a string delimiter
+      (modify-syntax-entry ?' "\"" table)
+      ;; " is a string delimiter too
+      (modify-syntax-entry ?\" "\"" table)
+
+      ;; / is punctuation, but // is a comment starter
+      (modify-syntax-entry ?/ ". 12" table)
+      ;; \n is a comment ender
+      (modify-syntax-entry ?\n ">" table)
+      table))
+
+  (define-derived-mode my-js-mode prog-mode "Simple JS Mode"
+    :syntax-table my-js-mode-syntax-table
+    (font-lock-fontify-buffer))
+#+END_SRC
+
+Here’s the result:
+[[http://www.wilfred.me.uk/assets/simple_js_mode.png]]
+
+看起来并没有作什么工作,但对于配置文件来说,一般够用了.
+
+恭喜你, 你现在已经是一名elisp hacker了! 将你的major mode发布到MELPA上吧,这样大家可以使用并贡献給你的新mode.
+
+* 完全的语法高亮
+
+从这里开始,存在一个很大的扩展空间了. 你需要看一下 [[http://www.wilfred.me.uk/blog/2014/09/27/the-definitive-guide-to-syntax-highlighting/][sophisticated syntax highlighting]] ,这篇文章囊括了一门语言的所有语法说明.
+
+随着你的major mode变得越来越复杂, 你应该开始考虑如何对它进行测试了. 虽说许多major mode确实都没有测试,但是像你这么一位自重的hacker是很乐意看到bug被修复的(but a self-respecting hacker like you likes bugs to stay fixed).
+
+第一步是创建一个包含各种特殊语法情况的案例文件然后打开它. 这种方式很繁杂,最终你会想用程序来进行测试. [[https://github.com/lunaryorn/puppet-mode/blob/1813c7bc46f178aeab5d78d5268dda0dd756c305/test/puppet-mode-test.el#L107][puppet-mode就是一个很好的例子]].
+
+* 缩进
+
+下一步该处理缩进的问题了. 用于希望Emacs在任何状态下都能正确地缩进代码. 你需要检查光标附近的语法然后计算出当前的嵌套层级.
+
+为了计算当前的嵌套层级,你往往需要从光标当前位置向后搜索整个buffer,并计算出现 ={= (或其他等价的作用域分隔符)的次数. 然后再根据嵌套层级调整当前行的缩进位置(一般是将嵌套层级乘于 =my-mode-tab-width=). 若你仔细的处理了字符串和注释中的 ={= ,这种方式往往能行.
+
+还有一种方法, Emacs提供了[[https://www.gnu.org/software/emacs/manual/html_node/elisp/SMIE.html][Simple Minded Indentation Engine (SMIE).]] 你只需要写好BNF语法,然后你就能生成基础的缩进与移动命令了.
+#+BEGIN_QUOTE
+    You could be a total lunatic, and Emacs has to make you happy.
+
+    – Steve Yegge on indentation
+
+#+END_QUOTE
+
+在实际中,对什么才是正确的缩进是有争议的,因此为了适应不同的缩进风格,你可以需要提供一些配置项供用户自己调整. 若一切正常的话,你应该能做: 到从一个现存的项目中打开一个大文件,然后运行 =(indent-region (point-min) (point-max))=, 结果缩进并不会有什么改变.
+
+缩进的逻辑测试起来很简单,你可以参见[[https://github.com/JuliaLang/julia/blob/76df7f48b3956de7d2eb07a15c995c9304d5361f/contrib/julia-mode.el#L441][julia-mode]] 中的例子. 你还需要测试在大文件中缩进是否足够快速,因为一不小心就可能应用了缓慢的算法.
+
+* 实时检查
+
+若能为 =flycheck= 添加一个linter那必是极好的. 然而即使尚没有成熟的lint工具,能够实时高亮语法错误也不错.
+
+[[https://github.com/Wilfred/flycheck-pyflakes][flycheck-pyflakes]] 标示出未用的变量
+[[http://www.wilfred.me.uk/assets/flycheck_python.png]]
+
+* 补全
+
+一个好的major mode能够提供自动补全的功能. 你可以通过编写 [[http://company-mode.github.io/][company]] 后端来为major mode提供补全的能力. 下面这些例子也许能给你一些灵感:
+
+=company-clang= (=company= 的一部分)使用 =Clang= 来发现结构体成员:
+[[http://www.wilfred.me.uk/assets/c_member_completion.png]]
+
+[[https://github.com/randomphrase/company-c-headers][company-c-headers]] 搜索本地文件系统来提供补全C头文件的建议
+[[http://www.wilfred.me.uk/assets/c_header_completion.png]]
+
+[[https://github.com/Wilfred/pip-requirements.el][pip-requirements]] 在internet上搜索可用的package列表
+[[http://www.wilfred.me.uk/assets/pip_library_completion.png]]
+
+* Eldoc
+
+[[http://www.gnu.org/software/emacs/manual/html_node/emacs/Lisp-Doc.html][Eldoc]] 是一个在minibuffer显示光标所在内容相关信息的minor mode,一般被用于提示函数前面或变量类型,但你可以用它来提示任何一样东西.
+
+假设你你的major mode能进行一些静态分析, 使用eldoc来显示上下文相关信息是一种很好的方式.
+
+用eldoc显示elisp中的docstrings:
+[[http://www.wilfred.me.uk/assets/elisp_eldoc.png]]
+
+用[[https://github.com/nflath/c-eldoc][c-eldoc]] 显示光标所在函数的函数原型:
+[[http://www.wilfred.me.uk/assets/c_eldoc.png]]
+
+* 整合REPL
+
+最后,最完美的major mode会允许你直接在Emacs中以交互的方式运行代码.
+
+Emacs提供了一个 =comint-mode=,该mode允许你自定义解析器,并在Emacs中运行该解析器. 许多major modes,尤其那些Emacs自带的major mode,都是继承自comint-mode的.
+
+像[[https://github.com/clojure-emacs/cider][cider]] 和 [[https://github.com/capitaomorte/sly][sly]] 这样的项目整合REPL的程序甚至比comint-mode还要高. 这些包允许你通过解释器进程查询文档字符串,进行自动补全,宏扩展等等其他很多内容.
+
+cider将Emacs和Clojure REPL完美的整合在一起了: 
+[[http://www.wilfred.me.uk/assets/cider.png]]
+
+* Polish
+
+Emacs一开始就内建支持C语言编程,而且 [[https://github.com/emacs-mirror/emacs/commits/master/lisp/progmodes/cc-mode.el][这种支持直到2015年还在不断的改进]]! 尽早发布,经常发布,你会创造精品.
+
+
+
