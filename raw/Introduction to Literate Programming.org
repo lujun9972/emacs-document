@@ -5,25 +5,19 @@
 #+DATE: [2016-06-23 四 17:59]
 #+OPTIONS: ^:{}
 
-Welcome to a brief tutorial on literate programming in org-mode.
+欢迎来到文学编程的世界! 本文会简单介绍一下如何使用org-mode进行文学编程
 
-The following began as the basis for a workshop for the PDX Emacs Hackers meetup, but since everyone couldn’t
-attend, I decided to expand it into a tutorial. I assume you understand the [[http://howardism.org/Technical/Emacs/getting-started.html][basics of Emacs]] and as well as 
-[[http://howardism.org/Technical/Emacs/learning-org-mode.html][familiarity with org-mode]] for creating exported documents.
+本文的内容来源于PDX Emacs Hackers举办的研讨会, 但是考虑到很少人能够现场参加该研讨会,因此我决定把它写成一片指南. 我假设你已经有了一定的[[http://howardism.org/Technical/Emacs/getting-started.html][Emacs基础]] 并且对[[http://howardism.org/Technical/Emacs/learning-org-mode.html][org-mode也比较熟悉]] ,至少知道如何导出文档.
 
-As you probably know, Org is pretty large, and the features for writing, evaluating and connecting blocks of
-source code in a document are extensive, and documenting them all is a daunting task. I hope this tutorial is
-a good start, but if I glossed over something you feel I should include, please [[http://howardism.org/formmail/mail?to=howardism][let me know]].
+众所周知,Org的功能太多了, 它具有在一个文档中编写,执行和连接代码块的能力,这种能力 are extensive, 要把这些功能都写成文档是件让人感觉恐怖的任务. 我希望这份指南能开个好头, 若你发现我遗漏了什么,请[[http://howardism.org/formmail/mail?to=howardism][告之]].
 
-Warning: The examples are pretty lame.
+*警告* :下面的例子都写得很蹩脚.
 
-* Requirements
+* 必要条件
 
-During my workshop, I mentioned needing version v8.2.10 of [[http://orgmode.org][org-mode]] (or better). Since org comes with Emacs,
-you may already have a version, so type: C-h v and org-version, to see if everything in this tutorial will
-work (most things will, but…).
+本文基于[[http://orgmode.org][org-mode]] v8.2.10(或更新). 由于Emacs已经内置了org, 你需要通过 =C-h v <RET> org-version= 来看所使用的org是否符合要求,以保障本指南例子能够正确运行(大多数的例子应该没问题,但是也不好说…).
 
-If you need a newer version, use our ELPA friend by running this code:
+若你的org版本太旧,请运行下面这段代码:
 
 #+BEGIN_SRC emacs-lisp
   (when (>= emacs-major-version 24)
@@ -36,42 +30,35 @@ If you need a newer version, use our ELPA friend by running this code:
     (package-install "org"))
 #+END_SRC
 
-That should do it. You may want to also install [[http://orgmode.org/worg/org-contrib/][org-plus-contrib]].
+That should do it. 你还需要安装 [[http://orgmode.org/worg/org-contrib/][org-plus-contrib]].
 
-During this tutorial, I wanted to demonstrate many of the available language interfaces, but this means, you’d
-have to have a slew of interpreters installed locally, so in this tutorial, I hope you have the following:
+在这篇指南中,我会向你展示多种语言的接口,但这也意味着你需要在本地安装大量的解释器,你至少需要安装下面几个解释器:
 
-  * Shell (sorry, this might be hard for you Windows people)
-  * Python
-  * Ruby
++ Shell (很抱歉,对于Windows用户来说,这一点恐怕比较难实现)
++ Python
++ Ruby
 
-However, you’re a smart cookie, so feel free to translate these silly examples into your favorite language.
+当然,你是个聪明人,把这些例子修改成你所使用的语言应该是很容易的.
 
-* Background
+* 背景知识
 
-Before we dive into how [[http://orgmode.org][org-mode]] does literate programming, perhaps I should briefly describe literate
-programming.
+在我们开始学习使用[[http://orgmode.org][org-mode]] 进行文学编程之前,我先简单介绍一下文学编程吧.
 
-** Why Literate Programming?
+** 为什么使用文学编程?
 
-Literate Programming was first invented by Donald Knuth in 1980’s in an attempt to emphasize communication to
-other members on your team. As [[http://www.brainyquote.com/quotes/authors/d/donald_knuth.html#0RwBBIoWjqiKPb2Y.99][Donald Knuth]] once wrote:
+文学编程最初是由Donald Knuth于20世纪80年代提出来的,旨在加强团队成员中的交流. 如[[http://www.brainyquote.com/quotes/authors/d/donald_knuth.html#0RwBBIoWjqiKPb2Y.99][Donald Knuth]] 所说过的
 
-    “Let us change our traditional attitude to the construction of programs. Instead of imagining that our
-    main task is to instruct a computer what to do, let us concentrate rather on explaining to human beings
-    what we want a computer to do.”
+#+BEGIN_QUOTE
+让我们改变针对程序结构的传统看法吧. 不要把我们的任务看成是像计算机描述怎么去作,而是向其他人解释我们想让计算机做什么.
+#+END_QUOTE
    
-Wanting programs to be written for human understanding, with the order based on logic of the problem, and not
-constrained to deficiencies in the programming language, we create a literate programming document that
-generates a document for people and the source code files:
+Wanting programs to be written for human understanding, with the order based on logic of the problem, and not constrained to deficiencies in the programming language, 下面是一份文学编程的例子,对人来说,这是份可阅读的文档,同时它还是源代码文件:
 
 [[http://howardism.org/Technical/Emacs/literate-programming-tangling.png]]
 
-The idea is to invert code peppered with comments to prose interjected with code.
+其背后的思想是反转注释与代码之间的关系,以前是代码中点缀着些注释,现在则是在文档中内嵌一些代码.
 
-While the resulting source code tangled from a literate programming document, may look the same as a source
-file coded directly, this idea did not change our industry (although it is used, to various degrees, in niche
-circles).
+由于从文学编程文档中抽取出来的源代码与直接编写的源代码无异,因此这一做法并不需要现有的编程环境做出什么改变.(although it is used, to various degrees, in niche circles).
 
 * Why Org?
 
