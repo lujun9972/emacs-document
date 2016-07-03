@@ -1,0 +1,248 @@
+#+TITLE: Literate-database-work
+#+URL: http://howardism.org/Technical/Emacs/literate-database.html                                   
+#+AUTHOR: lujun9972
+#+CATEGORY: raw
+#+DATE: [2016-07-03 日 15:16]
+#+OPTIONS: ^:{}
+
+
+I was asked to understand how the Keystone service of OpenStack (its authorization and authentication
+component) used MySQL. Like most things OpenStack, the documentation was pretty sparse, so instead of
+reading the source code, I went straight to the database.
+
+I’m certainly no DBA, but I figured that I could look at the data for one our development systems and
+get a pretty good handle on the bug that we were facing. My approach to exploring the database is
+slightly different as I used my [[http://howardism.org/Technical/Emacs/literate-devops.html][Literate Devops]] approach that I’ve been writing about recently, and
+thought I would share it as another example.
+
+* Header Properties
+
+I SSH’ed (is that now a verb) to the controller node and tunneling port 3306 to my local system:^[[http://howardism.org/Technical/Emacs/literate-database.html#fn.1][1]]
+
+#+BEGIN_SRC sh
+  ssh -L 3306:controller:3306 controller
+#+END_SRC
+
+I then opened my latest Sprint Notes (formatted in Emacs’ org-mode), and created a header. This was
+followed by a collapsible drawer of properties with the database connection information I found in a
+configuration file on the remote system.
+
+#+BEGIN_SRC org
+  ,** MySQL Analysis
+    :PROPERTIES:
+    :engine:   mysql
+    :dbhost:   localhost
+    :database: keystone
+    :dbuser:   keystone
+    :dbpassword: d97d880017c8b965
+    :cmdline:  --protocol=tcp
+    :exports:  both
+    :END:
+#+END_SRC
+
+Notice the cmdline property. If the host is set to localhost, the MySQL connector attempts to connect
+to the database through a local file socket. Since this is actually a forwarded port, I need to insist
+that it use the TCP protocol.
+
+* Using SQL Code Blocks
+
+Now I could begin my literate-oriented investigation. Since I assumed my results would be sent to
+teammates, my prose was for them as much as me…
+
+#+BEGIN_SRC org
+  Not knowing anything about the token properties in the Keystone
+  database structure, I jumped into the database to expose a bit of the
+  schema. What follows is a summary of my exploration as well as some
+  recommendations we can use to ascertain its health.
+
+  First, here are the tables associated with the =keystone= database:
+#+END_SRC
+
+Each paragraph of prose is followed by a code block, but the specified language was sql.^[[http://howardism.org/Technical/Emacs/literate-database.html#fn.2][2]] For
+instance:
+
+#+BEGIN_SRC org
+  ,#+BEGIN_SRC sql
+    SHOW tables;
+  ,#+END_SRC
+#+END_SRC
+
+The beauty of this approach, is that I can execute it with a C-c C-c and have it query the database,
+and insert the results as an org-mode formatted table:
+
+#+BEGIN_SRC org
+  ,#+RESULTS:
+  | Tables_in_keystone     |
+  |------------------------|
+  | credential             |
+  | domain                 |
+  | endpoint               |
+  | group                  |
+  | group_domain_metadata  |
+  | group_project_metadata |
+  | migrate_version        |
+  | policy                 |
+  | project                |
+  | role                   |
+  | service                |
+  | token                  |
+  | trust                  |
+  | trust_role             |
+  | user                   |
+  | user_domain_metadata   |
+  | user_group_membership  |
+  | user_project_metadata  |
+#+END_SRC
+
+Based on the results of this output, I could continue my investigation. The user table looked
+interesting:
+
+#+BEGIN_SRC org
+  The =user= table has the following schema:
+
+  ,#+BEGIN_SRC sql
+    SHOW columns FROM user;
+  ,#+END_SRC
+#+END_SRC
+
+And this gave me ideas for many of my queries:
+
+#+BEGIN_SRC org
+  ,#+RESULTS:
+  | Field              | Type         | Null | Key | Default | Extra |
+  |--------------------+--------------+------+-----+---------+-------|
+  | id                 | varchar(64)  | NO   | PRI | NULL    |       |
+  | name               | varchar(255) | NO   |     | NULL    |       |
+  | extra              | text         | YES  |     | NULL    |       |
+  | password           | varchar(128) | YES  |     | NULL    |       |
+  | enabled            | tinyint(1)   | YES  |     | NULL    |       |
+  | domain_id          | varchar(64)  | NO   | MUL | NULL    |       |
+  | default_project_id | varchar(64)  | YES  |     | NULL    |       |
+#+END_SRC
+
+And when I go to export my org-mode file, these tables are rendered well:
+
+
+  | Field              | Type         | Null | Key | Default | Extra |
+  |--------------------+--------------+------+-----+---------+-------|
+  | id                 | varchar(64)  | NO   | PRI | NULL    |       |
+  | name               | varchar(255) | NO   |     | NULL    |       |
+  | extra              | text         | YES  |     | NULL    |       |
+  | password           | varchar(128) | YES  |     | NULL    |       |
+  | enabled            | tinyint(1)   | YES  |     | NULL    |       |
+  | domain_id          | varchar(64)  | NO   | MUL | NULL    |       |
+  | default_project_id | varchar(64)  | YES  |     | NULL    |       |
+
+
+
+* More Interesting Queries
+
+Not that I care to burden you with the details of my actual investigation (as this is just an example
+to demonstrate the power of the literate devops concepts that come with [[http://orgmode.org][org-mode]], but because the SQL
+statements I type are sent directly to the database, I could include MySQL-specific anachronisms:
+
+#+BEGIN_SRC org
+   Clearly we are seeing a lot of expired tokens. How old is the oldest
+   expire token?
+
+   ,#+BEGIN_SRC sql
+     SELECT expires,
+      (UNIX_TIMESTAMP(expires) - UNIX_TIMESTAMP(NOW()))/60 AS minutes_ago,
+      (UNIX_TIMESTAMP(expires) - UNIX_TIMESTAMP(NOW()))/60/60 AS hours_ago
+     FROM token
+     ORDER BY expires DESC
+     LIMIT 1
+   ,#+END_SRC
+
+   ,#+RESULTS:
+   | expires             | minutes_ago |   hours_ago |
+   |---------------------+-------------+-------------|
+   | 2015-04-08 18:49:42 |   1438.2500 | 23.97083333 |
+
+  Huh. =1439= is /almost/ 24 hours ago. Is that our policy? Actually, it
+  is indeed a configurable policy. Set to 24 hours in case long running
+  stories cache that token.
+#+END_SRC
+
+* Summary
+
+The end result was interesting and I did export it (using the HTML exporter) to a mail message for an
+initial discussion, and eventually to our Wiki system (using a home-grown Confluence 5 exporter I’ve
+been working on).
+
+A section of the exported document [[http://howardism.org/Technical/Emacs/literate-database-example.html][can be viewed here]] (I changed the data in case you were wondering)
+…or, check out the [[http://howardism.org/Technical/Emacs/literate-database-example.org.txt][original org-mode file]].
+
+Another interesting side-effect of this approach occurred when I was Skyping with a remote colleague
+about the database, I shared my screen to Emacs, and could re-run some queries to show the output, and
+then enter her ideas as notes/queries for further elaboration.
+
+* Footnotes:
+
+^[[http://howardism.org/Technical/Emacs/literate-database.html#fnr.1][1]]
+
+You may need to configure MySQL to allow access to the database remotely.
+
+Edit the /etc/mysql/my.cnf file, and change the bind-address to 0.0.0.0. May also help to add your
+local machine to the server hosting the database in its /etc/hosts file, so that it can perform
+reversed lookups.
+
+It appears that create database user account that can access the system from any host, seems to be
+somewhat of a dark art. The following often works for me:
+
+#+BEGIN_SRC sql
+  CREATE USER 'howard'@'%' IDENTIFIED BY 'byebye';
+  GRANT ALL PRIVILEGES ON *.* TO 'howard'@'%' WITH GRANT OPTION;
+  FLUSH PRIVILEGES;
+#+END_SRC
+
+After you do that, try to connect with the CLI client:
+
+#+BEGIN_SRC sh
+  mysql -h localhost -P 3306 -u howard -p=byebye --protocol=tcp -e "show tables;"
+#+END_SRC
+
+I sometimes would receive this error:
+
+#+BEGIN_EXAMPLE
+  Warning: Using a password on the command line interface can be insecure.
+  ERROR 1045 (28000): Access denied for user 'howard'@'HABRAMS-02' (using password: YES)
+#+END_EXAMPLE
+
+So verify the database user accounts by executing this query:
+
+#+BEGIN_SRC sql
+  SELECT user, host FROM mysql.user;
+#+END_SRC
+
+This may return something like:
+
+| user             | host      |
+| howard           | %         |
+| root             | 10.0.2.2  |
+| root             | 127.0.0.1 |
+| root             | ::1       |
+| debian-sys-maint | localhost |
+| root             | localhost |
+
+Still having troubles, re-run the CREATE USER SQL statement with the following hosts:
+
+  * % … should allow all.
+  * localhost … isn’t really what you want
+  * The hostname of your local system
+
+Be careful with adding entries that you don’t need, for it appears that for MySQL, order matters, and
+some combination will be chosen for you.
+
+^[[http://howardism.org/Technical/Emacs/literate-database.html#fnr.2][2]]
+
+In order to use sql as a Babel formatting language, you have to specify it in the
+org-babel-load-languages list. In my case, I don’t use sql enough, so M-x load-library and then
+entering ob-sql is sufficient.
+
+Or:
+
+#+BEGIN_SRC emacs-lisp
+  (require 'sql)
+  (require 'ob-sql)
+#+END_SRC
