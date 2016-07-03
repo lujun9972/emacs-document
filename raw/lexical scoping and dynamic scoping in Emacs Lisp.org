@@ -1,0 +1,645 @@
+#+TITLE: lexical scoping and dynamic scoping in Emacs Lisp
+#+URL: https://yoo2080.wordpress.com/2011/12/31/lexical-scoping-and-dynamic-scoping-in-emacs-lisp/   
+#+AUTHOR: lujun9972
+#+CATEGORY: raw
+#+DATE: [2016-07-03 日 21:51]
+#+OPTIONS: ^:{}
+
+
+In this article, I demonstrate:
+
+ 1. difference between dynamic scoping and lexical scoping in Emacs Lisp
+ 2. what to watch out for with dynamic scoping
+ 3. what you can do with lexical scoping and lexical closures
+ 4. what happens when you mix lexical scoping code and dynamic scoping code
+
+Emacs Lisp is always dynamically scoped in Emacs 23 and below. Support for lexical scoping is added to
+Emacs 24. Nice because many agree that lexical scoping makes more sense in most cases than dynamic
+scoping does. You’ll see why soon in this article. If you have an el file that you want to load with
+lexical scoping, you can add -*- lexical-binding: t -*- as the first line, then when Emacs 24 loads the
+file, it will apply lexical scoping to the code in that el file. For example, the first line of my
+current init file is
+
+#+BEGIN_SRC emacs-lisp
+  ;; -*- coding: utf-8 -*-
+#+END_SRC
+
+and if I change that line to
+
+#+BEGIN_SRC emacs-lisp
+  ;; -*- coding: utf-8; lexical-binding: t -*-
+#+END_SRC
+
+then the code in my init file will be lexically scoped in Emacs 24. See [[http://www.gnu.org/software/emacs/manual/html_node/emacs/File-Variables.html][file variables]].
+
+To experiment with lexical scoping, first create an empty el file (C-x C-f lexical-scratch.el RET) and
+add this line:
+
+#+BEGIN_SRC emacs-lisp
+  ;; -*- lexical-binding: t -*-
+#+END_SRC
+
+and save it, and then revert the buffer (M-x revert-buffer). Now you can use the buffer as a sort of
+scratch buffer with lexical scoping on.
+
+What are dynamic scoping and lexical scoping? Let’s take a look at a simple example code.
+
+#+BEGIN_SRC emacs-lisp
+  (setq a 17)
+  (defun my-print-a ()
+    (print a))
+  (setq a 1717)
+  (let ((a 8))
+    (my-print-a))
+#+END_SRC
+
+Notice that the value of a is not specified within my-print-a, making it what some call a “free
+variable” (also known as nonlocal variables as in “a is nonlocal to my-print-a”). What will be the
+result of running the code above? Will it print 1717? Or is it going to be 8? With dynamic scoping, it
+prints 8. With lexical scoping, it prints 1717. With dynamic scoping, what the name a in my-print-a
+refers to is determined by when my-print-a is called. With lexical scoping, it is determined by where
+my-print-a is defined.
+
+With dynamic scoping, the code prints 8 because by the time my-print-a is called, we’re are in the let
+form which locally binds a to 8. If you call my-print-a after the let form, it will print 1717.
+
+With lexical scoping, the code prints 1717 because, first, where my-print-a is defined is outside of
+the let form, so a in my-print-a refers to the global binding for a (binding or associating the name a
+to a memory location), not the local binding created by the let form, and second, by the time
+my-print-a is called, the global value of a is 1717, which is separate from the local value of a being
+8. If you move the definition of my-print-a into the let form, the printed value will be 8 because then
+a in my-print-a will refer to the local binding for a created by the let form.
+
+If you know JavaScript, an equivalent code in JavaScript is
+
+#+BEGIN_SRC javascript
+  var a;
+  a = 17;
+  function myPrintA() {
+      console.log(a);
+  }
+  a = 1717;
+  (function () {
+      var a = 8;
+      myPrintA();
+  }());
+#+END_SRC
+
+That will print =1717=. Most programming languages are lexically scoped these days.
+
+If you are using Emacs 24, you can test if my example in lexical scoping actually prints 1717 by
+running the following code in the scratch buffer.
+
+#+BEGIN_SRC emacs-lisp
+  (eval
+   '(progn
+      (setq a 17)
+      (defun my-print-a ()
+        (print a))
+      (setq a 1717)
+      (let ((a 8))
+        (my-print-a)))
+   t)
+#+END_SRC
+
+The function eval in Emacs 24 takes a second argument (optional), and if that is t, eval evaluates
+using lexical scoping. Don’t forget the quote ' in front of (progn ...).
+
+Lexical scoping makes lexical closures possible. What are lexical closures? Let’s see with the
+following code.
+
+#+BEGIN_SRC emacs-lisp
+  (setq a 0)
+  (let ((a 17))
+    (defun my-print-a ()
+      (print a))
+    (setq a 1717))
+  (let ((a 8))
+    (my-print-a))
+#+END_SRC
+
+With lexical scoping, above prints 1717. Here’s what Alice thought about above:
+
+#+BEGIN_QUOTE
+    At first, that’s not strange. But if you look at that code again, something’s strange. At first, I
+    thought “This is lexical scoping, so the name a in the body of my-print-a refers to the local
+    binding for a created by the first let form. So 1717 should be printed” but then I looked again. By
+    the time my-print-a is called, that local binding created by the first let form is supposed to have
+    expired! You never drink expired milk! Why is 1717 printed instead of “Sorry, I don’t exist
+    anymore.”? Why is lexical scope resolution of a working without error even when it shouldn’t?
+#+END_QUOTE
+   
+The first local binding for a somehow survives even after the first let form is exited and waits for
+my-print-a to access it. The first local binding for a expired for all purposes except for my-print-a‘s
+access. That must mean that Emacs manages things behind so that lexical scoping works even better than
+it “should”.
+
+So what is a lexical closure? This relates to how “lexical scoping working even better” is implemented
+behind the scenes. The [[http://www.gnu.org/software/emacs/manual/html_node/elisp/Function-Cells.html][function cell]] of my-print-a contains a link to the relevant expired binding for
+a, as you can see by evaluating (symbol-function 'my-print-a). This combination of the function
+definition and the link to the scope at the time the function was created is called a lexical closure.
+Or you can call any lexically scoped function accessing an expired binding a lexical closure. Lexical
+closures are often simply called closures. Not all lexically scoped languages support closures.
+
+In lexical scoping, when you want to see what a variable in a function body refers to, you just look
+around where the function body is placed in the code text and find the relevant binding. That’s why
+lexical scoping is easy to wrap our heads around, because all we have to do to is look around where the
+variable is written in the code text, and we don’t even have to worry about when the relevant binding
+expires.
+
+Anyway, an equivalent code in JavaScript:
+
+#+BEGIN_SRC js
+  var a, myPrintA;
+  a = 0;
+  (function () {
+      // local variable a
+      var a = 17;
+      myPrintA = function () {
+          console.log(a);
+      };
+      a = 1717;
+  }());
+  (function () {
+      // local variable a
+      var a = 8;
+      myPrintA();
+  }());
+#+END_SRC
+
+That will print 1717 because JavaScript supports lexical closures.
+
+In Emacs 24, lexically scoped (interpreted) functions are represented by a form of function value that
+looks like (closure ENV ARGS BODY...) while dynamically scoped functions are represented by a form of
+function value that looks like (lambda ARGS BODY...), the same form you use to write an anonymous
+function in Emacs Lisp. The following code prints (lambda (x y) (+ x y)) twice in dynamic scoping.
+
+#+BEGIN_SRC emacs-lisp
+  (defun my-sum (x y)
+    (+ x y))
+  ;; print the contents of function cell of my-sum
+  (print (symbol-function 'my-sum))
+  ;; print an anonymous function
+  (print (lambda (x y) (+ x y)))
+#+END_SRC
+
+That prints (closure (t) (x y) (+ x y)) twice in lexical scoping. It seems that (lambda ...) evaluates
+to itself in dynamic scoping, while it evaluates to (closure ...) in lexical scoping.
+
+Now onto the nesting. In lexical scoping, when function A defines function B (i.e. B is defined within
+the function body of A) and function B defines function C and function C prints a, what that a should
+refer to is first searched within C, and if not found, then search continues within B (which is where C
+is defined), and so on.
+
+In the case of dynamic scoping, let’s say we have a function named my-func1 that calls another function
+my-func2 that calls my-func3 that prints a. Say my-func2 locally sets a to 2 when calling my-func3.
+What happens when we call my-func1 in dynamic scoping? It prints 2. What if we call my-func1 in an
+environment where a is 1? It still prints 2 instead of 1. Test with the following code.
+
+#+BEGIN_SRC emacs-lisp
+  (defun my-func1 ()
+    (my-func2))
+  (defun my-func2 ()
+    (let ((a 2))
+      (my-func3)))
+  (defun my-func3 ()
+    (print a))
+  (let ((a 1))
+    (my-func1))
+#+END_SRC
+
+What’s happening is that while a local binding for a to 1 is active, my-func1 is called, then my-func1
+calls my-func2, going deeper. my-func2 establishes another local binding for a which shadows the former
+binding for a to 1. At that point, it’s as if we are in the spot X in (let ((a 1)) (let ((a 2)) X )).
+It’s at that point that my-func3 is called. So 2 is printed.
+
+There is one nasty gotcha you should know about dynamic scoping. Let’s say you want to use a function
+that takes a function as an argument. Let me give you a simple example of such a function.
+
+#+BEGIN_SRC emacs-lisp
+  (defun my-call (f n)
+    (funcall f n))
+
+  (my-call #'1+ 5) ; => 6
+  (my-call #'oddp 5) ; => t
+
+  (dolist (i (list 1 2 3))
+    (print
+     (my-call (lambda (x) (* i x)) 5))) ; prints 5 10 15
+#+END_SRC
+
+Nothing surprising so far. Here we go.
+
+#+BEGIN_SRC emacs-lisp
+  (dolist (n (list 1 2 3))
+    (print
+     (my-call (lambda (x) (* n x)) 5))) ; prints 25 25 25 in dynamic scoping.
+#+END_SRC
+
+What’s going on? Why is it doing that? The problem is that the name n used in (lambda (x) (* n x)) is
+also one of the argument names of my-call. The anonymous function (lambda (x) (* n x)) is called inside
+my-call where n, as an argument, is bound to 5. In lexical scoping, the above code prints 5 10 15 as
+expected.
+
+Gotcha 1 – Passing a dynamically scoped function as an argument to another function can get you!
+(Update: a dynamically scoped function is a function defined in a dynamically scoped file. It’s
+probably better to think in terms of a dynamically scoped file vs lexically scoped file rather than in
+terms of functions, or much better, to think in terms of dynamically scoped code residing in a
+dynamically scoped elisp buffer vs lexically scoped code residing in a lexically scoped elisp buffer.
+See [[http://stackoverflow.com/questions/7654848/what-are-the-new-rules-for-variable-scoping-in-emacs-24][http://stackoverflow.com/questions/7654848/what-are-the-new-rules-for-variable-scoping-in-emacs-24]]
+)
+
+Another gotcha. Try to define a function that takes two functions f and g and returns a composed
+function that is equivalent to applying g first and then f.
+
+#+BEGIN_SRC emacs-lisp
+  ;; in dynamic scoping
+  (defun my-compose (f g)
+    (lambda (x)
+      (funcall f (funcall g x))))
+
+  (funcall
+   (my-compose (lambda (n) (+ n 3)) (lambda (n) (+ n 20)))
+   100) ; results in error, Lisp error: (void-variable f)
+#+END_SRC
+
+The error says f is not defined. Why? The composed function is created in my-compose, but is called in
+a different place where f and g are not bound. Again, in lexical scoping, the above code works as you
+expect.
+
+Gotcha 2 – Using a function returned from a dynamically scoped function can get you.
+
+In Emacs 24, defvar creates things called special variables. Special variables are dynamically scoped
+variables that will be bound dynamically even in lexically scoped functions. case-fold-search is an
+example of a special variable. Case sensitivity of the function search-forward depends on the value of
+the special variable case-fold-search. (search-forward "hello") matches HELLO when case-fold-search is
+t, while it doesn’t when case-fold-search is nil. Let’s say you define your own function
+my-search-forward maybe with some additional features in your lexically scoped el file, and
+my-search-forward also uses case-fold-search to decide case sensitivity. Because case-fold-search is a
+special variable, when you call
+
+#+BEGIN_SRC emacs-lisp
+  (let ((case-fold-search t))
+    (my-search-forward "hello"))
+#+END_SRC
+
+you can be certain that the search will be case insensitive.
+
+You can use the function special-variable-p to check if a variable is special.
+
+#+BEGIN_SRC emacs-lisp
+  (special-variable-p 'print-level) ; => t
+  (special-variable-p 'print-length) ; => t
+  (special-variable-p 'debug-on-error) ; => t
+  (special-variable-p 'debug-on-quit) ; => t
+#+END_SRC
+
+Special variables can be useful. [[http://www.reddit.com/r/programming/comments/ggmc2/emacs_lisp_now_lexically_scoped_oh_very_funny_no/c1nfngv][gsg on reddit said]]:
+
+    Dynamic scope allows you to parameterise code without having to pass an explicit parameter. It’s
+    not a good default, but some kinds of code do benefit from it.
+   
+[[http://www.reddit.com/r/programming/comments/ggmc2/emacs_lisp_now_lexically_scoped_oh_very_funny_no/c1nkdcu][kragensitaker said]]:
+
+    Thread-local variables, exception handlers, the current locale, and the current clipping region and
+    image transform are some examples of things that it makes sense to scope dynamically.
+   
+Now let’s see what we can do with lexical closures.
+
+Run the following code in lexical scoping.
+
+#+BEGIN_SRC emacs-lisp
+  (let (c)
+    (defun my-get-c ()
+      c)
+    (defun my-set-c (new-c)
+      (setq c new-c))
+    (defun my-add-to-c (x)
+      (setq c (+ x c))))
+#+END_SRC
+
+Then run the following code that use the three functions. The result is the same whether you run it
+with lexical scoping or not, because lexically scoped functions called in a dynamically scoped
+environment are still lexically scoped functions (Update: maybe it’s better to explain like this: a
+function call is just a function call, it doesn’t cause code in the function body to be moved around or
+passed around, it just executes the function body code. The function body is still right there in the
+lexically scoped buffer or the lexcially scoped environment. therefore every variable within the
+function body (except for special variables) will still refer to lexical bindings).
+
+#+BEGIN_SRC emacs-lisp
+  (my-set-c 10)
+  (my-add-to-c 5)
+  (print (my-get-c)) ; prints 15.
+  (my-add-to-c 1)
+  (print (my-get-c)) ; prints 16
+  (let ((c 0))
+    (print c) ; prints 0
+    (print (my-get-c))) ; prints 16.
+#+END_SRC
+
+The binding for c shared by my-get-c, my-set-c, and my-add-to-c acts like a sort of a private variable
+and is independent of other bindings of the name c such as one in the (let ((c 0)) ...) part. The
+reason this works is because the binding for c created by the let form surrounding the three defun
+forms has expired for all purposes except for the three functions’ access.
+
+Now let’s test using lexical closures to do what static variables in C do.
+
+#+BEGIN_SRC emacs-lisp
+  (require 'cl) ; for incf
+  (eval
+   '(let ((i 0))
+      (defun my-counter ()
+        (prog1
+            i
+          (incf i))))
+   t)
+  (my-counter) ; => 0
+  (my-counter) ; => 1
+  (my-counter) ; => 2
+  (let ((i 10))
+    (my-counter)) ; => 3
+  (my-counter) ; => 4
+#+END_SRC
+
+For those confused as to why the above code works that way, here is a demonstrative example code.
+
+#+BEGIN_SRC emacs-lisp
+  (eval
+   '(let ((i1 0))
+      (defun my-test ()
+        (let ((i2 0))
+          (prog1
+              (list i1 i2)
+            (incf i1)
+            (incf i2)))))
+   t)
+  (my-test) ; => (0 0)
+  (my-test) ; => (1 0)
+  (my-test) ; => (2 0)
+#+END_SRC
+
+my-test is defined and then it’s called three times. The let form (let ((i2 0)) ..) in my-test was
+executed upon the three times when my-test was called. On the other hand, the let form (let ((i1 0))
+... ) was executed once and that was when my-test was defined. I hope that helps.
+
+Now let’s test a function that returns functions that are lexical closures.
+
+#+BEGIN_SRC emacs-lisp
+  (eval
+   '(defun my-get-counter (start step)
+      (let ((count start))
+        (lambda ()
+          (prog1
+              count
+            (setq count (+ count step)))))
+      )
+   t)
+
+  (setq my-get-even-numbers (my-get-counter 0 2)
+        my-get-odd-numbers (my-get-counter 1 2))
+
+  (funcall my-get-even-numbers) ; => 0
+  (funcall my-get-even-numbers) ; => 2
+  (funcall my-get-even-numbers) ; => 4
+
+  (funcall my-get-odd-numbers) ; => 1
+  (funcall my-get-odd-numbers) ; => 3
+  (funcall my-get-odd-numbers) ; => 5
+
+  (funcall my-get-even-numbers) ; => 6
+  (funcall my-get-even-numbers) ; => 8
+
+  (setq my-get-even-numbers-2 (my-get-counter 0 2))
+  (funcall my-get-even-numbers-2) ; => 0
+  (funcall my-get-even-numbers-2) ; => 2
+  (funcall my-get-even-numbers-2) ; => 4
+
+  (funcall my-get-even-numbers) ; => 10
+  (funcall my-get-even-numbers) ; => 12
+  (funcall my-get-even-numbers) ; => 14
+#+END_SRC
+
+You might be wondering why my-get-even-numbers, my-get-odd-numbers and my-get-even-numbers-2 seem to
+have their own count instead of sharing a single count. They actually have their own count. If you are
+confused, what if you run the following code with lexical scoping?
+
+#+BEGIN_SRC emacs-lisp
+  (let ((count 0))
+    (setq my-count
+          (lambda ()
+            (prog1
+                count
+              (setq count (1+ count))))))
+  (let ((count 0))
+    (setq my-count-2
+          (lambda ()
+            (prog1
+                count
+              (setq count (1+ count))))))
+#+END_SRC
+
+my-count and my-count-2 have their own count. Each of the two let forms enclose each of the two (setq
+.. (lambda ...)) forms. That’s actually similar to what’s going on with my-get-counter. Each time
+(my-get-counter ..) is executed, (let ((count ..)) (lambda ..)) is executed again, each creating a new
+separate binding for count that each new returned function can access. When you execute (my-get-counter
+..) three times, (let ((count ..)) (lambda ..)) is executed three times, creating three bindings of
+count and three returned functions.
+
+Alice now writes all of her new Emacs Lisp code in lexically scoped el files. When lexically scoped new
+code written by Alice and dynamically scoped old code written by others interact, what will happen?
+Will things break?
+
+Let’s start with a simple example.
+
+#+BEGIN_SRC emacs-lisp
+  (eval
+   '(defun my-bah ())
+   t)
+
+  (eval
+   '(fset 'my-bah-2 (symbol-function 'my-bah))
+   nil)
+#+END_SRC
+
+The function my-bah is defined in a lexically scoped environment. So it must be a lexically scoped
+function. What about my-bah-2? Alice says “The function my-bah-2 is defined in a dynamically scoped
+environment. So it must be a dynamically scoped function.” On the other hand, Bob says “What is in the
+function cell of my-bah is copied to the function cell of my-bah-2. The function cell of my-bah
+contains a lexically scoped function. What is in the function cell of my-bah-2 should be the same
+lexically scoped function.” Alice says “Wait. These functions do nothing. Let’s make them do something.
+Let’s make them tell us whether they are lexically scoped by their return values.” The following code
+returns t in a lexically scoped environment, nil otherwise. [[https://yoo2080.wordpress.com/2011/12/30/how-to-check-dynamically-if-lexical-scoping-is-active-in-emacs-lisp/][Checking the value of lexical-binding]]
+[[https://yoo2080.wordpress.com/2011/12/30/how-to-check-dynamically-if-lexical-scoping-is-active-in-emacs-lisp/][instead here is a bad idea.]]
+
+#+BEGIN_SRC emacs-lisp
+  (let ((x nil)
+        (f (let ((x t)) (lambda () x))))
+    (funcall f))
+
+  Alice modifies the my-bah & my-bah-2 code.
+
+  (eval
+   '(defun my-bah ()
+      (let ((x nil)
+            (f (let ((x t)) (lambda () x))))
+        (funcall f)))
+   t)
+
+  (eval
+   '(fset 'my-bah-2 (symbol-function 'my-bah))
+   nil)
+#+END_SRC
+
+Let’s see if my-bah-2 is a lexically scoped function.
+
+#+BEGIN_SRC emacs-lisp
+  (my-bah) ; => t
+  (my-bah-2) ; => t
+#+END_SRC
+
+So Bob guessed right? Let’s test a similar code that does not use defun.
+
+#+BEGIN_SRC emacs-lisp
+  (eval
+   '(setq my-nah
+          (lambda ()
+            (let ((x nil)
+                  (f (let ((x t)) (lambda () x))))
+              (funcall f))))
+   t)
+
+  (eval
+   '(setq my-nah-2 my-nah)
+   nil)
+
+  (funcall my-nah) ; => t
+  (funcall my-nah-2) ; => t
+#+END_SRC
+
+When you run (setq abc (+ 1 1)), the expression (+ 1 1) describing a sum is evaluated first, and then
+the evaluation result 2, a number, is assigned to the variable abc. Likewise, when you run (setq my-nah
+(lambda ...)), the expression (lambda ...) describing an anonymous function is evaluated first. In
+lexical scoping, the evaluation result is something that looks like (closure ....), a lexically scoped
+function value. Then that result (closure ....) is assigned to the variable my-nah.
+
+When you run (setq abc (+ 1 1)) and then run (setq abc-2 abc), evaluation of the expression (+ 1 1)
+happens only once. The statement (setq abc-2 abc) does not evaluate (+ 1 1) again, it just saves the
+already computed result 2 to abc-2. What it does evaluate is the symbol abc itself, and the symbol abc
+evaluates to 2. Likewise, in the my-nah & my-nah-2 example code, evaluation of the expression (lambda
+...) happens only once and the result (closure ...) is not evaluated when you run (setq my-nah-2
+my-nah), it is simply saved to my-nah-2. Even though (setq my-nah-2 my-nah) is run in a dynamically
+scoped environment, because evaluation of the anonymous function expression happens in a lexically
+scoped environment, the variable my-nah-2 ends up holding a lexically scoped function.
+
+A lexically scoped function is created and it gets passed around in a dynamically scoped environment,
+and the function remains a lexically scoped function.
+
+The defun my-bah example is similar. The function cell of the symbol my-bah holds a lexically scoped
+function, which simply gets passed around. Check with the following test.
+
+#+BEGIN_SRC emacs-lisp
+  (print my-nah-2)
+  (print (symbol-function 'my-bah-2))
+#+END_SRC
+
+So when you have a defun in a lexically scoped el file, to see the meaning of free variables names in
+it, you just look around them in the el file, regardless of whether that function gets another name in
+a dynamically scoped file.
+
+Now that my-nah-2 & my-bah-2 example is understood, let’s revisit my-get-counter. As long as (defun
+my-get-counter ...) is in a lexically scoped el file, functions returned by my-get-counter are
+lexically scoped. Let’s see.
+
+#+BEGIN_SRC emacs-lisp
+  (eval
+   '(progn
+      (setq my-get-even-numbers (my-get-counter 0 2))
+      (print (funcall my-get-even-numbers))
+      (print (funcall my-get-even-numbers))
+      (print (funcall my-get-even-numbers)))
+   nil)
+#+END_SRC
+
+That prints 0 2 4. Alice’s argument repeated here would be like “The function my-get-even-numbers is
+defined in a dynamically scoped environment. So why is it acting like a lexically scoped function?” The
+variable my-get-even-numbers ends up holding a lexically scoped function for the same reason my-nah-2
+does. In case you are confused, let’s get our head around my-get-sum first.
+
+#+BEGIN_SRC emacs-lisp
+  (defun my-get-sum (x y)
+    (+ x y))
+#+END_SRC
+
+(+ x y) in my-get-sum is an expression describing a sum and my-get-sum returns the result of evaluation
+of (+ x y), not the expression (+ x y) itself. When you run (my-get-sum 1 2), it does not return the
+literal expression (+ x y), it returns 3, which is what (+ x y) evaluated to inside my-get-sum.
+
+Back to my-get-counter. (lambda ...) in my-get-counter is an expression describing an anonymous
+function. That expression is evaluated once inside my-get-counter. The result of its evaluation is
+something that looks like (closure ...) which is immediately returned and gets stored in the variable
+my-get-even-numbers. Evaluation of the (lambda ...) happens only once and that happens inside the
+lexically scoped function my-get-counter. Evaluation of a lambda form inside a lexically scoped
+function always results in (closure ...). That is how my-get-even-numbers ends up holding a lexically
+scoped function.
+
+By the way, lexically scoped functions can create and return a dynamically scoped function if the
+evaluation of a lambda form is somehow avoided maybe unintentionally.
+
+#+BEGIN_SRC emacs-lisp
+  (eval
+   '(defun my-return-dynamically-scoped-function ()
+      (list 'lambda '() 'a)
+      )
+   t)
+
+  (eval
+   '(defun my-return-dynamically-scoped-function ()
+      '(lambda () a) ; quoted lambda
+      )
+   t)
+#+END_SRC
+
+I don’t know why anybody would do that intentionally, but it can be done.
+
+Now let’s revisit the my-call example.
+
+#+BEGIN_SRC emacs-lisp
+  (eval
+   '(defun my-call (f n)
+      (funcall f n))
+   nil)
+
+  (eval
+   '(dolist (n (list 1 2 3))
+      (print
+       (my-call (lambda (x) (* n x)) 5)))
+   t)
+#+END_SRC
+
+That prints 5 10 15. Alice argument repeated would be “The function f is defined in a dynamically
+scoped environment. So why is it acting like a lexically scoped function?”. The anonymous functions to
+be passed to my-call are defined in a lexically scoped environment, so it stays as a lexically scoped
+function even after it is passed to my-call. In case you are still confused, the (lambda ...) is
+evaluated and then its result is passed to my-call. my-call stores the result to its local variable f.
+So f ends up referring to a lexically scoped function.
+
+The function mapcar* is like my-call in that it accepts a function as an argument and is defined in a
+dynamically scoped el file (for now). The following dynamic scoping gotcha example is from [[http://stackoverflow.com/a/3791877/37664][some]]
+[[http://stackoverflow.com/a/3791877/37664][StackOverflow answer]].
+
+#+BEGIN_SRC emacs-lisp
+  (let ((cl-x 10))
+    (mapcar* (lambda (elt) (* cl-x elt)) '(1 2 3)))
+#+END_SRC
+
+The name cl-x is also used as an argument name in the definition of mapcar*. So running the code above
+in a dynamically scoped environment leads to a surprise (Gotcha 1). But when you run the code in a
+lexically scoped environment, it works fine, because lexically scoped anonymous functions passed to
+mapcar* stays as lexically scoped functions.
+
+Judging by these examples, it seems that lexically scoped code blend in well. Time to go forth and
+enjoy lexical scoping!
+
+(Update: See also: [[https://yoo2080.wordpress.com/2013/08/14/invasion-of-special-variables-in-emacs-lisp/][Invasion of special variables]] which shows other pitfalls and what can be done about
+them )
+
