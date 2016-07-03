@@ -6,26 +6,20 @@
 #+OPTIONS: ^:{}
 
 
-I was asked to understand how the Keystone service of OpenStack (its authorization and authentication
-component) used MySQL. Like most things OpenStack, the documentation was pretty sparse, so instead of
-reading the source code, I went straight to the database.
+我曾被要求搞清楚OpenStack的Keystone服务(它的授权与认证组件)是如何使用MySQL的. OpenStack的文档一向零散,因此我决定直接研究它的数据库,而不是阅读源代码.
 
-I’m certainly no DBA, but I figured that I could look at the data for one our development systems and
-get a pretty good handle on the bug that we were facing. My approach to exploring the database is
-slightly different as I used my [[http://howardism.org/Technical/Emacs/literate-devops.html][Literate Devops]] approach that I’ve been writing about recently, and
-thought I would share it as another example.
+我当然不是DBA,但我觉得我可以看一下某个开发系统的数据并能够很好的解决所遇到的BUG. 我探索数据库的方法与他人有点不一样,我使用的是自创的 [[http://howardism.org/Technical/Emacs/literate-devops.html][Literate Devops]] 方法. 
+我在前一段时间已经介绍过这种方法了,现在我再以另一个案例为例,分享这种方法.
 
 * Header Properties
 
-I SSH’ed (is that now a verb) to the controller node and tunneling port 3306 to my local system:^[[http://howardism.org/Technical/Emacs/literate-database.html#fn.1][1]]
+我通过SSH登陆到控制节点并创建一个隧道与我本地系统的3306端口连接:^[[http://howardism.org/Technical/Emacs/literate-database.html#fn.1][1]]
 
 #+BEGIN_SRC sh
   ssh -L 3306:controller:3306 controller
 #+END_SRC
 
-I then opened my latest Sprint Notes (formatted in Emacs’ org-mode), and created a header. This was
-followed by a collapsible drawer of properties with the database connection information I found in a
-configuration file on the remote system.
+然后我打开最新的笔记(org-mode格式)并创建一个新标题. 标题后时一个可折叠的属性drawer. 其中包含了数据库连接的信息(这些信息是我从远程系统的配置文件中找到的).
 
 #+BEGIN_SRC org
   ,** MySQL Analysis
@@ -40,14 +34,11 @@ configuration file on the remote system.
     :END:
 #+END_SRC
 
-Notice the cmdline property. If the host is set to localhost, the MySQL connector attempts to connect
-to the database through a local file socket. Since this is actually a forwarded port, I need to insist
-that it use the TCP protocol.
+注意 =cmdline= 属性的值. 若mysql主机为 =localhost= 的话,则MySQL连接器会尝试通过local file socket来建立与数据库的连接. 由于这其实是个转发端口,因此我需要明确指定使用TCP协议创建连接.
 
 * Using SQL Code Blocks
 
-Now I could begin my literate-oriented investigation. Since I assumed my results would be sent to
-teammates, my prose was for them as much as me…
+现在我可以开始我的以文字为导向的探索. 由于我假定我的结果会被发送给同事阅读, my prose was for them as much as me…
 
 #+BEGIN_SRC org
   Not knowing anything about the token properties in the Keystone
@@ -58,8 +49,7 @@ teammates, my prose was for them as much as me…
   First, here are the tables associated with the =keystone= database:
 #+END_SRC
 
-Each paragraph of prose is followed by a code block, but the specified language was sql.^[[http://howardism.org/Technical/Emacs/literate-database.html#fn.2][2]] For
-instance:
+文档中每个端口后面都跟着一个SQL代码块.^[[http://howardism.org/Technical/Emacs/literate-database.html#fn.2][2]] 例如:
 
 #+BEGIN_SRC org
   ,#+BEGIN_SRC sql
@@ -67,8 +57,7 @@ instance:
   ,#+END_SRC
 #+END_SRC
 
-The beauty of this approach, is that I can execute it with a C-c C-c and have it query the database,
-and insert the results as an org-mode formatted table:
+这种方式的美妙之处在于,我可以通过按下 =C-c C-c= 来执行改代码块中的代码,并将查询数据库的结果以org-mode中表格的形式插入到文档中:
 
 #+BEGIN_SRC org
   ,#+RESULTS:
@@ -94,8 +83,7 @@ and insert the results as an org-mode formatted table:
   | user_project_metadata  |
 #+END_SRC
 
-Based on the results of this output, I could continue my investigation. The user table looked
-interesting:
+基于这个结果,我继续往下探索. 名为user的表格看起来蛮有意思的:
 
 #+BEGIN_SRC org
   The =user= table has the following schema:
@@ -105,7 +93,7 @@ interesting:
   ,#+END_SRC
 #+END_SRC
 
-And this gave me ideas for many of my queries:
+其结果给了我很多查询的灵感:
 
 #+BEGIN_SRC org
   ,#+RESULTS:
@@ -120,7 +108,7 @@ And this gave me ideas for many of my queries:
   | default_project_id | varchar(64)  | YES  |     | NULL    |       |
 #+END_SRC
 
-And when I go to export my org-mode file, these tables are rendered well:
+并且当我导出我的org-mode文件时,这些表格都被渲染的很不错:
 
 
   | Field              | Type         | Null | Key | Default | Extra |
@@ -137,9 +125,7 @@ And when I go to export my org-mode file, these tables are rendered well:
 
 * More Interesting Queries
 
-Not that I care to burden you with the details of my actual investigation (as this is just an example
-to demonstrate the power of the literate devops concepts that come with [[http://orgmode.org][org-mode]], but because the SQL
-statements I type are sent directly to the database, I could include MySQL-specific anachronisms:
+我无意于向你展示我探索的细节(因为这只是一个例子而已,用于想你展示这种基于org-mode的literate devops概念的威力). 但是,由于我输入的SQL语句时直接发送到数据库的,因此我还可以使用MySQL特有的语法:
 
 #+BEGIN_SRC org
    Clearly we are seeing a lot of expired tokens. How old is the oldest
@@ -164,31 +150,23 @@ statements I type are sent directly to the database, I could include MySQL-speci
   stories cache that token.
 #+END_SRC
 
-* Summary
+* 总结
 
-The end result was interesting and I did export it (using the HTML exporter) to a mail message for an
-initial discussion, and eventually to our Wiki system (using a home-grown Confluence 5 exporter I’ve
-been working on).
+最终结果很有趣,我将其导出成HTML格式作为邮件内容,并由此展开最初的讨论, 然后最终会记入我们的Wiki系统.
 
-A section of the exported document [[http://howardism.org/Technical/Emacs/literate-database-example.html][can be viewed here]] (I changed the data in case you were wondering)
-…or, check out the [[http://howardism.org/Technical/Emacs/literate-database-example.org.txt][original org-mode file]].
+导出的文档[[http://howardism.org/Technical/Emacs/literate-database-example.html][可以在这里看到]] (为防你好奇,我修改掉了原始数据). 你也[[http://howardism.org/Technical/Emacs/literate-database-example.org.txt][可以在这看到原始的org文档]].
 
-Another interesting side-effect of this approach occurred when I was Skyping with a remote colleague
-about the database, I shared my screen to Emacs, and could re-run some queries to show the output, and
-then enter her ideas as notes/queries for further elaboration.
+这种方法的另一个副作用时当我通过skype与远程的同事讨论数据库时,我可以与他共享Emacs屏幕,然后重新运行这些查询语句病获得输出结构. 然后将他的想法记录下来以备以后讨论.
 
 * Footnotes:
 
 ^[[http://howardism.org/Technical/Emacs/literate-database.html#fnr.1][1]]
 
-You may need to configure MySQL to allow access to the database remotely.
+你需要配置MySQL使之允许远程连接上数据库.
 
-Edit the /etc/mysql/my.cnf file, and change the bind-address to 0.0.0.0. May also help to add your
-local machine to the server hosting the database in its /etc/hosts file, so that it can perform
-reversed lookups.
+方法是,编辑 =/etc/mysql/my.cnf= 文件, 将 =bind-address= 改为 =0.0.0.0=. 若能将本机地址添加到数据库服务器上的 =/etc/hosts= 中,使之能进行反向查找,那也是有助远程连接数据库的.
 
-It appears that create database user account that can access the system from any host, seems to be
-somewhat of a dark art. The following often works for me:
+若不知道如何创建一个可以从任何主机连接上系统的数据库用户账户,请参照下面代码:
 
 #+BEGIN_SRC sql
   CREATE USER 'howard'@'%' IDENTIFIED BY 'byebye';
@@ -196,33 +174,33 @@ somewhat of a dark art. The following often works for me:
   FLUSH PRIVILEGES;
 #+END_SRC
 
-After you do that, try to connect with the CLI client:
+之后,你可以试着使用CLI客户端进行连接了:
 
 #+BEGIN_SRC sh
   mysql -h localhost -P 3306 -u howard -p=byebye --protocol=tcp -e "show tables;"
 #+END_SRC
 
-I sometimes would receive this error:
+若出现下面的错误:
 
 #+BEGIN_EXAMPLE
   Warning: Using a password on the command line interface can be insecure.
   ERROR 1045 (28000): Access denied for user 'howard'@'HABRAMS-02' (using password: YES)
 #+END_EXAMPLE
 
-So verify the database user accounts by executing this query:
+请执行下面的查询语句来检查数据库用户账户:
 
 #+BEGIN_SRC sql
   SELECT user, host FROM mysql.user;
 #+END_SRC
 
-This may return something like:
+返回的结果可能类似这样的:
 
 | user             | host      |
 | howard           | %         |
 | root             | 10.0.2.2  |
 | root             | 127.0.0.1 |
 | root             | ::1       |
-| debian-sys-maint | localhost |
+
 | root             | localhost |
 
 Still having troubles, re-run the CREATE USER SQL statement with the following hosts:
