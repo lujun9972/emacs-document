@@ -749,14 +749,14 @@ Donald Knuth当时所使用的老式语言,要求所有的变量和函数需要�
   ,#+END_SRC
 #+END_SRC
 
-Treats the preceding text before the noweb reference like initial comment characters, 其产生的结果如下:
+noweb引用前的文本会被当成最初的注释字符来看待(Treats the preceding text before the noweb reference like initial comment characters), 因此其产生的结果如下:
 
 #+BEGIN_SRC sh
   cat $* | xargs ruby -ne 'require "prime"
   cat $* | xargs ruby -ne 'Prime.prime?(ARG[0])'
 #+END_SRC
 
-This requires either [[http://ss64.com/bash/syntax-here.html][here docs]] or single quotes in a shell, or triple quotes in Python:
+这需要shell中的here docs或单引号. 或者是Python中的三引号(This requires either [[http://ss64.com/bash/syntax-here.html][here docs]] or single quotes in a shell, or triple quotes in Python):
 
 #+BEGIN_SRC sh
   cat $* | xargs ruby -ne '
@@ -1035,17 +1035,15 @@ Org能够以变量的形式传递一个或多个值到你的代码块中. 下面
 
 当我们在后面讨论Tower of Babel时,就会发现 =:post= 参数真的很有用, 因为我们可以创建一系列的输出处理器,在其他文档中使用.
 
-* Miscellaneous Features
+* 其他特性
 
-The following are some parameters and other features that didn’t seem to fit before.
+以下是一些不好分类的参数和特性.
 
-** Calling Blocks
+** 调用代码块
 
-So far, our code blocks have pulled values into their code blocks with the :var parameter, however, we can
-also push values into blocks by calling it elsewhere in our document.
+目前为止,我们是通过 =:var= 参数来为代码块设置值的, 我们还可以再调用代码块是给代码块赋值.
 
-Remember our roots_of_list block we [[http://howardism.org/Technical/Emacs/literate-programming-tutorial.html#orgheadline42][created above]]? It took a variable, lst, but here we re-call it with a
-different value for its variable:
+还记得我们之前创建过的那个名为roots_of_list的代码块吗? 该代码块接受一个名为lst的变量. 下面来演示一下如果使用一个不同的值来为该变量赋值:
 
 #+BEGIN_SRC org
   ,#+CALL: roots_of_list( lst='(16 144 81 61) )
@@ -1054,8 +1052,7 @@ different value for its variable:
   | 4.0 | 12.0 | 9.0 | 7.810249675906654 |
 #+END_SRC
 
-We can also call it with values from the output of another code block. Here we pass in a column from our
-cool-numbers table:
+我们还可以使用其他代码块的输出结果. 下面例子中就使用的时 cool-numbers 表格中的一列作为被传递的值.
 
 #+BEGIN_SRC org
   ,#+CALL: roots_of_list( lst=cool-numbers[,2] )
@@ -1064,10 +1061,9 @@ cool-numbers table:
   | 1.0 | 2.0 | 3.0 | 4.0 | 5.0 | 6.0 | 7.0 | 8.0 | 9.0 | 10.0 |
 #+END_SRC
 
-Note: You can set additional parameters for the block inside brackets. See [[http://orgmode.org/org.html#Evaluating-code-blocks][Evaluating code blocks]] for details.
+注意: 你可以在中括号内为代码块设置其他头参数的值. 详情请参见 [[http://orgmode.org/org.html#Evaluating-code-blocks][Evaluating code blocks]].
 
-How does this look when exported? Depends on the results. If the block returned a single value, for instance,
-something like:
+那么调用代码块在导出时是怎样的呢? 这个得看了. 若代码块运算结果像下例一样返回单个值:
 
 #+BEGIN_SRC org
   ,#+NAME: cube
@@ -1076,69 +1072,64 @@ something like:
   ,#+END_SRC
 #+END_SRC
 
-Calling it with a table does what you expect:
+那么,在设定结果为table格式的情况下调用它,其结果与平常没什么不同:
 
 #+BEGIN_SRC org
   ,#+CALL: cube[:results table](n=3)
 #+END_SRC
 
-But calling it with a list, seems to export it inside a <pre> block. YMMV, I suppose.
+但过在设定结果为list格式的情况下调用它,则导出的结果是嵌入 =<pre>= 块中. 
 
-** Embedded Results
+** 嵌入运算结果
 
-If you want a quickly evaluated result from a language, you can embed code in curlies. For instance, add the
-following to your org file, and type C-c C-c at the beginning of the line:
+如果你想得快速得到一门语言片段的计算结果,你可以在大括号内嵌入这段代码. 例如,可以试试将下面内容输入你的org文件中,然后在行首按下 =C-c C-c= 看看结果:
 
 #+BEGIN_SRC org
   src_ruby{ 5+6 } =11=
 #+END_SRC
 
-The answer, 11, was appended to the line. When exported, only the results are shown (not the source).
+其结果,11,会添加在代码块后面. 当导出时,只有计算结果会被导出(源代码不会被导出).
 
-I suppose these would be most useful within the prose, as in:
+我想这项功能应该常用于生成文档内容,像下面这样:
 
 #+BEGIN_SRC org
   We will be bringing src_ruby{ 5+6 } children.
 #+END_SRC
 
-Note: The answer will be wrapped in HTML <code> tags.
+注意: 计算的结果会被嵌入到HTML的 =<code>= 标签中.
 
-You can insert the results of a shell script:
+你也可以插入shell脚本的执行结果:
 
 #+BEGIN_SRC org
   Why do I have src_sh{ ls /tmp | wc -l } files?
 #+END_SRC
 
-Or even the insert the results from an Emacs Lisp function:
+甚至可以插入Emacs Lisp函数的返回值:
 
 #+BEGIN_SRC org
   src_elisp{ org-agenda-files }
 #+END_SRC
 
-Also supports calling blocks too. For instance, we defined a block of code earlier and named it roots_of_list,
-and this can be called:
+也支持插入调用代码块的值. 例如,假设我们定义了一个名为roots_of_list的代码块,则可以这样:
 
 #+BEGIN_SRC org
   call_roots_of_list( lst=cool-numbers[,2] )
   | 1.0 | 2.0 | 3.0 | 4.0 | 5.0 | 6.0 | 7.0 | 8.0 | 9.0 | 10.0 |
 #+END_SRC
 
-Warning: During my workshop, when I was demonstrating this feature, we noticed that if you C-c C-c the src_XYZ
-feature to embed the answer, when you export it, you will have two answers. The one you embedded and the
-results of evaluating the code during the exporting.
+警告: 当我再演示这项功能时,发现若你在 =src_XYZ= 上按下了 =C-c C-c= 会插入代码块的计算结果. 然后再导出时会内嵌两次结果. 一次是执行代码块时生成的结果,一次是内嵌的那个结果(这个问题现在已经被修复).
 
 ** Library of Babel
 
-The Library of Babel is a collection of code blocks accessible to any org-mode file. Like the Gem resources
-for Ruby, you specify the files containing named blocks that should be accessible.
+~Library of Babel~ 是一系列可以在任意org-mode文件总调用的代码块. 就好像时Ruby中的Gem源一样, 你需要指定哪些包含有命名代码块的文件是可访问的.
 
-Do this by following these steps:
+按照以下步骤进行操作:
 
-  * Create a new org-mode file with at least one named block
-  * Once in your Emacs session: C-c C-v i
-  * Select your new file to specify that this should be added to babel collection.
++ 新建一个org文件,并添加至少一个命名了的代码块
++ 按下 =C-c C-v i=
++ 选择你新建的这个org文件,表示将该文件加入babel集合中.
 
-Try it out with a code block that might be nice to use:
+用一个你常用的代码块时试一试:
 
 #+BEGIN_SRC org
   ,#+NAME: take
@@ -1152,7 +1143,7 @@ Try it out with a code block that might be nice to use:
   ,#+END_SRC
 #+END_SRC
 
-After you have saved this new file, and loaded it as a babel addition, let’s use it with a :post parameter:
+你保持该新建的org文件,并将其作为babel addition加载后, 就可以将该代码片段用于 =:post= 参数了:
 
 #+BEGIN_SRC org
   ,#+BEGIN_SRC python :post take(data=*this*, only=3)
@@ -1163,29 +1154,26 @@ After you have saved this new file, and loaded it as a babel addition, let’s u
   | 1 | 4 | 9 | ... |
 #+END_SRC
 
-This feature is really helpful with:
+该功能在以下几种情况下很有用:
 
-  * :post processing output
-  * #+CALL where you want just the results on line
-  * call_XYZ() where you want results embedded inline
++ 用于 =:post= 参数中处理结果
++ 通过 =#+CALL= 语句将运算结果嵌入到行中
++ 通过 =call_XYZ()= 语句将运算结果嵌入到行中
 
-For a more permanent addition to your tower, add a call to org-babel-lob-ingest with each file to your Emacs
-init file.
+要想让这些文件永久性的添加到 babel library中,需要在你的Emacs初始化文件中对每个想被添加的org文件调用 =org-babel-lob-ingest= 函数.
 
-* Specialized Languages
+* 专用语言
 
-I’ve found a few programming languages that really add to an org-mode way of writing documents.
+我发现有些语言被org-mode所支持是为了更好的编写文档的(I’ve found a few programming languages that really add to an org-mode way of writing documents).
 
 ** SQL
 
-The ability to query a database with SQL statements, and then manipulate the results in other languages is
-quite interesting, and if I felt I could have used them, would have made this workshop-tutorial less trivial
-(but also less accessible).
+通过SQL语句查询数据库,然后使用其他语言处理查询结果,这种能力十分有用. 
+and if I felt I could have used them, would have made this workshop-tutorial less trivial (but also less accessible).
 
-Assuming that you have installed [[https://www.sqlite.org][Sqlite]], and loaded the library in Emacs with: M-x load-library then ob-sqlite
+假设你已经安装了[[https://www.sqlite.org][Sqlite]], 并且通过 =M-x load-library <RET> ob-sqlite= 加载了必要的库:
 
-You can then specify a :db parameter to a database created by calling .backup in the Sqlite command line
-program. We can then write blocks like:
+你可以在Sqllite命令行中使用 =.backup= 命令导出一个数据库,然后在 =:db= 参数中指定该数据库. 就像下面这样:
 
 #+BEGIN_SRC org
   ,#+BEGIN_SRC sqlite :db dolphins.db
@@ -1197,16 +1185,16 @@ program. We can then write blocks like:
   | m | 89 |
 #+END_SRC
 
-Which renders a nice, simple table:
+其结果时一个简单的表格:
 
-f 55 
-m 89 
+| f | 55 |
+| m | 89 |
 
-If you like this idea, check out my [[http://howardism.org/Technical/Emacs/literate-database.html][Literate Database essay]].
+若你觉得这样很有用,请参见我的另一篇文章[[http://howardism.org/Technical/Emacs/literate-database.html][Literate Database essay]].
 
 ** Graphviz
 
-If you have [[http://www.graphviz.org/][Graphviz]] installed, we can create an diagram directly from your document:
+若你安装了[[http://www.graphviz.org/][Graphviz]] , 则我们可以直接再文档中创建图标:
 
 #+BEGIN_SRC org
   ,#+BEGIN_SRC dot :file some-illustration.png
@@ -1220,15 +1208,13 @@ If you have [[http://www.graphviz.org/][Graphviz]] installed, we can create an d
 
 [[http://howardism.org/Technical/Emacs/literate-programming-graphviz.png]]
 
-For these, I often set :exports results so that the code to generate the image isn’t exported.
+对这种应用,我一般会设置 =:exports results= 以便在导出时不要导出产生图片的代码.
 
-Warning: If you wish to execute the code block to generate an image, the language needs to be set to dot, but
-if you want to edit the code in a side buffer (with the C-c ’ … apostrophe), you need to change the language
-to graphviz-dot.
+警告: 若你希望执行代码块并生成图片,则需要设置代码块的语言类型为 =dot=, 但若你想编辑该代码块,则又需要把语言类型设置为 =graphviz-dot=.
 
 ** PlantUML
 
-If you have [[http://plantuml.sourceforge.net/download.html][PlantUML]] installed, you can do something like:
+若你安装了[[http://plantuml.sourceforge.net/download.html][PlantUML]] ,你可以实现类似下面的功能:
 
 #+BEGIN_SRC org
   ,#+BEGIN_SRC plantuml :file sequence.png :exports results
@@ -1243,11 +1229,11 @@ If you have [[http://plantuml.sourceforge.net/download.html][PlantUML]] installe
 
 [[http://howardism.org/Technical/Emacs/literate-programming-plantuml.png]]
 
-Hrm… have descriptive illustrations associated with your source code?
+哈哈,你可以为你的源代码插入描述性插图了.
 
 ** Calc
 
-We have access the impressive [[http://howardism.org/Technical/Emacs/calc.html#Top][Emacs Calculator]] as well to use a more normal mathematical syntax.
+我们已经接触过了令人印象深刻的 [[http://howardism.org/Technical/Emacs/calc.html#Top][Emacs Calculator]] 及其常用的数学符号.
 
 #+BEGIN_SRC org
   ,#+BEGIN_SRC calc :var a=2 b=9 c=64 x=5
@@ -1258,7 +1244,7 @@ We have access the impressive [[http://howardism.org/Technical/Emacs/calc.html#T
   : 121.727272727
 #+END_SRC
 
-Let’s simplify a formula by leaving out some of the values for a variable:
+若我们没有对某些变量赋值的话,则会简化这个方程式:
 
 #+BEGIN_SRC org
   ,#+BEGIN_SRC calc :var a=4 b=2
@@ -1269,63 +1255,47 @@ Let’s simplify a formula by leaving out some of the values for a variable:
   : (sqrt(c) + 216) / (2 x + 1)
 #+END_SRC
 
-You may need to load it: M-x load-library and type: ob-calc
+当然,你需要通过 =M-x load-library <RET> ob-calc= 加载必要的库.
 
-Keep in mind that each line of each calc block is placed on the stack in the Calc mode buffer (see it with C-x * *).
+注意每个calc代码块的每一行都会进入Calc mode buffer的栈中(使用 =C-x * *= 可以切换到Calc中查看).
 
-* Summary
+* 总结
 
-Here is a summary listing of the [[http://orgmode.org/org.html#Specific%2520header%2520arguments][header arguments]], separated based on your goal or needs:
+下面是针对[[http://orgmode.org/org.html#Specific%2520header%2520arguments][头参数]] 的说明清单,按你的目标或需求分类:
 
-  * Code Evaluation?
++ 代码执行?
    
-    [[http://orgmode.org/org.html#dir][dir]]
-        specify directory the code should run … Tramp?
-    [[http://orgmode.org/org.html#session][session]]
-        re-use interpreter between code blocks
-    [[http://orgmode.org/org.html#file][file]]
-        write results to the file system
-    [[http://orgmode.org/org.html#eval][eval]]
-        limit evaluation of specific code blocks
-    [[http://orgmode.org/org.html#cache][cache]]
-        cache eval results to avoid re-evaluation of blocks
-    [[http://orgmode.org/org.html#var][var]]
-        setting variables for a block (ignore with no-expand)
+    [[http://orgmode.org/org.html#dir][dir]] :: 指定代码执行的工作目录,支持Tramp
+    [[http://orgmode.org/org.html#session][session]] :: 在不同代码块之间共享解释器
+    [[http://orgmode.org/org.html#file][file]] :: 将代码块的计算结果写入文件中
+    [[http://orgmode.org/org.html#eval][eval]] :: 限制只指定特定的代码块
+    [[http://orgmode.org/org.html#cache][cache]] :: 缓存计算结果,防止对代码块重复计算
+    [[http://orgmode.org/org.html#var][var]] :: 为代码块赋值(ignore with no-expand)
    
-  * Exporting?
++ 导出?
    
-    [[http://orgmode.org/org.html#results][results]]
-        either output or value and the formatting
-    [[http://orgmode.org/org.html#exports][exports]]
-        how the code and results should be exported
+    [[http://orgmode.org/org.html#results][results]] :: 结果时要输出的内容还是返回值,格式时怎样的
+    [[http://orgmode.org/org.html#exports][exports]] :: 代码与结果该如何导出
    
-  * Literate Programming?
++ 文学编程?
    
-    [[http://orgmode.org/org.html#tangle][tangle]]
-        how the source written to a script file … this is literate programming.
-    [[http://orgmode.org/org.html#mkdirp][mkdirp]]
-        create parent directory of tangled source file
-    [[http://orgmode.org/org.html#shebang][shebang]]
-        the initial line written to tangled files
-    [[http://orgmode.org/org.html#noweb][noweb]]
-        toggle expansion of noweb references
-    [[http://orgmode.org/org.html#noweb-ref][noweb-ref]]
-        resolution target for noweb references
+    [[http://orgmode.org/org.html#tangle][tangle]] :: 源代码以何种方式写入到脚本文件中 ... 这时文学编程的核心.
+    [[http://orgmode.org/org.html#mkdirp][mkdirp]] :: 再tangle源码文件时是否创建父目录
+    [[http://orgmode.org/org.html#shebang][shebang]] :: 写入到源码文件中第一行的内容
+    [[http://orgmode.org/org.html#noweb][noweb]] :: 是否扩展noweb引用
+    [[http://orgmode.org/org.html#noweb-ref][noweb-ref]] :: noweb引用的内容
    
-  * Special Input?
++ Special Input?
    
-    [[http://orgmode.org/org.html#prologue][prologue]]
-        text to prepend to code block body
-    [[http://orgmode.org/org.html#epilogue][epilogue]]
-        text to append to code block body
+    [[http://orgmode.org/org.html#prologue][prologue]] :: 参数决定了在执行代码块中的代码之前,作什么初始化操作
+    [[http://orgmode.org/org.html#epilogue][epilogue]] :: 参数决定了在执行代码块中的代码之后,作什么清理操作
    
-  * Special Output and Formatting?
++ Special Output and Formatting?
    
     [[http://orgmode.org/org.html#padline][padline]]
-    [[http://orgmode.org/org.html#post][post]]
-        post processing of code block results
+    [[http://orgmode.org/org.html#post][post]] :: 参数用于决定了得到代码块的result后,该result要传递到哪个代码块中作进一步的处理
     [[http://orgmode.org/org.html#wrap][wrap]]
-    Misc.
+    其他.
         [[http://orgmode.org/org.html#hlines][hlines]], [[http://orgmode.org/org.html#colnames][colnames]], [[http://orgmode.org/org.html#rownames][rownames]]
    
 * Footnotes
