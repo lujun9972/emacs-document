@@ -6,28 +6,21 @@
 #+OPTIONS: ^:{}
 
 
-Yesterday I made the first official release of [[https://github.com/skeeto/emacsql][EmacSQL]], an Emacs package I’ve been working on for the past few weeks. EmacSQL is a high-level SQL database for Emacs. It primarily targets SQLite as a back-end,
-but it also currently supports PostgreSQL and MySQL.
+昨天我release了第一版的 [[https://github.com/skeeto/emacsql][EmacSQL]]. 我为这个Emacs package已经花费了几周的时间了. EmacSQL 是一个Emacs上的高层SQL数据库抽象接口. 它主要使用SQLite作为后端,目前也支持PostgreSQL和MySQL.
 
-  * [[https://github.com/skeeto/emacsql][https://github.com/skeeto/emacsql]]
+该package可以[[http://melpa.milkbox.net/#/emacsql][通过MELPA安装]] ,并且安装好后立即就能用了. 它依赖于我上周才添加的[[http://nullprogram.com/blog/2014/01/27/][finalizers package]] .
 
-It’s [[http://melpa.milkbox.net/#/emacsql][available on MELPA]] and is ready for immediate use. It depends on the [[http://nullprogram.com/blog/2014/01/27/][finalizers package]] I added last week.
+虽然这个package依赖于一个非Elisp的组件,SQLite,但对于使用者来说,并不需要关心这个. 当编译该package的Elisp的时候,若系统已经安装了C编译器,则package会自动编译出SQLite执行程序共EmacsSQL使用. 否则,会自动下载我预编译好的SQLite执行程序. 理想情况下,EmacsSQL的这部分非Elisp组件可以对使用者完全透明,使用者完全可以认为Emacs已经内建了关系型数据库.
 
-While there’s a non-Elisp component, SQLite, there are no special requirements for the user to worry about. When the package’s Elisp is compiled, if a C compiler is available it will use it to compile a SQLite
-binary for EmacSQL. If not, it will later offer to download a pre-built binary that I built. Ideally this makes the non-Elisp part of EmacSQL completely transparent and users can pretend Emacs has a built-in
-relational database.
+EmacsSQL不会去用SQLite的官方命令行程序(即使已经有了也不会取用),原因我会随后解释.
 
-The official SQLite command line shell is not used even if present, and I’ll explain why below.
+就好像[[http://nullprogram.com/blog/2012/10/31/][Skewer]] 使我接触到web开发一样, EmacSQL 让我快速学到了很多SQL与关系型数据库的知识. 在开始这个项目前,我对这个领域知之甚少, 但在开发这个项目的过程中,我学到了许多这方面的知识. 创建一个Emacs扩展真是进入一门新领域的快速途径.
 
-Just as [[http://nullprogram.com/blog/2012/10/31/][Skewer]] jump started my web development experience, EmacSQL has been a crash course in SQL and relational databases. Before starting this project I knew little about this topic and I’ve gained a lot of
-appreciation for it in the process. Building an Emacs extension is a very rapid way to dive into a new topic.
-
-If you’re a total newb about this stuff like I was and want to learn SQL for SQLite yourself, I highly recommend [[http://www.amazon.com/gp/product/0596521189/ref=as_li_qf_sp_asin_tl?ie=UTF8&camp=1789&creative=9325&creativeASIN=0596521189&linkCode=as2&tag=nullprogram-20][Using SQLite]]. It’s a really solid introduction.
+如果你跟我一样完全是个新手,而你又想自学SQLite的SQL,我强烈推荐[[http://www.amazon.com/gp/product/0596521189/ref=as_li_qf_sp_asin_tl?ie=UTF8&camp=1789&creative=9325&creativeASIN=0596521189&linkCode=as2&tag=nullprogram-20][Using SQLite]]这篇文章. 这真是一篇入门精品.
 
 * High-level SQL Compiler
 
-By “high-level” I mean that it goes beyond assembling strings containing SQL code. In EmacSQL, statements are assembled from s-expressions which, behind the scenes, are compiled into SQL using some simple
-rules. This means if you already know SQL you should be able to hit the ground running with EmacSQL. Here’s an example,
+所谓“high-level”意味着它会帮你拼接SQL语句. EmacSQL是根据一些简单的转换规则来将S表达式转化为SQL语句的. 也就是说,如果你已经懂得SQL了,你应该就能知道EmacsSQL的低层运行机理. 下面是一些例子,
 
 #+BEGIN_SRC emacs-lisp
   (require 'emacsql)
@@ -57,63 +50,61 @@ rules. This means if you already know SQL you should be able to hit the ground r
   ;; => (("Jeff" 1000) ("Susan" 1001))
 #+END_SRC
 
-A query is a vector of keywords, identifiers, parameters, and data. Thanks to parameters, these s-expression statements should not need to be constructed dynamically at run-time.
+一个查询就是一个由关键字,标识符,参数和数据组成的数组. 这里参数的作用在于使得使用者无需在运行期动态地组建S表达式.
 
-The compilation rules are listed in the EmacSQL documentation so I won’t repeat them in detail here. In short, lisp keywords become SQL keywords, row-oriented information is always presented as vectors,
-expressions are lists, and symbols are identifiers, except when quoted.
+将S表达式编译成SQL语句的规则已经列在EmacsSQL的文档中了,我这里就不再重复了. 简单来说,lisp关键字会转换成SQL关键字, 基于行的信息(row-oriented information)使用数组来表示, 表达式使用list来表示, symbol没有被引用的话则会转换成标识符.
 
 #+BEGIN_SRC emacs-lisp
   [:select [name weight] :from patients :where (< weight 150.0)]
 #+END_SRC
 
-That compiles to this,
+会被编译成:
 
 #+BEGIN_SRC sql
   SELECT name, weight FROM patients WHERE weight < 150.0;
 #+END_SRC
 
-Also, any [[http://nullprogram.com/blog/2013/12/30/#almost_everything_prints_readably][readable lisp value]] can be stored in an attribute. Integers are mapped to INTEGER, floats are mapped to REAL, nil is mapped to NULL, and everything else is printed and stored as TEXT. The specifics
-vary depending on the back-end.
+另外, 任何[[http://nullprogram.com/blog/2013/12/30/#almost_everything_prints_readably][可读的lisp值]] 都能存储到数据库的属性中. 整数被映射出INTEGER型,小数被映射成REAL型, nil被映射为NULL,其他类型的值都以字面量的格式存储为TEXT类型. 当然这种映射关系根据后端的不同而改变.
 
 * Parameters
 
-A symbol beginning with a dollar sign is a parameter. It has a type — identifier (i), scalar (s), vector (v), schema (S) — and an argument position.
+以$开头的symbol被看成是参数. 紧跟$的是参数的类型 — identifier (i), scalar (s), vector (v), schema (S) — 最后是参数的位置.
 
 #+BEGIN_SRC emacs-lisp
   [:select [$i1] :from $i2 :where (< $i3 $s4)]
 #+END_SRC
 
-Given the arguments name people age 21, three symbols and an integer, it compiles to:
+若接受三个symbol以及1个整数作为参数: =name people age 21=, 则会编译成:
 
 #+BEGIN_SRC sql
   SELECT name FROM people WHERE age < 21;
 #+END_SRC
 
-A vector parameter refers to rows to be inserted or as a set for an IN expression.
+数组类型的参数引用的是带插入的行或者IN表达式中的集合.
 
 #+BEGIN_SRC emacs-lisp
   [:insert-into people [name age] :values $v1]
 #+END_SRC
 
-Given the argument (["Jim" 45] ["Jeff" 34]), a list of two rows, this becomes,
+若接受了一个由两行组成的list作为参数: =(["Jim" 45] ["Jeff" 34])=,则会编译成
 
 #+BEGIN_SRC sql
   INSERT INTO people (name, age) VALUES ('"Jim"', 45), ('"Jeff"', 34);
 #+END_SRC
 
-And this,
+还有这个例子:
 
 #+BEGIN_SRC emacs-lisp
   [:select * :from tags :where (in tag $v1)]
 #+END_SRC
 
-Given the argument [hiking camping biking] becomes,
+若接受的参数为 =[hiking camping biking]=,则会编译成
 
 #+BEGIN_SRC sql
   SELECT * FROM tags WHERE tag IN ('hiking', 'camping', 'biking');
 #+END_SRC
 
-When writing these expressions keep in mind the command =emacsql-show-last-sql=. It will display in the minibuffer the SQL result of the s-expression statement before the point.
+当写这些S表达式时,记住可以使用命令 =emacsql-show-last-sql= 来在minibuffer中显示当前S表达式转换成的SQL语句是什么.
 
 * Schemas
 
