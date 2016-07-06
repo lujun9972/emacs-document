@@ -1,5 +1,5 @@
-#+TITLE: introducing-EmacsSQL
-#+URL: http://nullprogram.com/blog/2014/02/06/                                                                                                                                                                 
+#+TITLE: introducing-EmacSQL
+#+URL: http://nullprogram.com/blog/2014/02/06/
 #+AUTHOR: lujun9972
 #+CATEGORY: raw
 #+DATE: [2016-07-04 一 07:34]
@@ -10,9 +10,9 @@
 
 该package可以[[http://melpa.milkbox.net/#/emacsql][通过MELPA安装]] ,并且安装好后立即就能用了. 它依赖于我上周才添加的[[http://nullprogram.com/blog/2014/01/27/][finalizers package]] .
 
-虽然这个package依赖于一个非Elisp的组件,SQLite,但对于使用者来说,并不需要关心这个. 当编译该package的Elisp的时候,若系统已经安装了C编译器,则package会自动编译出SQLite执行程序共EmacsSQL使用. 否则,会自动下载我预编译好的SQLite执行程序. 理想情况下,EmacsSQL的这部分非Elisp组件可以对使用者完全透明,使用者完全可以认为Emacs已经内建了关系型数据库.
+虽然这个package依赖于一个非Elisp的组件,SQLite,但对于使用者来说,并不需要关心这个. 当编译该package的Elisp的时候,若系统已经安装了C编译器,则package会自动编译出SQLite执行程序共EmacSQL使用. 否则,会自动下载我预编译好的SQLite执行程序. 理想情况下,EmacSQL的这部分非Elisp组件可以对使用者完全透明,使用者完全可以认为Emacs已经内建了关系型数据库.
 
-EmacsSQL不会去用SQLite的官方命令行程序(即使已经有了也不会取用),原因我会随后解释.
+EmacSQL不会去用SQLite的官方命令行程序(即使已经有了也不会取用),原因我会随后解释.
 
 就好像[[http://nullprogram.com/blog/2012/10/31/][Skewer]] 使我接触到web开发一样, EmacSQL 让我快速学到了很多SQL与关系型数据库的知识. 在开始这个项目前,我对这个领域知之甚少, 但在开发这个项目的过程中,我学到了许多这方面的知识. 创建一个Emacs扩展真是进入一门新领域的快速途径.
 
@@ -20,7 +20,7 @@ EmacsSQL不会去用SQLite的官方命令行程序(即使已经有了也不会�
 
 * High-level SQL Compiler
 
-所谓“high-level”意味着它会帮你拼接SQL语句. EmacSQL是根据一些简单的转换规则来将S表达式转化为SQL语句的. 也就是说,如果你已经懂得SQL了,你应该就能知道EmacsSQL的低层运行机理. 下面是一些例子,
+所谓“high-level”意味着它会帮你拼接SQL语句. EmacSQL是根据一些简单的转换规则来将S表达式转化为SQL语句的. 也就是说,如果你已经懂得SQL了,你应该就能知道EmacSQL的低层运行机理. 下面是一些例子,
 
 #+BEGIN_SRC emacs-lisp
   (require 'emacsql)
@@ -52,7 +52,7 @@ EmacsSQL不会去用SQLite的官方命令行程序(即使已经有了也不会�
 
 一个查询就是一个由关键字,标识符,参数和数据组成的数组. 这里参数的作用在于使得使用者无需在运行期动态地组建S表达式.
 
-将S表达式编译成SQL语句的规则已经列在EmacsSQL的文档中了,我这里就不再重复了. 简单来说,lisp关键字会转换成SQL关键字, 基于行的信息(row-oriented information)使用数组来表示, 表达式使用list来表示, symbol没有被引用的话则会转换成标识符.
+将S表达式编译成SQL语句的规则已经列在EmacSQL的文档中了,我这里就不再重复了. 简单来说,lisp关键字会转换成SQL关键字, 要查询的记录信息(row-oriented information)使用数组来表示, 表达式使用list来表示, symbol没有被引用的话则会转换成标识符.
 
 #+BEGIN_SRC emacs-lisp
   [:select [name weight] :from patients :where (< weight 150.0)]
@@ -108,8 +108,7 @@ EmacsSQL不会去用SQLite的官方命令行程序(即使已经有了也不会�
 
 * Schemas
 
-A table schema is a list whose first element is a column specification vector (i.e. row-oriented information is presented as vectors). The remaining elements are table constraints. Here are the examples from
-the documentation,
+表结构是用列表来表示的,该列表的第一个元素是由列名组成的数组(也就是说,记录信息(row-oriented information)是以数组的形式来表示的). list中剩下的元素表示表格的约束条件. 下面是摘自文档中的一些例子:
 
 #+BEGIN_SRC emacs-lisp
   ;; No constraints schema with four columns:
@@ -124,10 +123,9 @@ the documentation,
    (:check (> id 0)))
 #+END_SRC
 
-In the handful of EmacSQL databases I’ve created for practice and testing, I’ve put the schema in a global constant. A table schema is a part of a program’s type specifications, and rows are instances of that
-type, so it makes sense to declare schemas up top with things like defstructs.
+我尝试过很多种语法来创建EmacSQL数据库,在这些语法中,表示表结构的方式一直没有改变过. 表结构类似于程序中的类型定义,而行则是这些类型的是一个实例, 因此使用类似 =defstrcut= 这样的结构来表示表结构是可行的.
 
-These schemas can be substituted into a SQL statement using a $S parameter (capital “S” for Schema).
+这种结构表达式可以被 =$S= 类的参数所替代("S"表示Schema).
 
 #+BEGIN_SRC emacs-lisp
   (defconst foo-schema-people
@@ -141,80 +139,59 @@ These schemas can be substituted into a SQL statement using a $S parameter (capi
 
 * Back-ends
 
-Everything I’ve discussed so far is restricted to the SQL statement compiler. It’s completely independent of the back-end implementations, themselves mostly handling strings of SQL statements.
+目前为止我们所讨论的任何东西都只与SQL声明编译器有关. SQL声明编译器与后端实现无关,这些后端被用于处理SQL声明编译产生的字符串.
 
 * SQLite Implementation Difficulties
+:PROPERTIES:
+:ID:       j5q7j1903ah0
+:END:
 
-A little over a year ago I wrote [[http://nullprogram.com/blog/2012/12/29/][a pastebin webapp]] in Elisp. I wanted to use SQLite as a back-end for storing pastes but struggled to get the SQLite command shell, sqlite3, to cooperate with Emacs. The problem
-was that all of the output modes except for “tcl” are ambiguous. This includes the “csv” formatted output. TEXT values can dump newlines, allowing rows to span an arbitrary number of lines. They can dump
-things that look like the sqlite3 prompt, so it’s impossible to know when sqlite3 is done printing results. I ultimately decided the command shell was inadequate as an Emacs subprocess.
+一年多前,我用Elisp写过[[http://nullprogram.com/blog/2012/12/29/][一个pastebin webapp]]. 我本想用SQLite作为后端来存储粘贴的内容,但是发现SQLite的命令行程序(sqlite3)很难与Emacs进行整合. 难点在于,除了"tcl"之外,所有的输出模式都很模糊. 输出可能是以"csv"格式输出的. TEXT属性值中可能包含换行符,这使得一条记录可能被分成了许多行. 输出中可能包含类似sqlite3的提示符这样的内容,这样就无法搞清楚sqlite3是否已经将结果完全输出了. 最终我认为sqlite3根本不适合与Emacs进行整合.
 
-Recently there [[http://nullprogram.com/blog/2013/09/09/][was some discussion]] from alexbenjm and Andres Ramirez on an Elfeed post about using SQLite as an Elfeed back-end. This inspired me to take another look and that’s when I came up with a
-workaround for SQLite’s ambiguity: only store printed Elisp values for TEXT values! With print-escape-newlines set, TEXT values no longer span multiple lines, and I can use read to pull in data from sqlite3.
-All of sqlite3’s output modes were now unambiguous.
+最近alexbenjm和Andres Ramirez[[http://nullprogram.com/blog/2013/09/09/][开始讨论 ]]在Elfeed中使用SQLie来作为后端. 这个讨论给我以灵感,让我用另一种方式来处理SQLite输出的这种模糊性: 只使用TEXT来存储Elisp值的输出字面量! 只要将 =print-escape-newlines= 设置为非nil, 则TEXT值就不会被分隔为多行了,并且我还能使用 =read= 来从sqlite3的输出中还原原数据. 所有的sqlite3的输出模式一下子清晰起来了.
 
-However, after making significant progress I discovered an even bigger issue: GNU Readline. The sqlite3 binary provided by Linux package repositories is almost always compiled with Readline support. This makes
-the tool much more friendly to use, but it’s a huge problem for Emacs.
+然而,在解决了这个重大问题之后,我发现了一个更大的难题: GNU Readline. Linux package仓库中的sqlite3程序几乎都在编译时开启了Readline支持了.开启Readline支持使得该工具更易于人使用,但对于Emacs来说却是个大难题.
 
-First, sqlite3 the command shell is not up to the same standards as SQLite the database. Not by a long shot. In my short time working with SQLite I’ve already discovered several bugs in the command shell. For
-one, it’s not properly integrated with GNU Readline. There’s an .echo meta-command that turns command echoing on and off. That is, it repeats your command back to you. Useful in some circumstances, though not
-mine. The bug is that this echo is separate from GNU Readline’s echo. When Readline is active and .echo is enabled, there are actually two echos. Turn it off and there’s one echo.
+First, sqlite3 the command shell is not up to the same standards as SQLite the database. 在我使用SQLite的那么点时间里,我就发现了该程序的多个BUG. 其中一个是因为sqlite3这个程序并未很好地与GNU Readline整合在一起. sqlite3中有一个 =.echo= 元命令可以设置是否回显输入的命令(该功能可能在某些情况下很有用,但对我来说无用). 该BUG产生的原因是该回显命令与GNU Readline的eaho是分开的,在激活Readline的情况下,若开启 =.echo= 则实际上会回显两次. 若关闭 =.echo= 则回显一次.
 
 * Pseudo-terminals
 
-Under some circumstances, like when communicating over a pipe rather than a PTY, Readline will mostly become deactivated. This would have been a workaround, but when Readline is disabled sqlite3 heavily
-buffers its output. This breaks any sort of interaction. Even worse, on Windows [[http://sqlite.1065341.n5.nabble.com/Command-line-shell-not-flushing-stderr-when-interactive-td73340.html][stderr is not always unbuffered]], so sqlite3’s error messages may not appear for a long time (another bug).
+在某些条件下,比如当通过管道而不是PTY进行通讯时,Readline无法被激活. 这个问题本应该被解决的, 当Readline被禁用的后果是sqlite3大量的缓存输出内容. 这使得无法与sqlite3进行正常的交互. 更糟糕的是,在Windows平台上[[http://sqlite.1065341.n5.nabble.com/Command-line-shell-not-flushing-stderr-when-interactive-td73340.html][错误信息也可能被缓存]], 这样一来sqlite3的出错信息都可能长时间不显示(这是sqlite3的又一个bug).
 
-Besides the problem of getting Readline to shut up, another problem is getting Readline to stop acting on control characters. The first 32 characters in ASCII are control characters. A pseudo-terminal (PTY)
-that is not in raw mode will immediately act upon any control characters it sees. There’s no escaping them.
+除了Readline无法正常输出的问题之外,还有一个问题是Readline无法接收到控制字符. ASCII表中头32个字符被认为是控制字符. 不处于raw模式下的伪终端(PTY)会立即对输入的控制字符做出反应. There’s no escaping them.
 
-Emacs communicates with subprocesses through a PTY by default (probably an early design mistake), limiting the kind of data that can be transmitted. You can try this yourself in a comint mode sometime where a
-subprocess is used (not a socket like SLIME). Fire up M-x sql-sqlite (part of Emacs) and try sending a string containing byte 0x1C (28, file separator). You can type one by pressing C-q C-\. Send that byte and
-the subprocess dies.
+Emacs默认通过PTY与其子进程进行通讯(这可能是早期设计上的一个错误), 这就限制住了可以被发送的数据范围. 你可以自己试一下. 执行 =M-x sql-sqlite= (该命令是Emacs内置的) 然后试着发送任意包含 ~0x1C~ 字符的字符串. 你可以通过按下 =C-q C-\= 来输入这个特殊字符,但发送这个字符会使得子进程挂掉.
 
-There are two ways to work around this. One is to use a pipe (bind process-connection-type to nil). Pipes don’t respond to control characters. This doesn’t work with sqlite3 because of the previously-mentioned
-buffering issue.
+有两种方法解决这个特殊字符的问题. 一种方法是使用管道进行通讯(方法是设置 =process-connection-type= 为t),因为管道并不会响应控制字符. 然而由于上面提到的缓存问题,因此这种方法不适用于sqlite3.
 
-The other way to work around this is to put the PTY in raw mode. Unfortunately there’s no function to do this so you need to call stty. Of course, this program needs to run on the same PTY, so a
-start-process-shell-command is required.
+另一种解决方法是将PTY置于raw模式下. 不幸的是,Emacs中并没有函数来实现这个功能,你不得不通过调用 ~stty~ 程序来完成这个动作. 当然, 由于需要在同一个PTY上运行 ~stty~ ,因此我们需要用到 =start-process-shell-command= 命令.
 
 #+BEGIN_SRC emacs-lisp
   (start-process-shell-command name buffer "stty raw && <your command>")
 #+END_SRC
 
-Windows has neither stty nor PTYs (nor any of PTY’s issues) so you’ll need to check the operating system before starting the process. Even this still doesn’t work for sqlite3 because Readline itself will
-respond to control characters. There’s no option to disable this.
+Windows平台既没有 ~stty~ 命令,也没有PTY(或任何类似PTY的东西),因此在运行进程前你需要先检查一下所处的操作系统. 然而即使是这种方法也不适用于sqlite3,因为Readline本身就会响应这些控制字符,而且没有办法禁止掉.
 
-There’s a package called [[https://github.com/mhayashi1120/Emacs-esqlite][esqlite]] that is also a SQLite front-end. It’s built to use sqlite3 and therefore suffers from all of these problems.
+有一个叫做[[https://github.com/mhayashi1120/Emacs-esqlite][esqlite]] 的package,也是SQLite的前端. 它就是基于sqlite3命令的,因此深受这些问题的侵扰.
 
 * A Custom SQLite Binary
 
-Since sqlite3 proved unreliable I developed my own protocol and external program. It’s just a tiny bit of C that accepts a SQL string and returns results as an s-expression. I’m not longer constrained to
-storing readable values, but I’m still keeping that paradigm. First, it keeps the C glue program simple and, more importantly, I can rely entirely on the Emacs reader to parse the results. This makes
-communication between Emacs and the subprocess as fast as it can possibly be. The reader is faster than any possible Elisp program.
+由于sqlite3如此不可靠，我设计了自己的协议并开发了相关的外置程序. 该程序只是一小段C代码，它接受一个SQL字符串然后将查询结果转换为S表达式的格式返回. 借助这段C程序,我不再需要强制存储lisp值的字面量了,但我依然保留了这一范式. 因为这样做可以简化这段C程序的实现, 更重要的是,我可以完全依赖Emacs的 =reader= 来解析查询结果. 这使得Emacs能够与子进程尽可能快地进行通讯. 毕竟 =reader= 要比任何Elisp程序更快.
 
-As I mentioned before, this C program is compiled when possible, and otherwise a pre-built binary is fetched from my server (popular platforms only, obviously). It’s likely EmacSQL will have at least one
-working back-end on whatever you’re using.
+我之前提到过的,当具备条件的情况下,安装程序会直接编译这段C程序,否则会从我的服务器上直接下载预编译好的程序(当然,只支持常见的那几个平台). 也就是说,不管你用的什么平台,EmacSQL至少都有一种可用的后端.
 
 * Other Back-ends
 
-Both PostgreSQL and MySQL are also supported, though these require the user have the appropriate client programs installed (psql or mysql). Both of these are much better behaved than sqlite3 and, with the stty
-trick, each can reliably be used without any special help. Both pass all of the unit tests, so, in theory, they’ll work just as well as SQLite.
+EmacSQL同时支持PostgreSQL 与 MySQL,当然,前提是已经安装了响应的客户端程序(psql/mysql). 两者处理起来都比sqlite3要好的多,通过调用 =stty= 设置PTY为raw mode,无需任何其他的帮助就能很好的解析两者的输出. 两种后端都通过了所有的单元测试,所以,技术上来说,它们都能正常的工具.
 
-To use them with the example at the beginning of this article, require emacsql-psql or emacsql-mysql, then swap emacsql-connect for the constructors emacsql-psql or emacsql-mysql (along with the proper
-arguments). All three of these constructors return an emacsql-connection object that works with the same API.
+要用它们来实现本文一开始的那些例子, 需要先require =emacsql-psql= 或 =emacsql-mysql=,然后替换 =emacsql-connect= 为 =emacsql-psql= 或 =emacsql-mysql= 的构造函数(参数也需要作响应改变). 所有这三个构造函数都返回一个emacsql-connection对象,并且共用同一个API.
 
-EmacSQL only goes so far to normalize the interfaces to these databases, so for any non-trivial program you may not be able to swap back-ends without some work. All of the EmacSQL functions that operate on
-connections are generic functions (EIEIO), so changing back-ends will only have an effect on the program’s SQL statements. For example, if you use q SQLite-ism (dynamic typing) it won’t translate to either of
-the other databases should they be swapped in.
+EmacSQL目前只为这几个数据库提供了统一的接口. 所有操作数据库连接的函数都是泛型函数(EIEIO),这样,改变后端只会影响到程序的SQL声明而已. 例如, if you use  SQLite-ism (dynamic typing) it won’t translate to either of the other databases should they be swapped in.
 
-I’ll cover the connections API, and what it takes to implement a new back-end, in a future post. Outside of the PTY caveats, it’s actually very easy. The MySQL implementation is just 80 lines of code.
+以后我会再写写关于数据库连接的API及其实现方式. 除了处理PTY这部分内容外,其实还蛮简单的. 比如MySQL的实现只有区区80行代码而已.
 
 * EmacSQL’s Future
 
-I hope this becomes a reliable and trusted database solution that other packages can depend upon. Twice so far, the pastebin demo and Elfeed, I’ve really wanted something like this and, instead, ended up
-having to hack together my own database.
+我希望EmacSQL能成为可供其他package依赖的可信任的数据库解决方案. 截止到目前未知,已经有两个package使用了EmacSQL: pastebin demo 和 Elfeed, 我希望有更多人使用这个package而不是自己去hacker数据库.
 
-I’ve already started a branch on Elfeed re-implementing its database in EmacSQL. Someday it may become Elfeed’s primary database if I feel there’s no disadvantage to it. EmacSQL builds SQLite with the
-full-text search engine enabled, which opens to the door to a powerful, fast Elfeed search API. Currently the main obstacle is actually Elfeed’s database API being somewhat incompatible with ACID database
-transactions — shortsightedness on my part!
+我已经重新创建了一个分支用于使用EmacSQL是重新实现其数据库操作. 总有一天,我会使用它作为Elfeed与数据库交互的主要方式. EmacSQL所使用的SQLite开启了 full-text search engine, 这使得Elfeed的搜索API可以即强大又快速. 目前来看,主要的问题是Elfeed的数据库API与ACID数据库事务不那么兼容 — 这是我的短视所造成的(shortsightedness on my part)!
