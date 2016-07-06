@@ -1,0 +1,94 @@
+#+TITLE: fun-with-emacs-calc
+#+URL: https://www.masteringemacs.org/article/fun-emacs-calc
+#+AUTHOR: lujun9972
+#+CATEGORY: raw
+#+DATE: [2016-07-06 三 11:25]
+#+OPTIONS: ^:{}
+
+* The Challenge
+
+Jon over at [[http://irreal.org/blog/?p=795][Irreal’s Emacs blog]] posted an interesting solution to a challenge raised by [[http://xahlee.blogspot.com/2012/04/programing-problem-decimalize-latitude.html][Xah Lee]]:
+
+#+BEGIN_EXAMPLE
+  How do you convert a string like this 37°26′36.42″N 06°15′14.28″W into a decimal answer like this 37.44345 -6.25396.
+#+END_EXAMPLE
+   
+First off, I’m not sure Xah’s example answer is entirely correct; my understanding of latitude and longitude
+is limited to what I can google, and if I type the original degrees, minutes and seconds into [[http://transition.fcc.gov/mb/audio/bickel/DDDMMSS-decimal.html][this tool by the]]
+[[http://transition.fcc.gov/mb/audio/bickel/DDDMMSS-decimal.html][U.S. FCC]] it returns 37.44345 6.25396.
+
+Anyway, on with the challenge. Jon’s solution is very interesting, but it got me thinking: surely Emacs has
+the facility in place to do this already? It’s Emacs, right? Right.
+
+* Fun with Emacs Calc
+
+Emacs is equipped with a really, really awesome and spiffy RPN calculator (HP calculator fans, rejoice)
+capable of manifold things like algebraic and symbolic manipulation; matrix manipulation; conversion routines
+and much, much more. It’s truly wonderful but really complex, but it does come with a really nice Info manual
+(type C-h i g (calc) and check it out.) It’s a shame so few people know about its potential, as it’s basically
+a much simpler version of Mathematica, or even Wolfram Alpha (arguably you’ll have as much trouble telling 
+Calc what you want as you would Wolfram Alpha…)
+
+Anyway, I figured the Emacs calculator would have a facility in place for converting Deg-Min-Sec to decimal
+form, and sure enough, it does.
+
+To try it out, type C-x * * and the calculator will open. Two windows will appear: the calculator mode and the
+trail containing a trail – a history – of commands and actions. The first thing we need to do is switch the
+calculator to “HMS” mode so we can try it out. To do this, type m h in the mode (the left) window and the
+modeline will change and say something like Calc: 12 Hms. The 12 is the floating point precision.
+
+Next, type in the expression, replacing the unicode symbols above with @ for degrees; ' for minutes; and " for
+seconds. If you typed it in correctly, it will appear in the calculator window.
+
+All we have to do now is convert it. Calc can convert between a wide range of units and systems, but we only
+care about decimals. Type c d and Calc will convert it to a decimal number. If you entered 37@26'36.42" you
+should see 37.44345 appear in its place.
+
+OK, so we know it can do it, but how do we weaponize it? It so happens that Calc comes with a neat, little
+(though underdocumented) command called calc-eval.
+
+Entering IELM, M-x ielm, we can query the calculator in real time:
+
+#+BEGIN_EXAMPLE
+  ELISP> (calc-eval "1+2")
+  "3"
+#+END_EXAMPLE
+
+Yep. It does work. The hardest part about using it is mapping the “algebraic” notation used above with the
+indirect, keybinding-based input you use in the RPN calculator. Thankfully, the manual and (often) the trail
+will tell you the name of the function you are calling.
+
+Let’s digress a little so I can show you how neat this calculator actually is: solving the elementary equation
+2x+5=10. In the calculator, type m a to go to algebraic mode; next, type (2x + 5 = 10) – don’t forget the
+brackets – and it should appear as an equation. Finally, type a S to “solve for” a variable – and when
+prompted, answer x. The answer will appear in your calculator window. How awesome is that?
+
+Back to the challenge. Calling the “convert to degrees” function is what we need to do, and the answer is
+hidden in the trail – it’s called deg.
+
+Putting it all together, and we get:
+
+#+BEGIN_EXAMPLE
+  ELISP> (calc-eval "deg(37@ 26' 36.42\")")
+  "37.44345"
+#+END_EXAMPLE
+
+That looks right. But the original challenge said that we had to take a string, like the one given above, and
+map that. So here’s my solution:
+
+#+BEGIN_EXAMPLE
+  (defun hms-to-dec (hms-str)
+    (let ((hms (split-string hms-str "[°′″NW ]" t)))
+      (flet ((to-deg ()
+                     (string-to-number
+                      (calc-eval (format "deg(%s@ %s' %s\")"
+                                         (pop hms) (pop hms) (pop hms))))))
+        (list (to-deg) (to-deg)))))
+#+END_EXAMPLE
+
+Calling it from IELM yields the following answer:
+
+ELISP> (hms-to-dec "37°26′36.42″N 06°15′14.28″W")
+(37.44345 6.25396666667)
+
+Looks good to me. Job done, and a fun challenge.
