@@ -1,0 +1,269 @@
+#+TITLE: tips-on-emacs-lisp-programming
+#+URL: http://nic.ferrier.me.uk/blog/2012_07/tips-and-tricks-for-emacslisp?hmsr=toutiao.io&utm_medium=toutiao.io&utm_source=toutiao.io
+#+AUTHOR: lujun9972
+#+CATEGORY: raw
+#+DATE: [2016-07-09 六 22:01]
+#+OPTIONS: ^:{}
+
+I think EmacsLisp is getting to be a great application base, a really good language and environment to
+write programs in, not just a fancy editor. A number of people seem to agree and are trying it out.
+
+Here's some tips and tricks distilled from my 15 years of using EmacsLisp to help budding Lisp hackers
+in Emacs.
+
+* Do use a modern Emacs
+
+The latest version of Emacs is 24. It's not added to a whole lot of operating system repositories yet
+but for Debian and Ubuntu you can get it easily by using this repository or PPA at 
+[[http://emacs.naquadah.org/][http://emacs.naquadah.org/]].
+
+Using the latest version will give you access to lexical scope, built in packaging and lots more
+goodness.
+
+I am working on a yum equivalent of that APT repository. [[http://nic.ferrier.me.uk/blog/2012_07/tips-and-tricks-for-emacslisp?hmsr=toutiao.io&utm_medium=toutiao.io&utm_source=toutiao.io#donate][Donating]] might make that quicker.
+
+* Cut. And also paste
+
+You don't have to have a reusable module for everything, it's ok to cut and paste code sometimes.
+
+There is a massive load of [[https://github.com/languages/Emacs%2520Lisp][EmacsLisp]] on github which you can look at and copy.
+
+* There's a wealth of code out there, use it
+
+There are Emacs librarys for [[https://github.com/psanford/emacs-oauth][OAuth]] (and Oauth2, in ELPA) and for talking to [[http://orgmode.org/org.html#Hacking][Org Mode]] and for writing 
+[[http://www.emacswiki.org/emacs/ErBot][IRC bots]] or interfacing to [[http://www.online-marketwatch.com/pgel/pg.html][PostgreSQL]] or [[http://www.emacswiki.org/emacs/mysql.el][MySQL]] or [[https://github.com/m2ym/mongo-el][MongoDB]]. Talking to [[http://www.gnu.org/software/emacs/manual/html_node/url/Retrieving-URLs.html#Retrieving-URLs][HTTP]] and [[http://www.gnu.org/software/emacs/manual/html_node/smtpmail/Emacs-Speaks-SMTP.html#Emacs-Speaks-SMTP][SMTP]] and [[http://www.gnu.org/software/emacs/manual/html_node/nxml-mode/index.html][handling]] and 
+[[http://www.gnu.org/software/emacs/manual/html_node/elisp/Parsing-HTML_002fXML.html][parsing XML]] is built into Emacs. Building [[http://www.emacswiki.org/emacs/ParserCompiler][parsers]] and things that understand data definition languages
+[[http://www.emacswiki.org/emacs/YamlPath][in all]] [[http://www.emacswiki.org/emacs/WikiCreole][sorts of formats]] is also well covered in EmacsLisp.
+
+Basically, pretty much everything you could want to do as a programmer is there. Sometimes it's not
+packaged very well, but that's coming.
+
+* Use name based namespaces
+
+EmacsLisp does not have a module system. Many people call this a serious weakness but in my experience
+it's easy to work around it.
+
+There is a heirarchy you should follow:
+
+  * a package is a file or list of files that may be installed as a package
+      + hopefully defined as a package using [[http://emacswiki.org/wiki/ELPA][ELPA standards]]
+      + this is important so you can write code that is portable and has declared dependancies
+  * a module is a file in a package that is provided so it can be required
+      + there may be one or many modules in a package
+  * functions, classes, variables, constants, structs and other top level definitions all exist in a
+    module.
+
+Given this heirarchy we can adopt some simple but consistent rules:
+
+  * Name classes with a suffix c or C.
+  * Name important constants in UPPERCASE.
+  * Use the package name in your module names.
+  * If you have more then one module in your package, then have one top-level module that is the main
+    module of your package, if your package is called somepackage then have a somepackage.el
+  * Use the module name in the names of your functions, variables, methods, classes.
+
+  #+BEGIN_SRC emacs-lisp
+    (defun packagename-module-function (args)
+      ...)
+  #+END_SRC
+
+  * or in your top-level module:
+
+    #+BEGIN_SRC emacs-lisp
+      (defun packagename-function (args)
+        ...)
+    #+END_SRC
+
+  * Use -- to indicate private variables or functions, like:
+
+    #+BEGIN_SRC emacs-lisp
+      (defun packagename--function (args)
+        ...)
+    #+END_SRC
+
+  * macros often need different names, try and use your package and module still, eg this is ok:
+
+    #+BEGIN_SRC emacs-lisp
+      (defmacro with-package-module-thing (...)
+        )
+    #+END_SRC
+
+* Understand packages and autoloads
+
+Autoloads allow lazy loading of EmacsLisp library code. This is basically how they work:
+
++  functions or variables marked as ;;;### autoload are compiled into functions that first load the
+    rest of the library and then call the original definition of the function
++  when Emacs starts all the autoloads from all packages are loaded; this is fast because autoloads
+    are very small
++  when an autoloaded function is called its autoload causes the library to load
+
+* Do use CL
+
+Emacs core has always suggested not requiring [[http://www.gnu.org/software/emacs/manual/html_mono/cl.html][cl]] or using:
+
+#+BEGIN_SRC emacs-lisp
+  (eval-when-compile (require 'cl))
+#+END_SRC
+
+If you are writing code to go into Emacs then that's still valid, but for your own code? Just require 
+[[http://www.gnu.org/software/emacs/manual/html_mono/cl.html][cl]], it has so many useful extensions, such as [[http://www.gnu.org/software/emacs/manual/html_mono/cl.html#Loop-Basics][loop]] and [[http://www.gnu.org/software/emacs/manual/html_mono/cl.html#Iteration][dotimes]] and [[http://www.gnu.org/software/emacs/manual/html_mono/cl.html#Sequence-Functions][merge]] and lots, lots more.
+
+* Do write tests
+
+[[http://www.gnu.org/software/emacs/manual/html_node/ert/index.html][ERT]] is included in Emacs 24 and provides a good way of writing tests.
+
+You can even use my [[http://nic.ferrier.me.uk/blog/2012_04/fakir-for-faking-bits-of-emacs][fakir]] library to mock tricky bits of Emacs like processes or files.
+
+It's best to write one module of tests for each module of code. A project with a lot of tests is 
+[[https://github.com/nicferrier/elnode][Elnode]]. Each test module is named after the module that it tests which seems like more good advice.
+
+* Do write function docs
+
+[[http://emacswiki.org/emacs/ElDoc][ElDoc]] is really useful when you're writing EmacsLisp but it only works when you have documentation.
+Try and write [[http://www.gnu.org/software/emacs/manual/html_node/elisp/Documentation-Basics.html][good documentation]].
+
+You can use my [[http://www.emacswiki.org/emacs/WikiDoc][wikidoc]] program to make HTML documentation from function and variable doc.
+
+* Write command scripts with EmacsLisp
+
+Shell scripts are always quick and easy but sometimes you want a program to do a little more, shell
+becomes unwieldy fast and you want to switch to a proper programming language. EmacsLisp can do this
+pretty well, here's an example I've used in [[http://nic.ferrier.me.uk/blog/2012_07/emacs-packages-for-programmers][my blog before]]:
+
+#+BEGIN_SRC emacs-lisp
+  :;exec emacs -batch -Q -l "$0" -f main "$@"
+  (require 'cl)
+  (toggle-debug-on-error)
+  (defun main ()
+    (interactive)
+    (destructuring-bind (package &optional elpa-parent) command-line-args-left
+      ;; Make the elpa dir for this if we need to.
+      (when (and elpa-parent
+                 (not (file-exists-p elpa-parent)))
+        (make-directory elpa-parent t))
+      ;; Package stuff
+      (setq package-user-dir
+            (concat
+             (or (concat elpa-parent "/")
+                 user-emacs-directory)
+             ".elpa"))
+      (setq package-archives
+            '(("gnu" . "http://elpa.gnu.org/packages/";)
+               ("marmalade" . "http://marmalade-repo.org/packages/";)))
+                (package-initialize)
+                (package-refresh-contents)
+                (if (and (file-exists-p (expand-file-name package))
+                         (not (file-directory-p (expand-file-name package))))
+                    (package-install-file (expand-file-name package))
+                  ;; Else must just be a package
+                  (package-install (intern package)))))
+
+              ;; End
+#+END_SRC
+
+The first line is what does the magic of making Emacs run the script in batch mode (no windows). Note
+that what you want to do with the script in that bang line is pretty flexible:
+
+#+BEGIN_SRC emacs-lisp
+  :;exec emacs -batch -Q -l "$0" -f main "$@"
+#+END_SRC
+
+main is the function to call and the $@ is of course shell for the arguments.
+
+Emacs is very powerful at file manipulation, it's buffer mechanism is very useful for certain
+programming tasks that may be very difficult in shell.
+
+More on scripts in the [[http://emacswiki.org/emacs/EmacsScripts][EmacsWiki]].
+
+* It's not weird to use Object Orientation in EmacsLisp
+
+Object Oriented coding is [[http://news.ycombinator.com/item?id=3717715][suffering a bit of a backlash in some circles]] but it's still very useful in
+lots of cicrumstances, where you are trying to declare a category of things that are quite complex for
+example.
+
+CommonLisp has [[http://en.wikipedia.org/wiki/Common_Lisp_Object_System][CLOS]], a very comprehensive Object Orientation programming API and EmacsLisp has EIEIO,
+an implementation of CLOS.
+
+Here's a trivial example of EmacsLisp classes and methods:
+
+#+BEGIN_SRC emacs-lisp
+  (defclass some-userc nil
+    ((id
+      :initarg :id
+      :initform (lambda () (some-user--make-uuid))
+      :documentation "The id of the person")
+     (name
+      :type string
+      :initarg :name
+      :initform ""
+      :documentation "Name of the person"))
+    "A user record.")
+
+  (defun some-user--make-uuid () ; functions can be used by constructors
+    "1213243")
+
+  (defmethod some-user-greeting ((user some-userc) ; this is a type specifier
+                                 &optional daytime)
+    "Methods are functions and have docstrings."
+    (if daytime
+        (message "good morning %s" (oref user name))))
+
+  (let ((user (some-userc "nic" :name "nic ferrier"))) ; make a user
+    (some-user-greeting user t)) ; call the method
+#+END_SRC
+
+* Macro writing needs settings
+
+=eval-expression-print-level= needs to be set to nil (turned off) so that you can always see what's happening.
+
+* Don't write too many macros
+
+Macro use cases are:
+
++ hiding access to resources
++ building DSLs
++ and abstracting control flow
+
+Of these only the first is common in most programming, the second is obvious when you need it and the
+last you should think quite carefully before doing, it's normally for Lisp language hackers, not
+hackers in Lisp language.
+
+PS That doesn't mean you should never write control flow macros, just think hard before doing it.
+
+* Closures are cool but harder to debug
+
+If you need anything more than a tiny callback function then make a tiny callback that calls an
+external function with the right data:
+
+#+BEGIN_SRC emacs-lisp
+  (let ((x somecapturedthing))
+    (lambda (httpcon)
+      (real--implementation httpcon x)))
+#+END_SRC
+
+The full function is nearly always private but it can be more easily instrumented for debugging so you
+can easily see what's going on in that code. It's also useful sometimes to separate stuff out like
+this temporarily. It's pretty easy to do quickly, it's probably easy enough that you could write some
+EmacsLisp to do it automatically.
+
+* Use the manuals
+
+[[http://www.gnu.org/software/emacs/manual/][Emacs has great documentation]] including about [[http://www.gnu.org/software/emacs/manual/html_node/elisp/index.html][EmacsLisp itself]] and [[http://www.gnu.org/software/emacs/manual/html_node/cl/index.html][CL]] and [[http://www.gnu.org/software/emacs/manual/html_node/eieio/index.html][EIEIO]].
+
+The [[http://emacswiki.org/emacs/ElispCookbook][Elisp Cookbook]] on the EmacsWiki is also a great resource.
+
+* Do ask questions
+
+On [[http://stackoverflow.com/questions/tagged/elisp][StackOverflow]], [[http://www.reddit.com/r/emacs/][reddit]] or [[http://www.emacswiki.org/emacs/EmacsChannel][on]] [[irc://irc.freenode.net/%2523emacs][IRC]].
+
+* So that's it
+
+These are the things I can think of that people don't know. If you're thinking of looking at a Lisp
+for your next programming project then I really recommend EmacsLisp, it's a very practical language
+with lots to recommend it.
+
+* Fixes
+
+I got the value of eval-expression-print-level wrong, it should be nil to be turned off, 0 will stop
+any structure printing. This is now fixed.
