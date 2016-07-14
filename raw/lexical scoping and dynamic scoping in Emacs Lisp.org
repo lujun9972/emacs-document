@@ -6,43 +6,38 @@
 #+OPTIONS: ^:{}
 
 
-In this article, I demonstrate:
+在本文中,我会演示:
 
- 1. difference between dynamic scoping and lexical scoping in Emacs Lisp
- 2. what to watch out for with dynamic scoping
- 3. what you can do with lexical scoping and lexical closures
- 4. what happens when you mix lexical scoping code and dynamic scoping code
+1. Emacs Lisp中动态作用域与静态作用域之间的不同点
+2. 实用动态作用域要当心什么
+3. 静态作用域及静态闭包有什么用
+4. 当混用静态作用域和动态作用域时,会发生什么情况
 
-Emacs Lisp is always dynamically scoped in Emacs 23 and below. Support for lexical scoping is added to
-Emacs 24. Nice because many agree that lexical scoping makes more sense in most cases than dynamic
-scoping does. You’ll see why soon in this article. If you have an el file that you want to load with
-lexical scoping, you can add -*- lexical-binding: t -*- as the first line, then when Emacs 24 loads the
-file, it will apply lexical scoping to the code in that el file. For example, the first line of my
-current init file is
+Emacs Lisp 在Emacs23及以下版本中只支持动态作用域. 直到Emacs24才开始支持静态作用域的. 这很好,因为静态作用域在大多数时候都要比动态作用域更清晰易懂.本文随后会解释这一点.
+若你希望使用静态作用域,需要将 =-*- lexical-binding: t -*-= 放到el文件的第一行中. 这样当Emacs24加载该文件时,就会对里面的代码应用静态作用域了.
+举个例子,我现在Emacs初始化文件中的第一行是
 
 #+BEGIN_SRC emacs-lisp
   ;; -*- coding: utf-8 -*-
 #+END_SRC
 
-and if I change that line to
+当我把这一行改成
 
 #+BEGIN_SRC emacs-lisp
   ;; -*- coding: utf-8; lexical-binding: t -*-
 #+END_SRC
 
-then the code in my init file will be lexically scoped in Emacs 24. See [[http://www.gnu.org/software/emacs/manual/html_node/emacs/File-Variables.html][file variables]].
+则Emacs初始化文件中的代码被Emacs24加载时使用的是静态作用域了. 参见 [[http://www.gnu.org/software/emacs/manual/html_node/emacs/File-Variables.html][file variables]].
 
-To experiment with lexical scoping, first create an empty el file (C-x C-f lexical-scratch.el RET) and
-add this line:
+要实验一下静态作用域,第一步创建一个空的le文件(C-x C-f lexical-scratch.el RET), 然后添加下面这行内容:
 
 #+BEGIN_SRC emacs-lisp
   ;; -*- lexical-binding: t -*-
 #+END_SRC
 
-and save it, and then revert the buffer (M-x revert-buffer). Now you can use the buffer as a sort of
-scratch buffer with lexical scoping on.
+保存一下, 然后再revert一下这个buffer(M-x revert-buffer). 现在该buffer中的代码处于静态作用域下了,你可以在该buffer中做各种尝试了.
 
-What are dynamic scoping and lexical scoping? Let’s take a look at a simple example code.
+那么,什么是动态作用域,什么又是静态作用域呢? 我们来看个简单的例子吧.
 
 #+BEGIN_SRC emacs-lisp
   (setq a 17)
@@ -53,24 +48,16 @@ What are dynamic scoping and lexical scoping? Let’s take a look at a simple ex
     (my-print-a))
 #+END_SRC
 
-Notice that the value of a is not specified within my-print-a, making it what some call a “free
-variable” (also known as nonlocal variables as in “a is nonlocal to my-print-a”). What will be the
-result of running the code above? Will it print 1717? Or is it going to be 8? With dynamic scoping, it
-prints 8. With lexical scoping, it prints 1717. With dynamic scoping, what the name a in my-print-a
-refers to is determined by when my-print-a is called. With lexical scoping, it is determined by where
-my-print-a is defined.
+注意到在 =my-print-a= 中并未指定 =a= 变量的值,我们称呼其为“free variable”(自由变量) (也被称为 "nonlocal varibale"(非局部变量) 因为"=a= 不是在 =my-print-a= 函数内定义的"). 
+上面代码的运行结果会是什么呢?会输出1717呢还是8? 在动态作用域下,它输出8,但在静态作用域下,输出为1717. 
+在动态作用域下, =my-print-a= 中 =a= 所引用的值由 =my-print-a= 的调用环境所决定. 而在静态作用域下, =a= 的值由 =my-print-a= 的定义环境所决定.
 
-With dynamic scoping, the code prints 8 because by the time my-print-a is called, we’re are in the let
-form which locally binds a to 8. If you call my-print-a after the let form, it will print 1717.
+在动态作用域下,该代码输出8是因为,调用 =my-print-a= 的时机,是在一个let语句中,在let语句内, =a= 的值被绑定到8. 若你是在let语句外面调用 =my-print-a= 则会输出1717.
 
-With lexical scoping, the code prints 1717 because, first, where my-print-a is defined is outside of
-the let form, so a in my-print-a refers to the global binding for a (binding or associating the name a
-to a memory location), not the local binding created by the let form, and second, by the time
-my-print-a is called, the global value of a is 1717, which is separate from the local value of a being
-8. If you move the definition of my-print-a into the let form, the printed value will be 8 because then
-a in my-print-a will refer to the local binding for a created by the let form.
+在静态作用域下,代码输出1717是因为,首先, =my-print-a= 是在let语句外定义的,因此 =my-print-a= 中的 =a= 所引用的是 =a= 的全局绑定,而不是由let语句所创建的局部绑定(所谓绑定是指将名字 =a= 绑定到或分配给一块内存地址). 
+其次,当 =my-print-a= 调用时, =a= 的全局的值变成了1717,它是与8这个局部值是相隔离的. 若你将 =my-print-a= 的定义移到let语句中,则输出的值会是8,这是因为这时 =my-print-a= 中的 =a= 引用的是let语句所创建的局部绑定.
 
-If you know JavaScript, an equivalent code in JavaScript is
+如果你会JavaScript, 那么上面那段代码其实相当于下面这段JavaScript代码
 
 #+BEGIN_SRC javascript
   var a;
@@ -85,10 +72,9 @@ If you know JavaScript, an equivalent code in JavaScript is
   }());
 #+END_SRC
 
-That will print =1717=. Most programming languages are lexically scoped these days.
+这段JavaScript代码会输出 =1717=. 现在大多数的编程语言都是使用静态作用域的.
 
-If you are using Emacs 24, you can test if my example in lexical scoping actually prints 1717 by
-running the following code in the scratch buffer.
+若你使用的是Emacs24, 你可以在scratch buffer中运行以下代码,来看看在静态作用域下,我上面的例子是否真的输出1717.
 
 #+BEGIN_SRC emacs-lisp
   (eval
@@ -102,11 +88,9 @@ running the following code in the scratch buffer.
    t)
 #+END_SRC
 
-The function eval in Emacs 24 takes a second argument (optional), and if that is t, eval evaluates
-using lexical scoping. Don’t forget the quote ' in front of (progn ...).
+Emacs24的 =eval= 函数可以接受第二个可选参数, 若该参数的值为t则表示在静态作用域下执行代码. 执行时,可别忘了 =(progn ...)前的'哦.
 
-Lexical scoping makes lexical closures possible. What are lexical closures? Let’s see with the
-following code.
+支持静态作用域是创建静态闭包的基础. 那么什么是静态闭包呢? 让我们看看下面这段代码:
 
 #+BEGIN_SRC emacs-lisp
   (setq a 0)
@@ -118,19 +102,15 @@ following code.
     (my-print-a))
 #+END_SRC
 
-With lexical scoping, above prints 1717. Here’s what Alice thought about above:
+在静态作用域下,其输出为1717. 下面是Alice针对上面代码的解释:
 
 #+BEGIN_QUOTE
-    At first, that’s not strange. But if you look at that code again, something’s strange. At first, I
-    thought “This is lexical scoping, so the name a in the body of my-print-a refers to the local
-    binding for a created by the first let form. So 1717 should be printed” but then I looked again. By
-    the time my-print-a is called, that local binding created by the first let form is supposed to have
-    expired! You never drink expired milk! Why is 1717 printed instead of “Sorry, I don’t exist
-    anymore.”? Why is lexical scope resolution of a working without error even when it shouldn’t?
+咋一看,得出这个结果并不奇怪,但是若你仔细观察,就会发现有点奇怪了. 一开始,我想"这是静态作用域下,因此 =my-print-a= 中的 =a= 引用的是第一个let语句中创建的额局部绑定. 所以输出1717是理所当然的事情了"
+但我再一看,发现 =my-print-a= 调用时,其中 =a= 所引用的由第一个let语句创建的局部绑定不是应该已经过期了吗? 你怎么可能还能使用过期的变量呢! 为什么会输出1717而不是提示"对不起,我已经不存在了"呢? 这里明明应该报错,为什么却没有呢?
 #+END_QUOTE
    
-The first local binding for a somehow survives even after the first let form is exited and waits for
-my-print-a to access it. The first local binding for a expired for all purposes except for my-print-a‘s
+第一个局部绑定通过某种方式在第一个let语句退出后还依然存在,并且允许 =my-print-a= 来访问它. 
+ The first local binding for a expired for all purposes except for my-print-a‘s
 access. That must mean that Emacs manages things behind so that lexical scoping works even better than
 it “should”.
 
