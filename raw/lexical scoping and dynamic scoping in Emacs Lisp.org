@@ -109,25 +109,14 @@ Emacs24的 =eval= 函数可以接受第二个可选参数, 若该参数的值为
 但我再一看,发现 =my-print-a= 调用时,其中 =a= 所引用的由第一个let语句创建的局部绑定不是应该已经过期了吗? 你怎么可能还能使用过期的变量呢! 为什么会输出1717而不是提示"对不起,我已经不存在了"呢? 这里明明应该报错,为什么却没有呢?
 #+END_QUOTE
    
-第一个局部绑定通过某种方式在第一个let语句退出后还依然存在,并且允许 =my-print-a= 来访问它. 
- The first local binding for a expired for all purposes except for my-print-a‘s
-access. That must mean that Emacs manages things behind so that lexical scoping works even better than
-it “should”.
+第一个局部绑定通过某种方式在第一个let语句退出后还依然存在,并且只允许 =my-print-a= 来访问它. 这意味着Emacs肯定在低层维护着这些变量,这才使得静态作用域工作的要比想像中的更好.
 
-So what is a lexical closure? This relates to how “lexical scoping working even better” is implemented
-behind the scenes. The [[http://www.gnu.org/software/emacs/manual/html_node/elisp/Function-Cells.html][function cell]] of my-print-a contains a link to the relevant expired binding for
-a, as you can see by evaluating (symbol-function 'my-print-a). This combination of the function
-definition and the link to the scope at the time the function was created is called a lexical closure.
-Or you can call any lexically scoped function accessing an expired binding a lexical closure. Lexical
-closures are often simply called closures. Not all lexically scoped languages support closures.
+那么,什么是静态闭包呢? 这与静态作用域的实现原理相关. =my-print-a= 的[[http://www.gnu.org/software/emacs/manual/html_node/elisp/Function-Cells.html][function cell]] 中包含了一个指向 =a= 的那个本应过期的绑定, 你可以通过执行 =(symbol-function 'my-print-a)= 来看到这一点.
+这种结合函数定义以及指向函数创建时作用域的指针的组合物就叫做静态闭包. 你也可以称呼任何能访问已过期绑定的静态作用域函数为静态闭包. 静态闭包也简称闭包. 但并不是所有的静态作用域语言都支持闭包.
 
-In lexical scoping, when you want to see what a variable in a function body refers to, you just look
-around where the function body is placed in the code text and find the relevant binding. That’s why
-lexical scoping is easy to wrap our heads around, because all we have to do to is look around where the
-variable is written in the code text, and we don’t even have to worry about when the relevant binding
-expires.
+在静态作用域下,当你想看看函数体中某个变量引用的是什么东西时,你只需要看看函数体是在代码的哪个地方定义的,然后找到相关绑定即可. 这也是为什么静态作用域写的代码更清晰的原因,我们所要做的仅仅是看一下变量是在哪个位置定义就行了,也无需担心相关的绑定会过期.
 
-Anyway, an equivalent code in JavaScript:
+总之,上面代码的用JavaScript表示就是:
 
 #+BEGIN_SRC js
   var a, myPrintA;
@@ -147,12 +136,10 @@ Anyway, an equivalent code in JavaScript:
   }());
 #+END_SRC
 
-That will print 1717 because JavaScript supports lexical closures.
+其输出结果为1717,因为JavaScript支持静态作用域.
 
-In Emacs 24, lexically scoped (interpreted) functions are represented by a form of function value that
-looks like (closure ENV ARGS BODY...) while dynamically scoped functions are represented by a form of
-function value that looks like (lambda ARGS BODY...), the same form you use to write an anonymous
-function in Emacs Lisp. The following code prints (lambda (x y) (+ x y)) twice in dynamic scoping.
+在Emacs 24内部, 静态作用域函数是由格式为 =(closure ENV ARGS BODY...)= 的form来表示的, 而动态作用域函数是由格式为 =(lambda ARGS BODY...)= 的form来表示的(其格式与你在Emacs Lisp中书写的匿名函数是一样的).
+下面这段代码在动态作用域下会输出 ~(lambda (x y) (+ x y))~ 两次,在静态作用域下会输出 ~(closure (t) (x y) (+ x y))~ 两次
 
 #+BEGIN_SRC emacs-lisp
   (defun my-sum (x y)
@@ -163,18 +150,12 @@ function in Emacs Lisp. The following code prints (lambda (x y) (+ x y)) twice i
   (print (lambda (x y) (+ x y)))
 #+END_SRC
 
-That prints (closure (t) (x y) (+ x y)) twice in lexical scoping. It seems that (lambda ...) evaluates
-to itself in dynamic scoping, while it evaluates to (closure ...) in lexical scoping.
+貌似 =(lambda ...)= 语句的执行结果在动态作用域下就是它自己,而在动态作用域下则是 =(closure ...)=.
 
-Now onto the nesting. In lexical scoping, when function A defines function B (i.e. B is defined within
-the function body of A) and function B defines function C and function C prints a, what that a should
-refer to is first searched within C, and if not found, then search continues within B (which is where C
-is defined), and so on.
+下面聊聊嵌套定义的情况. 在静态作用域下,若A函数定义了B函数(即是说B函数是在A函数的函数体中定义的),B函数又定义了C函数,那么当C函数输出 =a= 时,先会在函数C中查找 =a= 的引用,若没有找到,则会去函数B(函数C定义的位置)中查找 =a= 的引用,以此类推.
 
-In the case of dynamic scoping, let’s say we have a function named my-func1 that calls another function
-my-func2 that calls my-func3 that prints a. Say my-func2 locally sets a to 2 when calling my-func3.
-What happens when we call my-func1 in dynamic scoping? It prints 2. What if we call my-func1 in an
-environment where a is 1? It still prints 2 instead of 1. Test with the following code.
+在动态作用域下,假设我们有一个函数 =my-func1=,这个函数调用了函数 =my-func2=, =my-func2= 函数又调用了 =my-func3=,函数 =my-func3= 输出 =a= 的值. =my-func2= 在调用 =my-func3= 时在本地设置 =a= 为2. 
+那么在在动态作用域下调用 =my-func1= 会有什么结果呢? 它会输出 ~2~. 那么,若我是在一个将 =a= 设为1的环境调用 =my-func1=,又会是什么结果呢? 它还是输出2而不是1. 可以使用以下代码进行测试: 
 
 #+BEGIN_SRC emacs-lisp
   (defun my-func1 ()
@@ -188,13 +169,10 @@ environment where a is 1? It still prints 2 instead of 1. Test with the followin
     (my-func1))
 #+END_SRC
 
-What’s happening is that while a local binding for a to 1 is active, my-func1 is called, then my-func1
-calls my-func2, going deeper. my-func2 establishes another local binding for a which shadows the former
-binding for a to 1. At that point, it’s as if we are in the spot X in (let ((a 1)) (let ((a 2)) X )).
-It’s at that point that my-func3 is called. So 2 is printed.
+其执行过程是这样的,在将 =a= 局部绑定为1的情况下调用 =my-func1= ,然后 =my-func1= 又调用 =my-func2=. 接下来, =my-func2= 为a又创建了一个局部绑定,从而屏蔽了之前那个将 =a= 绑定为1的局部绑定了.
+这个执行时点,就好像是 =(let ((a 1)) (let ((a 2)) X ))= 中的X一样,在这个时点调用 =my-func3= 当然会输出2了.
 
-There is one nasty gotcha you should know about dynamic scoping. Let’s say you want to use a function
-that takes a function as an argument. Let me give you a simple example of such a function.
+动态作用域有一个弊端你应该知道的. 假设你你想调用一个以函数为参数的函数.
 
 #+BEGIN_SRC emacs-lisp
   (defun my-call (f n)
@@ -205,32 +183,27 @@ that takes a function as an argument. Let me give you a simple example of such a
 
   (dolist (i (list 1 2 3))
     (print
-     (my-call (lambda (x) (* i x)) 5))) ; prints 5 10 15
+     (my-call (lambda (x) (* i x)) 5))) ; 输出 5 10 15
 #+END_SRC
 
-Nothing surprising so far. Here we go.
+目前看来没什么问题. 接下来我们试试
 
 #+BEGIN_SRC emacs-lisp
   (dolist (n (list 1 2 3))
     (print
-     (my-call (lambda (x) (* n x)) 5))) ; prints 25 25 25 in dynamic scoping.
+     (my-call (lambda (x) (* n x)) 5))) ; 动态作用域下会输出 25 25 25
 #+END_SRC
 
-What’s going on? Why is it doing that? The problem is that the name n used in (lambda (x) (* n x)) is
-also one of the argument names of my-call. The anonymous function (lambda (x) (* n x)) is called inside
-my-call where n, as an argument, is bound to 5. In lexical scoping, the above code prints 5 10 15 as
-expected.
+怎么会这样? 问题的关键在于 =(lambda (x) (* n x))= 中的 =n= 与 =my-call= 中的参数同名了. 匿名函数 =(lambda (x) (* n x))= 是在 =my-call= 中被调用的,而 =my-call= 函数内,参数 =n= 被绑定成了5了. 
+在静态作用域中上面代码会如愿输出 ~5 10 15~
 
-Gotcha 1 – Passing a dynamically scoped function as an argument to another function can get you!
-(Update: a dynamically scoped function is a function defined in a dynamically scoped file. It’s
-probably better to think in terms of a dynamically scoped file vs lexically scoped file rather than in
-terms of functions, or much better, to think in terms of dynamically scoped code residing in a
-dynamically scoped elisp buffer vs lexically scoped code residing in a lexically scoped elisp buffer.
-See [[http://stackoverflow.com/questions/7654848/what-are-the-new-rules-for-variable-scoping-in-emacs-24][http://stackoverflow.com/questions/7654848/what-are-the-new-rules-for-variable-scoping-in-emacs-24]]
+缺陷 1 – 将一个动态作用域下的函数作为参数传递給另一个函数可能会有问题!
+(Update: 所谓动态作用域下的函数是指在动态作用域文件中定义的函数. 所以与其从函数的角度来思考这个问题不如从动态作用域文件对比静态作用域文件的角度来思考这个问题. 
+或者更精确一点, 是动态作用域elisp buffer中的动态作用域代码 vs 静态作用域elisp buffer中的静态作用域代码
+请参见 [[http://stackoverflow.com/questions/7654848/what-are-the-new-rules-for-variable-scoping-in-emacs-24][http://stackoverflow.com/questions/7654848/what-are-the-new-rules-for-variable-scoping-in-emacs-24]]
 )
 
-Another gotcha. Try to define a function that takes two functions f and g and returns a composed
-function that is equivalent to applying g first and then f.
+让我们来看另一个问题. 尝试定义一个函数,其接受两个函数f和g,并返回一个组合函数等价于先调用g函数然后再用结果调用f函数.
 
 #+BEGIN_SRC emacs-lisp
   ;; in dynamic scoping
@@ -240,32 +213,26 @@ function that is equivalent to applying g first and then f.
 
   (funcall
    (my-compose (lambda (n) (+ n 3)) (lambda (n) (+ n 20)))
-   100) ; results in error, Lisp error: (void-variable f)
+   100) ; 结果报错, Lisp error: (void-variable f)
 #+END_SRC
 
-The error says f is not defined. Why? The composed function is created in my-compose, but is called in
-a different place where f and g are not bound. Again, in lexical scoping, the above code works as you
-expect.
+错误信息告诉我们 =f= 没有定义. 为什么会这样? 因为组合函数是在 =my-compose= 中创建的, 但是在另一个 =f= 和 =g= 都没有绑定的地方调用的.
+当然,如果是静态作用域,则上面代码运行结果与预期一样.
 
-Gotcha 2 – Using a function returned from a dynamically scoped function can get you.
+缺陷 2 – 使用从动态作用域函数返回的函数可能会有问题!
 
-In Emacs 24, defvar creates things called special variables. Special variables are dynamically scoped
-variables that will be bound dynamically even in lexically scoped functions. case-fold-search is an
-example of a special variable. Case sensitivity of the function search-forward depends on the value of
-the special variable case-fold-search. (search-forward "hello") matches HELLO when case-fold-search is
-t, while it doesn’t when case-fold-search is nil. Let’s say you define your own function
-my-search-forward maybe with some additional features in your lexically scoped el file, and
-my-search-forward also uses case-fold-search to decide case sensitivity. Because case-fold-search is a
-special variable, when you call
+在Emacs 24中, =defvar= 创建的变量称为 =special variables=. =Special variables= 是动态作用域变量,即使它在静态作用域函数中创建的绑定也是动态绑定.
+=case-fold-search= 就是个special variable的例子. 函数 =search-forward= 是否大小写敏感依赖于 =case-fold-search= 的值. 当 =case-fold-search= 设为t时, =(search-forward "hello")= 能够匹配"HELLO", 当 =case-fold-search= 为 nil时则不匹配. 
+假设你在静态作用域下的el文件中定义自己的 =my-search-forward= 函数,且在 =my-search-forward= 中也使用 =case-fold-search= 来决定是否大小写敏感. 由于 =case-fold-search= 为special variable, 因此当你调用
 
 #+BEGIN_SRC emacs-lisp
   (let ((case-fold-search t))
     (my-search-forward "hello"))
 #+END_SRC
 
-you can be certain that the search will be case insensitive.
+你可以确定该搜索是大小写不敏感的.
 
-You can use the function special-variable-p to check if a variable is special.
+你可以使用函数 =special-variable-p= 来判断一个变量是否special.
 
 #+BEGIN_SRC emacs-lisp
   (special-variable-p 'print-level) ; => t
@@ -274,19 +241,21 @@ You can use the function special-variable-p to check if a variable is special.
   (special-variable-p 'debug-on-quit) ; => t
 #+END_SRC
 
-Special variables can be useful. [[http://www.reddit.com/r/programming/comments/ggmc2/emacs_lisp_now_lexically_scoped_oh_very_funny_no/c1nfngv][gsg on reddit said]]:
+Special variables某些情况下很有用. [[http://www.reddit.com/r/programming/comments/ggmc2/emacs_lisp_now_lexically_scoped_oh_very_funny_no/c1nfngv][gsg在reddit中曾经说过]]:
 
-    Dynamic scope allows you to parameterise code without having to pass an explicit parameter. It’s
-    not a good default, but some kinds of code do benefit from it.
+#+BEGIN_QUOTE
+    动态作用域允许你給参数化代码而无需明确地传递一个参数. 把这种方式作为默认的行为不太好,但是有些代码确实能因此而收益.
+#+END_QUOTE
    
-[[http://www.reddit.com/r/programming/comments/ggmc2/emacs_lisp_now_lexically_scoped_oh_very_funny_no/c1nkdcu][kragensitaker said]]:
+[[http://www.reddit.com/r/programming/comments/ggmc2/emacs_lisp_now_lexically_scoped_oh_very_funny_no/c1nkdcu][kragensitaker也说过]]:
 
-    Thread-local variables, exception handlers, the current locale, and the current clipping region and
-    image transform are some examples of things that it makes sense to scope dynamically.
+#+BEGIN_QUOTE
+    有些情况下需要使用动态作用域,例如Thread-local变量, 异常处理器, 当前语言环境, 当前选中的区域 以及图形转换等.
+#+END_QUOTE
    
-Now let’s see what we can do with lexical closures.
+接下来让我们看看静态作用域有什么用.
 
-Run the following code in lexical scoping.
+在静态作用域下运行下面代码.
 
 #+BEGIN_SRC emacs-lisp
   (let (c)
@@ -298,13 +267,7 @@ Run the following code in lexical scoping.
       (setq c (+ x c))))
 #+END_SRC
 
-Then run the following code that use the three functions. The result is the same whether you run it
-with lexical scoping or not, because lexically scoped functions called in a dynamically scoped
-environment are still lexically scoped functions (Update: maybe it’s better to explain like this: a
-function call is just a function call, it doesn’t cause code in the function body to be moved around or
-passed around, it just executes the function body code. The function body is still right there in the
-lexically scoped buffer or the lexcially scoped environment. therefore every variable within the
-function body (except for special variables) will still refer to lexical bindings).
+然后在下面的代码中使用这三个函数. 由于在动态作用域下调用的静态函数依然是静态函数(Update:也许这样解释比较好:函数调用仅仅只是调用函数而已,它仅仅执行函数体的代码,二不会改变函数体的代码. 函数体依然处于静态作用域环境下. 因此,函数体中的变量(special varialbe除外)依然是引用的静态绑定),因此不管你是否在静态作用域下运行,其结果都是一样的.
 
 #+BEGIN_SRC emacs-lisp
   (my-set-c 10)
@@ -317,10 +280,8 @@ function body (except for special variables) will still refer to lexical binding
     (print (my-get-c))) ; prints 16.
 #+END_SRC
 
-The binding for c shared by my-get-c, my-set-c, and my-add-to-c acts like a sort of a private variable
-and is independent of other bindings of the name c such as one in the (let ((c 0)) ...) part. The
-reason this works is because the binding for c created by the let form surrounding the three defun
-forms has expired for all purposes except for the three functions’ access.
+=my-get-c=, =my-set-c=, 和 =my-add-to-c= 共享同一个 =c= 绑定,这使得 =c= 就好像是一个私有变量一样, 并且与其他名为 =c= 的绑定(例如 =(let ((c 0)) ...)= 中的c)相独立.
+之所以会这样是因为创建这个c绑定的let语句包含了这三个 =defun= 语句,因此除了这三个函数能访问以外,对于其他的访问来说 =c= 以及过期了.
 
 Now let’s test using lexical closures to do what static variables in C do.
 
@@ -341,7 +302,7 @@ Now let’s test using lexical closures to do what static variables in C do.
   (my-counter) ; => 4
 #+END_SRC
 
-For those confused as to why the above code works that way, here is a demonstrative example code.
+若你觉得很奇怪,为什么上面代码的输出是这样的,请看下面的演示案例.
 
 #+BEGIN_SRC emacs-lisp
   (eval
@@ -358,11 +319,9 @@ For those confused as to why the above code works that way, here is a demonstrat
   (my-test) ; => (2 0)
 #+END_SRC
 
-my-test is defined and then it’s called three times. The let form (let ((i2 0)) ..) in my-test was
-executed upon the three times when my-test was called. On the other hand, the let form (let ((i1 0))
-... ) was executed once and that was when my-test was defined. I hope that helps.
+我们定义了 =my-test= 函数,然后调用这个函数三次. =my-test= 中的let语句 =(let ((i2 0)) ..)= 也随之执行了三次. 另一方面,let语句 =(let ((i1 0)) ... )= 仅仅在定义 =my-test= 时执行了一边. 我希望这个例子能有助于你的理解.
 
-Now let’s test a function that returns functions that are lexical closures.
+下面让我们测试一个返回闭包函数的函数.
 
 #+BEGIN_SRC emacs-lisp
   (eval
@@ -399,9 +358,8 @@ Now let’s test a function that returns functions that are lexical closures.
   (funcall my-get-even-numbers) ; => 14
 #+END_SRC
 
-You might be wondering why my-get-even-numbers, my-get-odd-numbers and my-get-even-numbers-2 seem to
-have their own count instead of sharing a single count. They actually have their own count. If you are
-confused, what if you run the following code with lexical scoping?
+你可能会觉得奇怪,为什么 =my-get-even-numbers=, =my-get-odd-numbers= 以及 =my-get-even-numbers-2= 看起来有自己独立的 =count= 变量一样,而不是共享同一个 =count= 变量呢?
+答案是,它们确实有自己独立的 =count= 变量. 若你感到困惑不解, 你可以试试在静态作用域下执行以下代码,看结果是什么.
 
 #+BEGIN_SRC emacs-lisp
   (let ((count 0))
@@ -418,18 +376,11 @@ confused, what if you run the following code with lexical scoping?
               (setq count (1+ count))))))
 #+END_SRC
 
-my-count and my-count-2 have their own count. Each of the two let forms enclose each of the two (setq
-.. (lambda ...)) forms. That’s actually similar to what’s going on with my-get-counter. Each time
-(my-get-counter ..) is executed, (let ((count ..)) (lambda ..)) is executed again, each creating a new
-separate binding for count that each new returned function can access. When you execute (my-get-counter
-..) three times, (let ((count ..)) (lambda ..)) is executed three times, creating three bindings of
-count and three returned functions.
+=my-count= 与 =my-count-2= 都有它们自己独立的 =count= 变量. 这两个let语句各自包含了各自的 =(setq .. (lambda ...))= 语句. 这与 =my-get-counter= 是一样的请看. 每次执行 =(my-get-counter ..)= 都会执行一次 =(let ((count ..)) (lambda ..))=, 每次都会为 =count= 创建一个新的独立的绑定給新返回的函数访问. 当你调用 =(my-get-counter ..)= 三次, =(let ((count ..)) (lambda ..))= 也被执行了三次, 创建了三个 =count= 绑定和三个返回的函数.
 
-Alice now writes all of her new Emacs Lisp code in lexically scoped el files. When lexically scoped new
-code written by Alice and dynamically scoped old code written by others interact, what will happen?
-Will things break?
+Alice现在写的所有Emacs Lisp代码都使用静态作用域. 那么当混用静态作用域代码和动态作用域代码时,会有什么后果呢?
 
-Let’s start with a simple example.
+让我们从一个简单的例子开始.
 
 #+BEGIN_SRC emacs-lisp
   (eval
@@ -441,23 +392,19 @@ Let’s start with a simple example.
    nil)
 #+END_SRC
 
-The function my-bah is defined in a lexically scoped environment. So it must be a lexically scoped
-function. What about my-bah-2? Alice says “The function my-bah-2 is defined in a dynamically scoped
-environment. So it must be a dynamically scoped function.” On the other hand, Bob says “What is in the
-function cell of my-bah is copied to the function cell of my-bah-2. The function cell of my-bah
-contains a lexically scoped function. What is in the function cell of my-bah-2 should be the same
-lexically scoped function.” Alice says “Wait. These functions do nothing. Let’s make them do something.
-Let’s make them tell us whether they are lexically scoped by their return values.” The following code
-returns t in a lexically scoped environment, nil otherwise. [[https://yoo2080.wordpress.com/2011/12/30/how-to-check-dynamically-if-lexical-scoping-is-active-in-emacs-lisp/][Checking the value of lexical-binding]]
-[[https://yoo2080.wordpress.com/2011/12/30/how-to-check-dynamically-if-lexical-scoping-is-active-in-emacs-lisp/][instead here is a bad idea.]]
+函数 =my-bah= 是定义在静态作用域环境的. 因此它肯定是静态作用域函数. 那么 =my-bah-2= 呢? Alice认为"函数 =my-bah-2= 是在动态作用域环境下定义的,因此它肯定是动态作用域函数". 但是另一方面,Bob认为"=my-bah-2= 中function-cell的内容就是拷贝的 =my-bah= 中function cell的内容. 及润 =my-bah= 中function-cell的内容是静态作用域函数,那么 =my-bah-2= 中function cell的内容也应该是静态作用域函数". Alice说"目前这些函数啥都不干,让我们修改一下它们,让它们通过返回值告诉我们它们是否处于静态作用域下"
+
+下面这段代码在静态作用域下会返回t,否则返回nil. [[https://yoo2080.wordpress.com/2011/12/30/how-to-check-dynamically-if-lexical-scoping-is-active-in-emacs-lisp/][Checking the value of lexical-binding instead here is a bad idea.]] 
 
 #+BEGIN_SRC emacs-lisp
   (let ((x nil)
         (f (let ((x t)) (lambda () x))))
     (funcall f))
+#+END_SRC
 
-  Alice modifies the my-bah & my-bah-2 code.
+  Alice 修改了一下 =my-bah= 以及 =my-bah-2= 的代码.
 
+#+BEGIN_SRC emacs-lisp
   (eval
    '(defun my-bah ()
       (let ((x nil)
@@ -470,14 +417,14 @@ returns t in a lexically scoped environment, nil otherwise. [[https://yoo2080.wo
    nil)
 #+END_SRC
 
-Let’s see if my-bah-2 is a lexically scoped function.
+让我们看看 =my-bah-2= 是否是静态作用域函数.
 
 #+BEGIN_SRC emacs-lisp
   (my-bah) ; => t
   (my-bah-2) ; => t
 #+END_SRC
 
-So Bob guessed right? Let’s test a similar code that does not use defun.
+看起来Bob是对的. 让我们不用 =defun= 再试一次.
 
 #+BEGIN_SRC emacs-lisp
   (eval
