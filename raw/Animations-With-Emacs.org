@@ -1,0 +1,303 @@
+#+TITLE: Animations-With-Emacs
+#+URL: http://blog.josephwilk.net/art/emacs-animation.html                                                  
+#+AUTHOR: lujun9972
+#+CATEGORY: raw
+#+DATE: [2016-07-16 六 12:06]
+#+OPTIONS: ^:{}
+
+Emacs is designed for fast, highly customisable manipulation of text. ASCII animation requires manipulating
+text at a sufficient speed that it appears animated. Emacs is also used by a number of performers to live code
+musical & visual performances (and many other things). Where the audience can see the code in emacs and hear
+it.
+
+[[http://blog.josephwilk.net/images/live-coding-emacs.png]]
+
+In my live coding performances as [[http://www.repl-electric.com][Repl Electric]] I’ve used emacs animations to augment emacs with more feedback
+for the performer and a chance to destroy the order and structure the programmer has spent the entire
+performance building. Reminding us that we are looking at thoughts expressed through code that seem magical
+but are ultimately nothing more than text.
+
+Maybe something akin to the creation and destruction of Sand Mandalas.
+
+[[http://blog.josephwilk.net/images/sandmandala.jpg]]
+
+* Framework for Emacs Animation
+
+Zone Mode is an Emacs plugin which provides a framework for screensaver like animations.
+
+[[http://www.emacswiki.org/emacs/ZoneMode][http://www.emacswiki.org/emacs/ZoneMode]]
+
+Importantly it allows us to turn on an animation using our current code buffer as input and to terminate the
+animation, returning to the original code on a key press. So we can safely mangle the text knowing we can also
+return to safety. Well so far I’ve always found it to be safe but there is a small risk as mentioned in the
+zoning warning:
+
+#+BEGIN_SRC emacs-lisp
+  (message "...here's hoping we didn't hose your buffer!") 
+#+END_SRC
+
+A nice property of taking our buffer as input is we are never quite sure what text will be there and hence the
+properties of the animation.
+
+* Example: Uppercase all letters
+
+A simple function that finds non-whitespace in the buffer and tries to uppercase the char. It knows nothing
+about the zoning framework, its just a plain old function that operates on the active buffer.
+
+#+BEGIN_SRC emacs-lisp
+  (defun zone-upper-case-text ()
+    (zone-fill-out-screen (window-width) (window-height))
+    (random t)
+    (goto-char (point-min))
+    (while (not (input-pending-p))
+      (let ((wbeg (window-start))
+            (wend (window-end)))
+
+        ;;Keep moving the char cursor until its not whitespace
+        (while (looking-at "[ \n\f]")
+          (goto-char (+ wbeg (random (- wend wbeg))))))
+
+      ;;If we are at the end of the buffer go to the last char
+      (when (eobp) (goto-char (point-min)))
+
+      ;;Read the char at the cursor
+      (let ((c (char-after (point))))
+        (delete-char 1)           ;; Remove the char
+        (insert-char (upcase c))) ;; Reinsert with caps
+
+      ;;Sleep
+      (zone-park/sit-for (point-min) 0.1)))
+#+END_SRC
+
+The animation in all its glory:
+
+* Zoning Setup
+
+We can override all other zoning programs and just specify our zone-fn. When we activate zoning our animation
+will be run.
+
+#+BEGIN_SRC emacs-lisp
+  (eval-after-load "zone"
+    '(unless (memq 'zone-upper-case-text (append zone-programs nil))
+       (setq zone-programs [zone-upper-case-text])))
+#+END_SRC
+
+* Zoning Examples:
+
+Zoning mode comes with lots of example animations that are good starting points:
+
+[[http://www.opensource.apple.com/source/emacs/emacs-51/emacs/lisp/play/zone.el][http://www.opensource.apple.com/source/emacs/emacs-51/emacs/lisp/play/zone.el]]
+
+  * zone-pgm-jitter
+  * zone-pgm-putz-with-case
+  * zone-pgm-dissolve
+  * zone-pgm-whack-chars
+  * zone-pgm-rotate
+  * zone-pgm-rotate-LR-lockstep
+  * zone-pgm-rotate-RL-lockstep
+  * zone-pgm-rotate-LR-variable
+  * zone-pgm-rotate-RL-variable
+  * zone-pgm-drip
+  * zone-pgm-drip-fretfully
+  * zone-pgm-five-oclock-swan-dive
+  * zone-pgm-martini-swan-dive
+  * zone-pgm-paragraph-spaz
+  * zone-pgm-stress
+
+* Open Sound Control Protocol Based animation
+
+OSC is a handy protocol for sending data between networked devices using url like endpoints. Emacs has a
+plugin to run an OSC server ([[http://delysid.org/emacs/osc.html][http://delysid.org/emacs/osc.html]]). Hence if we have some kind of beat signal we
+could send a message to Emacs and in turn it could render changes based on our musics timing.
+
+With my Overtone setup for Repl-Electric I have the following flow of OSC messages:
+
+#+BEGIN_QUOTE
+ [Supercollider] -> OSC -> [Clojure] -> OSC -> [Emacs] 
+#+END_QUOTE
+
+Within Emacs setup an OSC server and define two call backs which change the color of the window face number
+
+#+BEGIN_SRC emacs-lisp
+  (require 'osc)
+  (require 'cl)
+
+  (defvar osc-server nil "Connection to receive msgs"
+  (defvar flip-state t)
+                                                                
+  (defun osc-connect (
+    "Create an OSC server and bind our fallback functions"
+    (when (not osc-server)
+      (setq osc-s
+            (osc-make-s
+             "localhost" 4
+             (lambda (path &rest args)
+               (c
+                ((string-match "/beat" path)
+                 (progn (if flip-state (on-beat) (off-beat)
+                        (setq flip-state (not flip-s
+
+  (defun osc-make-server (host port default-handler)
+    "Settings for OSC server"
+    (make-network-p
+     :name "emacs OSC server"
+     :host h
+     :server t
+     :service p
+     :filter #'osc-f
+     :type '
+     :family '
+     :plist (list :generic default-handler)
+
+  (defun on-beat (
+    (custom-set-f
+     '(window-number-face ((t (:foreground "deeppink"
+
+  (defun off-beat (
+    (custom-set-f
+     '(window-number-face ((t (:foreground "#FDDD0C"
+
+  (osc-connect)
+  (provide 'osc-server)
+#+END_SRC
+
+In Overtone/Clojure the sending signal:
+
+#+BEGIN_SRC emacs-lisp
+  (defonce emacs-client (osc-client "localhost" 4558))
+  (def emacs-trigger    (on-beat-trigger 8 #(do (osc-send emacs-client "/beat"))))
+#+END_SRC
+
+Heres a little demo with the brackets and window number changing colour based on the Overtone beat.
+
+[[http://blog.josephwilk.net/images/brackets.gif]]
+
+* Synchronisation
+
+Given some small local lag we now have a timing signal which is threaded through all our tools. [[http://supercollider.github.io/][Supercollider]],
+[[http://overtone.github.io/][Overtone]] and Emacs.
+
+Which means our emacs animations can start to change to the beat of the music…
+
+* Sound in ASCII
+
+Now that we have ways to animate and to connect audio data with emacs we can go a little further (way too far)
+and start to visualise the data about our sound in ASCII.
+
+From Overtone or SuperCollider we can create a synth which tracks the peak and power of an audio signal. It
+sends us messages back with the data which we then forward on as OSC messages to Emacs.
+
+#+BEGIN_EXAMPLE
+  #Triggers a Sin Wave Oscillator and sends signals about power/peak
+  SynthDef(\pulse,{
+    var sig, chain, onsets;
+    sig = SinOsc.ar(Rand(220.0,440.0))
+    ,*EnvGen.ar(Env.perc(releaseTime:0.5),Dust.ar(0.5))*0.7;
+    Out.ar(0,sig !2);
+    //
+    chain = FFT({LocalBuf(512, 1)}, sig);
+    onsets = Onsets.kr(chain,0.1,\power);
+    SendTrig.kr(onsets);
+    SendPeakRMS.kr(sig, 20, 3, "/replyAddress");
+  }).add;
+  #Run the crazy synth above
+  Synth(\pulse)
+
+  #Forward the data on as an OSC message
+  #to emacs
+  ~host = NetAddr("localhost", 4859);
+  p = OSCFunc({ |msg|
+    ~host.sendMsg("/peakpower",msg[3], msg[4]);
+    "peak: %, rms: %".format(msg[3], msg[4]).postln
+  }, '/replyAddress');
+#+END_EXAMPLE
+
+And in our emacs OSC server:
+
+#+BEGIN_SRC emacs-lisp
+  ((string-match "/peakpower" path)
+   (progn
+     (with-current-buffer "flatiron.clj"
+       (let ((sig (round (* 100.0 (first args)))))
+         (message (format "%f" (first args)))
+         (dotimes (n sig)
+           (insert "▓"))
+         (insert "▒░"))
+       (insert "\n"))))
+#+END_SRC
+
+* Repl Electric Emacs animations
+
+All my Emacs animations are used to conclude the performance. Heres lies the source code, some screenshots and
+tricks & tips that made the animations possible.
+
+Here’s a demo of all the Repl Electric animations discussed in action:
+
+* End of Buffer
+
+[[https://github.com/repl-electric/view-pane/blob/master/animations/end-of-buffer.el][https://github.com/repl-electric/view-pane/blob/master/animations/end-of-buffer.el]]
+
+[[http://blog.josephwilk.net/images/endofbuffer01.png]]
+
+[[http://blog.josephwilk.net/images/endofbuffer02.png]]
+
+[[http://blog.josephwilk.net/images/endofbuffer03.png]]
+
+In this animations the text gets slowly broken up with white spaces and then like the wind, blows the
+characters away. Sometimes words are ripped apart as they blow in the wind (if we get lucky).
+
+Two main phases:
+
+  * Injection of spaces. This starts to distort the text while keeping it readable. It provides a way to
+    increase the effect of expanding whitespace in the next stage.
+   
+  * Transforming whitespace into lots of whitespace. A Regex matches whitespace and replaces it with a
+    randomly increasing amount of whitespace. Which leads to the effect of the characters of the code blowing
+    away. I spent a while trying to improve the speed of this phase and Regexs proved to be the fastest way.
+   
+If we move the text fast enough soft word wrapping means the text appears to re-enter from the left side of
+the screen and eventually disappear out of the buffer. Without soft wrapping we get a horrible jitter as emacs
+moves back and forth between left and right side of the buffer.
+
+A couple of other tricks/tactics used:
+
+  * Continually incrementing integer. Useful for injecting movement or using sin/cos fn with a continuous
+    value.
+  * Perserving the syntax highlighting of the original code in an attempt to maintain some of the meaning of
+    the code.
+
+* The Stars
+
+[[https://github.com/repl-electric/view-pane/blob/master/animations/the-stars.el][https://github.com/repl-electric/view-pane/blob/master/animations/the-stars.el]]
+
+[[http://blog.josephwilk.net/images/thestars01.png]]
+
+This was my first animation and was based heavily on zone-pgm-drip-fretfully.
+
+It randomly picks a single character and moves it down the screen until it hits another letter or exits the
+screen.
+
+When running Emacs + Overtone + OpenGL, Emacs starts to slow down so part of the challenge was ensuring the
+animation ran as fast as possible.
+
+A nice property of this is that as the OpenGL shaders shutdown, the speed of the animation increases and the
+code destroys itself more quickly.
+
+* Waves
+
+[[https://github.com/repl-electric/view-pane/blob/master/animations/waves.el][https://github.com/repl-electric/view-pane/blob/master/animations/waves.el]]
+
+[[http://blog.josephwilk.net/images/waves01.png]]
+
+[[http://blog.josephwilk.net/images/waves02.png]]
+
+This animations attempts to simulate the effect of waves using line wrapping and mixing deletions with
+insertions of different sizes to create lines that seem to move at different speeds.
+
+* Breaking Tools
+
+While it may seem silly to bend Emacs to do things it was never intended to do, it’s an important part of
+discovering for yourself how you want your tools to work. Not just doing what you are expected but breaking
+them apart and discovering for yourself how you want to use them.
+
+Posted by Joseph Wilk Oct 2nd, 2015 [[http://blog.josephwilk.net/art][art]]
