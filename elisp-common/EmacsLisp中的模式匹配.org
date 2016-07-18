@@ -1,14 +1,13 @@
-#+TITLE: Pattern-Matching
+#+TITLE: EmacsLisp中的模式匹配
 #+URL: https://www.emacswiki.org/emacs/PatternMatching                                                      
 #+AUTHOR: lujun9972
-#+CATEGORY: raw
-#+DATE: [2016-07-16 六 12:36]
+#+CATEGORY: elisp-common
+#+DATE: [2016-07-18 周一 18:27]
 #+OPTIONS: ^:{}
 
-Emacs comes with the library [[http://repo.or.cz/w/emacs.git/blob/HEAD:/lisp/emacs-lisp/pcase.el][GIT:emacs-lisp/pcase.el]] that gives “ML-style pattern-matching macro for Elisp”.
-The macros are [[https://www.emacswiki.org/emacs/AutoLoad][AutoLoad]]ed, so a ‘require’ expression is not necessary.
+Emacs自带了一个库 [[http://repo.or.cz/w/emacs.git/blob/HEAD:/lisp/emacs-lisp/pcase.el][GIT:emacs-lisp/pcase.el]] 可以为Elisp提供ML风格的模式匹配宏. 该宏是[[https://www.emacswiki.org/emacs/AutoLoad][自动加载的]], 因此你无需显式的require它.
 
-A simple function for finding the reciprocal of a number, using ‘if’.
+下面倒数的函数中使用了 =if=.
 
 #+BEGIN_SRC emacs-lisp
   (defun recip (n)
@@ -17,7 +16,7 @@ A simple function for finding the reciprocal of a number, using ‘if’.
       (/ 1.0 n)))
 #+END_SRC
 
-Here is a pattern matching version using ‘pcase’.
+可以使用 =pcase= 改写成使用模式匹配的版本.
 
 #+BEGIN_SRC emacs-lisp
   (defun recip (n)
@@ -31,7 +30,7 @@ Here is a pattern matching version using ‘pcase’.
   ==> 0.5
 #+END_SRC
 
-Find the absolute value of a number by using the ‘pred’ syntax of the macro system.
+下面是另一个使用 =pcase= 的例子,是一个取绝对值的函数,其中用到了该宏中定义的 =pred= 符号
 
 #+BEGIN_SRC emacs-lisp
   (defun absval (x)
@@ -47,7 +46,7 @@ Find the absolute value of a number by using the ‘pred’ syntax of the macro 
   ==> 1
 #+END_SRC
 
-Find the head (“car”) of a list.
+下面函数实现了 =car= 的功能,找出list的头元素.
 
 #+BEGIN_SRC emacs-lisp
   (defun newcar (list)
@@ -57,7 +56,7 @@ Find the head (“car”) of a list.
   ==> a
 #+END_SRC
 
-Find the tail (“cdr”) of a list.
+下面函数实现了 =cdr= 的功能,找出list的尾部.
 
 #+BEGIN_SRC emacs-lisp
   (defun newcdr (list)
@@ -67,7 +66,7 @@ Find the tail (“cdr”) of a list.
   ==> (b c)
 #+END_SRC
 
-The second element of a list.
+下面函数取出list中的第二个元素.
 
 #+BEGIN_SRC emacs-lisp
   (defun 2nd (list)
@@ -77,14 +76,14 @@ The second element of a list.
   ==> 2
 #+END_SRC
 
-The second element when the list is smaller than length two is the empty list.
+上面函数在处理长度小于2的list时会返回nil.
 
 #+BEGIN_SRC emacs-lisp
   (2nd '(1))
   ==> nil
 #+END_SRC
 
-The third element of a list.
+下面函数取出list中的第三个元素.
 
 #+BEGIN_SRC emacs-lisp
   (defun 3rd (list)
@@ -94,21 +93,20 @@ The third element of a list.
   ==> 3
 #+END_SRC
 
-There is no pattern for matching the last element of a list. Instead, you need to recursively find the tail
-until the end using ‘cdr’.
+没有模式来匹配list中的最后那个元素,因此你需要递归的用 =cdr= 截取list的尾部,直到最后一个元素.
 
 #+BEGIN_SRC emacs-lisp
   (defun thelast (list)
     (pcase list
       (`(,l . nil) l)
-      (_ (thelast (cdr list)))))
+      (_ (thelast (cdr list)))))          ;_表示default/otherwise
   (thelast '(1 2))
   ==> 2
   (thelast '(1 2 3 4))
   ==> 4
 #+END_SRC
 
-Sum the series of integers from 1 to N.
+累加1到N的整数.
 
 #+BEGIN_SRC emacs-lisp
   (defun sum-to (n)
@@ -137,7 +135,7 @@ Sum the series of integers from 1 to N.
          6786 6903 7021 7140)
 #+END_SRC
 
-Find the Nth Fibonacci number.
+计算第N个Fibonacci数.
 
 #+BEGIN_SRC emacs-lisp
   (defun fib (n)
@@ -149,7 +147,7 @@ Find the Nth Fibonacci number.
   ==> (1 1 2 3 5 8 13)
 #+END_SRC
 
-Finding the factorial of N (N!) is
+计算N的阶乘(N!)
 
 #+BEGIN_SRC emacs-lisp
   (defun fac (n)
@@ -160,8 +158,7 @@ Finding the factorial of N (N!) is
   ==> (1 2 6 24 120 720 5040 40320 362880 3628800 39916800 479001600)
 #+END_SRC
 
-Euclid’s algorithm for greatest common divisor of two numbers. Pattern matching works on multiple arguments
-when they are made into a list-value.
+计算最大公约数的欧几里得算法. 通过将多个参数整合为一个list,可以将模式匹配用于多个参数.
 
 #+BEGIN_SRC emacs-lisp
   (defun gcd (x y)
@@ -172,8 +169,7 @@ when they are made into a list-value.
   ==> 4
 #+END_SRC
 
-Another way to use multiple arguments in a pattern is to use [[https://www.emacswiki.org/emacs/BackquoteSyntax][BackquoteSyntax]]. It is eerily similar to the
-pattern syntax. Raising the number X to the power N.
+另一种将同时匹配多参数模式的方法是使用[[https://www.emacswiki.org/emacs/BackquoteSyntax][反引用符号`]]. 要注意它与模式符号用的同一个符号. 下面计算X的N次方.
 
 #+BEGIN_SRC emacs-lisp
   (defun pow (x n)
@@ -183,7 +179,7 @@ pattern syntax. Raising the number X to the power N.
        (* x (pow x (1- n))))))
 #+END_SRC
 
-A faster version that uses squaring.
+下面是一个优化后的版本.
 
 #+BEGIN_SRC emacs-lisp
   (defun pow-fast (x n)
@@ -197,7 +193,7 @@ A faster version that uses squaring.
   ==> 32
 #+END_SRC
 
-The total computable function (for non-negative inputs) of Ackermann:
+Ackermann函数的实现:
 
 #+BEGIN_SRC emacs-lisp
   (defun ackermann (m n)
@@ -238,7 +234,7 @@ The total computable function (for non-negative inputs) of Ackermann:
   ==> 65533
 #+END_SRC
 
-A recursive function for describing numbers in English.
+用递归的方式将数字转换为英文书写形式.
 
 #+BEGIN_SRC emacs-lisp
   (defun int-to-words (n)
@@ -351,10 +347,10 @@ A recursive function for describing numbers in English.
   ==> "negative four-thousand, four-hundred and forty-four"
 #+END_SRC
 
-  * See also [[http://en.wikipedia.org/wiki/Pattern%2520matching][WikiPedia:Pattern matching]], [[http://nic.ferrier.me.uk/blog/2013_03/refactoring-elisp-polymorphically][Nic Ferrier on using pcase for refactoring]]
+另外关于 [[http://en.wikipedia.org/wiki/Pattern%2520matching][WikiPedia:Pattern matching]], [[http://nic.ferrier.me.uk/blog/2013_03/refactoring-elisp-polymorphically][Nic Ferrier on using pcase for refactoring]]
 
     #+BEGIN_SRC org
-      I use the following code to make an experiment, and it works fine:
+      我试了一下下面的代码,完全没问题.
 
       ,#+BEGIN_SRC emacs-lisp
         (pcase '(apple . (banana orange))
@@ -362,7 +358,7 @@ A recursive function for describing numbers in English.
         ==> (apple banana orange)
       ,#+END_SRC
 
-      But when I macroexpand the expression, the result is:
+      但是当我将这个表达式进行宏展开后,得到的结果是:
 
       ,#+BEGIN_SRC emacs-lisp
         (pp-macroexpand-expression 
@@ -390,13 +386,11 @@ A recursive function for describing numbers in English.
           nil)
       ,#+END_SRC
 
-      It’s clearly wrong that ‘a’, ‘b’, ‘c’ all bound to ‘xcar’ and the result is “(orange orange orange)”. It
-      confuses me very much. Is it a bug of Emacs’s macroexpand or I have missed some thing? My emacs version is
-      “GNU Emacs 24.3.1”
+      很明显不可能将‘a’, ‘b’, ‘c’都绑定到‘xcar’,否则结果应该是“(orange orange orange)”. 
+      我感到很迷惑,这是Emacs中 =macroexpand= 的BUG吗? 还是我理解有问题?我的Emacs版本是 “GNU Emacs 24.3.1”
 
       --xiepan
     #+END_SRC
 
 
-All those ‘xcar’s are different symbols that happen to have the same string as a symbol name. If you (setq
-print-gensym t) you can see they will be printed as #:xcar indicating they are uninterned symbols.
+事实上,所有这些‘xcar’都是不同的symbol,只不过恰巧有同一个名字而已. 若你执行过 =(setq print-gensym t)=, 你就会发现这些xcar输出为 =#:xcar= ,也就是说它们是uninterned symbols.
