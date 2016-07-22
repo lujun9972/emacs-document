@@ -1,0 +1,122 @@
+#+TITLE: 在Android手机上运行Emacs
+#+URL: http://endlessparentheses.com/running-emacs-on-android.html?source=rss                               
+#+AUTHOR: lujun9972
+#+CATEGORY: emacs-common
+#+DATE: [2016-07-22 周五 17:39]
+#+OPTIONS: ^:{}
+
+Android手机的性能越来越强,蓝牙键盘越来越便宜,你对Emacs的依赖又与日俱增,很自然的,你会开始想将手机,蓝牙键盘和Emacs三者整合在一起.
+幸运的是,现在来整合这三者已经不再像以前那么苦难了. 事实上,只需要做一些小小的工作就能完美的在手机上复用你的桌面配置.
+
+我本打算只是简单罗列一下整合这三者的步骤就好, 但是我写得有点太忘情了使得本文有点长. 我会先列出简略的说明,你可以根据需要来接着阅读后面的详细说明.
+
+1. 通过手机Play store安装[[https://play.google.com/store/apps/details?id=com.termux][Termux]] (还可以安装[[https://play.google.com/store/apps/details?id=org.pocketworkstation.pckeyboard][Hacker’s keyboard]], 但不是必须的)
+2. 启动Termux,然后运行下面的命令
+  
+   #+BEGIN_SRC sh
+     apt update
+     apt install emacs
+   #+END_SRC
+   
+3. 拷贝桌面PC的init.el文件到手机上(后面还会提到如何保持初始化文件的同步).
+4. 运行emacs 
+     + 若Emacs报出“void-function …”这样的错误,注释掉初始化文件中的相关部分,然后再运行emacs. 后面会解释为什么会这样
+       try again. See below for the explanation.
+5. emacs启动成功,可以大肆庆祝了.
+
+   [[http://endlessparentheses.com/images/android-emacs-result.png]]
+
+Emacs在手机山运行的太好了,让我感到很惊奇. 甚至是[[https://github.com/Malabarba/beacon][Beacon]] 这样的大型图形化package,也能够直接运行(只是可能会有点慢).
+
+* Update 11 Apr 2016
+
+Fredrik Fornwall給Termux上的Emacs package打了补丁,现在已经不再需要tmp目录了. 因此现在在Android手机上安装Emacs变得超级简单了.
+
+* A tale of two thumbs
+
+昨天晚上,由于没有了笔记本以及任何带键盘的东西,我感到有些无聊, 于是我做了任何一个正常人都会做的事情:在我的手机上安装Emacs. 
+我第一次有这个想法是在一年多前,但是最后以失败而告终了. 但是这次有些不一样了,我感觉我能成.
+
+最开始,我看到play store上有个[[https://play.google.com/store/apps/details?id=com.zielm.emacs][Emacs app]] 看起来完全能满足我的要求. 我上一次尝试在手机上安装Emacs时也安装了这个app,但是它很不稳定,经常crash. 这一次更糟糕,它甚至都无法被安装了,Play Store每次都提示"Failure to install"的错误信息.
+
+然而,我也并不是完全一无所获. 一条[[https://play.google.com/store/apps/details?id=com.zielm.emacs&reviewId=Z3A6QU9xcFRPSGQ2WG1fR1M3MlhacU13MmtWd2NlaGpza1k0czVkaVlVUm85QThiZ3V6RjRNQWU2bUFTcE0yWWVzM3VheG1ERkYxOVctbnhfWVJBeUZsc0E][好心的评论]] (然而它的评分却并不高) 给我指出了一个新的放向. [[https://play.google.com/store/apps/details?id=com.termux][Termux]], 一个很健壮的程序,他声称提供了"强大的终端模拟器,以及大量的linux packages".
+
+安装完了Termux之后,我确实得到了一个终端模拟器,但是我并不觉得这有什么,以早就用过像这种的终端app了. 我尝试着输入如下命令
+
+#+BEGIN_SRC sh
+  apt update
+  apt install emacs
+#+END_SRC
+
+[[http://endlessparentheses.com/images/termux-emacs.png]]
+
+令人惊叹的是, Termux的表现比预想中的还要好. 安装Emacs的过程很顺利的,而且安装的还是是Emacs25! 本来我还担心,我的初始化文件与Emacs24并不兼容呢...现在完全没有这个问题了.
+Dare I even hope? Could I reproduce my entire setup on this minute device?
+
+在开始前,我跳回play store不能够安装了[[https://play.google.com/store/apps/details?id=org.pocketworkstation.pckeyboard][Hacker’s keyboard]], 它使得我可以按下modifier keys.
+然后再在终端中启动emacs,除了有点慢以外,一切都很正常. 但是我的好运气马上就要到头了.
+
+我执行的第一个命令是 =M-x list-packages=, 但是却报了一个很奇怪的错,提示在/tmp/asdlij198h1目录下没有文件 (不过这个问题已经被Fredrik的补丁修复了). package menu能显示出来,但是无法刷新. 
+没办法,我只好按 =C-z= 退出emacs,然后运行 =mkdir /tmp/=. 结果创建目录失败,提示"Permission denied"
+
+好吧,我本应该想到会有这个错误的. 我尝试使用sudo,发现也不行,没办法我用 =fg= 命令切回Emacs,然后尝试重新设置Emacs的临时文件目录的方法来跳过这个错误.
+
+#+BEGIN_SRC emacs-lisp
+  (setq temporary-file-directory "~/tmp/")
+#+END_SRC
+
+在执行一次 =list-packages= 后,总算正常工作了! 我试着从gnu仓库中安装了一下company,也很正常! 事实上所有的操作都很正常. 我运行了一下 =M-x global-company-mode=, 所有的东西都很正常,甚至能正常弹出菜单.
+
+到了这一步,已经基本可以满足我的要求了,但是我并没有就此罢手.
+
+下一步是将我实际的初始化文件移植到手机上. 好在我将它使用Dropbox进行了同步,因此将它放到手机上就很简单了. 只需要打开Dropbox app,找到我的init.el和init.org,然后将它们都标记为“Available offline”.
+Dropbox有个数据目录,用于存放那些文件,并在我们对这些文件做出修改后自动进行同步(不过下载其他地方做出改动需要你手动确认).
+
+我再次按下 =C-z= 将Emacs切换至后台,然后在Termux中输入一下命令
+
+#+BEGIN_SRC sh
+  cd ~/.emacs.d
+  ln -s /sdcard/Android/data/com.dropbox.android/files/SOME_GIBBERISH/.emacs.d/init.el
+  ln -s /sdcard/Android/data/com.dropbox.android/files/SOME_GIBBERISH/.emacs.d/init.org
+#+END_SRC
+
+找到Dropbox同步的这些文件的地址着实有些麻烦. 我不得不在一堆莫名其妙的目录中实验才能找出正确的那个目录地址.
+
+运行 =fg= 回到Emacs.
+
+下一个问题是如何安装package. 在安装好必要的package前我的初始化文件是无法正常加载完成的. 可惜我没有预先使用类似 =use-package= 这样的(能自动安装package的)工具来重写配置文件,好在,事情还有所传记.
+就像我之前提到过的, Emacs 25 [[http://endlessparentheses.com/new-in-package-el-in-emacs-25-1-user-selected-packages.html][会记录下用户选择过的package]], 因此我可以在(初始化文件中的) =custom-set-variables= 语句中找到 =package-selected-packages= 的值即是安装过的package列表.
+因此,我唯一要做的只是按下 =C-M-x= 执行整个 =custom-set-variables= 语句,然后执行 =M-x package-install-selected-packages= 而已.
+
+安装package的过程可花了点时间…
+
+我又试了试Termux是否在后台也能工作的很好. 我切换到Youtube app,看了会视频,然后再切回Termux,发现完全没有问题!
+
+现在到了关键时刻了. 虽然到目前为止一切都很顺利,但是我不得不考虑正常重启的概率有多大了. 毕竟,我的初始化文件有4千行Elisp代码,涉及到100多个package. 有太多可能出错的地方.
+
+我做了下深呼吸,降低了一下我的心理预期. 我按下 =C-x C-c= 退出Emacs回到终端,然后输入 =emacs↵=. 结果果然报错了. 
+
+错误原因又是与tmp目录有关. 我之前不是已经解决这个问题了吗? 我查了一下原因,发现这是由 =(server-start)= 引发的错误. 原因是 =server-socket-dir= 的值为 =/tmp/emacs1000=. 该变量的注释解释了为什么它没有直接使用 =temporary-file-directory= 的值.
+
+#+BEGIN_SRC emacs-lisp
+  ;; We do not use `temporary-file-directory' here,
+  ;; because emacsclient does not read the init file.
+  (defvar server-socket-dir
+    ...)
+#+END_SRC
+
+我能理解为什么它不使用 =temporary-file-directory= 的值,然而这并不能帮助我解决问题. 我感到很不耐烦,于是直接将调用 =server-start= 的语句放到 =ignore-errors= 中,然后再试着重启Emacs…
+
+又出现了一个error. 这一次是说没有 =set-fringe-mode= 这个函数. 出错的原因很容易理解. Termux提供的Emacs是为终端环境编译的(为什么不呢?), 因此很多与图像相关的函数根本就没有定义. 解决方案也很简单,加个判断就行.
+
+#+BEGIN_SRC emacs-lisp
+  (when (fboundp 'set-fringe-mode)
+    (set-fringe-mode '(nil . 0)))
+#+END_SRC
+
+第三次重启Emacs,这次总算成功了! 没有任何错误. 甚至连个警告都没有! 除了我所钟爱的darktooth主题不能被识别外,其他都很正常
+=Smart-mode-line= 在屏幕底部显示. =Beacon= 在我滚动鼠标的时候开始闪烁. 虽然触屏键盘的界面很小,但是我所熟悉的按键绑定让我觉得很舒畅.
+
+有些人可能会觉得很无趣,这么折腾有什么意义呢? 对我来说,当我知道无论何时何地,Emacs都与我同行,这让我感到心安.
+
+现在我只需要再搞台蓝牙键盘就好了…
