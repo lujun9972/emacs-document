@@ -1,0 +1,135 @@
+#+TITLE: Emacs-as-an-X-Clipboard-Manager
+#+URL: http://ftfl.ca/blog/2015-12-28-emacs-clipboard-manager.html                                          
+#+AUTHOR: lujun9972
+#+CATEGORY: raw
+#+DATE: [2016-07-25 一 17:19]
+#+OPTIONS: ^:{}
+
+
+Until recently, I was using clipit, a fork of parcellite, as an X clipboard manager. Discovering a [[https://github.com/emacs-helm/helm/issues/1157][bug]] in
+Emacs that presented when a clipboard manager was running prompted me to look for an alternative to clipit. I
+was pleased to discover the [[https://github.com/bburns/clipmon][clipmon]] package, which worked relatively well, but it also has a showstopping [[https://debbugs.gnu.org/cgi/bugreport.cgi?bug=22214][bug]].
+Moreover, it seems the only way to monitor the X clipboard from within Emacs is to poll it. I'm not keen on
+something inside Emacs having to wake up every second or two to check the X clipboard. An alternative is to
+move the polling outside of Emacs with this shell script.
+
+#+BEGIN_SRC sh
+  #!/bin/sh
+
+  occ=$(xclip -sel clip -o | sed 's/[\"]/\\&/g')
+
+  while sleep 2; do
+      ncc=$(xclip -sel clip -o | sed 's/[\"]/\\&/g')
+      if [ "${occ}" != "${ncc}" ]; then
+          emacsclient -e "(kill-new \"${ncc}\")"
+          occ=${ncc}
+      fi
+  done
+#+END_SRC
+
+This is a simple solution and it works, but it still bothers me that I'm polling the clipboard. An event
+driven solution would be better. My Emacs experience drives me to try and write an on-clipboard-change hook
+for X, but that's beyond the scope of my mini holiday project.
+
+With few exceptions, I only use two applications outside of Emacs (a web browser and a terminal emulator) and
+both are customizable. Each time I copy something to the X clipboard in those applications, I could also add
+the new clipboard entry to the Emacs kill ring. Here are the customizations I add to the init file of my
+primary browser, Conkeror.
+
+#+BEGIN_SRC js
+  function ekr (cc) {
+      if (typeof cc === 'undefined') { cc = read_from_clipboard(); }
+      cc = cc.replace(/([^\\]*)\\([^\\]*)/g, "$1\\\\$2");
+      cc = cc.replace('"', '\\"', "g");
+      cc = cc.replace("'", "'\\''", "g");
+      var ecc = "emacsclient -e '(kill-new \"" + cc + "\")' > /dev/null";
+      shell_command_blind(ecc);
+  }
+
+  interactive(
+      "ekr_cmd_copy",
+      "Copy the selection to the clipboard and the Emacs kill ring",
+      function (I) {
+          call_builtin_command(I.window, "cmd_copy", true);
+          ekr();
+      }
+  );
+
+  undefine_key(caret_keymap,"M-w");
+  define_key(caret_keymap,"M-w", "ekr_cmd_copy");
+  undefine_key(content_buffer_normal_keymap,"M-w");
+  define_key(content_buffer_normal_keymap,"M-w", "ekr_cmd_copy");
+  undefine_key(special_buffer_keymap,"M-w");
+  define_key(special_buffer_keymap,"M-w", "ekr_cmd_copy");
+  undefine_key(text_keymap,"M-w");
+  define_key(text_keymap,"M-w", "ekr_cmd_copy");
+#+END_SRC
+
+I also add calls to ekr(); at the end of the kill-region and kill-ring-save commands in modules/commands.js,
+the cut-to-end-of-line command in modules/content-buffer-input.js and a call to ekr(text); at the end of the 
+copy_text function in modules/elements.js.
+
+When eshell doesn't cut it, the second place I find myself outside of Emacs is in urxvt/tmux. To accomplish
+the same thing there, I added the line below to ~/.tmux.conf.
+
+#+BEGIN_SRC conf
+  bind-key -temacs-copy M-w copy-pipe 'c2e -r'
+#+END_SRC
+
+Here is the c2e script.
+
+#+BEGIN_SRC sh
+  #!/bin/sh
+
+  # c2e: Copy text to the Emacs kill ring.
+  #
+  # With no arguments, send the contents of the X clipboard to the Emacs kill ring.
+  # With -r, first set the clipboard to the contents read from standard input.
+  # With -s, instead send X primary selection to the Emacs kill ring.
+
+  if [ "${1}" = '-r' ]; then
+      exec xclip -sel clip -i -f | \
+          emacsclient -e "(kill-new \"$(sed 's/[\"]/\\&/g')\")"
+  elif [ "${1}" = '-s' ]; then
+      exec xclip -o | \
+          emacsclient -e "(kill-new \"$(sed 's/[\"]/\\&/g')\")"
+  else
+      exec xclip -sel clip -o | \
+          emacsclient -e "(kill-new \"$(sed 's/[\"]/\\&/g')\")"
+  fi
+#+END_SRC
+
+To make the new clipboard manager (the Emacs kill ring) easily accessible, I created a simple command and
+keybinding for StumpWM.
+
+#+BEGIN_SRC lisp
+  (defcommand eaacm () ()
+    "Emacs as a clipboard manager."
+    (run-or-raise "emacsclient -nc" '(:class "Emacs"))
+    (run-shell-command "emacsclient -n -e '(let ((helm-full-frame t)) \
+        (save-window-excursion (delete-other-windows) (helm-show-kill-ring)))'"))
+
+  (define-key *root-map* (kbd "c") "eaacm")
+#+END_SRC
+
+Now, no matter what application is focused, I hit C-t c and I'm shown a nice helm interface to the kill ring.
+Helm even includes an action, bound by default to C-c C-k, to move an entry to the top of the kill ring and to
+the X clipboard.
+
+I also created two simple StumpWM commands and keybindings to call the c2e script for the rare occasions when
+I am copying text in some other application.
+
+#+BEGIN_SRC lisp
+  (defcommand c2e () ()
+    "Copy the X clipboard contents to the Emacs kill ring."
+    (run-shell-command "c2e"))
+
+  (defcommand s2e () ()
+    "Copy the X selection contents to the Emacs kill ring."
+    (run-shell-command "c2e -s"))
+
+  (define-key *root-map* (kbd "C")        "c2e")
+  (define-key *root-map* (kbd "s")        "s2e")
+#+END_SRC
+
+It's only been a few days, but so far Emacs makes a nice X clipboard manager.
