@@ -5,51 +5,32 @@
 #+DATE: [2016-07-28 四 16:58]
 #+OPTIONS: ^:{}
 
-Been meaning to write a post about my current Emacs setup for a while to explain how I work with Emacs on both
-Mac and Linux. I am going to call this my Emacs Workflow. I have been using this setup for over a year now
-with very few tweaks and it serves me well. I am currently using Emacs 24, but this setup worked fine for
-earlier versions.
+一直以来都想写一篇关于我当前Emacs配置的文章来描述我是如何在Mac和Linux上使用Emacs的,即我的Emacs工作流. 我使用这套配置一年多了,一直以来这套配置都工作的很好,几乎不需要怎么调整. 我现在用的是Emacs24,但是这套配置对更早些版本的Emacs也适用.
 
-First, let me explain how I work and what I was looking for out of an Emacs Workflow. I spend most of my time
-on the command line. That is either a terminal or eshell running in Emacs, with really no rhyme or reason for
-which. Although longer running things like tailing logs and stuff over ssh tends to crash Emacs so I typically
-do not do those things in eshell. Having used vim for a long time, I got used to quickly opening a file,
-making an edit, and then closing it. But I do find it helpful to have all the currently open files in Emacs
-available in buffers. Emacs daemon seemed to fit both of these, but I didn’t like starting it up in my init.el
-or on login.
+首先,我需要解释一下我是怎么工作的,以及我希望我的Emacs工作流能达到什么效果. 我大多数时候用的都是命令行,随机在终端或者Emacs的eshell中运行. 当然长时间的tail日志或者ssh操作可能导致Emacs崩溃因此这类操作我一般不在eshell中进行.
+我之前用过很长一段时间点额vim,我习惯于快速打开一个文件,做一些修改,然后再关闭这个文件. 但是我也确实发现在Emacs中同时打开多个文件也很有用. Emacs daemon似乎能够满足这两种模式,但是我不喜欢在我登录系统或启动Emacs时自动启动该功能.
 
-Avdi Grimm wrote an article at [[http://devblog.avdi.org/2011/10/27/running-emacs-as-a-server-emacs-reboot-15/][http://devblog.avdi.org/2011/10/27/running-emacs-as-a-server-emacs-reboot-15/]]
-about how he launches Emacs and that got me started. I hadn’t used emacsclient very much before this. The -a
-"" trick was exactly what I wanted to start the daemon. Avdi uses this script to launch emacsclient and create
-a new frame. By default, the terminal waits for you to close Emacs, but you can pass in -n to the ec script
-and return control back to the terminal immediately.
+Avdi Grimm 曾经写过 [[http://devblog.avdi.org/2011/10/27/running-emacs-as-a-server-emacs-reboot-15/][一篇文章关于他是如何运行Emacs的]]. 这篇文章給我以启示. 在这之前我不太常用emacsclient. 但随后我发现它的 =-a= 参数能自动启动daemon,正是我所需要的. Avdi就是使用该脚本来启动emacsclient并创建新frame的.
+默认情况下,终端会挂起并等待你关闭Emacs,但是你可以給 =ec= 脚本传递 =-n= 参数,这会使得控制权立刻回到终端.
 
 * My ‘Emacs Workflow’
 
-My workflow is a little different. When a file is opened in the Windowed or GUI version of Emacs, I want to
-work on it and leave it open. Often times I am heading back to the terminal to run a command against the newly
-edited file, like rake test or mvn package. That mean the terminal launching emacsclient shouldn’t wait. When
-there is a GUI version of emacs already running, I want to use that instead of opening a new frame. When a GUI
-Emacs is open but minimized, I want to maximize it and then open the file there.
+我的工作流有点与众不同. 当在图形化的Emacs中打开一个文件的时候,我会编辑这个文件但不会去关闭它. 然后我经常会再回到终端去运行命令处理那个新编辑过的文件(rake test或mvn packge). 这意味着终端运行emacsclient后不能一直在那等待emacsclient运行完毕.
+若已经有一个图形化的emacs在运行,我希望能在这个emacs中编辑文件而不是重新打开一个新frame. 若有一个图形化的Emacs在运行但是处于最小化状态,则我希望最大化这个emacs然后用它打开文件.
 
-For quick edits, I want to open the file quickly in Emacs in the current terminal, make my edit, and then
-close it. Therefore, the terminal needs to wait for me to finish.
+对于一下快速编辑的情况,我希望在当前终端用Emacs快速打开文件,做出修改,然后关闭该文件. 这时终端应该等待直到我完成修改.
 
 ** Sidebar
 
 #+BEGIN_QUOTE
-    This method for quick edits is how I did all my git commits before I took the time to learn magit. If you
-    haven’t used magit, I highly recommend you take the time to learn it. See [[http://magit.github.io/magit/magit.html][http://magit.github.io/magit/]]
-    [[http://magit.github.io/magit/magit.html][magit.html]]. This is why I export editor=et in my ~/.bashrc.
+    我在学会magit前都是使用这种快速编辑的方法来提交git commit的. 若你没有用过magit,我强烈推荐你花点时间学习它. 参加 [[http://magit.github.io/magit/magit.html][http://magit.github.io/magit/magit.html]]. 这也是为什么我在 =~/.bashrc= 中添加了 =export editor=et= 的缘故了.
 #+END_QUOTE
    
 * Tools
 
-So what I ended up with is 2 scripts, which I call ec and et, following Avdi’s lead. The former opens
-emacsclient in the GUI and returns control immediately to the shell. The latter opens emacs in the current
-terminal and waits. Because both scripts are backed by the same daemon, all open files are available as
-buffers in both cases. Both script will starts the daemon if it is not open. The ec script has some extra code
-to switch focus as described in my workflow. Here are the scripts, which what I hope are useful comments.
+最终,我写了两个脚本: =ec= 和 =et=. 前一个脚本会在图形化Emacs中打开emacsclient然后将控制权立即交回shell. 后一个会在当前终端打开emacs并等待我完成编辑.
+由于两个脚本都是连接的同一个daemon,因此所有打开的文件对两者都是可见的. 两个脚本都会在daemon未启动的情况下自动启动daemon. 
+=ec= 脚本还有一些额外的代码用来实现我工作流中所描述的那样将焦点切换到emacs上. 下面是脚本的内容,我已经加上了注释了.
 
 ** ec
 
@@ -132,35 +113,27 @@ to switch focus as described in my workflow. Here are the scripts, which what I 
 
 * Github repo
 
-These files can be found in dotfiles repo at [[https://github.com/mjwall/dotfiles][https://github.com/mjwall/dotfiles]]. There are also instructions
-on how I install Emacs on a [[https://github.com/mjwall/dotfiles#on-macosx][Mac]] and [[https://github.com/mjwall/dotfiles#on-linux][Linux]]. Also in this repo is my ~/.emac.d configuration. I keep everything
-together to make it as easy as possible to get setup on a new machine and keep multiple machines in sync.
+可以在[[https://github.com/mjwall/dotfiles][https://github.com/mjwall/dotfiles]] 中找到这两个脚本以及在Mac和Linux下安装Emacs的方法. 该仓库存放的其实是我的 =~/.emac.d= 配置. 我把所有的东西都放在一起,这样便于在新机器上重建配置,也便于在多态机器之间同步配置.
 
 ** Warning
 
 #+BEGIN_QUOTE
-    If you are on a Mac, it is important to get the newer version of Emacs and emacslient on the path
-    correctly. What has worked for me is referenced in the mac [[https://gist.github.com/mjwall/3fe935a8becb60dd3c4c][gist]]. Likely there are other/better ways.
+    若你用的是Mac,请务必保证新版本的emacs和emacsclient被放在了正确的路径中. 可以去[[https://gist.github.com/mjwall/3fe935a8becb60dd3c4c][gist]] 上看看我是怎么做的. 当然肯定还有其他更好的实现方式吧.
 #+END_QUOTE
    
 * Bonus, executing elisp
 
-Another way I use these scripts is by passing in -e to execute arbitrary elisp code. For example, I have an
-alias setup in my bashrc to launch magit. Because it is using the same script, it takes advantage of launching
-the daemon if necessary and changing focus. Here is what it looks like:
+我使用这两个脚本的另一种方式是使用 =-e= 选项来执行elisp代码. 例如,我就在我的bashrc中为magit设置了一个alias. 由于用到了这两个脚本因此它也能自动启动daemon并自动捕获焦点. 下面是定义alias的方法
 
 #+BEGIN_SRC emacs-lisp
   alias magit='ec -e "(magit-status \"$(pwd)\")"' 
 #+END_SRC
 
-So in the terminal, I run magit and it launches Emacs and runs magit-status on the current directory. This was
-inspired by a similiar tweet somewhere, but takes advantage of the rest of the ec script.
+这样在终端中运行magit就会调用Emacs并在当前目录下运行magit-status了. This was inspired by a similiar tweet somewhere, but takes advantage of the rest of the ec script.
 
 * Stopping the Daemon
 
-The last piece of this was a shell script to stop the daemon, which is used for example when I need to reload
-Emacs configs. Sometimes shutdown on my Mac hangs while waiting for Emacs to close, so I tend to call this es
-script beforehand. The script looks like this
+最后还有一个脚本用于关闭daemon,这个脚本常用于重新加载emacs配置. 有时我的Mac在关机时会挂起等待Emacs退出,因此我一般都是先手工运行该脚本关闭Emacs. 脚本内容如下:
 
 ** es
 
@@ -190,13 +163,11 @@ script beforehand. The script looks like this
   fi                                                                           
 #+END_SRC
 
-Likely there is a good way to fix this hanging, but it doesn’t bother me so I haven’t dug deeper.
+似乎有很好的方法能解决Mac关机挂起的问题,但这个问题对我来说不是什么大问题,因此我没有深入这个问题.
 
 * Wrap up
 
-If you are still reading this, you may be thinking “This all makes me want to execute arbitrary elisp in a
-shell script for other things”. If so, and you looked at [[https://github.com/mjwall/dotfiles/blob/master/bin/ed.el][https://github.com/mjwall/dotfiles/blob/master/bin/]]
-[[https://github.com/mjwall/dotfiles/blob/master/bin/ed.el][ed.el]], you would see the following example of how to do that
+若你读到了这里,你可能会想"在shell执行elisp代码真不错啊". 如果你有这个想法,可以看看 [[https://github.com/mjwall/dotfiles/blob/master/bin/ed.el][https://github.com/mjwall/dotfiles/blob/master/bin/ed.el]], 你会看到下面这样的实现方式
 
 #+BEGIN_SRC emacs-lisp
   #!/usr/bin/env emacs --script 
@@ -205,8 +176,6 @@ shell script for other things”. If so, and you looked at [[https://github.com/
   (print (server-running-p))    
 #+END_SRC
 
-Imagine the possibilities. Go through a git repo and change all tabs to spaces. I haven’t really though of
-anything useful to do with this, but thought it was interesting.
+想象一下吧. 借助这种能力,你可以遍历一个git仓库,将其源代码中的所有tab都替换成空格. 这样做可能没什么意义,但是想一想也觉得蛮有意思的.
 
-If you are not still reading this, you probably stopped because you thought all this was overkill. Maybe you
-are right.
+如果你没有读到这里,可能是因为你觉得这样搞太小题大做了. 嗯,没准你是对的.
