@@ -5,13 +5,11 @@
 #+DATE: [2016-08-02 二 09:32]
 #+OPTIONS: ^:{}
 
-Well, "refactoring" is for the Java people, I simply rename things. Just today, I had to do a big rename
-operation related to the [[https://github.com/abo-abo/lispy/releases][release of lispy 0.22.0]]. Below, I'll share some functions and packages that I used
-for that.
+好吧,只有写Java的人才会重构,我只是重命名而已. 今天,由于[[https://github.com/abo-abo/lispy/releases][要发布lispy 0.22.0]] ,我不得不进行大量的重命名操作. 下面我会分享我所用到的那些函数和package.
 
 * My Github setup
 
-Here's it (tree -da -L 1) is:
+我的仓库结构如下(tree -da -L 1):
 
 #+BEGIN_EXAMPLE
   .
@@ -21,12 +19,11 @@ Here's it (tree -da -L 1) is:
   └── images
 #+END_EXAMPLE
 
-I've cloned my gh-pages branch into its own git repository inside the original lispy repository. This way, I
-can rename functions in the code and the documentation simultaneously.
+我将gh-pages分支也作为独立的git仓库克隆到了原始的lispy仓库中了. 这样我就可以同时重命名代码和文档中的函数了.
 
-* Declaring functions obsolete in Elisp
+* 声明废弃的函数
 
-It can be done like this:
+可以用类似下面的方法来声明废弃的函数:
 
 #+BEGIN_SRC emacs-lisp
   (define-obsolete-function-alias 'lispy-out-forward
@@ -37,40 +34,31 @@ It can be done like this:
     'lispy-right-nostring "0.21.0")
 #+END_SRC
 
-After version "0.21.0" hits, any time you call lispy-left by its now obsolete alias lispy-out-backward, you'll
-get a message:
+这样在"0.21.0"及其以后的版本中, =lispy-out-backward= 作为 =lispy-left= 被废弃的别名,在调用时会有以下提醒:
 
 #+BEGIN_EXAMPLE
   `lispy-out-forward' is an obsolete command (as of 0.21.0); use `lispy-right' instead.
 #+END_EXAMPLE
 
-So now, since I'm releasing version "0.22.0", I can remove even the alias declarations. I gave people one week
-of warnings to adjust (just rename to the new name) any of their code that's calling the currently obsolete
-functions.
+现在,在发布"0.22.0"版本时,我完全可以删掉这些别名的声明了. 毕竟我已经給他们予警告并预留了一个星期的时间来让他们把代码中的废弃函数名改为新的名字了.
 
-* Renaming obsolete functions in the documentation
+* 修改文档中的废弃函数名
 
-Taking advantage of the repository setup, I can:
+给予仓库的结果,我可以通过下面几步来进行:
 
 ** Step 1: call rgrep
 
-rgrep is a fine function, I wonder why it's not bound by default; I bind it to C-<, taking advantage of my
-weird key mappings (I'm actually pressing the C-;-l physical keys).
+=rgrep= 是一个很好用的函数, 我都觉得好奇怪,为什么默认没有为它分配一个快捷键呢; 考虑到我的键映射十分古怪,我将它的快捷键设置为 =C-<=,这样实际上我要按下的键是 =C-;-l=
 
-It requires 3 inputs:
+=rgrep= 函数接受三个参数:
 
- 1. Symbol to search for: I call it with the point positioned on the symbol that I want to rename in the code,
-    in the middle of the define-obsolete-function-alias tag, so rgrep picks up the symbol name as the default
-    and I just type RET to select it.
- 2. File pattern: *.el, the current file extension is the default. I type * RET, since I want to match the org
-    and html files as well.
- 3. Base directory: this directory will be will be recursively searched for files that match the file pattern;
-    the default ~/git/lispy/ is fine here, RET.
+1. 要搜索的符号: 我将光标定位到 =define-obsolete-function-alias= 语句中要重命名的那个符号上,然后调用该 =rgrep=. 这样 =rgrep= 会将该symbol名来作为搜索的默认正则表达式的值,而我要作的仅仅是按下回车就行了.
+2. 文件模式: 默认情况下使用的是当前文件的扩展名,即 ~*.el~. 我输入的是 =* RET=,因为我还要搜索org和html文件.
+3. 基线目录: rgrep会在该目录下递归地搜索符合文件模式的文件; 这里的默认值为 =~/git/lispy/=, 没问题,直接按 =RET=.
 
 ** Step 2: call wgrep
 
-[[https://github.com/mhayashi1120/Emacs-wgrep][wgrep]] is a fine package, I wonder why it's not more popular. Since it's so similar to wdired (one of the best
-things since sliced bread, btw), I like to bind the starter to C-x C-q and the finisher to C-c C-c as well:
+[[https://github.com/mhayashi1120/Emacs-wgrep][wgrep]] 是一个很棒的package,它本应该更加的流行的. 由于它与wdired这个package及其类似,因此我也将它的启动热键设为 =C-x C-q=,退出热键设为 =C-c C-c=:
 
 #+BEGIN_SRC emacs-lisp
   (eval-after-load 'grep
@@ -84,45 +72,36 @@ things since sliced bread, btw), I like to bind the starter to C-x C-q and the f
 
 ** Step 3: call iedit
 
-[[https://github.com/victorhge/iedit][iedit]] is an amazing package, it's crazy-good. Here's how I bind it, since once iedit-mode is on, you can move
-to the next occurrence with C-i:
+[[https://github.com/victorhge/iedit][iedit]] 是一个令人震惊的package,它太TMD好用了. 我为它设置快捷键的配置如下所示,在开启了iedit-mode的情况下,你可以用 =C-i= 移动到下一个同名symbol出现的地方.
 
 #+BEGIN_SRC emacs-lisp
   (global-set-key (kbd "C-M-i") 'iedit-mode)
 #+END_SRC
 
-In order to change really every occurrence in the buffer, I need to mark the thing that I want to change,
-before C-M-i. Otherwise, iedit will automatically add symbol bounds (a nice feature, actually), so that e.g. =
-lispy-out-forward= will not match lispy-out-forward.
+为了更改buffer中所有搜索出的同名symbol,我需要在按下 =C-M-i= 之前mark好所有我想修改的地方. 否则的话,iedit会自动为搜索的symbol加上分隔标示(事实上,这本是一个很棒的功能), 这样的话=lispy-out-forward=和lispy-out-forward就不被iedit认为是匹配的了.
 
-Finally, I interactively, char-by-char, rename e.g. lispy-out-forward to lispy-right. The experience is
-similar to the popular [[https://github.com/magnars/multiple-cursors.el][multiple-cursors]], which I also like to use, just for different purposes.
+最终,我可以交互式的,一个字一个字的将所有的 =lispy-out-forward= 改为 =lispy-right=. 这个体验类似于[[https://github.com/magnars/multiple-cursors.el][multiple-cursors]], (我也挺喜欢这个package的), 只是目的不一样而已.
 
 ** Step 4: exiting
 
-When I'm done:
+我做完这些修改之后:
 
-  * I exit iedit-mode with C-M-i.
-  * I exit wgrep with C-c C-c
-  * I save all affected files if I want, since they aren't saved yet and it's still possible to revert
-    everything.
++ 按下 =C-M-i= 退出iedit-mode
++ 按下 =C-c C-c= 退出wgrep
++ 检查无误后保持被修改的文件, 在没有保存前,你还可以将文件回退回原来的内容.
 
 * Outro
 
 #+BEGIN_QUOTE
-    Woah, that's a lot of steps!
+    我靠,这么多步骤!
 #+END_QUOTE
    
-True, but do note that all three tools can be used on their own for various other tasks. See for instance my
-other [[http://youtu.be/DFTXnC1scno?t=3m49s]["refactoring" demo]], that uses iedit-mode to unbind a let-bound variable in Elisp (should also work for
-Common Lisp, since the syntax is the same).
+没错,但是请注意,这三个工具可以分开来完成各自不同的任务. 例如在我的另一个[[http://youtu.be/DFTXnC1scno?t=3m49s]["refactoring" demo]]中, 我使用iedit-mode来为一个Elisp中的let-boud变量解绑(该操作为Common Lisp也应该生效,毕竟这两者的符号都是一样的).
 
-There's beauty and utility in having such composable tools. A lot of the time, it's better than to just have
-one "Rename" button. For instance, when only one buffer is involved, the rgrep-wgrep step can be skipped and I
-can rename stuff with iedit-mode only.
+拥有这种可以相互配合的工具是一件很棒的事情. 在大多数情况下,这笔只有一个"Rename"功能要好. 
+例如若你只想在一个buffe的范围内重命名,则可以跳过rgrep和wgrep的步骤,而只使用iedit-mode就行了. 
+而若修改的范围只是bufer的一部分,则我只需要:
 
-Or, when the playground for renaming is less than a buffer, I can:
-
- 1. C-x nd - narrow-to-defun or C-x nn - narrow-to-region (both are equivalent to N in lispy)
- 2. iedit-mode
- 3. C-x nw - widen (W in lispy)
+1. 按下 =C-x nd= 调用 =narrow-to-defun= 函数 或者 按下 =C-x nn= 调用 =narrow-to-region= 函数(两个都对应lispy中的N键)
+2. 调用 =iedit-mode=
+3. 按下 =C-x nw= 调用 =widen= (在lispy中按下W键)
