@@ -1,0 +1,93 @@
+#+TITLE: use-package:a-declarative-configuration-tool
+#+URL: https://www.masteringemacs.org/article/spotlight-use-package-a-declarative-configuration-tool        
+#+AUTHOR: lujun9972
+#+CATEGORY: raw
+#+DATE: [2016-08-02 二 09:49]
+#+OPTIONS: ^:{}
+
+Have you ever heard of [[https://github.com/jwiegley/use-package/][use-package]]? It’s a declarative way of expressing package configuration in Emacs but
+without the tears. It’s written by the inimitable [[http://www.newartisans.com/][John Wiegley]], the new GNU Emacs lead maintainer and author
+of many, many cool tools like [[http://ledger-cli.org/][a commandline ledger]], Emacs’s Eshell, and much more.
+
+It’s fair to say most of us have declared .emacs bankruptcy at least once. It comes about when the passage of
+time and your ossified hacks-upon-hacks conspire against you, and a fresh Emacs instance fails to start
+cleanly.
+
+Even in a post-hack world of package managers, starter kits, and sane defaults, it still sneaks up on you as
+you pile on more and more packages and customizations. use-package goes some way towards solving that by
+introducing a simple, declarative macro that – through some eldritch elisp magic – ensures your package is
+loaded only when it’s needed, and that its settings are loaded alongside it, in a deterministic and
+understandable manner.
+
+use-package is very easy to use, and it ships with a very nice README.md file explaining how it works.
+
+For instance, if you regularly use smex – an excellent IDO-like interface for M-x – you can add this to your
+init file:
+
+#+BEGIN_SRC emacs-lisp
+  (use-package smex
+    :ensure t
+    :bind (("M-x" . smex))
+    :config (smex-initialize))
+#+END_SRC
+
+And now Emacs ensures the package is installed (and installs it from the package archives if it is not) and it
+binds M-x to smex, and calls out to smex-initialize when you first press M-x.
+
+You can combine your customizations with :config, :init and :preface. Each type works in a slightly different
+way.
+
+The :config keyword executes the code after a package is loaded; the :init keyword executes the code before
+the package is loaded; and the :preface keyword is there so the Emacs byte compiler and the lisp evaluator
+know about things like function and symbol declarations.
+
+My personal view is to put most things into :config (as you probably want to initialize your own settings 
+after the package has loaded its own defaults) and only toy with :init and :preface if you have a good reason
+to.
+
+Here’s an example where I change the default M-x re-builder syntax to string:
+
+#+BEGIN_SRC emacs-lisp
+  (use-package re-builder
+    :bind (("C-c R" . re-builder))
+    :config (setq reb-re-syntax 'string))
+#+END_SRC
+
+You can even migrate all your hand-crafted auto-mode-alist alterations to use-package. Here I declare that
+.txt, .rst and .rest files must use rst-mode:
+
+#+BEGIN_SRC emacs-lisp
+  (use-package rst
+    :mode (("\\.txt$" . rst-mode)
+           ("\\.rst$" . rst-mode)
+           ("\\.rest$" . rst-mode)))
+#+END_SRC
+
+You can use it with built-in “packages” in Emacs also. Here I re-bind certain keys in M-x term and M-x
+ansi-term:
+
+#+BEGIN_SRC emacs-lisp
+  (use-package term
+    :preface
+    (defun mp-term-custom-settings ()
+      (local-set-key (kbd "M-p") 'term-send-up)
+      (local-set-key (kbd "M-n") 'term-send-down))
+    :config
+    (add-hook 'term-load-hook 'mp-term-custom-settings)
+    (define-key term-raw-map (kbd "M-o") 'other-window)
+    (define-key term-raw-map (kbd "M-p") 'term-send-up)
+    (define-key term-raw-map (kbd "M-n") 'term-send-down))
+#+END_SRC
+
+As you can see, it keeps everything nice and tidy. The older way of evaluating things after load, or even just
+require’ing all the packages you use and then applying your changes is completely unnecessary with
+use-package. use-package is clever enough to only autoload commands you’ve bound (or explicitly declared with
+:commands), meaning Emacs won’t load the package into memory until you actually need it. In practical terms,
+it should greatly speed up your Emacs start time.
+
+I think the winning feature, for me, is the ability to automatically ensure the package is present before
+continuing.
+
+It is also a convenient way to share snippets of code. You can copy my smex declaration above and not only
+will you get the package installed automatically (if it is not already), you will get my declared changes as
+well.
