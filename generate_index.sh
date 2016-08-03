@@ -8,6 +8,7 @@ function generate_headline()
     catalog=$1
     echo "* " $catalog
     echo ${catalog_comment_dict[$catalog]}
+    echo 
     generate_links $catalog
 }
 
@@ -18,6 +19,7 @@ function generate_links()
     for post in $posts
     do
         echo "[[https://github.com/lujun9972/emacs-document/blob/master/$catalog/$post][$post]]"
+        echo
     done
 }
 
