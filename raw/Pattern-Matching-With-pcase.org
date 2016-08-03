@@ -43,10 +43,9 @@
 
 * 捕获匹配的值
 
-But pcase can go one step further: Not only can we compare a candidate value against a family of possible
-values described by their pattern, we can also “capture” sub-values from that pattern for later use.
-Continuing from the last example, let’s say we want to print the string that match, even though we didn’t care
-about the contents of the string for the sake of the match:
+pcase还能更进一步: 我们不仅仅可以进行模式匹配,还能从模式中捕获匹配的值供后续使用.
+
+让我们继续上一个案例,假设我们想输出匹配出来的字符串内容:
 
 #+BEGIN_SRC emacs-lisp
   (pcase value
@@ -54,22 +53,15 @@ about the contents of the string for the sake of the match:
      (message "It matched, and the string was %s" foo)))
 #+END_SRC
 
-Whenever a naked symbol like foo occurs as a logical pattern (see next section), the part of the value being
-matched at that position is bound to a local variable of the same name.
+当出现像上例中foo那样的裸符号(没有被引用的符号)时,匹配的值会被绑定到与该符号同名的局部变量中. 这种模式我们称之为logic pattern(逻辑模式).
 
 * Logical and literal patterns
 
-To master pcase, there are two types of patterns you must know: Logical patterns, and literal, or quoted,
-patterns. Logical patterns describe the kind of data we’d like to match against, and other special actions to
-take when it matches; and quoted patterns are the “literal” aspect, stating the exact form of a particular
-match.
+要掌握pcase,有两类模式你必须要知道: Logical patterns, 以及 literal 或者说 quoted patterns(字面模式或引用模式). Logical patterns 说明我们想匹配某一类数据,并会对匹配的这些数据进行某些操作. 而quoted patterns的重点在于它的"字面意义",表示匹配的时候要与它的字面说明一模一样.
 
-Literal patterns are by far the easiest to think about. To match against any atom, string, or list of the
-same, the corresponding literal pattern is that exact value. So the literal pattern "foo" matches the string
-"foo", 1 matches the atom 1, etc.
+Literal patterns是目前为止最容易理解的了. 要匹配任何atom,string或list的值,对应的literal pattern就是值本身. 也就是说literal pattern "foo" 匹配字符串 "foo", 1 匹配 1, 诸如此类.
 
-pcase matches against a list of logical patterns, so to use a literal pattern, we must quote it, unless it
-consists entirely of self-quoting atoms:
+pcase默认匹配logical patterns,如果你想匹配literal pattern,则需要将之引用起来,除非该模式完全是由自引用的atom组成的:
 
 #+BEGIN_SRC emacs-lisp
   (pcase value
@@ -77,8 +69,7 @@ consists entirely of self-quoting atoms:
     ((1 2) (message "Matched the list (1 2)")))
 #+END_SRC
 
-Literal patterns may also be introduced using a backquote, in which case commas may be used to place logical
-patterns within them, in exactly the same way that quoting and anti-quoting works for macros. For example:
+Literal patterns也可以用反引号来引用,这种情况下可以用逗号在其中插入一个logical patterns,就跟宏中的引用和反引用一样的. 例如:
 
 #+BEGIN_SRC emacs-lisp
   (pcase value
@@ -88,12 +79,11 @@ patterns within them, in exactly the same way that quoting and anti-quoting work
 
 * More on logical patterns
 
-There are many special logical patterns. Let’s consider them one by one.
+logical patterns也分很多种. 让我们逐一了解下.
 
-** Underscore _
+** 下划线 _
 
-To match against anything whatsoever, no matter its type or value, use underscore. Thus to match against a
-list containing anything at all at its head, we’d use:
+下划线匹配任意元素,而不管这个元素的类型和值是时候那么. 例如,要匹配一个list,而不关心它的头元素是什么可以怎么作:
 
 #+BEGIN_SRC emacs-lisp
   (pcase value
@@ -103,8 +93,7 @@ list containing anything at all at its head, we’d use:
 
 ** Symbol
 
-When performing a match, if a symbol occurs within a logical pattern, it binds whatever was found at that
-position to a local symbol of the same name. Some examples will help to make this clearer:
+当执行匹配动作时,logical pattern中的符号会匹配该位置的任意元素,并且并且会将该元素作为同名局部变量的绑定值. 为了让你更容易理解一些,下面是一些例子:
 
 #+BEGIN_SRC emacs-lisp
   (pcase value
@@ -116,8 +105,7 @@ position to a local symbol of the same name. Some examples will help to make thi
     (message "Match any cons cell, binding the car and cdr locally"))
 #+END_SRC
 
-The reason for doing this is two-fold: Either to refer to a previous match later in the pattern (where it is
-compared using eq), or to make use of a matched value within the related code block:
+这项功能有两个作用:你可以在模式后面的匹配中引用前面的匹配(这里两者比较的条件是eq). 还可以在后面的相关代码中使用匹配的值.
 
 #+BEGIN_SRC emacs-lisp
   (pcase value
@@ -127,7 +115,7 @@ compared using eq), or to make use of a matched value within the related code bl
 
 ** (or PAT ...) and (and PAT ...)
 
-We can express boolean logic within a pattern match using the or and and Patterns:
+我们还可以使用or和and来对各个模式进行布尔逻辑运算:
 
 #+BEGIN_SRC emacs-lisp
   (pcase value
@@ -139,17 +127,13 @@ We can express boolean logic within a pattern match using the or and and Pattern
               "that is lexically greater than 'aaa'")))
 #+END_SRC
 
-** pred predicates
+** pred 判断式
 
-Arbitrary predicates can be applied to matched elements, where the predicate will be passed the object that
-matched. As in the previous example, lambdas can be used to form arbitrarily complex predicates, with their
-own logic. See above for examples.
+可以用任意的判断式来对待匹配的元素进行过滤,只有通过判断式的元素才被认为是匹配上了. 正如上个例子中所显示的,可以用lambda函数来组成任意复杂的判断式.
 
-** guard expressions
+** guard 表达式
 
-At any point within a match, you may assert that something is true by inserting a guard. This might consult
-some other variable to confirm the validity of a pattern at a given time, or it might reference a local symbol
-that was earlier bound by the match itself, as described above:
+在匹配的任何一个位置,你都可以插入一个guard表达式来保证某些条件是成立的. 它可以用来约束模式中的其他变量以保证某种模式的有效性,而且在guard表达式中还可以引用之前匹配时所绑定的局部变量. 参见下面的例子:
 
 #+BEGIN_SRC emacs-lisp
   (pcase value
@@ -158,10 +142,7 @@ that was earlier bound by the match itself, as described above:
                   "but only if the first anything wasn't the number 10"))))
 #+END_SRC
 
-Note that in this example, the guard occurs at a match position, so even though the guard doesn’t refer to
-what is being matched, if it passes, then whatever occurs at that position (the fourth element of the list),
-would be an unnamed successful matched. This is rather bad form, so we can be more explicit about the logic
-here:
+注意到在上面这个例子中,guard表达式是作为一个单独的匹配项存在的. 也就是说,虽然guard表达式本身并没有引用到它所匹配的元素上,但若guard表达式中的条件是成立的, 则该位置上的元素(即列表中的第四个元素)依然会被作为一个未命名的匹配项. 这是个相当不好的匹配形式,我们可以让这里的逻辑更明确一些:
 
 #+BEGIN_SRC emacs-lisp
   (pcase value
@@ -170,8 +151,7 @@ here:
               "but only if the first anything wasn't the number 10"))))
 #+END_SRC
 
-This means the same, but associates the guard with the value it tests, and makes it clear that we don’t care
-what the fourth element is, only that it exists.
+这个例子的意思是一样,但是将guard表达式与其要测试的值联系在一起了,这样就更明确的表示我们不关心第四个元素是什么,只要存在就可以了.
 
 ** Pattern let bindings
 
