@@ -155,8 +155,7 @@ logical patterns也分很多种. 让我们逐一了解下.
 
 ** Pattern let bindings
 
-Within a pattern we can match sub-patterns, using a special form of let that has a meaning specific to
-`pcase’:
+在一个模式中,还可以通过let语句来匹配子模式:
 
 #+BEGIN_SRC emacs-lisp
   (pcase value
@@ -164,8 +163,7 @@ Within a pattern we can match sub-patterns, using a special form of let that has
      (message "A weird way of matching (1 2 3)")))
 #+END_SRC
 
-This example is a bit contrived, but it allows us to build up complex guard patterns that might match against
-values captured elsewhere in the surrounding code:
+这个例子看起来有点怪,但是let语句允许我们创建一个复杂的guard patterns用于匹配在别处捕获到的值:
 
 #+BEGIN_SRC emacs-lisp
   (pcase value1
@@ -175,15 +173,11 @@ values captured elsewhere in the surrounding code:
         (message "A nested pcase depends on the results of the first")))))
 #+END_SRC
 
-Here the third value of value2 – which must be a list of exactly three elements, starting with 1 and 2 – is
-being bound to the local variable bar, but only if foo was a 3 or 4. There are many other ways this logic
-could be expressed, but this gives you a test of how flexibly you can introduce arbitrary pattern matching of
-other values within any logical pattern.
+这里value2肯定是一个由三个元素组成的list,且它的前两个元素肯定是1和2. 且value2的第三个元素在foo为3或4的情况下会被绑定到局部变量bar上. 实际上有很多种方法都能够表示这个逻辑,但是这个例子向你展示了在logical pattern中允许对其他值作任意的子模式匹配是多么的具有灵活性.(but this gives you a test of how flexibly you can introduce arbitrary pattern matching of other values within any logical pattern.)
 
 ** pcase-let and pcase-let*
 
-That’s all there is to know about pcase! The other two utilities you might like to use are pcase-let and
-pcase-let*, which do similar things to their logical pattern counter-part let, but as regular Lisp forms:
+这一章是关于pcase的最后内容了! 另外两个常用的语句是 =pcase-let= 和 =pcase-let*=,他们的功能与logical pattern中的let语句类似,但是形式上更像是普通的lisp语句:
 
 #+BEGIN_SRC emacs-lisp
   (pcase-let ((`(1 2 ,foo) value1)
@@ -192,9 +186,7 @@ pcase-let*, which do similar things to their logical pattern counter-part let, b
              foo bar))
 #+END_SRC
 
-Note that pcase-let does not fail, and always executes the correspond forms unless there is a type error. That
-is, value1 above is not required to fit the form of the match exactly. Rather, every binding that can paired
-is bound to its corresponding element, but every binding that cannot is bound to nil:
+需要注意的是, =pcase-let= 除非是匹配的类型是错的,否则并不存在匹配失败的情况,也就是说它总会去执行对应的语句. 比如,上面例子中的value1并不要求严格的遵循匹配的形式. 任何符号都会与它对应的元素相绑定. 若某个符号无法找到其对应的元素,则该符号的绑定值为nil.
 
 #+BEGIN_SRC emacs-lisp
   (pcase-let ((`(1 2 ,foo) '(10)))
@@ -207,9 +199,9 @@ is bound to its corresponding element, but every binding that cannot is bound to
     (message "foo = %s" foo))   => prints "foo = 10"
 #+END_SRC
 
-Thus, pcase-let can be thought of as a more expressive form of destructuring-bind.
+因此, =pcase-let= 可以认为是 =destructuring-bind= 的加强版.
 
-The pcase-let* variant, like let*, allows you to reference bound local symbols from prior matches.
+=pcase-let*= 变体跟 =let*= 一样, 允许你在后面的待匹配数据中引用前面匹配中的局部变量
 
 #+BEGIN_SRC emacs-lisp
   (pcase-let* ((`(1 2 ,foo) '(1 2 3))
@@ -217,8 +209,7 @@ The pcase-let* variant, like let*, allows you to reference bound local symbols f
     (message "foo = %s, bar = %s" foo bar))  => foo = 3, bar = 3
 #+END_SRC
 
-However, if you name a symbol with same name in a later logical pattern, it is not used as an eq test, but
-rather shadows that symbol:
+但若你是在后面的模式中用了与前面同名的symbol的话,则该symbol不是用来做eq测试的,它反而会屏蔽之前的那个同名symbol:
 
 #+BEGIN_SRC emacs-lisp
   (pcase-let* ((`(1 2 ,foo) '(1 2 3))
@@ -226,4 +217,4 @@ rather shadows that symbol:
     (message "1 2 %s" foo))
 #+END_SRC
 
-This prints out "1 2 5", rather than the current match.
+上面的例子中输出为"1 2 5".
