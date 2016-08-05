@@ -1,0 +1,52 @@
+#+TITLE: disable-mouse-only-inside-emacs
+#+URL: http://endlessparentheses.com/disable-mouse-only-inside-emacs.html?hmsr=toutiao.io&source=rss&utm_medium=toutiao.io&utm_source=toutiao.io
+#+AUTHOR: lujun9972
+#+CATEGORY: raw
+#+DATE: [2016-08-05 五 13:13]
+#+OPTIONS: ^:{}
+
+As laptop touchpads seem to be steadily increasing in size, one unfortunate consequence is that it becomes
+increasingly harder to avoid touching them by accident while you type. Most systems have safeguards in place
+that disable the touchpad as you’re typing, but they always seem to fall short for me when it comes to Emacs.
+While in Emacs, my hands are permanently resting on the keyboard (and over the touchpad), so even if I stop
+typing for several seconds I don’t want the touchpad to reactivate.
+
+There are ways to permanently deactivate the touchpad with a hotkey, but, so far, the solution that best fits
+my use-style is to disable it only inside Emacs.
+
+#+BEGIN_SRC emacs-lisp
+  (define-minor-mode disable-mouse-mode
+    "A minor-mode that disables all mouse keybinds."
+    :global t
+    :lighter " 🐭"
+    :keymap (make-sparse-keymap))
+
+  (dolist (type '(mouse down-mouse drag-mouse
+                        double-mouse triple-mouse))
+    (dolist (prefix '("" C- M- S- M-S- C-M- C-S- C-M-S-))
+      ;; Yes, I actually HAD to go up to 7 here.
+      (dotimes (n 7)
+        (let ((k (format "%s%s-%s" prefix type n)))
+          (define-key disable-mouse-mode-map
+            (vector (intern k)) #'ignore)))))
+#+END_SRC
+
+All we do here is define a minor-mode that binds all mouse-related keys to ignore. This is a slight
+improvement over the code on [[http://stackoverflow.com/questions/4906534/disable-mouse-clicks-in-emacs/4906698#4906698][this StackOverflow answer]]. Of course, let’s not forget to enable this.
+
+#+BEGIN_SRC emacs-lisp
+  (disable-mouse-mode 1)
+#+END_SRC
+
+Two relevant limitations:
+
+  * This doesn’t distinguish between a touchpad an an actual mouse.
+  * It is still possible for modes to define specific buttons that interact with the mouse, but that’s not a
+    huge problem because these buttons take a small portion of the screen so it’s fairly difficult to touch
+    them by accident.
+
+* Update 29 Jun 2016
+
+By mere coincidence, it looks like Steve Purcell implemented something extremely similar (comment below).
+Unlike me, he actually had the decency of wrapping the minor-mode in a [[https://github.com/purcell/disable-mouse][Melpa package]], and I know some might
+prefer that over lengthening their init file.
