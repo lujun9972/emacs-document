@@ -1,0 +1,370 @@
+#+TITLE: Optimal-Emacs-Settings-for-Org-mode-for-Literate-Programming
+#+URL: http://fgiasson.com/blog/index.php/2016/06/21/optimal-emacs-settings-for-org-mode-for-literate-programming/?utm_content=36384675&utm_medium=social&utm_source=twitter
+#+AUTHOR: lujun9972
+#+CATEGORY: raw
+#+DATE: [2016-08-05 五 12:58]
+#+OPTIONS: ^:{}
+
+
+For some time I have been interested in using Emacs and Org-mode for developing Clojure in a Literate
+Programming way. I discussed the [[http://fgiasson.com/blog/index.php/2016/04/27/my-literal-programming-commitment/][basic ideas]], [[http://fgiasson.com/blog/index.php/2016/05/30/creating-and-running-unit-tests-directly-in-source-files-with-org-mode/][some of the benefits of doing so]], [[http://fgiasson.com/blog/index.php/2016/06/09/literate-programming-and-team-development/][etc]], [[http://fgiasson.com/blog/index.php/2016/04/05/using-clojure-in-org-mode-and-implementing-asynchronous-processing/][etc]]. It is now time to
+start showing how I am doing this, what are the rules of thumb I created, what is the structure of my
+programs, etc.
+
+However, before I start writing about any of this, I think the next step is to explain how I configured
+Org-mode to have a frictionless experience to develop my applications in Literate Programming using Org-mode.
+Then in a subsequent series of blog posts I will explain how I structured my Clojure project, what is my
+development workflow, etc.
+
+Note that if you don’t have Emacs setup for Clojure/Cider, I would encourage you to [[http://fgiasson.com/blog/index.php/2016/06/14/my-optimal-gnu-emacs-settings-for-developing-clojure-revised/][read this other blog post]]
+which explains how to setup a Clojure environment in Emacs.
+
+* Packages
+
+[[http://fgiasson.com/blog/index.php/2016/06/14/my-optimal-gnu-emacs-settings-for-developing-clojure-revised/][Once Emacs is installed with Cider]], the first thing you have to do is to install all the packages that are
+required to use Org-mode and some of the tweaks that I am proposing. The packages that you have to install
+are:
+
+ 1. [[http://orgmode.org/][org]]
+ 2. [[https://github.com/emacsmirror/adaptive-wrap][adaptive-wrap]]
+ 3. [[https://www.emacswiki.org/emacs/Htmlize][htmlize]]
+
+They can easily be installed using the following commands:
+
+#+BEGIN_EXAMPLE
+M-x package-install [RET] org [RET]
+M-x package-install [RET] adaptive-wrap [RET]
+M-x package-install [RET] htmlize [RET]
+#+END_EXAMPLE
+
+Additionally, you could have used M-x package-list-packages, then move your cursor in the buffer to the
+packages’ line. Then press i (for install) and once all the packages are selected, you could have press x
+(execute) to install all the packages all at once.
+
+* Configure Org-mode Editor Behaviors
+
+Org-mode is installed with a series of default settings, but I don’t like all of them when come the time to do
+Literate Programming with it. The first thing I like doing is to hide some of the Org-mode markup and to
+replace it by the actual font. For example, I don’t want to see /test/ in my text, I want to see the
+(italized) version of test. Same for bold, links, etc. This can be done by setting org-hide-emphasis-markers.
+
+Then I want to turn the Emacs visual line mode, but only for Org-mode. This basically wraps long lines without
+justifying it.
+
+#+BEGIN_SRC emacs-lisp
+  (require 'org)
+
+  ;; Remove the markup characters, i.e., "/text/" becomes (italized) "text"
+  (setq org-hide-emphasis-markers t)
+
+  ;; Turn on visual-line-mode for Org-mode only
+  ;; Also install "adaptive-wrap" from elpa
+  (add-hook 'org-mode-hook 'turn-on-visual-line-mode)
+#+END_SRC
+
+* Configure Cider for Org-mode
+
+Since we want to do Literate Programming using (among others) Clojure, what we have to do is to configure
+Cider to be the Clojure backend to be used by Org-mode. Org-mode’s code block feature supports a long list how
+programming language. However, each of these programming languages are supported by a backend except for a few
+like Elisp (which uses Emacs as the backend). This is what we are doing here for Clojure.
+
+What we do here is first to specify to Org-mode which language we want to support with its code blocks. I only
+defined four for now: clojure, sh, dot and elisp.
+
+Then we specify that the org-babel-clojure-backend we want to use is Cider.
+
+#+BEGIN_SRC emacs-lisp
+  ;; Configure org-mode with Cider
+
+  ;; Configure Org-mode supported languages
+  (org-babel-do-load-languages
+   'org-babel-load-languages
+   '((clojure . t)
+     (sh . t)
+     (dot . t)
+     (emacs-lisp . t)))
+
+  ;; Use cider as the Clojure execution backend
+  (setq org-babel-clojure-backend 'cider)
+  (require 'cider)
+#+END_SRC
+
+** Useful Key Bindings
+
+There are a few key bindings in Cider that are handy to have directly in Org-mode. We can easily add them like
+this. What I did here is to define two new: one for evaluating the last Clojure expression bound to C-x C-e.
+Then the binding to get the documentation of a symbol bound to C-c C-d.
+
+If you wonder why this is necessary, it is because each Org-mode code block is not running the Clojure major
+mode, so these key bindings are not available directly within a Org-mode file. This is why we have to remap
+the ones we want to use directly within Org-mode.
+
+#+BEGIN_SRC emacs-lisp
+  ;; Useful keybindings when using Clojure from Org
+  (org-defkey org-mode-map "\C-x\C-e" 'cider-eval-last-sexp)
+  (org-defkey org-mode-map "\C-c\C-d" 'cider-doc)
+#+END_SRC
+
+** Configuration of Custom Features
+
+In my [[http://fgiasson.com/blog/index.php/2016/04/05/using-clojure-in-org-mode-and-implementing-asynchronous-processing/][Using Clojure in Org-mode and Implementing Asynchronous Processing]] I discuss some limitations of the
+current implementation of org-babel-clojure. In that blog post I show how these limitations can be overcome.
+One of the setting I need to change is to remove the timeout of the nrepl middleware. It can be done that way:
+
+Only set that setting if you updated org-bable-clojure with the information from that blog post.
+
+#+BEGIN_SRC emacs-lisp
+  ;; No timeout when executing calls on Cider via nrepl
+  (setq org-babel-clojure-sync-nrepl-timeout nil)
+#+END_SRC
+
+* Configure Code blocks Behaviors
+
+The code block in Org-mode has their own behaviors that can be modified like the default number of spaces for
+indentations, if you can use the shift key, the use the mode’s (Clojure in this code) native tab behavior and
+fontification (syntax highlighting), etc.
+
+#+BEGIN_SRC emacs-lisp
+  ;; Let's have pretty source code blocks
+  (setq org-edit-src-content-indentation 0
+        org-src-tab-acts-natively t
+        org-src-fontify-natively t
+        org-confirm-babel-evaluate nil
+        org-support-shift-select 'always)
+#+END_SRC
+
+* Change Behaviors On Save
+
+The most important configuration I did related to use Org-mode as a Literate Programming environment are all
+the behaviors that occurs when I save a org-mode document.
+
+The purpose of Literate Programming is to write a computer software while writing about its development
+process, its purpose, its implementation, etc. However, every time I save a literate file, I want the literate
+environment to extract (tangle) the code from that file into a [Clojure] source file that can be executed.
+What I did to enable this behavior is to add a function to call for Emacs’ after-save-hook. What the function
+does is to make sure that the buffer being saved is a Org-mode buffer. If it is, then I run Org-mode’s
+tangling procedure that will tangle the Org file on save.
+
+However, given the nature of Literate Programming in Clojure, it is often the case that you will have another
+buffer where the tangled source file is open. What this means is that if you change some code in a Org file
+that get tangled on save, then the buffer where this code file is open won’t automatically be refreshed with
+the newly tangled code. To fix this issue, I set the global-auto-revert-mode which means that as soon as a
+file changes on the file system, if it is open in an Emacs buffer, then this buffer will be refreshed with
+that content.
+
+Finally, because Org-mode is not only about code blocks, I also enabled a final behavior when I save a Org
+file. What I often do is to leave TODO tasks at different places in my Org file to tell me what some work
+needs to be done at that place. However, once you start developing multiple projects with Org-mode, and when
+you start using Org-mode for others of its features, there is no way to track where you left TODO items across
+your entire computer system (and not just programing projects!). This is why Org-mode created a global list of
+TODO items via its agenda feature. To see the list of all the TODOs across all the Org files you created, you
+can access it using: M-x org-todo-list. However the problem here is that each of the Org file you want to have
+accessible in your agenda, you have to push it to the agenda system. It is not a problem in itself, but it
+becomes a problem is you forget to push each relevant Org file to the agenda. This is why I choose to
+automatically push any Org file to the Org agenda every time a Org file is being saved. That way I don’t have
+to worry when I check the global list of TODOs, I am sure that all of them are there.
+
+#+BEGIN_SRC emacs-lisp
+  ;; Tangle Org files when we save them
+  (defun tangle-on-save-org-mode-file()
+    (when (string= (message "%s" major-mode) "org-mode")
+      (org-babel-tangle)))
+
+  (add-hook 'after-save-hook 'tangle-on-save-org-mode-file)
+
+  ;; Enable the auto-revert mode globally. This is quite useful when you have 
+  ;; multiple buffers opened that Org-mode can update after tangling.
+  ;; All the buffers will be updated with what changed on the disk.
+  (global-auto-revert-mode)  
+
+  ;; Add Org files to the agenda when we save them
+  (defun to-agenda-on-save-org-mode-file()
+    (when (string= (message "%s" major-mode) "org-mode")
+      (org-agenda-file-to-front)))
+
+  (add-hook 'after-save-hook 'to-agenda-on-save-org-mode-file)
+#+END_SRC
+
+* Export Configurations
+
+There are a few things you can do regarding how you export your org files. One thing I like to do is to set
+org-html-htmlize-output-type to css (default is inline-css) such that it does not include the CSS in the
+exported HTML. I prefer using the CSS that comes with the HTML themes I use. However, when I need inline CSS
+(like when I export HTML to be displayed elsewhere, i.e. on my blog) then I simply define a elisp code block
+to set org-html-htmlize-output-type back to inline-css to reverse that behavior for that special usecase.
+
+#+BEGIN_SRC emacs-lisp
+  ;; make sure that when we export in HTML, that we don't export with inline css.
+  ;; that way the CSS of the HTML theme will be used instead which is better
+  (setq org-html-htmlize-output-type 'css)
+#+END_SRC
+
+** Enable External Exporters
+
+There are tons of Org-mode export plugins, but not all of them are enabled by default. For contributed
+exporters, you will have to get it from the contrib/lisp [[http://orgmode.org/w/org-mode.git?p=org-mode.git;a=tree;f=contrib/lisp;h=c5dc72cebae54e5175f373d5b85f1a6bdbbd764f;hb=refs/heads/master][folder on the Git repository]] and save it in your else
+repository in [home]/.emacs.d/elpa/[org-20160623]/ Here is an example of how you can enable a new one which is
+the exporter for Confluence. Then you can export typing M-x org-confluence-export-as-confluence
+
+#+BEGIN_SRC emacs-lisp
+  ;; Enable Confluence export
+  (require 'ox-confluence)
+#+END_SRC
+
+* Dire Configuration
+
+I personally use Dire a lot. However it displays everything by default which may not be optional, particularly
+when working within Org related directories with all the auto-save files that get generated. This is why I
+like to filter out a few things such that everything is not being displayed in the Dire buffer.
+
+#+BEGIN_SRC emacs-lisp
+  ; Remove autosave and other unnecessary files to see in Dire
+  (require 'dired-x)
+  (setq-default dired-omit-files-p t) ; Buffer-local variable
+  (setq dired-omit-files "^\\.?#")
+#+END_SRC
+
+* Spell checker
+
+It is always convenient to have a spell checker in Org-mode. Right now I am using ispell along with flyspell.
+That works fine, but I don’t like the fact that the last aspell version for Windows is about 14 years old! Any
+idea to improve this situation would be greatly welcome!
+
+The first step that is required to enable this feature is to download [[http://aspell.net/win32/][GNU Aspell (in my case, for Windows)]].
+Then we have to instruct Emacs where the aspell dictionary is located, and then we have to enable Flyspell for
+text modes. Finally, make sure to install the appropriate language pack as well.
+
+#+BEGIN_SRC emacs-lisp
+  (custom-set-variables
+   '(ispell-program-name "c:\\Program Files (x86)\\Aspell\\bin\\aspell.exe"))
+
+  ;; Enable Flyspell for text modes
+  (add-hook 'text-mode-hook 'flyspell-mode)
+#+END_SRC
+
+* DOT support
+
+[[https://en.wikipedia.org/wiki/DOT_(graph_description_language)][DOT]] is like a markup language for describing graphs. It is really simple to use and generate effective graph
+images that can easily be embedded into your Org-mode files.
+
+The first step is to install [[http://www.graphviz.org/][Graphviz]] on your computer. This is the library that will be used to generate the
+images from the DOT specification. The only thing you have to do is to make sure that Graphviz’s bin directory
+is in the Path environment variable and you are done.
+
+Once Graphviz is installed and configured, restart Emacs and start using it right away, no other configuration
+is required. Here is an example of a class hierarchy created using DOT:
+
+#+BEGIN_SRC dot
+  digraph {
+    soloist -> "musical performer";
+    "musical performer" -> musician;
+    musician -> artist;
+    artist -> person;
+    person -> human;
+    author -> artist;
+    "scifi writer" -> author;
+    journalist -> author;
+    correspondent -> journalist;
+  }
+#+END_SRC
+
+[[http://fgiasson.com/blog/wp-content/uploads/2016/06/actors-authors-humans-e1466538581874.jpeg]]
+
+* Inline Images Display
+
+One essential feature of Org-mode to make it a useful Notebook application is to be able to have inline images
+(that we generate from code blocks or that are somewhere on the file system) directly in Emacs. Depending on
+your Emacs distribution, you may require to download and install a few libraries in order to make this working
+properly (at least on Windows).
+
+The first step is to make sure that Org-mode does display inline images by default. If you don’t want this
+behavior, you can always use the key binding C-c C-x C-v to toggle this behavior. If you want to enable this
+by default when Emacs enter in Org-mode, then you have to add the following to your .emacs file:
+
+#+BEGIN_SRC emacs-lisp
+  ;; Enable inline image when entering org-mode
+  ;; Make sure you have all the necessary DLL for image display
+  ;; Windows ones can be downloaded from: https://sourceforge.net/projects/ezwinports/files/
+  (defun turn-on-org-show-all-inline-images ()
+    (org-display-inline-images t t))
+
+  (add-hook 'org-mode-hook 'turn-on-org-show-all-inline-images)
+#+END_SRC
+
+It is possible that you get the following error message in your mini buffer if you type C-c C-x C-v:
+
+    “no images to display inline”
+   
+What this probably means is that you are lacking the libraries to display these type of images. What you
+should do is to run this elisp code to see the expected library files each supported file format and the
+expected library files names:
+
+#+BEGIN_SRC emacs-lisp
+  (print image-library-alist)
+#+END_SRC
+
+#+BEGIN_SRC emacs-lisp
+  ((xpm "libxpm.dll" "xpm4.dll" "libXpm-nox4.dll") (png "libpng16.dll" "libpng16-16.dll") (tiff "libtiff-5.dll" "libtiff3.dll" "libtiff.dll") (jpeg "libjpeg-9.dll") (gif "libgif-7.dll") (svg "librsvg-2-2.dll") (gdk-pixbuf "libgdk_pixbuf-2.0-0.dll") (glib "libglib-2.0-0.dll") (gobject "libgobject-2.0-0.dll") (gnutls "libgnutls-28.dll" "libgnutls-26.dll") (libxml2 "libxml2-2.dll" "libxml2.dll") (zlib "zlib1.dll" "libz-1.dll"))
+#+END_SRC
+
+Then for each of the format you want to report, get the library file and for add it in your [...]/emacs/bin/
+folder. On windows, you can find all these DLL from the [[https://sourceforge.net/projects/ezwinports/files/][EzWinPorts]] project repository.
+
+* Language Specific Libraries
+
+For a few tasks I simply use external libraries to get the job done instead of Emacs/Org-mode specific plugins
+or functionality. I will refer to Clojure external libraries, but the same kind of libraries could be used in
+any other programming languages.
+
+For example, if I want to output tabular information in Org-mode, then I normally use the [[https://github.com/cldwalker/table][Clojure Table]]
+application which takes multiple different kind of Clojure data structure and turns them into well-formatted
+tables in the resultsets. This is really handy for that kind of operation.
+
+Otherwise I use [[http://incanter.org/][Incanter]] a lot to generate effective graphs, charts of plots that I save as PNG and that I
+display inline in Org-mode. However, if I have a graph or flow chart to create, then I will use the DOT plugin
+since it is really easy to use not to use it within Org-mode.
+
+Basically anything that output some text or some image could be used within Org-mode, but for the kind of
+software I develop and the kind of data analysis tasks I am doing, these are the two bests in my toolset for
+the moment.
+
+* Helpful Keys for Working With Org-mode
+
+There are a few key bindings in Org-mode that really make your life easier when come the time to do Literate
+Programming in Org-mode.
+
+If you are using Clojure in your Org file, then the first thing to do is to start Cider. I bound cider-jack-in
+to F9. Once Cider is started, then you will be able to run Clojure code within your Org file.
+
+The most obvious key binding is C-x C-s which will save the Org file. At the same time, it will do all the
+things described in the section Change Behaviors On Save described above.
+
+Then we have C-c C-c that will execute a specific code block and show the results. Note that the cursor needs
+to be somewhere within the code block (including the header and footer) to execute that block with that key
+binding.
+
+When you open an existing Org file with a lot of code blocks, you often want to run all the code blocks at
+once. It can easily be done using C-c C-v t which will do exactly that.
+
+We have to remember that it is not the Clojure major mode that we use directly in Org-mode. However, it is
+often handy to be able to switch to Clojure’s major mode from a Org file (to get auto completion, etc.). It
+can easily be done with C-c ' which will open a new buffer with the code in Clojure’s major mode. Then if you
+modify that buffer and save it using C-c C-x then the Org file will be updated with the changes as well. To
+switch back to the Org file, then you simply has to hit C-c ' again.
+
+There are a few key bindings quite handy to work with the structure of the document. We often endup writing
+big Org file with a lot of headers and level of headers. It is quite handy to be able to focus on specific
+regions in a Org outline. This can easily be done using C-x n s which will focus on a particular region (only
+the content of that region appears in the buffer). Then you can use C-x n w to unfocus a focused region
+(everything surrounding that region will reappear in the buffer).
+
+There are tens of other key bindings that you will endup using in Org-mode for doing Literate Programming, but
+these are the ones I most often use when writing a Org file.
+
+* Conclusion
+
+As you can see, there are quite a lot of things that can be configured in Org-mode. This is even just the tip
+of the iceberg in fact. However, these are the main features I use to do Literate Programming and to create
+data analysis notebooks. Now that we have [[http://fgiasson.com/blog/index.php/2016/06/14/my-optimal-gnu-emacs-settings-for-developing-clojure-revised/][Emacs configured]], and that we have Org-mode configured, my next step
+will be to write about how I do organize my Clojure applications to write Literate programs.
