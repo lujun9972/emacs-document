@@ -16,11 +16,15 @@ function generate_links()
 {
     catalog=$1
     posts=$(ls $catalog)
+    old_ifs=$IFS
+    IFS="
+"
     for post in $posts
     do
         echo "[[https://github.com/lujun9972/emacs-document/blob/master/$catalog/$post][$post]]"
         echo
     done
+    IFS=$old_ifs
 }
 
 for catalog in ${!catalog_comment_dict[*]}
