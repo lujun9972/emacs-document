@@ -6,30 +6,23 @@
 #+OPTIONS: ^:{}
 
 
-For some time I have been interested in using Emacs and Org-mode for developing Clojure in a Literate
-Programming way. I discussed the [[http://fgiasson.com/blog/index.php/2016/04/27/my-literal-programming-commitment/][basic ideas]], [[http://fgiasson.com/blog/index.php/2016/05/30/creating-and-running-unit-tests-directly-in-source-files-with-org-mode/][some of the benefits of doing so]], [[http://fgiasson.com/blog/index.php/2016/06/09/literate-programming-and-team-development/][etc]], [[http://fgiasson.com/blog/index.php/2016/04/05/using-clojure-in-org-mode-and-implementing-asynchronous-processing/][etc]]. It is now time to
-start showing how I am doing this, what are the rules of thumb I created, what is the structure of my
-programs, etc.
+我一度热衷于用Emacs和Org-mode以文学编程的方式开发来开发Clojure. 我也写过了很多关于文学编程的文章,比如[[http://fgiasson.com/blog/index.php/2016/04/27/my-literal-programming-commitment/][它的基础理念]], [[http://fgiasson.com/blog/index.php/2016/05/30/creating-and-running-unit-tests-directly-in-source-files-with-org-mode/][文学编程的好处]], [[http://fgiasson.com/blog/index.php/2016/06/09/literate-programming-and-team-development/][等]][[http://fgiasson.com/blog/index.php/2016/04/05/using-clojure-in-org-mode-and-implementing-asynchronous-processing/][等]]. 
+这一次我想告诉你们我是怎么来实践文学编程的,我在实践过程中总结出来的经验有哪些,我写程序时一般是怎样的结构,等等内容.
 
-However, before I start writing about any of this, I think the next step is to explain how I configured
-Org-mode to have a frictionless experience to develop my applications in Literate Programming using Org-mode.
-Then in a subsequent series of blog posts I will explain how I structured my Clojure project, what is my
-development workflow, etc.
+不过在我开始之前,我想我有必要先解释一下为了用文学编程开发应用时有一个流畅的体验,我是怎样配置Org-mode的.
+再然后才会写一系列的文章来解释我是怎么组织Clojure项目的,我的开发流程等内容.
 
-Note that if you don’t have Emacs setup for Clojure/Cider, I would encourage you to [[http://fgiasson.com/blog/index.php/2016/06/14/my-optimal-gnu-emacs-settings-for-developing-clojure-revised/][read this other blog post]]
-which explains how to setup a Clojure environment in Emacs.
+如果你没有配置过Clojure/Cider, 那我推荐你[[http://fgiasson.com/blog/index.php/2016/06/14/my-optimal-gnu-emacs-settings-for-developing-clojure-revised/][看看这篇文章]], 它会告诉你如何在Emacs中配置Clojure开发环境.
 
 * Packages
 
-[[http://fgiasson.com/blog/index.php/2016/06/14/my-optimal-gnu-emacs-settings-for-developing-clojure-revised/][Once Emacs is installed with Cider]], the first thing you have to do is to install all the packages that are
-required to use Org-mode and some of the tweaks that I am proposing. The packages that you have to install
-are:
+[[http://fgiasson.com/blog/index.php/2016/06/14/my-optimal-gnu-emacs-settings-for-developing-clojure-revised/][Emacs安装Cider之后]], 你要做的第一件事就是安装下面这些package. 这些package,有些是使用Org-mode必须的,有些能够优化Org-mode的使用体验.
 
- 1. [[http://orgmode.org/][org]]
- 2. [[https://github.com/emacsmirror/adaptive-wrap][adaptive-wrap]]
- 3. [[https://www.emacswiki.org/emacs/Htmlize][htmlize]]
+1. [[http://orgmode.org/][org]]
+2. [[https://github.com/emacsmirror/adaptive-wrap][adaptive-wrap]]
+3. [[https://www.emacswiki.org/emacs/Htmlize][htmlize]]
 
-They can easily be installed using the following commands:
+安装过程也很容易,运行下面这些命令就行:
 
 #+BEGIN_EXAMPLE
 M-x package-install [RET] org [RET]
@@ -37,19 +30,14 @@ M-x package-install [RET] adaptive-wrap [RET]
 M-x package-install [RET] htmlize [RET]
 #+END_EXAMPLE
 
-Additionally, you could have used M-x package-list-packages, then move your cursor in the buffer to the
-packages’ line. Then press i (for install) and once all the packages are selected, you could have press x
-(execute) to install all the packages all at once.
+你也可以先运行 =M-x package-list-packages=, 然后将光标移动到要安装的package那一行. 按下 =i= (意思是install), 等待所有要安装的package都选中后,再按下 =x= (意思是execute) 就可以一次性安装所有的package了.
 
 * Configure Org-mode Editor Behaviors
 
-Org-mode is installed with a series of default settings, but I don’t like all of them when come the time to do
-Literate Programming with it. The first thing I like doing is to hide some of the Org-mode markup and to
-replace it by the actual font. For example, I don’t want to see /test/ in my text, I want to see the
-(italized) version of test. Same for bold, links, etc. This can be done by setting org-hide-emphasis-markers.
+Org-mode安装之后有很多默认的设置,但是我觉得它的默认设置不适于进行文学编程. 
+首先我要隐藏掉一些Org-mode的标志,而代之以显示为它真正要显示的字体样式. 例如,我不想看到 =/test/= 这样的内容,而应该看到的是斜体的 =test=. 同样的,粗体,链接也是一样的显示方式. 为了做到这一点,我们需要设置一下 =org-hide-emphasis-markers= 变量.
 
-Then I want to turn the Emacs visual line mode, but only for Org-mode. This basically wraps long lines without
-justifying it.
+然后我会为Org-mode设置开启Emacs visual line mode. 这样就会自动折行而无需手工调整.
 
 #+BEGIN_SRC emacs-lisp
   (require 'org)
@@ -64,15 +52,13 @@ justifying it.
 
 * Configure Cider for Org-mode
 
-Since we want to do Literate Programming using (among others) Clojure, what we have to do is to configure
-Cider to be the Clojure backend to be used by Org-mode. Org-mode’s code block feature supports a long list how
-programming language. However, each of these programming languages are supported by a backend except for a few
-like Elisp (which uses Emacs as the backend). This is what we are doing here for Clojure.
+由于我们想用文学编程的方式来开发Clojure,因此我们需要配置一下Org-mode让它使用Cider作为Clojure的后端. 
+Org-mode的code block功能支持许多的编程语言. 然而除了像Elisp(Elisp本身使用Emacs作为后端)这样的语言外,绝大部分的语言都要有一个后端作支持.
+我们要做的就是为Clojure设置一个后端.
 
-What we do here is first to specify to Org-mode which language we want to support with its code blocks. I only
-defined four for now: clojure, sh, dot and elisp.
+这里我们首先要做的是告诉Org-mode要支持哪些语言的code blocks. 我这里暂时只定义了4种语言: clojure, sh, dot 和 elisp.
 
-Then we specify that the org-babel-clojure-backend we want to use is Cider.
+然后我们要设置 =org-babel-clojure-backend= 为cider.
 
 #+BEGIN_SRC emacs-lisp
   ;; Configure org-mode with Cider
@@ -92,13 +78,10 @@ Then we specify that the org-babel-clojure-backend we want to use is Cider.
 
 ** Useful Key Bindings
 
-There are a few key bindings in Cider that are handy to have directly in Org-mode. We can easily add them like
-this. What I did here is to define two new: one for evaluating the last Clojure expression bound to C-x C-e.
-Then the binding to get the documentation of a symbol bound to C-c C-d.
+Cider本身有一些快捷键如果能直接在Org-mode触发那就很方便了. 要做到这样也不难,只要像下面这样设置就行了. 
+我这里设置了两个快捷键,一个用来运行上一个Clojure表达式的,快捷键为 =C-x C-e=. 还有一个是获取symbol的文档说明的,快捷键是 =C-c C-d=
 
-If you wonder why this is necessary, it is because each Org-mode code block is not running the Clojure major
-mode, so these key bindings are not available directly within a Org-mode file. This is why we have to remap
-the ones we want to use directly within Org-mode.
+你可能会觉得奇怪为什么要重新设置一下快捷键呢? 这是因为Org-mode的code block本身不是处于Clojure major mode下的, 因此Clojure major mode的快捷键并不能在Org文件中直接使用. 这也就是为什么我们需要在org-mode下重用映射一次快捷键的原因了.
 
 #+BEGIN_SRC emacs-lisp
   ;; Useful keybindings when using Clojure from Org
@@ -108,22 +91,19 @@ the ones we want to use directly within Org-mode.
 
 ** Configuration of Custom Features
 
-In my [[http://fgiasson.com/blog/index.php/2016/04/05/using-clojure-in-org-mode-and-implementing-asynchronous-processing/][Using Clojure in Org-mode and Implementing Asynchronous Processing]] I discuss some limitations of the
-current implementation of org-babel-clojure. In that blog post I show how these limitations can be overcome.
-One of the setting I need to change is to remove the timeout of the nrepl middleware. It can be done that way:
-
-Only set that setting if you updated org-bable-clojure with the information from that blog post.
+在我的[[http://fgiasson.com/blog/index.php/2016/04/05/using-clojure-in-org-mode-and-implementing-asynchronous-processing/][Using Clojure in Org-mode and Implementing Asynchronous Processing]] 一文中,我提到了 =org-babel-clojure= 实现的一些限制,也展示了越过这些限制的方法.
+这里与那篇文章中设置唯一不同的地方在于我需要去除nrepl中间层的超时设置. 方法如下:
 
 #+BEGIN_SRC emacs-lisp
   ;; No timeout when executing calls on Cider via nrepl
   (setq org-babel-clojure-sync-nrepl-timeout nil)
 #+END_SRC
 
+请确保你只有在已经按照上面那篇博文中所提到的方法修改了 =org-bable-clojure= 的情况下才做上面的设置.
+
 * Configure Code blocks Behaviors
 
-The code block in Org-mode has their own behaviors that can be modified like the default number of spaces for
-indentations, if you can use the shift key, the use the mode’s (Clojure in this code) native tab behavior and
-fontification (syntax highlighting), etc.
+Org-mode中的code block有它们独特的行为规范,例如,缩进的空格数量,是否能使用shift+方向键选中文本,是否使用编程语言所属mode的原生tab行为以及语法高亮等等. 对于这些行为规范,我们也能做出改变.
 
 #+BEGIN_SRC emacs-lisp
   ;; Let's have pretty source code blocks
@@ -136,22 +116,11 @@ fontification (syntax highlighting), etc.
 
 * Change Behaviors On Save
 
-The most important configuration I did related to use Org-mode as a Literate Programming environment are all
-the behaviors that occurs when I save a org-mode document.
+将Org-mode配置成文学编程环境最主要的是配置org-mode文档保存时的行为.
 
-The purpose of Literate Programming is to write a computer software while writing about its development
-process, its purpose, its implementation, etc. However, every time I save a literate file, I want the literate
-environment to extract (tangle) the code from that file into a [Clojure] source file that can be executed.
-What I did to enable this behavior is to add a function to call for Emacs’ after-save-hook. What the function
-does is to make sure that the buffer being saved is a Org-mode buffer. If it is, then I run Org-mode’s
-tangling procedure that will tangle the Org file on save.
+使用文学编程的目的是在记录软件开发过程,软件的作用,软件的实现等内容的同时将软件编写出来. 我希望每次保存文件时,都能自动抽取出文件中的代码并保存到相应的Clojure源文件中去. 要做到这一点,需要为 =after-save-hook= 添加一个新的函数, 这个新的函数先判断当前保存的buffer是否是Org-mode的buffer,若是的话,则调用Org-mode的tangle过程.
 
-However, given the nature of Literate Programming in Clojure, it is often the case that you will have another
-buffer where the tangled source file is open. What this means is that if you change some code in a Org file
-that get tangled on save, then the buffer where this code file is open won’t automatically be refreshed with
-the newly tangled code. To fix this issue, I set the global-auto-revert-mode which means that as soon as a
-file changes on the file system, if it is open in an Emacs buffer, then this buffer will be refreshed with
-that content.
+此外,在实际用文学编程开发Clojure时,你通常还有在另一个buffer中打开tangled的源文件. 这时若你修改了org文件并保存,则buffer中的内容与tangled文件的实际内容就不同步了. 要解决这个问题需要开启 =global-auto-revert-mode=. 它会在buffer所属文件被修改后,自动重新加载文件的内容.
 
 Finally, because Org-mode is not only about code blocks, I also enabled a final behavior when I save a Org
 file. What I often do is to leave TODO tasks at different places in my Org file to tell me what some work
