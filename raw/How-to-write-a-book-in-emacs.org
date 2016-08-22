@@ -37,21 +37,14 @@
 
 在我决定写这本书时,我希望能以ePub和PDF这两种格式来发布这本书. 我个人觉得技术类书籍比较适合以PDF格式发布或者打印出来看. 但是不是所有人都跟我一样这么热衷于PDF,因此我还得去寻找一个工具链来导出成ePub格式.
 
-为了能以ePub和PDF的格式来发布此书,我的第一反应是使用LaTeX来写作. Indeed, the final PDF output is typeset with LaTeX. 但是LaTeX的格式太过诡异,并且将LaTeX转换成ePub的过程也很困难.
-I’d have to reach in and manually fix things. Knowing how cumbersome
-mapping one source format to another can be, I decided not to write the book in LaTeX.
+为了能以ePub和PDF的格式来发布此书,我的第一反应是使用LaTeX来写作. Indeed, the final PDF output is typeset with LaTeX. 但是LaTeX的格式太过诡异,并且将LaTeX转换成ePub的过程也很困难,我需要深入到低层来手工实现这个转换过程. 所以我放弃了用LaTeX来写书的打算.
 
-Ultimately I settled on reStructuredText. As a Python developer I knew it already, and as I have an aversion
-to Markdown – nobody can seemingly agree on a singular specification for that format – that ruled it out, even
-though it is far more ubiquitous.
+最终我的选择是用reStructuredText格式来写作. 因为,作为一名Python开发者,我本身就会reStructredText格式了. 此外虽然Markdown格式要运用的更广泛的多,但我本身并不喜欢Markdown格式,因为它甚至都没有一个统一的语法. 
 
-So the idea was I’d write the book in reStructuredText and convert it to ePub and LaTeX using [[http://pandoc.org/][Pandoc]].
+所以我的想法是,用reStructuredText格式来写作,然后用[[http://pandoc.org/][Pandoc]] 将之转换为ePub和LaTeX格式.
 
-Another option is, of course, Org mode. Unfortunately converting Org mode from one format to another made it
-difficult to work with. I could’ve exported Org mode as HTML, but like LaTeX there are many ways of doing the
-same thing. Plus, reStructuredText has a clearly-defined specification, and the docutils tool to fall back on
-if Pandoc failed me. I didn’t want the hassle of switching formats mid-way either, so I went with
-reStructuredText.
+当然,我本来也可以直接用Org来写作的. 可惜Org mode很难与其他格式进行相互转换. 如果最终生成的格式是HTML的话,我可能会选择用Org格式来写作,但是最终生成的格式是LaTeX那就有太多的其他选择了.
+而且,reStructuredText的格式也很清晰,并且若Pandoc无法完成转换工作的情况下,至少有docutils供我使用. 我可不想写到一半的时候不得不转换一种写作格式呢. 因此,最终我还是选择了reStructuredText.
 
 #+BEGIN_SRC rst
   =============
@@ -77,17 +70,13 @@ reStructuredText.
   ========   =========
 #+END_SRC
 
-Here’s a snapshot of what the reStructuredText looks like. Very clean, and very readable, especially with
-syntax highlighting.
+上面是一段reStructuredText的示例,看起来很简洁,可读性很好,而且还能语法高亮.
 
 ** Proofreading and Tracking Changes
 
-The next thing I had to worry about was proofreading. I wanted the book professionally edited, so I had to
-hire an editor. But I simultaneously didn’t want to deal with Microsoft Word.
+下一步,我要考虑校对的问题了. 我希望本书能够经过专业的编辑,因此我需要雇用一个编辑. 但是同时我又不想使用Microsoft Word.
 
-Instead, I’d send the manuscript – the raw reStructuredText file – to the editor, and she would edit it as
-though it were her own manuscript. No track changes. If she had comments, she’d insert it above the paragraph,
-like so:
+最终我直接把原始的reStructuredText文件作为草稿发给编辑,然后让她按照自己的意愿随意修改草稿. 不需要追踪任何修订过程. 如果她需要添加注释只需要像下面那样在段落上插入注释就行了:
 
 #+BEGIN_EXAMPLE
   SUE: You should consider rewriting this paragraph.
@@ -95,53 +84,38 @@ like so:
   When you use the command ``M-x toggle-truncate-lines`` [...]
 #+END_EXAMPLE
 
-She still wanted to use Microsoft Word, so I inserted the raw text into a Word document, switched it to a
-fixed-width font, and told her to disable Word’s “helpful” AutoCorrect, as it’d mangle the reStructuredText
-formatting.
+不过她依然坚持要用Microsoft Word, 那我只要将原始的文本插入到Word中,调整为等宽字体,然后让她把Word中的自动跟正功能禁用掉(因为它会搞乱reStructuredText的格式).
 
 [[https://www.masteringemacs.org/static/uploads/ediff.png]]
 
-When she finished with the manuscript I’d use Emacs’s M-x ediff-buffers to ediff the corrected and original
-source manuscript, in effect using diff to track changes. Now you might be wondering: what about the comment
-paragraphs? Wouldn’t they screw up the diffing? Why yes, yes they would. But Emacs’s ediff is so advanced that
-you can tell it to hide regions match patterns by typing #h in the Ediff Control frame and enter the following
-regexp:
+在她完成对草稿的修改后,我用Emacs的 =M-x ediff-buffers= 来对比校对后内容与原始草稿之间的区别,在效果上也也就等同于用diff来追踪修订的过程. 
+你可能会好奇:那么哪些注释段落该怎么办呢?他们不是也会被diff监测出来吗? 是的,它们确实会被监测出来. 但是Emacs的ediff牛就牛在你可以让它隐藏匹配某一模式的区域,方法是在Ediff的控制frame中按下 ~#h~,然后输入下面这段正则表达式:
 
 #+BEGIN_EXAMPLE
   ^SUE:
 #+END_EXAMPLE
 
-And Emacs would disregard lines beginning with that pattern. Extremely useful, as I could read the comment and
-modify my manuscript according to the instructions given, while I also merged her changes. It’s hard to make
-out from the screenshot above that it works, and there were a couple of times it generated a too-complicated
-diff, but that took up maybe 10 minutes of my time, out of 4 hours or so of reviewing and merging her changes.
+这样Emacs就会忽略以SUE开头的行了. 这样我不仅可以阅读编辑的注释并按照她的指导来修改我的草稿,还能合并她所做出的改动.
+从上面的截图中你可能很难想象它是怎么工作的,而且有时候diff产生的结果可能太过于复杂了,但是这种情况所耗时间占总校对的时间很少.
 
-There were a few niggles such as the unicode character for NON-BREAKING SPACE not reading right, but I chalk
-that up to me using UTF-8 and her Windows machine using iso-8859-1. Again, with a regexp replace, fixing it
-took maybe 2 minutes. No problem.
+还有一些小问题,比如有一些字符显示不太正常,因为我用的是UTF-8格式的编码,而她的Windows机器用的是iso-8859-1格式的编码. 不过要修正这个问题也容易,用个正则表达式替换就搞定了,两分钟的事,没什么问题.
 
-So, all in all, I got to have my cake and eat it: I wrote the book in reStructuredText, had it proofread in
-reStructuredText, and corrected it in Emacs using ediff.
+因此,最终我能做到用reStructuredText写作,用reStructuredText校正,然后在Emacs中用ediff来修订它.
 
 ** Spell Checking
 
-This is one where I wish I had Microsoft Word. I used M-x flyspell-mode to track misspelled words as I type,
-and I tweaked aspell (the commandline spell checker Emacs uses in the background) so it’d use American English
-instead of my native UK English LOCALE:
+这部分工作我倒是挺怀念Microsoft Word的. 我用 =M-x flyspell-mode= 来追踪我输入的拼错的单词, 而且我调整了一下aspell(Emacs用来在后台进行拼写检查的命令行工具),让它使用美式英语而不是英式英语的方式来检查拼写:
 
 #+BEGIN_SRC emacs-lisp
   .. -*- mode: rst; encoding: utf-8; ispell-dictionary: "american" -*-
 #+END_SRC
 
-But aspell is an adequate, not great, spell checker. It’s fine for source code comments and minor README
-files, but for a book I found that it missed too many things, and used awkward hyphenation rules. Still,
-though, in the grand scheme of things it worked well. And being able to type C-M-i on a misspelled word and
-have Emacs auto correct it was certainly useful.
+但是aspell并不特别好用,用它来检查源码中的注释或README文件还好. 但是用来检查书籍的话,我发现很多地方它都检查不出来,而且它对连字符的监测规则也很糟糕. 
+当然,总体来说aspell工作的还算可以,而且你在拼错的单词上按下 ~C-M-i~ 就能让Emacs自动修正该单词,这项功能还挺不错的.
 
 ** Jumping around
 
-Jumping between chapters was very easy thanks to Helm’s M-x imenu support. M-x rst-mode builds an imenu index
-of all the chapters and sections, making cross-chapter navigation easy.
+Helm提供了对imenu的支持,因此在章节之间跳转其实很容易. =M-x rst-mode= 本身就创建了一个关于所有章节位置的imenu索引,这让你在跨章节导航是十分便利.
 
 ** Pandoc
 
