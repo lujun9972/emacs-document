@@ -5,54 +5,39 @@
 #+DATE: [2016-08-12 五 16:57]
 #+OPTIONS: ^:{}
 
-I [[https://spin.atomicobject.com/2016/01/26/webstorm-nodejs-development/][wrote recently]] about using [[https://www.gnu.org/software/emacs][Emacs]] as a JavaScript development environment. One of my chief complaints was the
-inability to easily run JavaScript tests from within Emacs. I practice TDD frequently, and having to
-context-switch out of the editor I’m using to run tests is a big annoyance for me.
+我[[https://spin.atomicobject.com/2016/01/26/webstorm-nodejs-development/][最近写了篇帖子]] 是关于用[[https://www.gnu.org/software/emacs][Emacs]] 作为JavaScript开发环境的. 其中一个着重要解决的问题是如何在Emacs中方便的运行JavaScript测试. 我经常使用TDD的开发方式,因此需要经常跳出编辑器去运行测试案例,这让我觉得很麻烦.
 
-I knew it was possible to do what I wanted from within Emacs, as evidenced by other test runner modes like 
-[[https://github.com/pezra/rspec-mode][RSpec-mode]]. Armed with that knowledge, I decided to go through the process of learning enough [[https://www.gnu.org/software/emacs/manual/html_node/elisp][Emacs Lisp]] to
-make a [[https://mochajs.org/][Mocha]] test runner. In the process, I learned a lot about developing Emacs packages and ended up with a
-really useful tool, so I thought I would share some of the things I learned.
+我知道Emacs是完全可以做到这一点的,因为已经有了类似的运行测试的mode了,比如[[https://github.com/pezra/rspec-mode][RSpec-mode]]. 基于此,我决定去学习一下[[https://www.gnu.org/software/emacs/manual/html_node/elisp][Emacs Lisp]] 然后自己写一个[[https://mochajs.org/][Mocha]] 测试器. 
+在这个过程中,我学到了许多关于开发Emacs package的知识,并且最终开发出了一个有用的工具. 我想我有必要分享一下我学到的东西了.
 
-There is a lot of content here, and we are going to cover three main topics: using Emacs as a Lisp IDE,
-writing a simple package, and publishing that package for others to use.
+关于这部分的内容有很多,我们这主要关注三个方面知识: 将Emacs作为Lisp IDE,编写简答的package,以及发布该package給他人使用.
 
 * Emacs as an Emacs Lisp IDE
 
-Unsuprisingly, Emacs itself is an excellent development environment for Emacs Lisp code. It can be easily
-cofigured to include IDE features for Lisp development, such as autocompletion, popup documentation,
-integrated debugging, and a REPL.
+毋庸置疑, Emacs本身就很适合作为Emacs Lisp代码的开发环境. 它可以很轻易的配置成像IDE那样包括自动补全,文档提示,整合调试以及REPL等功能.
 
 ** A few recommendations
 
-Most of these features are built in, although I highly recommend installing the third-party packages 
-[[http://company-mode.github.io/][company-mode]] (autocompletion) and [[http://www.flycheck.org/en/latest/][Flycheck]] (real-time syntax checking) if you’re going to do Emacs Lisp
-development.
+虽说Emacs本身就内置了这些IDE的特性,但我还是强烈推荐安装一些第三方的package,比如 [[http://company-mode.github.io/][company-mode]] (提供自动补全功能) and [[http://www.flycheck.org/en/latest/][Flycheck]] (提供实时语法监测功能).
 
-I also recommend turning on the built-in eldoc-mode, which will pop up documentation and signatures for
-various functions and symbols as you write code.
+我也推荐开启内置的eldoc-mode, 它在你编写代码时为各种函数与symbol提供文档与签名的提示信息.
 
-Lastly, I recommend familiarizing yourself with the built-in debugging and evaluation functions for Emacs
-Lisp. For evaluating code to test it, you can use the built-in Lisp-interaction-mode, which the *scratch*
-buffer usually has enabled by default. With the mode, you can paste Emacs Lisp code and then press C-x C-e to
-evaluate the code and see the results.
+最后,你应该熟悉那些内置的Emacs Lisp调试与执行相关的函数. 要测试一段代码,你可以开启内置的 =Lisp-interaction-mode=, =*scratch*= buffer在默认情况下会开启该mode. 在该mode下,你可以粘贴一段Emacs Lisp代码然后按下 =C-x C-e= 来运行这段代码并看到运行的结果.
 
-Emacs also comes with [[https://www.gnu.org/software/emacs/manual/html_node/elisp/Edebug.html][Edebug]], a built-in stepping debugger for Emacs Lisp code. There are several ways to use
-it, but I most commonly use the interactive function edebug-defun. When run inside the body of a function, it
-sets a breakpoint at the start of that function that will be hit the next time you run it.
+Emacs还内置了一个[[https://www.gnu.org/software/emacs/manual/html_node/elisp/Edebug.html][Edebug]] 工具, 它可以单步调试Emacs Lisp代码. 它有很多的功能,但是我最常用的是它的 =edebug-defun= 函数. 它会在函数开始的地方设置一个断点,并在运行到这个函数时触发该断点.
 
 * Making a Custom Compilation Mode
 
-Mocha is a CLI tool, and Emacs has a number of built-in utilities for running external CLI programs.
+Mocha是一个命令行工具, Emacs内置有很多函数来运行外部的命令行程序.
 
 ** Compilation buffer
 
-The most relevant one for something like a test runner is a compilation buffer. In Emacs, this runs an
+在Emacs中最贴近测试运行器的东西应该就是 =compilation buffer= 了. In Emacs, this runs an
 external CLI process and displays the output in a buffer. This is useful for programs where you care about the
 output, like a compiler or test runner. It also includes some built-in niceties like the ability to highlight
 errors and jump to them.
 
-In fact, you don’t even need to write any code to run an external command in a compilation buffer. You can
+
 just use the M-x compile command like so:
 
 [[http://g.recordit.co/wWAwkTuVH2.gif]]
