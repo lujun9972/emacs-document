@@ -80,11 +80,9 @@ Mocha是一个命令行工具, Emacs内置有很多函数来运行外部的命�
 
 ** Find project root
 
-Many types of command line utilities need to be run from the project root. Fortunately, project roots
-are generally easily identified by the presence of a particular file or directory (like a source control
-directory). Since this is such a common need, Emacs has a built-in function, locate-dominating-file, to
-recursively search up a directory tree for a particular file name. The Emacs documentation on this function
-explains how to use it better than I could:
+许多命令行工具都要求是在项目的根目录下运行的. 好在项目的根目录一般都会有一些特定的文件或目录存在(比如版本控制目录).
+由于通过寻找特定文件/目录来确定项目根目录位置的需求太常见了,因此Emacs内建了一个名为 =locate-dominating-file= 的函数来递归地沿着目录树向上搜索特定的文件名称.
+该函数的文档很好的说明了如何使用该函数:
 
 #+BEGIN_QUOTE
     (locate-dominating-file FILE NAME)
@@ -96,12 +94,10 @@ explains how to use it better than I could:
    
 ** Customize configuration
 
-Unlike an actual compilation, which would involve rerunning a single static command, something like a test
-runner needs to be dynamically configurable. Fortunately, Emacs has Customize, an awesome built-in and
-extensible configuration interface for packages (and the core editor). Customize exposes several macros which
-can be used to define custom configuration parameters for a package and display them in an editable GUI.
+测试与编译毕竟是不一样的,编译每次的编译命令都是一样的,然而测试时需要动态的生成测试命令. 好在Emacs内置的 ~Customize~ 为package提供了一套很棒的配置界面.
+~Customize~ 预定义了很多宏,这些宏可以用来为package定义配置参数,并提供了一套图形界面来配置这些参数.
 
-For example, here are the configurations we expose for our Mocha runner:
+例如,下面定义了一些Mocha的配置项:
 
 #+BEGIN_SRC emacs-lisp
   (defgroup mocha nil
@@ -134,13 +130,12 @@ For example, here are the configurations we expose for our Mocha runner:
     :group 'mocha)
 #+END_SRC
 
-And those show up in the customize GUI like so:
+这些配置项的配置界面如下所示:
 
 [[https://spin.atomicobject.com/wp-content/uploads/20160514211809/Screen-Shot-2016-05-14-at-7.04.02-PM-1024x393.png][GUI interface for configuring our package]]
 
-Since many of these options make sense to configure on a per-project rather than global basis, Emacs also
-supports a special file called .dir-locals.el, which can override these settings on a per-directory basis. A
-typical .dir-locals.el file might look like this:
+由于许多的配置项是用来配置项目信息而不是全局信息的,因此Emacs还支持通过一个名为 =.dir-locals.el= 的文件来为每个目录设置自己的配置信息.
+=.dir-locals.el= 文件的内容大致如下所示:
 
 #+BEGIN_SRC emacs-lisp
   ((nil . (
@@ -152,11 +147,9 @@ typical .dir-locals.el file might look like this:
            )))
 #+END_SRC
 
-The syntax is a little cryptic, but if your Emacs working directory is in the same directory as this file or
-below it, it will respect these options in favor of any global configuration.
+上面这段代码可能有点难懂. 这样设置的效果是,如果你的Emacs工作目录处于该 =.dir-locals.el= 文件的同级目录或子目录下时,Emacs会使用 =.dir-locals.el= 中配置的信息而不是全局的配置信息.
 
-Once we have these configuration options defined, it is easy to write a function that will concatenate all the
-strings together to create our test runner command!
+我们定义好了这些配置项后,很容易就能写出个函数来拼装这些配置信息成一个测试命令了!
 
 #+BEGIN_SRC emacs-lisp
   (defun mocha-generate-command (debug &optional mocha-file test)
@@ -179,9 +172,8 @@ strings together to create our test runner command!
 
 * Generating and Running Compile Command
 
-Now that we can configure our test command and find the root of our project, we are ready to run it with the
-custom compilation mode we made earlier. I’m going to show you the most important code for doing that below,
-and then break it down and explain the different parts.
+现在我们可以配置测试命令并且还能找出项目的根目录了, 下一步就是在之前自定义的compilation mode中运行测试命令了.
+下面我会向你展示实现该功能的最关键的那些代码,我将这些代码分成几个部分并逐一进行讲解.
 
 #+BEGIN_SRC emacs-lisp
   (defun mocha-run (&optional mocha-file test)
@@ -201,13 +193,12 @@ and then break it down and explain the different parts.
         (compilation-start test-command-to-run 'mocha-compilation-mode (lambda (m) (buffer-name))))))
 #+END_SRC
 
-Whew! That is some pretty dense code, so let’s break it down bit by bit.
+哇塞! 这份代码看起来挺难懂的,让我们一点一点来分析.
 
 ** Check for unsaved buffers
 
-The first thing this function does is check if there are any unsaved buffers open, and then prompt the user to
-save them. Sounds pretty complex, but since this is such a common operation, Emacs makes it possible with just
-a couple of lines.
+该函数作的第一件事就是检查是否还有未保存的buffer存在,如果存在则提示用于先保存. 
+这项工作看起来挺复杂的,不过对于这种常用的操作,Emacs只需要寥寥数行就能搞定.
 
 #+BEGIN_SRC emacs-lisp
   (save-some-buffers (not compilation-ask-about-save)
@@ -217,8 +208,7 @@ a couple of lines.
 
 ** Clean up test buffer
 
-Next, we search for the named buffer we use to run tests to see if it is still around from a previous test
-run. If it is, we kill it so we can get a fresh start.
+下一步我们通过搜索运行测试的那个buffer,来看它是否还在运行上一个测试. 若还在运行上一个测试,则我们直接杀掉它另起一个新测试.
 
 #+BEGIN_SRC emacs-lisp
   (when (get-buffer "*mocha tests*")
@@ -227,9 +217,7 @@ run. If it is, we kill it so we can get a fresh start.
 
 ** Bind values
 
-After that, the real work begins. We start by binding two values: the actual test command we are going to run
-and the path to the project root directory. Both values are calculated using the techniques and code we
-defined above.
+之后,正戏开始了. 我们一开始先设置了两个值:一个时我们要调用的测试命令,另一个是项目的根目录地址. 这两个值都通过上面定义的代码计算出来的.
 
 #+BEGIN_SRC emacs-lisp
   (let ((test-command-to-run (mocha-generate-command nil mocha-file test)) (root-dir (mocha-find-project-root)))
@@ -237,13 +225,13 @@ defined above.
 
 ** Run test command
 
-Finally, now that we have those two values, we actually run our test command. This is a three-step process of:
+然后,我们真正运行测试命令. 分三步走:
 
-1. Creating and switching to the buffer our tests will run in.
-2. Changing the working directory to our project root.
-3. Running our test command in the buffer with our custom compilation mode.
+1. 创建并切换到一个buffer中,该buffer就是我们测试的运行环境.
+2. 更改工作目录到项目根路径.
+3. 在自定义的compilation mode中运行测试命令.
 
-All of this is done with the last three lines of code:
+这三步就对应着代码中的最后三行:
 
 #+BEGIN_SRC emacs-lisp
   (with-current-buffer (get-buffer-create "*mocha tests*")
@@ -253,12 +241,9 @@ All of this is done with the last three lines of code:
 
 ** Expose interface to users
 
-Now that we have the code to run our test commands, we need to expose it to users. For explicit actions like
-running commands, Emacs uses interactive functions, which can be called interactively by a user via either the
-M-x interface or a hotkey.
+现在我们有了运行测试命令的代码了,我们还需要将之暴露給用户使用. Emacs使用interactive functions来实现这一点, interactive function可以被用户通过 "M-x 函数名"或热键的方式调用.
 
-To make a function interactive, you just include the (interactive) special form at the top of the function
-body like so:
+要让一个函数变得interactive, 你只需要将 =(interactive)= 这句话放在函数体的最开头就行了,像这样:
 
 #+BEGIN_SRC emacs-lisp
   ;;;###autoload
@@ -268,9 +253,7 @@ body like so:
     (mocha-run (buffer-file-name)))
 #+END_SRC
 
-If you are not exporting the function as part of a mode, it is also customary to add the ;;;###autoload magic
-comment before the function, which helps other Emacs files referencing your package find the function so
-it can be used (for example, to bind them to a hotkey).
+习惯上我们常常会将 =;;;###autoload= 这个特殊的注释放在函数前面,这个注释会帮助其他引用你package的Emacs文件找到函数定义的位置,这样就可以直接使用该函数(例如你可以为它绑定一个热键)而不用先加载package了.
 
 Once a function is defined as interactive, it will appear in the M-x interface and can be activated by a user.
 
