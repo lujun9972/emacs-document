@@ -1,0 +1,84 @@
+#+TITLE: how_to_enable_GnuTLS_for_Emacs24_on_Windows
+#+URL: http://חנוך.se/diary/how_to_enable_GnuTLS_for_Emacs_24_on_Windows/index.en.html
+#+AUTHOR: lujun9972
+#+CATEGORY: raw
+#+DATE: [2016-08-30 二 14:37]
+#+OPTIONS: ^:{}
+
+Emacs 24 introduced the possibility to open TLS network connections using the GnuTLS library directly, instead
+of using a command line tool as a wrapper. This is especially interesting for those who are stuck using Emacs
+on Windows, as the command line tools can be rather brittle on that platform.
+
+However, there are some steps that need to be performed in order to get native GnuTLS to work. This page
+attempts to describe them.
+
+* Get a GnuTLS-enabled Emacs
+
+The Windows binaries available for download from the GNU site are compiled against GnuTLS, but if you compile
+your own Emacs, see the file nt/INSTALL in the Emacs source distribution for instructions.
+
+* Find the GnuTLS DLLs
+
+The first google hit for "emacs gnutls windows" is [[http://www.gnu.org/software/emacs/manual/html_mono/emacs-gnutls.html][this page]]. It says:
+
+#+BEGIN_QUOTE
+    There's one way to find out if GnuTLS is available, by calling gnutls-available-p. This is a little bit
+    trickier on the W32 (Windows) platform, but if you have the GnuTLS DLLs (available from [[http://sourceforge.net/projects/ezwinports/files/][http://]]
+    [[http://sourceforge.net/projects/ezwinports/files/][sourceforge.net/projects/ezwinports/files/]] thanks to Eli Zaretskii) in the same directory as Emacs, you
+    should be OK.
+#+END_QUOTE
+   
+On that page, I found:
+
+gnutls-3.0.9-w32-bin.zip    2012-01-02  7.2 MB
+
+* Extract the GnuTLS DLLs
+
+I first naïvely tried opening the zip file in Explorer and copying the files from there, but that does
+nothing—it neither copies the files nor displays any error message. You need to extract the zip file, and then
+copy all DLL files to the bin directory where your Emacs is installed, probably somewhere like C:\Program
+Files (x86)\emacs-24.3\bin.
+
+* Restart Emacs and try it
+
+At this point, if you restart Emacs and type: =M-: (gnutls-available-p) RET=
+
+you should see t in the echo area, which means that Emacs can find the GnuTLS libraries.
+
+* Configure trust files
+
+However, if you try to open a TLS connection, it will fail complaining that certificate validation failed.
+This happens because GnuTLS needs to have a set of CA certificates to verify the certificates of the servers
+it connects to. It looks for CA certificates in the locations specified in the variable gnutls-trustfiles, but
+none of the default values work out of the box on Windows.
+
+I'm not aware of any way to make GnuTLS use any certificates that come with the Windows system, so you need to
+get a certificate bundle from elsewhere. The cURL project [[http://curl.haxx.se/docs/caextract.html][provides such a bundle]] that you can download.
+Download the cacert.pem file to a suitable location, and point gnutls-trustfiles to it with customize-option.
+Note that the file name is passed unexpanded to GnuTLS, so you cannot use ~ as a shorthand for your home
+directory; use the full absolute file name instead.
+
+* See if it works
+
+Paste the following piece of code into the *scratch* buffer:
+
+#+BEGIN_SRC emacs-lisp
+  (condition-case e
+      (delete-process
+       (gnutls-negotiate
+        :process (open-network-stream "test" nil "www.google.com" 443)
+        :hostname "www.google.com"
+        :verify-error t))
+    (error e))
+#+END_SRC
+
+Then put point at the end and hit C-j. If nil gets inserted into the buffer, then the certificate could be
+verified, and your setup appears to be working.
+
+Otherwise, you'll see an error like:
+
+#+BEGIN_SRC emacs-lisp
+  (error "Certificate validation failed www.google.com, verification code 66")
+#+END_SRC
+
+If so, a good place to start debugging is setting the variable gnutls-log-level to a value greater than 0.
