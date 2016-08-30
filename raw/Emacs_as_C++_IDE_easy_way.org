@@ -1,0 +1,81 @@
+#+TITLE: Emacs_as_C++_IDE_easy_way
+#+URL: http://blog.binchen.org/posts/emacs-as-c-ide-easy-way.html
+#+AUTHOR: lujun9972
+#+CATEGORY: raw
+#+DATE: [2016-08-30 二 14:46]
+#+OPTIONS: ^:{}
+
+I design a quick and newbie friendly solution.
+
+It works at Linux/OSX/Cygwin (should work at Windows, but I don't develop at Windows).
+
+Setup is minimum. You only need install GNU Global and two Emacs plugins:
+
+  * [[https://github.com/company-mode/company-mode][company]] for code completion
+  * [[https://github.com/syohex/emacs-helm-gtags][emacs-helm-gtags]] or [[https://github.com/syohex/emacs-counsel-gtags][emacs-counsel-gtags]] for code navigation. I use emacs-counsel-gtags.
+
+Here is the step to step guide.
+
+* Step 1, create sample projects for experiment
+
+Say I have two projects ~/proj1 and ~/proj2. Both projects will use third party library C++ header files from 
+read-only directory /usr/include.
+
+A new directory ~/obj to store the index files of third party libraries.
+
+#+BEGIN_SRC sh
+  mkdir -p ~/{proj1,proj2,obj}
+#+END_SRC
+
+The content of ~/proj2/lib.cpp,
+
+#+BEGIN_SRC cpp
+  void proj2_hello(int a2, char* b2) {
+  }
+#+END_SRC
+
+The content of ~/proj1/main.cpp,
+
+#+BEGIN_SRC cpp
+  void proj1_hello(int a1, char* b1) {
+  }
+
+  int main(int argc, char *argv[]) {
+    return 0;
+  }
+#+END_SRC
+
+* Step 2, scan C++ code and setup Emacs
+
+Run below command in shell to scan code,
+
+#+BEGIN_SRC sh
+  cd /usr/include && MAKEOBJDIRPREFIX=~/obj gtags -O && cd ~/proj1 && gtags && cd ~/proj2 && gtags
+#+END_SRC
+
+After setting up the corresponding Emacs plugins (minimum setup copied from their website is enough), insert
+below code into ~/.emacs,
+
+#+BEGIN_SRC emacs-lisp
+  ;; Please note `file-truename' must be used!
+  (setenv "GTAGSLIBPATH" (concat "/usr/include"
+                                 ":"
+                                 (file-truename "~/proj2")
+                                 ":"
+                                 (file-truename "~/proj1")))
+  (setenv "MAKEOBJDIRPREFIX" (file-truename "~/obj/"))
+  (setq company-backends '((company-dabbrev-code company-gtags)))
+#+END_SRC
+
+* Usage
+
+Use the Emacs plugins as usual.
+
+But you need install latest company built on 25th August because I [[https://github.com/company-mode/company-mode/issues/570][fixed a company issue]] yesterday.
+
+[[http://blog.binchen.org/wp-content/cpp-gtags-demo-nq8.png]]
+
+
+* Technical Details (Optional)
+
+Check [[https://www.gnu.org/software/global/manual/global.html][GNU Global manual]] to understand environment variables =GTAGSLIBPATH= and =MAKEOBJDIRPREFIX=.
