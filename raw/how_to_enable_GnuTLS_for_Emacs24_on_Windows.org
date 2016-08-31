@@ -5,21 +5,17 @@
 #+DATE: [2016-08-30 二 14:37]
 #+OPTIONS: ^:{}
 
-Emacs 24 introduced the possibility to open TLS network connections using the GnuTLS library directly, instead
-of using a command line tool as a wrapper. This is especially interesting for those who are stuck using Emacs
-on Windows, as the command line tools can be rather brittle on that platform.
+Emacs 24开始允许直接使用GnuTLS库来创建TLS网络链接,而无需再调用命令行工具了. 这对Windows平台的Emacs用户是个重大利好消息,因为Windows平台上缺少这种命令行工具.
 
-However, there are some steps that need to be performed in order to get native GnuTLS to work. This page
-attempts to describe them.
+不过要在Windows上启用原生GnuTLS支持还需要经过以下几个步骤:
 
 * Get a GnuTLS-enabled Emacs
 
-The Windows binaries available for download from the GNU site are compiled against GnuTLS, but if you compile
-your own Emacs, see the file nt/INSTALL in the Emacs source distribution for instructions.
+GNU网站上提供下载的Windows版Emacs是支持GnuTLS的, 不过如果你是自己编译Emacs,请参照Emacs源码目录下的 =nt/INSTALL= 的说明来编译.
 
 * Find the GnuTLS DLLs
 
-The first google hit for "emacs gnutls windows" is [[http://www.gnu.org/software/emacs/manual/html_mono/emacs-gnutls.html][this page]]. It says:
+在google上搜索"emacs gnutls windows"的结果中,第一个页面就是[[http://www.gnu.org/software/emacs/manual/html_mono/emacs-gnutls.html][这个页面]]. 上面说:
 
 #+BEGIN_QUOTE
     There's one way to find out if GnuTLS is available, by calling gnutls-available-p. This is a little bit
@@ -28,39 +24,30 @@ The first google hit for "emacs gnutls windows" is [[http://www.gnu.org/software
     should be OK.
 #+END_QUOTE
    
-On that page, I found:
+在那个网页上,我找到了这个:
 
 gnutls-3.0.9-w32-bin.zip    2012-01-02  7.2 MB
 
 * Extract the GnuTLS DLLs
 
-I first naïvely tried opening the zip file in Explorer and copying the files from there, but that does
-nothing—it neither copies the files nor displays any error message. You need to extract the zip file, and then
-copy all DLL files to the bin directory where your Emacs is installed, probably somewhere like C:\Program
-Files (x86)\emacs-24.3\bin.
+我一开始想用Explorer来打开zip文件,然后将文件拷贝出来,结果失败了. 文件拷贝不出来而且也没有任何错误提示. 我只好解压该zip文件然后将解压出来的所有DLL文件拷贝到Emacs安装路径的 =bin= 目录下. 在我的电脑上就是 =C:\Program Files (x86)\emacs-24.3\bin=.
 
 * Restart Emacs and try it
 
-At this point, if you restart Emacs and type: =M-: (gnutls-available-p) RET=
-
-you should see t in the echo area, which means that Emacs can find the GnuTLS libraries.
+一切做完之后,重启Emacs并输入 =M-: (gnutls-available-p) RET=,你应该能在echo area中看到显示了一个t,这表示Emacs找到了GnuTLS库了.
 
 * Configure trust files
 
-However, if you try to open a TLS connection, it will fail complaining that certificate validation failed.
-This happens because GnuTLS needs to have a set of CA certificates to verify the certificates of the servers
-it connects to. It looks for CA certificates in the locations specified in the variable gnutls-trustfiles, but
-none of the default values work out of the box on Windows.
+不过,如果你现在尝试创建一个TLS链接,会提示证书验证失败. 这时因为GnuTLS需要一些CA证书来验证它所连接的服务器.
+它会在变量 =gnutls-trustfiles= 所指定的位置搜索CA证书, 不过该变量的默认值并不适用于Windows环境.
 
-I'm not aware of any way to make GnuTLS use any certificates that come with the Windows system, so you need to
-get a certificate bundle from elsewhere. The cURL project [[http://curl.haxx.se/docs/caextract.html][provides such a bundle]] that you can download.
-Download the cacert.pem file to a suitable location, and point gnutls-trustfiles to it with customize-option.
-Note that the file name is passed unexpanded to GnuTLS, so you cannot use ~ as a shorthand for your home
-directory; use the full absolute file name instead.
+我不清楚怎么让GnuTLS使用Windows系统自带的那些证书,没办法,只能从其他地方获取证书集了. 好在cURL项目 [[http://curl.haxx.se/docs/caextract.html][提供了线程的证书集]] 可以下载.
+将下载下来的 =cacert.pem= 文件放在合适的目下,然后设置 =gnutls-trustfiles= 指向它就行了.
+注意,传递给GnuTLS的文件名不会被扩展,因此你不能用 =~= 来表示你的home目录,你需要使用绝对路径的文件.
 
 * See if it works
 
-Paste the following piece of code into the *scratch* buffer:
+将下列代码拷贝到 =*scratch*= buffer:
 
 #+BEGIN_SRC emacs-lisp
   (condition-case e
@@ -72,13 +59,12 @@ Paste the following piece of code into the *scratch* buffer:
     (error e))
 #+END_SRC
 
-Then put point at the end and hit C-j. If nil gets inserted into the buffer, then the certificate could be
-verified, and your setup appears to be working.
+将光标放在代码后面然后按下 =C-j=. 如果在buffer中插入一个 =nil=,则表示验证通过了,你的配置生效了.
 
-Otherwise, you'll see an error like:
+否则你应该会看到如下错误:
 
 #+BEGIN_SRC emacs-lisp
   (error "Certificate validation failed www.google.com, verification code 66")
 #+END_SRC
 
-If so, a good place to start debugging is setting the variable gnutls-log-level to a value greater than 0.
+如果出现这种错误,那么可以试试将变量 =gnutls-log-level= 的值设置成大于0的值,再进行调试.
