@@ -5,46 +5,36 @@
 #+DATE: [2016-08-30 二 14:21]
 #+OPTIONS: ^:{}
 
-I’ve done it. I’m now done with Zshell and Fish and Bash and all of those guys…mostly. While they all have
-nice features, I find that what drives my workflow is my editor. I start in Emacs, and then pop over to shell
-for file manipulation and whatnot. I don’t start in the shell and move around and then edit files.
+我做到了. 我已经不再需要Zshell , Fish , Bash 等等这些东西了…至少大部分时候都不再需要了. 
+它们都是很不错的工具,只不过我我的工作流是以编辑器来驱动的. 我启动Emacs,然后仅仅在需要管理文件之类的操作时才进入shell,而不是先进入shell四处游荡,然后再开始编辑文件.
 
-Most Emacs users split the Emacs window and start a shell inside Emacs, and pop over and back to that window.
-However, I’m finding that Emacs’ eshell to be a better fit, for the more I use it, the better I like it.
+大多数Emacs用户都会拆分Emacs window然后在Emacs中启动一个shell,并在需要时进入该shell window中进行操作,不需要时则切换到其他window.
+不过我发现Emacs的eshll似乎更适合于我,我越用就越发的爱上它了.
 
-It’s problem is the lack of documentation…and a bit of misunderstanding. Hence this essay. Before I get
-started, I would like to put a plug for Mickey Petersen’s new book, [[https://www.masteringemacs.org][Mastering Emacs]], as he has an excellent
-chapter on [[https://www.masteringemacs.org/article/complete-guide-mastering-eshell][mastering the eshell]] (which happens to be free).
+不过eshell有一个问题就是缺少文档...而且还有点难以理解. 因此我才撰写了本文. 不过在我开始之前,我要给Mickey Petersen的新书《[[https://www.masteringemacs.org][Mastering Emacs]]》做个广告,它里面有一篇"[[https://www.masteringemacs.org/article/complete-guide-mastering-eshell][mastering the eshell]]" 写得特别好(而且免费就能阅读).
 
 * Why?
 
-A shell is a command-driven REPL. You type in a command and view the results, type in another command…rinse
-and repeat. Fine until you type something you expect to have a few lines, but if it responds with hundreds of
-lines, you redo the command and pipe it through less.
+shell其实就是一个由命令驱动的REPL. 你输入命令然后查看结果,然后输入另一个命令…如此往复. 如果输出结果只有几行,你会让它直接输出,如果输出结果有几百行,你会通过管道将结果传递给less命令.
 
-But with EShell, you don’t need to bother with a pager, since if you received too much information, hit C-c
-C-p which jumps you to the top of the last command, and then C-v your way down. Or better yet, just search for
-what you want. EShell means every command goes through the Emacs pager.
+不过在eshell中,你根本无需将结果传递给另一个pager,如果你发现输出结果太多内容了,只需要按下 =C-c C-p= 就会帮你跳到最后输入命令的头部,and then C-v your way down. 甚至于,你可以直接搜索你想要的那部分内容.
+在eshell中执行命令意味着,这些命令的输出都会经过Emacs pager的处理.
 
-To be even cooler, try the [[http://www.masteringemacs.org/articles/2010/12/13/complete-guide-mastering-eshell/][Plan 9-like]] approach using the Eshell smart display, where you automatically begin
-at the top of the command until you type a non-cursor-movement key.
+更酷的是,你可以像[[http://www.masteringemacs.org/articles/2010/12/13/complete-guide-mastering-eshell/][Plan 9]] 那样启用Eshell的智能显示功能, 这时,执行命令后,如果命令输出过长,你的光标会自动留在输入命令的位置,直到你输入了一个非光标移动的键,光标才会跳到输入下一条命令的地方.
 
-The Emacs Shell has a few other advantages:
+Eshell拥有如下几个优点:
 
-  * Since it is written in Emacs Lisp, it has the same shell behavior between different operating systems.
-  * Along with access to all your scripts and programs, you also have access to Emacs functions … write your
-    shell scripts in Lisp? Sure!
-  * Craft and extend your shell experience.
++ 它是由Emacs Lisp写成的, 因此它是跨平台的.
++ 你不仅仅可以使用脚本和程序,你还可以使用Emacs函数… 想用Lisp写你的shell脚本?没问题!
++ 它的使用体验也比一般的shell要好.
 
-Eshell’s primary disadvantage shows when a program attempts to control the terminal.^[[http://www.howardism.org/Technical/Emacs/eshell-fun.html#fn.1][1]]
+但是当一个程序想要直接操作终端时,就不适于Eshell了.^[[http://www.howardism.org/Technical/Emacs/eshell-fun.html#fn.1][1]]
 
-While you might have tried EShell in the past, I doubt you inhaled and noticed its uniqueness. Let’s level up…
+你可能也尝试过Eshell, 我想你一定为它的独特性所吸引. 现在让我们更近一步的了解它…
 
 * Starting the Shell
 
-Since my workflow is driven from Emacs, shells are temporary. I pop out to a shell for a few commands, and
-then return to my work. When I say pop out to the shell, I use the following function which creates a
-buffer-specific window in the lower third portion and start Eshell (which picks up that buffer’s directory).
+我的工作流是以Emacs所驱动的,偶尔才会用到shell. 我常常会在shell中输入一些命令后,然后回到原来的工作中. 当我想弹出一个shell时,我使用下列函数来创建一个指定buffer的window(该window位于原始window的下方,占三分之一的高度),并开启eshell(它会自动进入当前buffer的目录中).
 
 #+BEGIN_SRC emacs-lisp
   (defun eshell-here ()
@@ -68,7 +58,7 @@ buffer-specific window in the lower third portion and start Eshell (which picks 
   (global-set-key (kbd "C-!") 'eshell-here)
 #+END_SRC
 
-My function, x exits that shell and closes that window.
+下面是我自定义的函数 =x=, 它会退出shell并关闭该window.
 
 #+BEGIN_SRC emacs-lisp
   (defun eshell/x ()
@@ -79,15 +69,14 @@ My function, x exits that shell and closes that window.
 
 * Lisp REPL? Almost
 
-EShell is a Lisp REPL. The following works as you’d expect from such a REPL:
+EShell 同时也是一个 Lisp REPL. 下面是一些例子:
 
 #+BEGIN_EXAMPLE
   $ (message "hello world")
   "hello world"
 #+END_EXAMPLE
 
-However, in a shell, we care more for simplicity and speed of typing that we do for semantic clearness, so we
-can, in this case, drop the parens with the same results:
+不过,在shell中,相比语法的清晰度我们更在意输入的简洁性与速度, 因此,在这种情况下,我们可以省略掉两边的括号:
 
 #+BEGIN_EXAMPLE
   $ message "hello world"
