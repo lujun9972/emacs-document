@@ -83,62 +83,60 @@ EShell 同时也是一个 Lisp REPL. 下面是一些例子:
   "hello world"
 #+END_EXAMPLE
 
-Functions that begin with eshell/ are available in Eshell without the prefix, so calling the eshell/echo
-function makes the shell experience less surprising:
+以 =eshell/= 为前缀的函数在Eshell中执行时可以省略掉这个前缀, 也就是说你可以直接输入echo而实际调用的是 =eshell/echo= 函数:
 
 #+BEGIN_EXAMPLE
   $ echo "hello world"
   "hello world"
 #+END_EXAMPLE
 
-If you put it in parens, you need to give it the full name:
+不过如果你把函数调用放入括号内,则你需要输入函数的全称:
 
 #+BEGIN_EXAMPLE
   $ (eshell/echo "hello world")
   "hello world"
 #+END_EXAMPLE
 
-What about types? In a normal shell, everything is a string, but EShell has a foot in both worlds:
+那么传递的参数类型是什么呢? 在普通shell中,所有的参数都是字符串类型的,不过在Eshell中就不一定了:
 
 #+BEGIN_EXAMPLE
   $ echo hello world
   ("hello" "world")
 #+END_EXAMPLE
 
-A list of two strings. However, you can NOT attempt to pass that echo to car… at least not directly:
+结果是一个由两个字符串组成的list. 然而,你并不能把echo的结果传递给car… 至少不能直接传递过去:
 
 #+BEGIN_EXAMPLE
   $ car echo hello world
 #+END_EXAMPLE
 
-Returns an error, as does:
+会返回一个错误, 下面这样也会报错:
 
 #+BEGIN_EXAMPLE
   $ car (list hello world)
 #+END_EXAMPLE
 
-You see, once you bring in parens, you also bring in syntactic specific-ness, so you would need to do this:
+你会发现,一点你把代码纳入括号内,你就必须严格遵守elisp的相关语法规定了,所以你应该这么做:
 
 #+BEGIN_EXAMPLE
   $ car (list "hello" "world")
 #+END_EXAMPLE
 
-EShell has a listify that converts its arguments to a list of strings:
+EShell定义了一个名为 =listify= 的命令(译者注:这里严格来说是eshell/listify函数,但在eshell中不严格区分命令还是函数,所以按照shell的说法说成是命令了,下面在不区分函数或命令时也一样),能将传递给它的参数转换为字符串列表:
 
 #+BEGIN_EXAMPLE
   $ listify hello world
   ("hello" "world")
 #+END_EXAMPLE
 
-But if you want to pass that data to something like car, you need to surround it in curly braces, which is
-EShell’s way of saying, call some shell-like-goodness, but return it like Lisp:
+不过如果你想把这个命令的结果传递给别的命令,比如car,你需要将之用大括号括起来,它的意思是说,以shell的方式执行命令,但是将返回的结果作为lisp对象来对待:
 
 #+BEGIN_EXAMPLE
   $ car { listify hello world }
   hello
 #+END_EXAMPLE
 
-Not really sure what is the real difference between list and listify, as they seem to behave the same to me:
+目前我还没搞清楚 =list= 和 =listify= 之间的区别, 它们看起来作用是一样的:
 
 #+BEGIN_EXAMPLE
   $ listify hello world
@@ -162,19 +160,17 @@ Not really sure what is the real difference between list and listify, as they se
      (escaped t)))
 #+END_EXAMPLE
 
-I guess my point to this little exploration is that you can pretend it is a shell, and you can pretend it is a
-Lisp REPL, and you have ways to weave between the two, but be a bit careful.
+说了这么多,其实我的意思就是说,你既可以把Eshell当成是一个shell,也可以把它当成是一个Lisp REPL,你也可以既把它当成是shell也把它当成是Lisp REPL,只要你不要被搞糊涂了就成.
 
 * Variables
 
-As the documentation says,
+在Eshell的文档中有这么一段话
 
 #+BEGIN_QUOTE
-    Since Eshell is just an Emacs REPL(1), it does not have its own scope, and simply stores variables the
-    same you would in an Elisp program.
+    由于Eshell是基于Emacs的REPL(1), 它并没有自己的作用域, 因此它存储变量的方式跟你在Elisp程序中是一样的.
 #+END_QUOTE
    
-Running printenv only displays the environment variables:
+运行 =printenv= 会显示出那些环境变量,使用 =setenv= 来设置环境变量:
 
 #+BEGIN_EXAMPLE
   $ setenv A "hello world"
@@ -182,7 +178,7 @@ Running printenv only displays the environment variables:
   "hello world"
 #+END_EXAMPLE
 
-Use the setq to assign normal, Emacs variables:
+使用 =setq= 来未普通的Emacs变量来赋值:
 
 #+BEGIN_EXAMPLE
   $ setq B hello world
@@ -193,14 +189,14 @@ Use the setq to assign normal, Emacs variables:
   hello world
 #+END_EXAMPLE
 
-Preface with a =$=, you can access any Emacs variable:
+通过在变量名前加 =$=, 你可以查看所有Emacs变量的值:
 
 #+BEGIN_EXAMPLE
   $ echo $recentf-max-menu-items
   25
 #+END_EXAMPLE
 
-Keep in mind that environment variables over-shadow Emacs variables:
+需要注意的是,同名的环境变量的值会覆盖Emacs普通变量的值:
 
 #+BEGIN_EXAMPLE
   $ setenv C hello
@@ -209,7 +205,7 @@ Keep in mind that environment variables over-shadow Emacs variables:
   hello
 #+END_EXAMPLE
 
-Finally, you can source Eshell variables from a file:
+左后,你可以从文件中读取Eshell变量的设置:
 
 #+BEGIN_EXAMPLE
   $ cat blah.eshell
@@ -229,8 +225,7 @@ Finally, you can source Eshell variables from a file:
 
 * Loops
 
-Executing a series of commands on each matching file is a standard use case for shells. While you could use a
-Lisp-like dolist, EShell attempts to give you a similar shell-like syntax:
+在shell中经常需要逐个地处理多个文件. 在Eshell中,你既可以使用lisp中的dolist来实现,也可以使用类似shell的语法来实现:
 
 #+BEGIN_EXAMPLE
   $ for file in *.org {
@@ -239,17 +234,15 @@ Lisp-like dolist, EShell attempts to give you a similar shell-like syntax:
   }
 #+END_EXAMPLE
 
-The (:U) converts the contents before it to upper case format. It is a modifier, and I’ll babble on about this
-in the next section (since this is one of Eshell’s best feature).
+上例中的 (:U)是一个转换器,会将它之前的内容转换为大写形式. 我会在下一部分内容对它中进行讲解(这也是Eshell最出色的特性之一).
 
-I find it interesting to note that *.org gives the for loop a list to iterate over, but if there is more than
-one argument, a list is created, as in:
+你可能会发现,上例中的 =*.org= 传递给 =for= 循环语句的是一个用来迭代的list. 另外,如果有多于1个的参数传递给 =for= 时,也会创建一个list,例如:
 
 #+BEGIN_EXAMPLE
   $ for i in 1 2 3 4 { echo $i }
 #+END_EXAMPLE
 
-Passing more than one list flattens them into one list, so the following works as you expect:
+若传递给 =for= 的是多个list,则这些list会合并(flatten)成一个list, 因此你可以像下面这样操作:
 
 #+BEGIN_EXAMPLE
   $ for file in emacs* zsh* { ... }
@@ -257,33 +250,27 @@ Passing more than one list flattens them into one list, so the following works a
 
 * File Selection
 
-If all you were doing was renaming a single file, or changing access permissions on all files in a directory,
-you’d hardly need a flexible shell, as dired or even Finder is sufficient for those tasks. A shell comes in
-handy when selecting a subset of files based on a pattern, and EShell really shines here, because of its
-filters (that it stole from [[http://zsh.sourceforge.net/Doc/Release/Expansion.html][Zshell’s modifiers]]):
+若你要做的仅仅是重命名一个文件,或修改某个目录下所有文件的访问权限,那你根本无需用到shell,用dired甚至是Finder就足够了. shell只有在你想操作一部分匹配某模式的文件时才能比较方便.
+Eshell由于其特有的的filter(偷师于[[http://zsh.sourceforge.net/Doc/Release/Expansion.html][Zshell的modifiers]])功能而尤为表现出众:
 
 #+BEGIN_EXAMPLE
   $ ls -al *.mp3(U)   # Show songs I own
 #+END_EXAMPLE
 
-The *.mp3 part is just a normal globbing pattern we all know and love, but the (U) part further filters the
-selection. In this case limiting the selection to files you own.
+上例中的 =*.mp3= 这部分就是我们所熟知的globbing pattern,而后面的(U)部分则进一步对结果进行了过滤. 在本例中,仅仅会输出宿主为你自己的那些文件.
 
-The help for this feature is available in the shell, so type the following:
+你可以用下面两个命令来获取相关帮助信息:
 
 #+BEGIN_EXAMPLE
   $ eshell-display-predicate-help
   $ eshell-display-modifier-help
 #+END_EXAMPLE
 
-While you may have seen the predicates before (since they are similar to ZShell’s), the coolest part is that
-you can write some ELisp code to add your own predicates and modifiers.
+你可能之前有接触过predicates(因为它们跟ZShell中的意义很接近), 不过更酷的是,你可以通过编写Elisp代码来新增自己的predicates 和 modifiers.
 
 ** File Filter Predicates
 
-Here is a list of the filter predicates. These can be stacked, so typing, ls **/*(IW) will display all the
-files in the current directory (and sub-directories) that are readable by the group owner or all accounts on
-the system.
+下面是filter predicates的一份列表. 可以叠加多个filter predicate,也就是说输入 =ls **/*(IW)= 会列出当前目录及其子目录中那些同组用户及其他用户可读的文件.
 
 | / | Directories (may accept d … gotta verify that)          |
 | . | Regular files                                            |
@@ -305,21 +292,19 @@ the system.
 | t | Sticky bit                                               |
 | % | Other file types.                                        |
 
-These are fairly straight-forward. For example, list all the directories:
+"filter predicates" 的用法很直观. 比如要列出所有的目录只需要:
 
 #+BEGIN_EXAMPLE
   ls -ld *(/)
 #+END_EXAMPLE
 
-Some symbols take options, like to list all files owned by the howard account, specify the string with single
-quotes:
+有些"filter predicates"可以接受其他选项参数,例如要列出所有属于howard的文件,可以这样做:
 
 #+BEGIN_EXAMPLE
   ls -ld *(u'howard')
 #+END_EXAMPLE
 
-The % requires a second parameter to specify the file type to filter. These are taken from the ls, so %c will
-display char devices. Here is the list if stole from the ls man page:
+=%= 需要第二个参数来指定文件的类型. 这里文件类型的说明与 =ls= 命令的输出一致,例如 =%c= 表示字符设备. 下面是一份来自 =ls= man page的列表:
 
 | b | Block special file     |
 | c | Character special file |
@@ -328,13 +313,13 @@ display char devices. Here is the list if stole from the ls man page:
 | s | Socket link            |
 | p | FIFO                   |
 
-The options can be combined. For instance, list all symbolic links owned by your account:
+可以整合多个"filter predicates". 比如要列出所有你拥有的符号链接,可以这样:
 
 #+BEGIN_EXAMPLE
   ls -l *(@U)
 #+END_EXAMPLE
 
-Or, list all symbolic links that you don’t own by prefixing the ^ symbol:
+你也可以列出不属于你的所有符号链接,方法是加一个前缀^:
 
 #+BEGIN_EXAMPLE
   ls -l *(@^U)
@@ -552,7 +537,7 @@ And then issue a C-c | on that results to create an org-mode table you can conti
 While the Eshell is baked into Emacs, and requires no customization, I have [[https://github.com/howardabrams/dot-files/blob/master/emacs-eshell.org][made a few improvements]] that may
 be helpful to others.
 
-* Footnotes:
+Footnotes:
 
 ^[[http://www.howardism.org/Technical/Emacs/eshell-fun.html#fnr.1][1]]
 
