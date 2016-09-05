@@ -1,0 +1,113 @@
+#+TITLE: Read-your-RSS-feeds-in-emacs-with-elfeed
+#+URL: http://pragmaticemacs.com/emacs/read-your-rss-feeds-in-emacs-with-elfeed/
+#+AUTHOR: lujun9972
+#+CATEGORY: raw
+#+DATE: [2016-09-05 一 16:00]
+#+OPTIONS: ^:{}
+
+The package [[https://github.com/skeeto/elfeed][elfeed]] is an excellent feed reader for Emacs. The project web page has great documentation, and
+you should read that to cover the basics. I thought I’d share some of the details of my setup. I’ll split this
+up into a few posts, but today I’ll cover my basic setup and some teaks to give me shortcut keys to groups of
+feeds, and to help with the syncing of my feeds between multiple machines.
+
+First I have an org-mode file with my list of feeds. Here is an excerpt.
+
+#+BEGIN_SRC org
+  ,* blogs                                                        :elfeed:
+  ,** daily                                                        :daily:
+  ,*** http://telescoper.wordpress.com/feed/
+  ,*** http://xkcd.com/rss.xml
+  ,*** http://timharford.com/feed/
+  ,*** http://understandinguncertainty.org/rss.xml
+  ,** emacs                                                        :emacs:
+  ,*** http://www.reddit.com/r/emacs/.rss
+  ,*** http://planet.emacsen.org/atom.xml
+  ,*** http://feeds.feedburner.com/XahsEmacsBlog
+  ,*** http://pragmaticemacs.com/feed/
+  ,*** [[http://emacs.stackexchange.com/feeds][SX]]
+#+END_SRC
+
+We need to use the package [[https://github.com/remyhonig/elfeed-org][elfeed-org]] to tell elfeed to use the org file above:
+
+#+BEGIN_SRC emacs-lisp
+  ;; use an org file to organise feeds
+  (use-package elfeed-org
+    :ensure t
+    :config
+    (elfeed-org)
+    (setq rmh-elfeed-org-files (list "/path/to/elfeed.org")))
+#+END_SRC
+
+Note how in the org file I have used an org-mode link to the stack exchange feed; the description part of the
+link (SX in this case) will be used as the feed title in elfeed. I have also collected some feeds together,
+under the tags “daily” and “emacs”. These tags are used by elfeed to let you view sets of feeds. The first
+time we run elfeed we will add [[http://pragmaticemacs.com/emacs/use-bookmarks-to-jump-to-files-or-directories][bookmarks]] to allow us to jump to those sets of feeds, and to do that we’ll need
+some simple helper functions, which we need to add to our [[http://pragmaticemacs.com/emacs/editing-your-emacs-config-file/][emacs config file]].
+
+#+BEGIN_SRC emacs-lisp
+  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  ;; elfeed feed reader                                                     ;;
+  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  ;;shortcut functions
+  (defun bjm/elfeed-show-all ()
+    (interactive)
+    (bookmark-maybe-load-default-file)
+    (bookmark-jump "elfeed-all"))
+  (defun bjm/elfeed-show-emacs ()
+    (interactive)
+    (bookmark-maybe-load-default-file)
+    (bookmark-jump "elfeed-emacs"))
+  (defun bjm/elfeed-show-daily ()
+    (interactive)
+    (bookmark-maybe-load-default-file)
+    (bookmark-jump "elfeed-daily"))
+#+END_SRC
+
+Now, I use elfeed on two machines and I keep the elfeed database (stored in ~/.elfeed by default) synchronised
+between those machines. (I use [[https://www.cis.upenn.edu/~bcpierce/unison/][unison]], but you could use dropbox etc). For this to work well we need to make
+sure elfeed updates its database whenever we quit it, and reads it again when we resume. Here are some helper
+functions for this:
+
+#+BEGIN_SRC emacs-lisp
+  ;;functions to support syncing .elfeed between machines
+  ;;makes sure elfeed reads index from disk before launching
+  (defun bjm/elfeed-load-db-and-open ()
+    "Wrapper to load the elfeed db from disk before opening"
+    (interactive)
+    (elfeed-db-load)
+    (elfeed)
+    (elfeed-search-update--force))
+
+  ;;write to disk when quiting
+  (defun bjm/elfeed-save-db-and-bury ()
+    "Wrapper to save the elfeed db to disk before burying buffer"
+    (interactive)
+    (elfeed-db-save)
+    (quit-window))
+#+END_SRC
+
+Now let’s [[http://pragmaticemacs.com/emacs/install-packages/][install]] and configure elfeed
+
+#+BEGIN_SRC emacs-lisp
+  (use-package elfeed
+    :ensure t
+    :bind (:map elfeed-search-mode-map
+                ("A" . bjm/elfeed-show-all)
+                ("E" . bjm/elfeed-show-emacs)
+                ("D" . bjm/elfeed-show-daily)
+                ("q" . bjm/elfeed-save-db-and-bury)))
+#+END_SRC
+
+With that, we can launch elfeed with M-x bjm/elfeed-load-db-and-open and (for the first time only) create the
+bookmarks to our tags. Hit G to refresh the feeds and then create a bookmark with C-x r m and name it
+elfeed-all to match the name we used in the function above. Now hit s to edit the search filter and add +emacs
+to the filter string. This should show only your emacs feeds. Create a bookmark named elfeed-emacs for this
+filter and do the same for any other tags you have used.
+
+With the bookmarks saved, you can now use E in the elfeed window to jump to your Emacs feeds and so on.
+
+If you use q to quit elfeed when you are done, then the database will be saved and your latest changes will be
+synced to any other machines.
+
+In future posts I’ll look at starring and saving articles with org-mode and a nice simple tweak to feed
+filtering.
