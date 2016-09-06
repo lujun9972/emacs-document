@@ -7,62 +7,44 @@
 
 * Introduction
 
-The main user entry point is `el-search-pattern'.  This command
-prompts for a `pcase' pattern and searches the current buffer for
-matching expressions by iteratively `read'ing buffer contents.  For
-any match, point is put at the beginning of the expression found
-(unlike isearch which puts point at the end of matches).
+最常用的命令是 =el-search-pattern=. 该命令提示你输入一个 =pcase= 模式然后通过反复"读取"当前buffer内容的方式搜索匹配的表达式.
+若找到了匹配的表达式,则会将光标放在匹配表达式的开头部分(与isearch不同,isearch会将光标放在匹配结果的末尾).
 
-Why is it based on `pcase'?  Because pattern matching (and the
-ability to combine destructuring and condition testing) is well
-suited for this task.  In addition, pcase allows to add specialized
-pattern types and to combine them with other patterns in a natural
-and transparent way out of the box.
+为什么 =el-search-pattern= 要基于 =pcase= 呢? 因为模式匹配(以及这种整合destructuring 与 condition testing的能力)很适合于完成这项任务.
+而且pcase允许添加专门的模式类型,还能以一种自然而透明的方式将这些模式类型整合起来.
 
-It doesn't matter how the code is actually formatted.  Comments are
-ignored, and strings are treated as atomic objects, their contents
-are not being searched.
+=el-search-pattern= 并不关心代码的组织格式. 它在搜索时会自动忽略代码中的注释,并将字符串当作原子对象来处理而不会去搜索它的具体内容.
 
-Example 1: if you enter
+案例1: 假设你在提示符中输入 =97=, 它会在代码中搜索所有出现数字97的地方,但是不会搜索出 =977= 或 =(+ 90 7)= 或 "My string containing 97" 这些内容.
+相对的,它所搜索的是所有read后 `eq` 97的内容,例如 =#x61= 或 =?a=.
 
-   97
+案例2: 如果你输入模式 =`(defvar ,_)=, 你会搜索出所有没有指定初始值的 =defvar= 语句.
 
-at the prompt, this will find any occurrence of the number 97 in
-the code, but not 977 or (+ 90 7) or "My string containing 97".
-But it will find anything `eq' to 97 after reading, e.g. #x61 or
-?a.
+下面的模式会搜索出所有docstring的第一行超过70字符的 =defvar= 语句.
 
-Example 2: If you enter the pattern
-
-  `(defvar ,_)
-
-you search for all defvar forms that don't specify an init value.
-
-The following will search for defvar forms with a docstring whose
-first line is longer than 70 characters:
-
+#+BEGIN_SRC emacs-lisp
   `(defvar ,_ ,_
      ,(and s (guard (< 70 (length (car (split-string s "\n")))))))
+#+END_SRC
 
 When a search pattern is processed, the searched buffer is current
 with point at the beginning of the currently tested expression.
 
 * Convenience
 
-For pattern input, the minibuffer is put into `emacs-lisp-mode'.
+在输入要匹配的模式时,minibuffer会进入emacs-lisp-mode.
 
-Any input PATTERN is silently transformed into (and exp PATTERN)
-so that you can always refer to the whole currently tested
-expression via the variable `exp'.
+任何输入的模式都会被转换成(and exp PATTERN)这种格式,因此你可以在模式中用变量 =exp= 来指代当前测试的表达式.
 
-Example 3:
+案例3:
 
-If you want to search a buffer for symbols that are defined in
-"cl-lib", you can use this pattern
+假设你想在buffer中搜索在 =cl-lib= 中定义的符号,你可以这些些匹配模式:
 
+#+BEGIN_SRC emacs-lisp
   (guard (and (symbolp exp)
               (when-let ((file (symbol-file exp)))
-                (string-match-p "cl-lib\\.elc?$" file))))
+                        (string-match-p "cl-lib\\.elc?$" file))))
+#+END_SRC
 
 ,----------------------------------------------------------------------
 | Q: "But I hate `pcase'!  Can't we just do without?"                 |
@@ -73,45 +55,25 @@ If you want to search a buffer for symbols that are defined in
 | the currently tested expression.  Just like in the last example!    |
 `----------------------------------------------------------------------
 
-It's cumbersome to write out the same complicated pattern
-constructs in the minibuffer again and again.  You can define your
-own pcase pattern types for the purpose of el-search with
-`el-search-defpattern'.  It is just like `pcase-defmacro', but the
-effect is limited to this package.  See C-h f `el-search-pattern'
-for a list of predefined additional pattern forms.
+要一遍又一遍地在minibuffer中输入相同的复杂模式是一件很烦人的事情. 幸运的是,你可以用 =el-search-defpattern= 来为el-search定义自己的pcase模式类型.
+它的语法与 =pcase-defmacro= 一样,但是只会对本package起作用. 可以用 =C-h f el-search-pattern= 来查看预定义的附加的模式列表.
 
-Some additional pattern definitions can be found in the file
-"el-search-x.el".
+"el-search-x.el"中定义了其他更多的模式.
 
 * Replacing
 
-You can replace expressions with command `el-search-query-replace'.
-You are queried for a (pcase) pattern and a replacement expression.
-For each match of the pattern, the replacement expression is
-evaluated with the bindings created by the pcase matching in
-effect, and printed to produce the replacement string.
+你可以用命令 =el-search-query-replace= 来替换表达式. 你会被要求输入一个pcase模式,以及一个替换表达式. 每次找到一个匹配模式的表达式,就会在pcase匹配环境下执行替换表达式,并将原表达式替换成其返回值.
 
-Example: In some buffer you want to swap the two expressions at the
-places of the first two arguments in all calls of function `foo',
-so that e.g.
+举个例子: 若你想交换所有foo函数中头两个参数的位置, 例如将 =(foo 'a (* 2 (+ 3 4)) t)= 替换成 =(foo (* 2 (+ 3 4)) 'a t)=, 你可以这样做:
 
-  (foo 'a (* 2 (+ 3 4)) t)
+#+BEGIN_EXAMPLE
+  M-x el-search-query-replace RET
+  `(foo ,a ,b . ,rest) RET
+  `(foo ,b ,a . ,rest) RET
+#+END_EXAMPLE
 
-becomes
-
-  (foo (* 2 (+ 3 4)) 'a t).
-
-This will do it:
-
-   M-x el-search-query-replace RET
-   `(foo ,a ,b . ,rest) RET
-   `(foo ,b ,a . ,rest) RET
-
-Type y to replace a match and go to the next one, r to replace
-without moving, SPC to go to the next match and ! to replace all
-remaining matches automatically.  q quits.  n is like SPC, so that
-y and n work like in isearch (meaning "yes" and "no") if you are
-used to that.
+按下 =y= 会替换匹配值然后跳到下一个匹配的地方, =r= 则表示只替换匹配值而不会移动光标位置, =SPC= 会跳到下一个匹配位置不替换, =!= 会自动替换剩下的所有匹配值. =q= 表示退出替换过长. =n= 的效果与 =SPC= 是一样的.
+如果你熟悉isearch的话,就会发现 =y= 和 =n= 的用法与isearch是一样的,分别表示"yes"和"no".
 
 It is possible to replace a match with multiple expressions using
 "splicing mode".  When it is active, the replacement expression
@@ -121,35 +83,15 @@ in a `el-search-query-replace' session.
 
 * Suggested key bindings
 
-   (define-key emacs-lisp-mode-map [(control ?S)] #'el-search-pattern)
-   (define-key emacs-lisp-mode-map [(control ?%)] #'el-search-query-replace)
+#+BEGIN_SRC emacs-lisp
+  (define-key emacs-lisp-mode-map [(control ?S)] #'el-search-pattern)
+  (define-key emacs-lisp-mode-map [(control ?%)] #'el-search-query-replace)
 
-   (define-key isearch-mode-map [(control ?S)] #'el-search-search-from-isearch)
-   (define-key isearch-mode-map [(control ?%)] #'el-search-replace-from-isearch)
+  (define-key isearch-mode-map [(control ?S)] #'el-search-search-from-isearch)
+  (define-key isearch-mode-map [(control ?%)] #'el-search-replace-from-isearch)
 
-   (define-key el-search-read-expression-map [(control ?S)] #'exit-minibuffer)
+  (define-key el-search-read-expression-map [(control ?S)] #'exit-minibuffer)
+#+END_SRC
 
-The bindings in `isearch-mode-map' let you conveniently switch to
-"el-search" searching from isearch.  The binding in
-`el-search-read-expression-map' allows you to hit C-S twice to
-start a search for the last search pattern.
-
-* Bugs, Known Limitations
-
-- Replacing: in some cases the reader syntax of forms
-is changing due to reading+printing.  "Some" because we can treat
-that problem in most cases.
-
-- Similarly: Comments are normally preserved (where it makes
-sense).  But when replacing like `(foo ,a ,b) -> `(foo ,b ,a)
-
-in a content like
-
-  (foo
-    a
-    ;;a comment
-    b)
-
-the comment will be lost.
-
-FIXME: when we have resumable sessions, pause and warn about this case.
+=isearch-mode-map= 中的快捷键设置让你可以很容易的从isearch切换到el-search. 
+=el-search-read-expression-map= 中的快捷键设置则允许你通过按两次 =C-S= 重复上一次的模式搜索.
