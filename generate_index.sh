@@ -3,6 +3,10 @@
 declare -A catalog_comment_dict
 catalog_comment_dict=([calc]="关于Cacl的内容" [elisp-common]="关于elisp的内容" [org-mode]="关于org-mode的内容" [emacs-common]="其他未分类的emacs内容" [raw]="未翻译或者翻译到一半的内容")
 
+catalogs=$(for catalog in ${!catalog_comment_dict[*]};do
+               echo $catalog
+           done |sort)
+
 function generate_headline()
 {
     catalog=$1
@@ -28,7 +32,7 @@ function generate_links()
     IFS=$old_ifs
 }
 
-for catalog in ${!catalog_comment_dict[*]}
+for catalog in $catalogs
 do
     generate_headline $catalog
 done
