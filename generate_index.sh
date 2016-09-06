@@ -21,7 +21,8 @@ function generate_links()
 "
     for post in $posts
     do
-        echo "[[https://github.com/lujun9972/emacs-document/blob/master/$catalog/$post][$post]]"
+        modify_date=$(stat -c "%y" $catalog/$post|cut -d " " -f1)
+        echo "[[https://github.com/lujun9972/emacs-document/blob/master/$catalog/$post][$post]]		<$modify_date>"
         echo
     done
     IFS=$old_ifs
