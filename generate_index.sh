@@ -15,7 +15,7 @@ function generate_headline()
 function generate_links()
 {
     catalog=$1
-    posts=$(ls $catalog)
+    posts=$(ls -t $catalog)
     old_ifs=$IFS
     IFS="
 "
