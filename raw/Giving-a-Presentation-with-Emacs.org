@@ -1,0 +1,76 @@
+#+TITLE: Giving-a-Presentation-with-Emacs
+#+URL: http://nathanielknight.ca/articles/emacs_presentation.html
+#+AUTHOR: lujun9972
+#+CATEGORY: raw
+#+DATE: [2016-09-06 二 20:57]
+#+OPTIONS: ^:{}
+
+
+At the risk of becoming one of those people who does [[http://c2.com/cgi/wiki?EmacsAsOperatingSystem][everything in Emacs]], I recently put together my very own
+Org Mode presentation tool. It's not a complicated mode: it introduces two functions, org-next-slide and
+org-prev-slide, and binds them to Pg Up and Pg Down (or <prior> and <next> in terms of Emacs keycodes). It
+also increases the text size and adds a small margin on the left of the page.
+
+#+BEGIN_SRC emacs-lisp
+  (defun org-next-slide () ;; move forward to the next top-level heading
+    (interactive)
+    (beginning-of-buffer) ;; navigate to the beginning of this header
+    (forward-char)
+    (widen) ;; expand to see the whole buffer
+    (if (search-forward-regexp ;; if we can find another header,
+       (rx line-start "* ") nil t)
+      (progn
+      (org-narrow-to-subtree) ;; go to it, narrow to it,
+      (show-all)) ;; and show all its sub-trees
+    (progn
+      (org-narrow-to-subtree) ;; otherwise let the user know we're
+      (beginning-of-buffer) ;; on the last slide
+      (message "Last slide"))))
+
+  (defun org-prev-slide () ;; as `org-next-slide`, but searching backwards
+    (interactive)
+    (beginning-of-buffer)
+    (widen)
+    (if (search-backward-regexp
+       (rx line-start "* ") nil t)
+      (progn
+      (org-narrow-to-subtree)
+      (show-all))
+    (progn
+      (org-narrow-to-subtree)
+      (beginning-of-buffer)
+      (message "First slide"))))
+
+  (defvar org-slides-mode-keymap ;; bind functions to page-up and page-down
+    (let ((map (make-sparse-keymap)))
+    (define-key map (kbd "<next>") 'org-next-slide)
+    (define-key map (kbd "<prior>") 'org-prev-slide)
+    map))
+
+  (define-minor-mode org-slides-mode ;; Synthesize into a minor mode
+    "View org-mode sub-trees as slides."
+    :lighter " Slides"
+    :keymap org-slides-mode-keymap
+    (progn
+    (set-face-attribute 'default nil :height 300) ;; big font
+    (set-variable 'left-margin-width '2 t) ;; little margin
+    (set-window-buffer (selected-window) (current-buffer)))) ;; don't change windows
+#+END_SRC
+
+It uses [[http://www.gnu.org/software/emacs/manual/html_node/emacs/Narrowing.html][narrow-mode]], which displays a portion of a document that you want to focus on. In this case, I used it
+to narrow the presentation document to a single top-level heading at a time: presto, slides!
+
+The idea was to use Org Mode's support for [[http://orgmode.org/manual/Working-With-Source-Code.html][code-blocks]] during an Emacs Lisp presentation I gave recently at
+the [[http://www.meetup.com/Vancouver-Functional-Programmers/][Vancouver Functional Programming meetup]]. Code blocks let you display high-lighted code directly in an Org
+Mode document or jump into a temporary buffer with the appropriate language mode to demonstrate editing in
+your usual environment.
+
+Org Slides Mode does have its downsides: there's no support for graphics or images or transitions, just you
+and your text. You're also responsible for setting the colour scheme to [[http://practicaltypography.com/presentations.html][something suitable]]. There's also no
+support for speaker's notes or using a remote (which could probably be fixed by binding the forward and back
+functions to the right keys, but would rather defeat the original point of the exercise).
+
+The core value proposition is live-coding and interleaving living code and normal text, which it does just
+fine. Making best use of those capabilities to give an effective talk is up to you.
+
+Nat Knight — 2015-10-10
