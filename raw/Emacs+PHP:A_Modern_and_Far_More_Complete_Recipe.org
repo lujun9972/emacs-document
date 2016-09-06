@@ -1,0 +1,135 @@
+#+TITLE: Emacs+PHP:A_Modern_and_Far_More_Complete_Recipe
+#+URL: http://www.blogbyben.com/2016/08/emacs-php-modern-and-far-more-complete.html
+#+AUTHOR: lujun9972
+#+CATEGORY: raw
+#+DATE: [2016-09-06 二 21:30]
+#+OPTIONS: ^:{}
+
+Recently, I had a chance to do a bit of emacs evangelism. Man, is that a soapbox I like to climb on! I hit all
+my [[http://www.blogbyben.com/2011/04/10-concepts-emacs-newbie-should-master.html][favorite features]] from dired and dynamic abbreviation expansion to under appreciated gems like ispell. I
+talked about the power of having a fully programmable, self documenting editor at your fingertips. When I was
+done, I thought for sure I had managed to add another member to the tribe.
+
+Then, yesterday, my possible convert came to me with a simple question: what mode do you use to edit PHP?
+Considering that most of the code I write is PHP, you'd think I would be ready to deliver a solid answer.
+Instead, I mumbled something about having a hacked bit of code I relied on, but really wouldn't recommend it
+for the general use. Yeah, not cool. I closed out the conversation with a promise: I'd see what the latest PHP
+options were and report back.
+
+PHP is actually a fairly tricky language to build an editor for. That's because depending on the style it's
+written in, it can range from disciplined C like code to a gobbly gook C like code with HTML, CSS and
+JavaScript all mixed in. Add to that the classic emacs problem of having too many 85% solutions, and there's
+definitely room for frustration. Check out the [[https://www.emacswiki.org/emacs/PhpMode#toc3][emacs wiki]] to see what I mean. You'll find lots of promising
+options, but no one definitive solution.
+
+After reading up on my choices and trying out some options, I do believe I have a new recipe for PHP + emacs
+success. Here goes.
+
+* Step 1: Setup Melpa
+
+[[https://melpa.org/][Melpa]] is a code repository that emacs can magically pull in packages from. Back in the day, adding packages to
+emacs meant downloading, untarring, and running make. Like all things emacs, the process has been both
+streamlined, and of course, is fully executable from within emacs. To add Melpa, you'll need to follow the
+instructions [[https://melpa.org/#/getting-started][here]]. Assuming you have a modern version of emacs, this probably just means adding the following
+to your .emacs:
+
+#+BEGIN_SRC emacs-lisp
+  (add-to-list 'package-archives
+               '("melpa" . "https://melpa.org/packages/"))
+#+END_SRC
+
+* Step 2: Install the Melpa available PHP Mode
+
+Emacs comes with a PHP mode out of the box, but it seems as though [[https://github.com/ejmr/php-mode][this one]] (also named php-mode) is more
+modern. I love that the [[https://github.com/ejmr/php-mode#php-7-support][README]] talks about PHP 7, showing just how up to date this mode is with respect to the
+latest language constructs.
+
+Installing this mode, assuming Melpa is cooperating, couldn't be easier. Just run: M-x package-install and
+enter php-mode.
+
+My preference for indentation is 2 spaces and no insertion of tab characters. Two other tweaks I was after was
+to turn off HTML support from within PHP and enable [[https://www.gnu.org/software/emacs/manual/html_node/ccmode/Subword-Movement.html][subword-mode]]. All these tweaks are stored in a function
+and attached to the php-mode-hook. This is all standard .emacs stuff:
+
+#+BEGIN_SRC emacs-lisp
+  (defun bs-php-mode-hook ()
+    (setq indent-tabs-mode nil)
+    (setq c-basic-offset 2)
+    (setq php-template-compatibility nil)
+    (subword-mode 1))
+
+  (add-hook 'php-mode-hook 'bs-php-mode-hook)
+#+END_SRC
+
+* Step 3: Install Web-Mode.el
+
+php-mode above is ideal for code centric PHP files. But what about those pesky layout files that contain HTML,
+CSS and JavaScript? For that, [[http://web-mode.org/][web-mode.el]] looks especially promising. [[http://web-mode.org/][Installation]] and configuration mirrors
+php-mode. Here's the code I use to customize it:
+
+#+BEGIN_SRC emacs-lisp
+  (defun bs-web-mode-hook ()
+    (local-set-key '[backtab] 'indent-relative)
+    (setq indent-tabs-mode nil)
+    (setq web-mode-markup-indent-offset 2
+          web-mode-css-indent-offset 2
+          web-mode-code-indent-offset 2))
+
+  (add-hook 'web-mode-hook 'bs-web-mode-hook)
+#+END_SRC
+
+Web-mode.el is quite impressive and who knows, it may actually fulfill all my PHP needs. If that's the case, I
+may choose to stop using the php-mode. However, for now, I like the idea of being able to switch between the
+two modes. Which brings me to the next step...
+
+* Step 4: Add a Quick Mode Toggle
+
+Inspired by [[https://www.emacswiki.org/emacs/PhpMode#toc8][this tip]] on the EmacsWiki, I went ahead and setup a quick toggle between php-mode and web-mode.
+Here's that code:
+
+#+BEGIN_SRC emacs-lisp
+  (defun toggle-php-flavor-mode ()
+    (interactive)
+    "Toggle mode between PHP & Web-Mode Helper modes"
+    (cond ((string= mode-name "PHP")
+           (web-mode))
+          ((string= mode-name "Web")
+           (php-mode))))
+
+  (global-set-key [f5] 'toggle-php-flavor-mode)
+#+END_SRC
+
+Now I'm only an F5 keystroke away from two different editor strategies.
+
+When I have a say in the matter, I tend to be pretty particular about which files in my source tree are pure
+code and which are pure markup. At some point, I could codify this so that files in the snippets directory,
+for example, always open in web-mode, whereas files loaded from under lib start off in php-mode. Such is the
+joy of having a fully programmable editor at your fingertips. You make up the rules!
+
+* Step 5: Bonus - Setup aggressive auto-completion
+
+For bonus points, I decided to play with [[https://github.com/xcwen/ac-php][ac-php]], a library that supports auto completion of function and class
+names. I followed the install [[https://github.com/xcwen/ac-php#install][here]], updated my .emacs file as noted below, created the empty file named
+.ac-php-conf.json in my project's root and then ran M-x ac-php-remake-tags-all. Once that's done, emacs now
+shouts completions like crazy at me:
+
+[[https://1.bp.blogspot.com/-3aHEBmiVixs/V7RKpwtaNrI/AAAAAAAE_bs/RWCp-dws7tsNzXeWQVrH2HMsksuwUhw1QCLcB/s1600/completion.png][{completion}]]
+
+It's slick, I'll give you that. I think I may have to see if I can turn down the volume, a bit. Here's what my
+.emacs now looks like to configure php-mode: now looks like:
+
+#+BEGIN_SRC emacs-lisp
+  (defun bs-php-mode-hook ()
+    (auto-complete-mode t)                 ;; «
+    (require 'ac-php)                      ;; «
+    (setq ac-sources  '(ac-source-php ))   ;; «
+    (yas-global-mode 1)                    ;; «
+    (setq indent-tabs-mode nil)
+    (setq php-template-compatibility nil)
+    (setq c-basic-offset 2))
+#+END_SRC
+
+Bye-bye hacked PHP code. Hello modern, feature filled, super easy to install, mega powerful code.
+
+Update: updated the web-mode hook I'm using to make sure all code on the page, not just markup code, is
+indented 2 steps.
