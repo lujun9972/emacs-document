@@ -25,7 +25,7 @@ function generate_links()
 "
     for post in $posts
     do
-        modify_date=$(stat -c "%y" $catalog/$post|cut -d " " -f1)
+        modify_date=$(git log --date=short $catalog/$post |grep ^Date:|head -1|cut -f2 -d ':')
         echo "[[https://github.com/lujun9972/emacs-document/blob/master/$catalog/$post][$post]]		<$modify_date>"
         echo
     done
