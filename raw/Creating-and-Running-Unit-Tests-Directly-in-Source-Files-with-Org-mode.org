@@ -1,0 +1,262 @@
+#+TITLE: Creating-and-Running-Unit-Tests-Directly-in-Source-Files-with-Org-mode
+#+URL: http://fgiasson.com/blog/index.php/2016/05/30/creating-and-running-unit-tests-directly-in-source-files-with-org-mode/
+#+AUTHOR: lujun9972
+#+CATEGORY: raw
+#+DATE: [2016-09-14 三 14:53]
+#+OPTIONS: ^:{}
+
+Developing a computer program is not an easy task. The process needs a constant focus. Any interruption of
+that process means that time is spent re-focusing on it and errors are more prone to be introduced. The
+process involves analyzing a problem to solve by executing a series of steps. It involves writing about the
+problem we are trying to solve and writing about the solution we found to solve it. Finally it involves
+writing test procedures that can run to make sure that the current state of the implementation of the solution
+behaves as expected and that expected behavior is not altered by subsequent modifications.
+
+The problem I have been struggling with for the past 19 years — common to all programmers — is that each part
+of this development process was performed in a cascade. The tools available, and the methods employed, forced
+me to perform each of these steps in isolation and then to iterate how to:
+
+ 1. Analyze a problem
+ 2. Code a solution to the problem
+ 3. Document the implementation
+ 4. Create tests for the implementation
+ 5. If the problem changed, or the solution needed fixing, iterate these same isolated steps from from 1 to 4.
+
+The problem is that keeping the focus, and more importantly having the willpower (literally) to perform each
+step under the pressure of deadlines, between meetings, etc., is nearly impossible to do right. Normally the
+steps 1 and 2 will be done, but then steps 3 and 4 will be postponed until tomorrow (which never comes…)
+
+I don’t think there is any definitive solution to solve this situation. Developing computer programs won’t
+ever be an easy task, and focus will always be warranted. However I think there are methodologies and tools
+that can be adopted to smooth the process. But one best practice that I think goes quite a bit of the way to
+address this problem is to have a single document become the focal point of the overall process.
+
+What we want is to be able to perform the process with a single tool and in a single document such that we
+only have to focus on it without having to refocus on different tools in different windows all the time during
+the development process.
+
+In this blog post, I will describe a way to develop, and run, the unit tests (step 4) while keeping the focus
+on writing about the solution and implementing it, all in the same (Org-mode) document.
+
+This blog post belong to a series of posts about Literate [Clojure] Programming:
+
+  * [[http://fgiasson.com/blog/index.php/2016/07/06/literate-clojure-programming-using-org-mode/][Project folder structure]]
+  * [[http://fgiasson.com/blog/index.php/2016/08/11/literate-clojure-programming-anatomy-of-a-org-mode-file/][Anatomy of a Org-mode file]]
+  * Tangling all project files
+  * Publishing documentation in multiple formats
+  * [[http://fgiasson.com/blog/index.php/2016/05/30/creating-and-running-unit-tests-directly-in-source-files-with-org-mode/][Unit Testing]] (this post)
+
+* Literate Programming
+
+Literate programming is many things to many people. I started to write about it on this blog and I will
+continue in the coming months. However what I want to do with this blog post is to discuss another important
+aspect (at least to me) of Literate Programming, which is that literate programming concepts and principles
+leads to create tools (such as Org-mode with Emacs) that help developers to perform the development process in
+a single document such that their focus is not distracted.
+
+* Unit Testing in Org-mode (for Clojure)
+
+What I want to show in this blog post is how we can use Org-mode to:
+
+ 1. Create a series of unit tests directly where it matters (right below the function to test)
+ 2. Run the tests when it matters (all the time, while developing or improving the tested function).
+
+Unit tests can be used for a lot of different tasks. The main task is to test the behavior of a function and
+to make sure that any future improvements to that function ends up with the expected behavior. But unit tests
+can also be used as documentation about all of the ways that a function can be used in code, how their
+parameters work and what is expected, etc. Whatever the reason, it is really helpful to have the tests
+side-by-side with the function’s code. In most, if not almost all, development environments this is impossible
+to get. However, this is really possible with Org-mode and I think this is a really effective way to develop
+computer software.
+
+Now, let’s figure out how we could properly define unit tests directly into Org-mode files while developing an
+application. The goal is to let unit tests be developed at the same time as we develop the code and the
+discussions surrounding the code. We shouldn’t have 4 distinct steps: we should do all of them, at the same
+time, in the same document. The goal is that all this should happen at the same time such that the focus
+doesn’t change all the time.
+
+Let’s start with a simple function that gives the factorial of a number n.
+
+#+BEGIN_SRC clojure
+(defn n!
+  [n]
+  (loop [x n 
+         f 1]
+    (if (or (= x 1)
+            (= x 0))
+      f
+      (recur (dec x) (* f x)))))
+#+END_SRC
+
+Now let’s use the function to see what it returns:
+
+#+BEGIN_SRC clojure
+(n! 10)
+
+3628800
+#+END_SRC
+
+Now let’s define some tests to make sure that this implementation works as expected:
+
+#+BEGIN_SRC clojure
+(require '[clojure.test :refer :all])
+
+(deftest test-n!-0
+  (testing "Testing the n! function for the value 0"
+    (is (= 1 (n! 0)))))
+
+(deftest test-n!-1
+  (testing "Testing the n! function for the value 1"
+    (is (= 1 (n! 1)))))
+
+(deftest test-n!-2
+  (testing "Testing the n! function for the value 2"
+    (is (= 2 (n! 2)))))
+
+(deftest test-n!-4
+  (testing "Testing the n! function for the value 4"
+    (is (= 24 (n! 4)))))
+
+(deftest test-n!-5
+  (testing "Testing the n! function for the value 5"
+    (is (= 120 (n! 5)))))
+
+(deftest test-n!-5-fails
+  (testing "Testing the n! function for the value 5 that fails"
+    (is (= 121 (n! 5)))))
+#+END_SRC
+
+Then we can run all the tests at once:
+
+#+BEGIN_SRC clojure 
+(run-tests)
+#+END_SRC
+
+#+BEGIN_EXAMPLE
+Testing user
+
+FAIL in (test-n!-5-fails) (form-init2702185496610974397.clj:25)
+Testing the n! function for the value 5 that fails
+expected: (= 121 (n! 5))
+  actual: (not (= 121 120))
+
+Ran 6 tests containing 6 assertions.
+1 failures, 0 errors.
+#+END_EXAMPLE
+
+There are a few things we have to understand regarding how org-mode and clojure work together. When code
+blocks are executed directly from a Org-mode document, all of the Clojure code is executed in the namespace
+started by Cider, namely the user namespace. When we first define the n! function then it gets defined in the
+user namespace, and then when we define the tests, they get defined in that namespace as well. Finally when we
+call the run-tests function without any parameter, then it runs the tests from the current namespace, which is
+user.
+
+This is why it works flawlessly: because each block is executed from the same Clojure namespace; everything
+runs from there. If I update that function in the future, I will be able to re-run the tests directly from
+that same development context without having to switch to another file or anything.
+
+This is really interesting since we can define the functions that compose our application, then we can
+immediately start writing the tests to make sure that the function behaves appropriately as expected, and we
+can run the tests as often as we want, directly from the same context (development document). Then every time
+I save the Org-mode document, then it gets “tangled” into the tests suites that will be normally be run when
+the application get compiled, or used in other contexts that requires these tests to run. (Note that “tangle”
+is an Org-mode term for generating only the code from an Org-mode document.)
+
+What is fantastic with Org-mode is that every time you execute every code block in the document by pressing
+C-c C-v b you define the functions and the unit tests in the default namespace, you tangle the code, and you
+execute all the code which includes the tests and immediately see, contextually in your work, if any
+modifications you made to your code broke some earlier assumptions.
+
+* Running One or Multiple Tests
+
+It is often the case that you write a function and then want to test it right away. And then you write another
+one and test it, too. You will end up with multiple code blocks where you want to test the inner test(s) and
+get the results for those only.
+
+With clojure.test we are limited in our options: we have run-tests and run-all-tests which provide a summary
+report of the executed tests. Since Clojure 1.6 we have access to the test-vars function that we can use to
+test one or multiple test cases. However, the usage of that function is a bit complex (in its syntax) and no
+reporting is provided except if the tests fails.
+
+So what I choose to do is to change this situation by creating a macro that greatly simplifies the code used
+to run a specific set of tests and that reports failures and successes.
+
+I created a really small and simple application for that purpose called [[https://github.com/structureddynamics/org-mode-clj-tests-utils][org-mode-clj-tests-utils]]. You can
+easily use it in your Org-mode document just by making sure that the underlying project uses it.
+
+Here is the macro. What it does is simply to take a series of symbols as input and use test-vars to run the
+tests and then report failures and successes.
+
+#+BEGIN_SRC clojure
+(defmacro tests
+  "Run one or multiple tests with fixtures. Returns successes or failures. 
+   Tests should be in the same namespace."
+  [& args]  
+  `(binding [clojure.test/*test-out* (java.io.StringWriter.)]
+     (clojure.test/test-vars [~@(mapv (fn [tname]
+                                        `(var ~tname))
+                                      args)])
+     (if (empty? (str clojure.test/*test-out*))
+       (println "All tests succeeded.")
+       (println (str clojure.test/*test-out*)))))
+#+END_SRC
+
+Another option would be to define the tests in a specific namespace and then to use run-tests on that
+namespace only. But that is cumbersome since you would have to use in-ns to define that new namespace and to
+revert it back to the default namespace once you are done with the tests.
+
+Now let’s see how this new macro can be used. Let’s say we just want to run the test test-n!-0:
+
+#+BEGIN_SRC clojure 
+(tests test-n!-0)
+#+END_SRC
+
+#+BEGIN_EXAMPLE
+All tests succeeded.
+#+END_EXAMPLE
+
+Then let’s see what it looks like if a test fails:
+
+#+BEGIN_SRC clojure 
+(tests test-n!-5-fails)
+#+END_SRC
+
+#+BEGIN_EXAMPLE
+FAIL in (test-n!-5-fails) (form-init2702185496610974397.clj:25)
+Testing the n! function for the value 5 that fails
+expected: (= 121 (n! 5))
+  actual: (not (= 121 120))
+#+END_EXAMPLE
+
+Then we can run any number of tests:
+
+#+BEGIN_SRC clojure 
+(tests test-n!-0
+       test-n!-1
+       test-n!-2
+       test-n!-5-fails)
+#+END_SRC
+
+#+BEGIN_EXAMPLE
+FAIL in (test-n!-5-fails) (form-init2702185496610974397.clj:25)
+Testing the n! function for the value 5 that fails
+expected: (= 121 (n! 5))
+  actual: (not (= 121 120))
+#+END_EXAMPLE
+
+As you can notice, the syntax for calling specific tests has been greatly simplified. We only have a write
+tests followed by the name of the tests you want to test in that code block. Then every time you press C-c C-v
+b you will re-run every code block of the document and all the results of the tests will be updated.
+
+* Conclusion
+
+Many people think that Literate Programming is only about typesetting and writing documents as books. However
+I think this perception (or at least the general understanding) is wrong. I think the historic context of
+Literate Programming influenced that perception but it is really much broader and important (at least to me)
+than that. It is about the process of writing computer software, similar to the process of writing books,
+articles, blog posts, etc., which includes documentation and testing, more than the task of simply coding.
+
+Unit testing is one integral part of this process.
+
+Note that you can take a look at the org-html-htmlize-output-type [[https://github.com/structureddynamics/org-mode-clj-tests-utils/blob/master/org/core.org][Org file to see a really simple example of a]]
+[[https://github.com/structureddynamics/org-mode-clj-tests-utils/blob/master/org/core.org][Clojure Org-mode project]].
