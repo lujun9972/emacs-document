@@ -1,0 +1,93 @@
+#+TITLE: Integrate-iTerm2-in-your-Emacs-setup
+#+URL: https://sam217pa.github.io/2016/09/01/emacs-iterm-integration/
+#+AUTHOR: lujun9972
+#+CATEGORY: raw
+#+DATE: [2016-09-14 三 15:00]
+#+OPTIONS: ^:{}
+
+
+
+The terminal experience inside emacs being what it is — ie really slow and kinda difficult to use —, I use
+iTerm2 as my main terminal. I put up three little emacs-lisp functions using AppleScript. They allow me to
+quickly switch between iTerm and spacemacs.
+
+This one return the directory of the file currently opened. If it is a *scratch* buffer or something like
+that, it simply returns the home directory.
+
+#+BEGIN_SRC emacs-lisp
+  (defun get-file-dir-or-home ()
+    "If inside a file buffer, return the directory, else return home"
+    (interactive)
+    (let ((filename (buffer-file-name)))
+      (if (not (and filename (file-exists-p filename)))
+          "~/"
+        (file-name-directory filename))))
+#+END_SRC
+
+This one allow me to cd to the directory of the file I am editing in emacs. If I am in a *scratch* buffer or
+something like that, it cd to the $HOME directory. It then focus the iTerm2 app.
+
+#+BEGIN_SRC emacs-lisp
+  (defun iterm-goto-filedir-or-home ()
+    "Go to present working dir and focus iterm"
+    (interactive)
+    (do-applescript
+     (concat
+      " tell application \"iTerm2\"\n"
+      "   tell the current session of current window\n"
+      (format "     write text \"cd %s\" \n" (get-file-dir-or-home))
+      "   end tell\n"
+      " end tell\n"
+      " do shell script \"open -a iTerm\"\n"
+      ))
+    )
+#+END_SRC
+
+EDIT: 2016-09-05 I have taken Steve Purcell advice into account. Emacs already have a nice variable called
+default-directory. It is set to the directory of the buffer being edited, or nil if the buffer does not
+correspond to a file. So (or default-directory "~") does exactly what we want.
+
+In case the directory name contains some strange characters like unicode chars or spaces, we need to escape
+that before passing to shell. That’s exactly what shell-quote-argument does. Unfortunately, we need to escape
+the escaping characters before passing it as arguments to an applescript statement. Thus the escaping madness
+of the next chunk. It now work flawlessly even in directory like “~/Users/me/Google Drive/pâte à pizza/”.
+
+#+BEGIN_SRC emacs-lisp
+  (defun sam--iterm-goto-filedir-or-home ()
+    "Go to present working dir and focus iterm"
+    (interactive)
+    (do-applescript
+     (concat
+      " tell application \"iTerm2\"\n"
+      "   tell the current session of current window\n"
+      (format "     write text \"cd %s\" \n"
+              ;; string escaping madness for applescript
+              (replace-regexp-in-string "\\\\" "\\\\\\\\"
+                                        (shell-quote-argument (or default-directory "~"))))
+      "   end tell\n"
+      " end tell\n"
+      " do shell script \"open -a iTerm\"\n"
+      ))
+    )
+#+END_SRC
+
+This last one just focus the iTerm2 app, without modifying the working directory.
+
+#+BEGIN_SRC emacs-lisp
+  (defun iterm-focus ()
+    (interactive)
+    (do-applescript
+     " do shell script \"open -a iTerm\"\n"
+     ))
+#+END_SRC
+
+I have mapped it to SPC ' and SPC ? using general.el.
+
+#+BEGIN_SRC emacs-lisp
+  (general-define-key
+   :states '(normal visual insert emacs)
+   :prefix "SPC"
+   "'" '(iterm-focus :which-key "focus iterm")
+   "?" '(iterm-goto-filedir-or-home :which-key "focus iterm - goto dir")
+   )
+#+END_SRC
