@@ -6,17 +6,15 @@
 #+OPTIONS: ^:{}
 
 
-This is a guide to installing [[https://github.com/Andersbakken/rtags][RTags]] on linux, and then using it in [[http://spacemacs.org/][spacemacs]]
+这是一篇教你怎么在linux上安装[[https://github.com/Andersbakken/rtags][RTags]], 然后将之用到[[http://spacemacs.org/][spacemacs]] 上的说明.
 
-The distro I use in this post is Ubuntu 16.04, but most of the information should be general in nature.
+我用的发行版是Ubuntu16.04,不过该过程应该基本适用于所有的发行版.
 
-We will install RTags’ dependencies, build and install RTags itself, build an RTags tag database for our
-project, and then enable the rtags layer in spacemacs.
+我们要做的事情包括安装RTags的依赖,构建并安装RTags,为项目创建RTags标签数据库,最后在spacemacs中启用rtags layer.
 
 * Dependencies
 
-According to the [[https://github.com/Andersbakken/rtags#installing-rtags][Installing rtags]] section of the Readme, we need to have the following dependencies (starred
-ones are optional):
+根据Readme中[[https://github.com/Andersbakken/rtags#installing-rtags][Installing rtags]]的内容, 我们需要如下依赖(带星号的表示可选的):
 
   * clang-3.3 or higher
   * cmake-2.8 or higher
@@ -24,13 +22,13 @@ ones are optional):
   * bash-completion*
   * lua*
 
-I am using Ubuntu 16.04, so the default versions offered by the Ubuntu package manager are all sufficient
+我用的是Ubuntu 16.04, 直接使用Ubuntu包管理器中的默认版本就行了.
 
-#+BEGIN_SRC sh
-  sudo apt install clang libclang-dev cmake pkg-config bash-completion lua
+#+BEGIN_SRC sh :dir /sudo:: :output raw
+  sudo apt install -y clang libclang-dev cmake pkg-config bash-completion lua5.3
 #+END_SRC
 
-Download, build and install RTags
+下载, 构建, 然后安装RTags
 
 #+BEGIN_SRC sh
   cd /tmp
@@ -44,17 +42,19 @@ Download, build and install RTags
 
 * Configure a service in systemd
 
-** Create a systemd config directory for your user
+** 为你的用户创建systemd配置目录
 
 #+BEGIN_SRC sh
   mkdir -p ~/.config/systemd/user
 #+END_SRC
 
-** Create the RTags daemon socket service config
+#+RESULTS:
+
+** 创建RTags daemon socket service配置文件
 
 Add the following to =~/.config/systemd/user/rdm.socket=:
 
-#+BEGIN_SRC conf
+#+BEGIN_SRC conf :tangle "~/.config/systemd/user/rdm.socket"
   [Unit]
   Description=RTags daemon socket
 
@@ -65,11 +65,11 @@ Add the following to =~/.config/systemd/user/rdm.socket=:
   WantedBy=multi-user.target
 #+END_SRC
 
-** Create the RTags daemon service config
+** 创建 the RTags daemon service配置文件
 
 Add the following to =~/.config/systemd/user/rdm.service=:
 
-#+BEGIN_SRC conf
+#+BEGIN_SRC conf :tangle "~/.config/systemd/user/rdm.service"
   [Unit]
   Description=RTags daemon
 
@@ -80,7 +80,7 @@ Add the following to =~/.config/systemd/user/rdm.service=:
   ExecStart=/usr/local/bin/rdm --log-file=%h/.rtags/rdm.log --data-dir=%h/.rtags/rtags-cache --verbose --inactivity-timeout 300
 #+END_SRC
 
-Enable and start the socket service
+启用socket service
 
 #+BEGIN_SRC sh
   systemctl --user enable rdm.socket
@@ -89,13 +89,11 @@ Enable and start the socket service
 
 * Build an RTags database for your project
 
-Since RTags uses clang to parse your code, it needs to know the compiler flags your project uses.
+RTags使用的是clang来解析代码, 它需要知道项目使用的编译器flags.
 
-There are [[https://github.com/Andersbakken/rtags#setup][multiple ways]] to tell RTags what flags you use.
+[[https://github.com/Andersbakken/rtags#setup][有多种途径能]] 告诉RTags你使用的flags是什么.
 
-My project uses cmake, so I will use that.
-
-Using cmake we can generate a compile_commands.json file which RTags will use to index the project
+我的项目用的时cmake,所以我可以生成一个 =compile_commands.json= 文件,这样RTags会从中获取信息.
 
 #+BEGIN_SRC sh
   cd ~/src/project
@@ -103,14 +101,13 @@ Using cmake we can generate a compile_commands.json file which RTags will use to
   cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=1 ..
 #+END_SRC
 
-Now we can instruct RTags to index our code
+现在可以用RTags来为代码生成索引了
 
 #+BEGIN_SRC sh
   rc -J ./compile_commands.json
 #+END_SRC
 
-This takes a while to complete, we can watch the progress by looking at the log file we configured in ~
-/.config/systemd/user/rdm.service
+这得花点儿时间, 我们可以通过查看日志文件的方式来了解进度,日志文件的地址可以在 =~/.config/systemd/user/rdm.service= 中配置.
 
 #+BEGIN_SRC sh
   tail -f ~/.rtags/rdm.log
@@ -118,11 +115,11 @@ This takes a while to complete, we can watch the progress by looking at the log 
 
 * Enable RTags in spacemacs
 
-We now need to set up RTags support in emacs, and configure some keybindings.
+现在开始让emacs支持RTags,然后分配一些快捷键.
 
-For this I’m using [[https://github.com/mineo/dotfiles/tree/master/spacemacs/.emacs.d/private/layers/mineo-rtags][mineo-rtags]]
+这里用到的layer是[[https://github.com/mineo/dotfiles/tree/master/spacemacs/.emacs.d/private/layers/mineo-rtags][mineo-rtags]]
 
-I copied the 2 files packages.el and keybindings.el into a folder in my spacemacs config directory
+我将这两个文件下载到我的spacemacs配置目录中
 
 #+BEGIN_SRC sh
   mkdir ~/.spacemacs.d/mineo-rtags && cd ~/.spacemacs.d/mineo-rtags
@@ -130,7 +127,7 @@ I copied the 2 files packages.el and keybindings.el into a folder in my spacemac
   wget https://raw.githubusercontent.com/mineo/dotfiles/master/spacemacs/.emacs.d/private/layers/mineo-rtags/keybindings.el
 #+END_SRC
 
-For posterity, here is the contents of these two files at the time of writing:
+为了以防万一,我这里也把两个文件的内容列出来:
 
 packages.el:
 
@@ -208,7 +205,7 @@ keybindings.el:
   (provide 'keybindings)
 #+END_SRC
 
-** Enable mineo-rtags layer in spacemacs
+** 在spacemacs中启用mineo-rtags layer
 
 #+BEGIN_SRC emacs-lisp
   dotspacemacs-configuration-layers
@@ -222,8 +219,8 @@ keybindings.el:
     )
 #+END_SRC
 
-Restart spacemacs and it should install rtags and its dependencies.
+重启spacemacs,它会自动安装rtags这个package及其依赖.
 
-The keybindings are available under , g
+所有的快捷键都以 ", g" 开头的
 
-Written on August 26, 2016
+写于2016年8月26日
