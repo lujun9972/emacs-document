@@ -1,0 +1,704 @@
+#+TITLE: 手把手教你从Vim迁移到Emacs+Evil
+#+URL: http://juanjoalvarez.net/es/detail/2014/sep/19/vim-emacsevil-chaotic-migration-guide/                
+#+AUTHOR: lujun9972
+#+CATEGORY: emacs-common
+#+DATE: [2016-09-24 周六 16:54]
+#+OPTIONS: ^:{}
+
+我用Vim已经有18年的历史了, 它是我唯一的正式编辑工具(当我编程或写作时使用的工具). 我是如此的痴迷于带模式的编辑方式，以至于当我要用非模式编辑器时会觉得很不习惯. 
+你可能会说，编程不是你打字速度快就行了. 这当然没错,但你可以想象一下在平板上用屏幕上键盘来编程的感觉,这差不多就是模式编辑器用户用非模式编辑器时的感觉.
+
+就如同很多Vim用户一样,我也一直对Emacs感到好奇(Emacs是Vim在编辑器世界中的对手!). 它试图在一个窗口中完成所有事情,并且基于一个Lisp虚拟机.
+然而它并不支持模式编辑,或者即使有些mode支持模式编辑也远远不如Vim来的好用,这使得我对Emacs敬而远之.
+
+不过现在Evil-mode出现了. 它完美的模拟了Vim. Evil-mode的开发者公开宣称Evil-mode应该与Vim一模一样,任何不一样的地方都视为BUG.
+Evil-mode的风评一直不错, 然后有一些相熟的资深Vim党也开始用这个Evil-mode,于是我知道了,这个mode确实很棒.
+
+于是,两周前,我安装了Emacs和Evil开始安装我希望的样子配置Emacs. 我的首要目标是把编辑环境配置成我在Vim中那样的高效. 它们需要有相同的插件和相同的快捷键.
+我本以为这个过程会很费时间,因为我听说Emacs的插件要比Vim的少. 而且我也以为用Elisp作配置是很痛苦的一件事情. 然而经过两个星期的折腾,我发现我错了,而且错的很离谱. 
+我不仅拥有了之前Vim的几乎所有功能,而且有些地方还更胜之前了(我还尚未开始学习大名鼎鼎的Org mode和Gnus呢).
+
+本文记录了我将Emacs配置成像Vim并再次基础上做出改进的点点滴滴. 大多数的内容都是解释配置文件中的Elisp代码或者关于某个插件的说明.
+我希望本文能够帮助其他想尝试Emacs+Evil的Vim资深用户,毕竟当初我在尝试作迁移时那是相当的希望有这么一篇文章可供参考啊.
+
+本文的内容参考了许多人的配置,文章,解答(大多数是StackOverflow上的解答),github以及各种论坛上的内容. 不过为了让文章看起来整洁一些,我就不一一列出这些代码片段的来源了,你可以很容易的在google上搜索到它.
+
+你也可以参照我的 [[http://github.com/juanjux/emacs-dotfiles][Emacs配置]] , 不过要留意,由于我还是个新手因此可能会犯下很多愚蠢的错误.
+你也许会发现我把配置拆分成了几个文件. 不过我不建议你一开始就这么做. 将所有配置都放在一个 =.emacs= 中会让你更容易调试(如果你像我一样,你会化很长时间来调试你的配置).
+当你的配置差不多定型后,再把它拆分成几类就比较好了.
+对了,别忘了先把Vim准备好,你可能会经常要用它来修复那些配错的配置文件.
+
+* A good Windows version
+
+我的工作环境用的是Windows操作系统,但是官方版本的Windows Emacs有很多问题(又慢又不稳定还巨费内存). Reddit用户tuhdo推荐了我两款第三方编译的Windows Emacs. 经过测试,我认为 [[http://emacsbinw64.sourceforge.net/][这款Emacs]] 能够很好的解决那些问题.
+
+* Basic Emacs survival keys
+
+若你是Vim用户,那么安装完Evil后,你可以在大多数情况下都使用Vim风格的操作,但是在你安装Evil时或处于某些Evil不起作用的mode时,你依然需要使用一些基本的Emacs操作. 
+
++ C-g (即同时按下Control和g键) 能够取消命令提示. 后面我们会将escape键也映射成该操作以符合Vim的操作惯例.
++ C-x k 杀掉(关闭)一个buffer. 那些自动打开的windows通常可以通过按下"q"键来关闭.
++ C-x o (字母"o"而不是数字零) 会在window之间循环跳转.
++ C-x 2 横向分割(window)
++ C-x 3 竖向分割
++ M-x (M = PC上的Alt键) 会显示一个"minibuffer",在那你可以调用Emacs函数. 后面我会展示如何让它更好用.
++ 要切换long lines wrapping功能 (类似Vim中:set wrap/nowrap), 执行 =M-x visual-line-mode RET=.
++ C-y: yank/paste. 粘贴,它在你开启Evil功能时依然有效.
+
+* Package management
+
+Emacs内置的插件(然Emacs的说法叫做package)管理器就很棒. 你可以很方便的用它来显示,下载,升级,安装package.
+我试过几乎所有的Vim插件管理器,没有一款跟这个类似的. 你可以通过 =M-x list-packages= 来调用它(然后enter表示安装,d表示删除,x表示执行删除).
+
+下面的配置可以为package管理器添加更多的源,并且还定义了一个函数来安装并加载package(当你需要在不同电脑之前迁移配置时很有用):
+
+#+BEGIN_SRC emacs-lisp
+  ;; packages
+  (setq package-archives '(("gnu" . "http://elpa.gnu.org/packages/")
+                           ("org" . "http://orgmode.org/elpa/")
+                           ("marmalade" . "http://marmalade-repo.org/packages/")
+                           ("melpa-stable" . "http://melpa-stable.milkbox.net/packages/")))
+  (package-initialize)
+
+  (defun require-package (package)
+    (setq-default highlight-tabs t)
+    "Install given PACKAGE."
+    (unless (package-installed-p package)
+      (unless (assoc package package-archive-contents)
+        (package-refresh-contents))
+      (package-install package)))
+#+END_SRC
+
+Note: 若Phil在评论所说, 使用non-stable Melpa仓库对新手来说比较危险,因为它是直接从git master中拉取的源代码,所以在上例中我用的是 melpa-stable 仓库,不过如果你想要使用 Melpa 仓库,你只需要删除配置中名称与URL中的"-stable"就可以了.
+
+* Evil (Vim emulation)
+
+这个package真TMD太棒了. 它支持Vims所有的text command, operator, motion 以及 work flow. 
+它几乎模拟了Vim的一切,包括Marks, paragraph reformatting, visual mode, visual block, macros, registers, text objects, splits (可以横向切分也可以纵向切分) :normal, folding等等功能.
+
+当然它不支持直接使用Vim插件,不过有大量的Emacs/Evil的插件可供替代.
+
+* Themes
+
+你可以使用 =M-x load-theme RET= 来选择那些可用主题(你也可以通过package管理器来安装更多的主题).
+一旦你选中了要用哪一款主题,可以在 =.emacs= 文件中添加类似这么一行配置: ~(load-theme 'misterioso t)~.
+
+* Terminal Colors
+
+大多数Emacs主题在终端环境(使用emacs -nw会在终端环境下运行emacs)下都很糟糕. Vim下也有一些主题会这样,Emacs的情况要严重得多,几乎所有的主题都有这个问题.
+不过这种情况可以通过安装 =color-theme-approximate= 这个package得到有效改善. 这个package的功能类似Vim中的CSApprox: 它会将色彩转换为终端下的等价色.
+安装好 =color-theme-approximate= 后,再将 ~(color-theme-approximate-on)~ 添加到你的 =.emacs= 文件中就行了. 
+如果没有生效的话,试着把这一行的位置放后一点再试试(我就遇到过这个问题). 
+如果完成上面操作后,主题还是惨不忍睹,那你可能就需要检查一下TERM环境变量是否设置正常了.(hint: 该环境变量的值在screen和tmux下是不一样的).
+
+* Change cursor color depending on mode
+
+我在Vim中就喜欢这么干. 好在Emacs也支持这样作. 美中不足的是,在非GUI emacs中似乎做不到这一点.
+
+#+BEGIN_SRC emacs-lisp
+  (setq evil-emacs-state-cursor '("red" box))
+  (setq evil-normal-state-cursor '("green" box))
+  (setq evil-visual-state-cursor '("orange" box))
+  (setq evil-insert-state-cursor '("red" bar))
+  (setq evil-replace-state-cursor '("red" bar))
+  (setq evil-operator-state-cursor '("red" hollow))
+#+END_SRC
+
+* Tabs(标签页)
+
+若你安装了 =evil-tabs= package并通过 ~(global-evil-tabs-mode t)~ 开启该功能,你就拥有了 =:tabnew=, =gt= 等与numbered tabs(编号过的标签页)有关的功能.
+若你能像Vim那样通过 =#gt= (这里#表示从0到9的整数) 来切换到指定编号的标签页,那么显示标签页的编号就很有用了. 可惜的是,该package似乎并不支持 =#gt=. 不过我还是用我无上的Elisp能力(接近于0)实现了类似的功能:
+
+#+BEGIN_SRC emacs-lisp
+  (define-key evil-normal-state-map (kbd "C-0") (lambda() (interactive) (elscreen-goto 0)))
+  (define-key evil-normal-state-map (kbd "C- ") (lambda() (interactive) (elscreen-goto 0)))
+  (define-key evil-normal-state-map (kbd "C-1") (lambda() (interactive) (elscreen-goto 1)))
+  (define-key evil-normal-state-map (kbd "C-2") (lambda() (interactive) (elscreen-goto 2)))
+  (define-key evil-normal-state-map (kbd "C-3") (lambda() (interactive) (elscreen-goto 3)))
+  (define-key evil-normal-state-map (kbd "C-4") (lambda() (interactive) (elscreen-goto 4)))
+  (define-key evil-normal-state-map (kbd "C-5") (lambda() (interactive) (elscreen-goto 5)))
+  (define-key evil-normal-state-map (kbd "C-6") (lambda() (interactive) (elscreen-goto 6)))
+  (define-key evil-normal-state-map (kbd "C-7") (lambda() (interactive) (elscreen-goto 7)))
+  (define-key evil-normal-state-map (kbd "C-8") (lambda() (interactive) (elscreen-goto 8)))
+  (define-key evil-normal-state-map (kbd "C-9") (lambda() (interactive) (elscreen-goto 9)))
+  (define-key evil-insert-state-map (kbd "C-0") (lambda() (interactive) (elscreen-goto 0)))
+  (define-key evil-insert-state-map (kbd "C- ") (lambda() (interactive) (elscreen-goto 0)))
+  (define-key evil-insert-state-map (kbd "C-1") (lambda() (interactive) (elscreen-goto 1)))
+  (define-key evil-insert-state-map (kbd "C-2") (lambda() (interactive) (elscreen-goto 2)))
+  (define-key evil-insert-state-map (kbd "C-3") (lambda() (interactive) (elscreen-goto 3)))
+  (define-key evil-insert-state-map (kbd "C-4") (lambda() (interactive) (elscreen-goto 4)))
+  (define-key evil-insert-state-map (kbd "C-5") (lambda() (interactive) (elscreen-goto 5)))
+  (define-key evil-insert-state-map (kbd "C-6") (lambda() (interactive) (elscreen-goto 6)))
+  (define-key evil-insert-state-map (kbd "C-7") (lambda() (interactive) (elscreen-goto 7)))
+  (define-key evil-insert-state-map (kbd "C-8") (lambda() (interactive) (elscreen-goto 8)))
+  (define-key evil-insert-state-map (kbd "C-9") (lambda() (interactive) (elscreen-goto 9)))
+#+END_SRC
+
+跪求大神帮忙把这坨代码改的更简洁些, 不过不管怎样,这段代码确实可以工作(而且它比按 =#gt= 还少一个键呢).
+
+* Leader key
+
+你需要安装 =evil-leader= 才能自定义 <leader> key. 安装好后,将下面几行写到 =.emacs= 文件中(我这里用逗号作为leader key):
+
+#+BEGIN_SRC emacs-lisp
+  (global-evil-leader-mode)
+  (evil-leader/set-leader ",")
+#+END_SRC
+
+所有我又发现光这样的话,在某些mode中(比如编辑 .emacs 文件时所处于的emacs-lisp-mode),leader key并不起作用,还在该package的FAQ中有该问题的解决方案,你需要在设置 =global-evil-leader-mode= 之前添加一行:
+
+#+BEGIN_SRC emacs-lisp
+  (setq evil-leader/in-all-states 1)
+#+END_SRC
+
+* Sessions (:mksession in Vim)
+
+Emacs通过命令 =M-x desktop-save= 和 =desktop-read= 来保存/回复编辑环境. 若你想让Emacs自动帮你保存/回复编辑环境,可以将 ~(desktop-save-mode 1)~ 添加到 =.emacs= 文件中.
+之后若你想启动emacs而不加载session,则需要通过 =emacs --no-desktop= 来启动emacs. 可惜Emacs sessions 并无法保存elscreens(evil-tabs用它来创建类似Vim那样的标签页)的信息.
+若你希望能保存/恢复所有的session信息,包括标签页信息,那么拷贝下面这些函数到你的配置文件中然后为它们分配个快捷键吧:
+
+#+BEGIN_SRC emacs-lisp
+  ;; Save session including tabs
+  ;; http://stackoverflow.com/questions/22445670/save-and-restore-elscreen-tabs-and-split-frames
+  (defun session-save ()
+      "Store the elscreen tab configuration."
+      (interactive)
+      (if (desktop-save emacs-configuration-directory)
+          (with-temp-file elscreen-tab-configuration-store-filename
+              (insert (prin1-to-string (elscreen-get-screen-to-name-alist))))))
+
+  ;; Load session including tabs
+  (defun session-load ()
+      "Restore the elscreen tab configuration."
+      (interactive)
+      (if (desktop-read)
+          (let ((screens (reverse
+                          (read
+                           (with-temp-buffer
+                            (insert-file-contents elscreen-tab-configuration-store-filename)
+                            (buffer-string))))))
+              (while screens
+                  (setq screen (car (car screens)))
+                  (setq buffers (split-string (cdr (car screens)) ":"))
+                  (if (eq screen 0)
+                      (switch-to-buffer (car buffers))
+                      (elscreen-find-and-goto-by-buffer (car buffers) t t))
+                  (while (cdr buffers)
+                      (switch-to-buffer-other-window (car (cdr buffers)))
+                      (setq buffers (cdr buffers)))
+                  (setq screens (cdr screens))))))
+#+END_SRC
+
+* Accents
+
+Accents 只在text模式下有效,而在GUI模式下无效. 不过可以通过在 =.emacs= 中添加一行 ~(require 'iso-transl)~ 来解决这个问题.
+
+* "After" macro definition
+
+我从某人的配置中(忘了是谁了,抱歉)拷贝了一个名为"after"的宏,它可以指定加载某些插件后自动运行一段特定的代码. 其定义如下:
+
+#+BEGIN_SRC emacs-lisp
+  ;; "after" macro definition
+  (if (fboundp 'with-eval-after-load)
+      (defmacro after (feature &rest; body)
+                               "After FEATURE is loaded, evaluate BODY."
+                               (declare (indent defun))
+                               `(with-eval-after-load ,feature ,@body))
+        (defmacro after (feature &rest; body)
+                                 "After FEATURE is loaded, evaluate BODY."
+                                 (declare (indent defun))
+                                 `(eval-after-load ,feature
+                                    '(progn ,@body))))))
+#+END_SRC
+
+* Vim-like search highlighting
+
+我比较喜欢Vim的高亮搜索方式,它会一致保持高亮直到你进行下一次搜索或明确清除已有高亮. 我本以为这种效果应该很容易获得,但是却发现实现起来颇费周章(对于我来说). 
+最后我居然倒腾出了我的第一个Emacs扩展(也是我N久以前从大学毕业后的第一次Lisp编程...). [[https://github.com/juanjux/evil-search-highlight-persist][这个扩展]] 我也已经把它放到Melpa上去了,取名为 =evil-search-highlight-persist=. 
+你可以通过下面语句启动该功能:
+
+#+BEGIN_SRC emacs-lisp
+  (require 'evil-search-highlight-persist)
+  (global-evil-search-highlight-persist t)
+#+END_SRC
+
+然后我将快捷键 =leader-space= 设置为清除高亮显示:
+
+#+BEGIN_SRC emacs-lisp
+  (evil-leader/set-key "SPC" 'evil-search-highlight-persist-remove-all)
+#+END_SRC
+
+而且我还发现,在Emacs中还有一种很好的搜索方式,就是使用 =occur= 和 =helm-occur=. 它们会将搜索列表显示在一个列表中(这个列表显示在另一个独立window中),这样你就可以很容易的跳转到任意一个匹配行.
+
+* Helm: Unite/CtrlP style fuzzy file/buffer/anything searcher on steroids
+
+Helm就是Vim中的Unite/CtrlP. 而且它用起来很不错. 你也可以用Helm来管理 command buffer,方法是将 ~(helm-mode 1)~ 放到 =.emacs= 文件中. 
+我也为它在normal mode下分配了一个快捷键: =SPACE SPACE=, 这与我在Vim上一致. 方法是执行语句 ~(define-key evil-normal-state-map " " 'helm-mini)~.
+
+而且Helm的可配置项极好,你可以为它任意增加/排除模块, 例如我是这么配置helm的:
+
+#+BEGIN_SRC emacs-lisp
+  ;; helm settings (TAB in helm window for actions over selected items,
+  ;; C-SPC to select items)
+  (require 'helm-config)
+  (require 'helm-misc)
+  (require 'helm-projectile)
+  (require 'helm-locate)
+  (setq helm-quick-update t)
+  (setq helm-bookmark-show-location t)
+  (setq helm-buffers-fuzzy-matching t)
+
+  (after 'projectile
+         (package 'helm-projectile))
+  (global-set-key (kbd "M-x") 'helm-M-x)
+
+  (defun helm-my-buffers ()
+    (interactive)
+    (let ((helm-ff-transformer-show-only-basename nil))
+      (helm-other-buffer '(helm-c-source-buffers-list
+                           helm-c-source-elscreen
+                           helm-c-source-projectile-files-list
+                           helm-c-source-ctags
+                           helm-c-source-recentf
+                           helm-c-source-locate)
+                         "*helm-my-buffers*")))
+#+END_SRC
+
+这里, 我定义了一个名为"helm-my-buffers"的函数,当该函数被调用时(当然要预先分配好快捷键),它会在一个buffer中显示Helm列表供你搜索(支持模糊搜索,能随着你的输入实时搜索,但是结果是无序的),可供搜索的内容包括最近打开的文件,项目中的文件,tags,标签页以及linux命令locate(该命令能快速从一个包含文件系统中所有文件的数据库中搜索出文件路径)的输出结果. 超牛逼有没有?
+
+不过这对Helm来说也不过是牛刀小试. 你还可以用它来搜索当前buffer中的符号,包括函数,类,全局变量,等等(helm-imenu), 可以搜索浏览器书签(包括Chrome/Firefox的书签), 搜索HTML颜色(会显示颜色,名称以及16进制代码),apt包等等很多东西.
+
+仔细看上面 =helm-my-buffers= 函数的源中,我用到了一个叫做 =helm-c-source-projectile-files-list= 的东东. 它会用到另一个名为 =Projectile= 的第三方package.
+该package会在当前目录及其父目录中搜罗git/hg/svn 文件并抽取出当前项目的文件. Projectile与Helm配合使得要打开当前项目的任意文件变得超级简单(前提是你的项目被纳入版本控制系统中了).
+这样你根本无需浏览文件系统,甚至对那些你从未打开过的文件(这些文件也就不会在Emacs的最近文件清单中出现了)也是这样.
+
+Helm还能与另外一个Emacs内建的功能相互搭配,那就是helm-imenu. iMenu是一个挺讨巧的minor mode. 它会抽取出buffer中的各要素的位置.
+对于编程代码来说,这意味着类,方法以及其他符号. 使用 =helm-imenu= 而不是 =imenu= 会使得跳转到buffer中个要素的位置变得很容易,你只需要输入几个字母就搞定了. 
+
+Helm还能替代默认的"M-x"菜单界面. 你需要使用 =M-x= 来调用Emacs命令,有点类似于Vim中的":"(仅仅是有点类似,其实跟Vim/Evil中的ex mode完全不同). 
+Emacs的一大优点就是它有很多的命令和mode可供使用, 而通过Helm M-x 你无需将它们都学一遍. 
+举个例子,假设我忘记了如何如何让Emacs显示出空格字符,我只需要按下 =M-x= 然后输入 =whitesp=, 就会发现Helm显示的第一个结果是 =whitespace-mode=, 它真是我要找的东西(而且我还发现了一个叫 =whitespace-cleanup= 的命令,可以用来删除所有语句末尾的空白字符)
+想要看看有哪些与拼写有关的命令吗? 执行 =M-x spell=. 想要用flycheck列出代码中的错误? 执行 =M-x fly errors=. 想知道怎么对选中的行进行排序? 执行 =M-x sort=. 
+这个功能真的是太方便了,作为一个Emacs新手,我通过 =Helm-M-x= 就学到了很多东西了,而无需通过Google搜索. 
+你可以用下面命令将 =Helm-M-x= 分配给快捷键 =M-x=:
+
+#+BEGIN_SRC emacs-lisp
+  (global-set-key (kbd "M-x") 'helm-M-x)
+#+END_SRC
+
+还有另一个package可以帮助你学习mode:"Discover My Major" (在Melpa中它叫做discover-my-major).
+调用该命令(命令名与包名一致)就会列出当前major mode中所有能用的函数. 用来探索每个mode的能力相当有用.
+
+* Vim's Marks => Evil's Marks + Emacs' Bookmarks
+
+Evil有和Vim中一样的marks操作: 用 =m= 跳转到某个mark,用 =m-字母= 来设置某个mark, =m-大写字母= 来设置跨越buffer的mark. 
+其实Emacs本身也有类似mark的东西叫做"书签", 它跟跨越文件的 mark 很接近,但是你可以用名字而不是单个字母来区分各个mark,而且将下面这一点elisp代码放入配置文件后,你可以在不同session之间共享书签了.
+我使用 =helm-bookmarks= 来浏览和设置书签, 并将其快捷键设置为 =SPC-b=. 要删除书签,则需要在helm字窗口中按下 =TAB= 键,就能看到一个动作列表,选择"Delete Bookmark(s)"就行了.
+
+#+BEGIN_SRC emacs-lisp
+  ;; save bookmarks
+  (setq bookmark-default-file "~/.emacs.d/bookmarks"
+        bookmark-save-flag 1) ;; save after every change
+#+END_SRC
+
+* Folding... and narrowing!
+
+Evil中的折叠与Vim中的一样(而且如果你使用 =Helm-M-x= 的话,万一你忘了Vim的折叠是怎么操作的,你还可以用 =M-x RET fold= 来搜索折叠命令).
+Emacs还支持一种名为"narrowing"的功能. Narrowing会隐藏文件中的其他内容只显示指定被narrow的函数/范围.
+这在你想对buffer中的部分内容进行全局替换或运行一段宏是特别有用. 我本身用到这个功能的时候不多,因此我并未给它分配快捷键,而是直接使用命令 =narrow-to-region= 及 =narrow-to-defun=.
+当你对这段被narrow的范围修改完之后,你可以用 =widen= 命令来将剩余部分的内容又显示出来.
+
+* Project Management
+
+我之前提到过 =Projectile=,它与 =Helm= 搭配可以使得搜索项目文件变得很简单, 不过它还有其他功能. 
+一个常用功能就是 =project-explorer=, 它与Vim的"project" script颇类似: 当你开启这个功能,就会出现一个侧栏显示项目文件.
+其实借助 Helm + Helm-Projectile + 文件管理器,几乎无需用到项目的树状文件展示功能,但是有时候,有这个功能也不错.
+你可以通过命令 =project-explorer-open= 开启树状文件显示(我并没有为此分配快捷键). 不过要注意,若你使用Evil的话,只有在insert mode才能用 =TAB= 来缩/展目录子树.
+
+#+BEGIN_SRC emacs-lisp
+  (package 'project-explorer)
+  (after 'project-explorer
+         (setq pe/cache-directory "~/.emacs.d/cache/project_explorer")
+         (setq pe/omit-regex (concat pe/omit-regex "\\|single_emails")))
+#+END_SRC
+
+* Ctags => Etags
+
+Emacs使用一种叫做"etag"的tags文件格式,而不是默认的ctags. 
+要生成etags文件也很简单,只需要给Exuberant-Ctags添加 =-e= 选项就行了. 而且Emacs发行版中通常就包含了一个etags执行文件.(不过我还是使用ctags来生成,因此ctags还支持[[http://dlang.org][D language]], 而etags不支持)
+生成tags文件后,Emacs会在你第一次使用tag相关命令时(比如find-tag或evil-jump-to-tag)询问你tags文件的地址. 随后Emacs会记住这个tags文件的地址(至少在当前sesson中有效,我还在寻找在不同sessions之间记住tags文件路径的方法).
+
+我定义了一个 =create-tags= 函数用来重新生成tags文件(它会要你输入一个目录,然后扫描该目录下的所有文件并在该目录下生成tags文件):
+
+#+BEGIN_SRC emacs-lisp
+  ;; etags
+  (cond ((eq system-type 'windows-nt)
+         (setq path-to-ctags "C:/installs/gnuglobal/bin/ctags.exe")))
+  (cond ((eq system-type 'gnu/linux)
+         (setq path-to-ctags "/usr/local/bin/ctags")))
+
+  (defun create-tags (dir-name)
+    "Create tags file."
+    (interactive "DDirectory: ")
+    ;; (message
+    ;;  (format "%s -f %s/tags -eR %s"
+    path-to-ctags (directory-file-name dir-name) (directory-file-name
+                                                  dir-name)))
+  (shell-command
+   (format "%s -f %s/tags -eR %s" path-to-ctags
+           (directory-file-name dir-name) (directory-file-name dir-name)))
+  )
+#+END_SRC
+
+借助第三方package,Emacs也能支持ctags和GNU global,但是我觉得etags已经足够使用了.
+
+* Spell checking
+
+只需要安装了ispell就行了, 然后执行 =:ispell-buffer= 就会开始对当前buffer进行拼写检查了. 执行 =:ispell-change-dictionary= 可以更改拼写检查所使用的字典(要检查其他语言的话).
+若你想要实时检查并将错误拼写的单词用下划线画出来,可以使用 =:flyspell-mode=. 想查看错误拼写单词的修正推荐,可以将光标放在错误拼写单词上,然后按下 =M-$= (大多数PC上其实就是Alt-$)
+
+* Relative line numbers
+
+安装好package "relative-line-numbers",然后在配置文件中加上下面配置就能够全局启动该功能了.
+
+#+BEGIN_SRC emacs-lisp
+  (add-hook 'prog-mode-hook 'relative-line-numbers-mode t)
+  (add-hook 'prog-mode-hook 'line-number-mode t)
+  (add-hook 'prog-mode-hook 'column-number-mode t)
+#+END_SRC
+
+* TODO Easymotion => Evil Ace Jump
+
+默认情况下,Evil已经集成了Vim中Easymotion的功能,它使用一个名为 =Ace Jump= 的package来实现该功能.
+它其实并没有Easymotion那么强大(只有向前跳转/先后跳转/跳转到单词结尾处这几个功能,其他功能没有), and I prefer how
+Easymotion shows directly two chars when a jump is going to require them (instead of showing one and after
+pressing it, the other which is what Ace-Jump does) but the important modes (bidirectional jump to word and to
+char) that were the ones I was mostly using are provided.
+
+Unlike Easymotion, jump to word asks for a letter, but that can be easily disabled with: (setq
+ace-jump-word-mode-use-query-char nil). The author makes the case that without asking for a char you're
+probably entering more key presses most of the time. This is probably true, but when I want to jump to a
+random word inside the buffer my brain-eye connection has already identified the word but I've to stop and
+look/think for the first char, so in the end for me is actually faster to get jump shortcuts to all the words
+without having to provide the leading character.
+
+I mapped the word/line/char to e/l/x with:
+
+#+BEGIN_SRC emacs-lisp
+  (evil-leader/set-key "e" 'evil-ace-jump-word-mode) ; ,e for Ace Jump (word)
+  (evil-leader/set-key "l" 'evil-ace-jump-line-mode) ; ,l for Ace Jump (line)
+  (evil-leader/set-key "x" 'evil-ace-jump-char-mode) ; ,x for Ace Jump (char)
+#+END_SRC
+
+* Smooth scrolling
+
+大多数Vim用户都会觉得Emacs的滚动方式很糟糕. 要想让Emacs向Vim那样滚动,需要安装package =smooth-scrolling= 然后添加以下代码到配置中:
+
+#+BEGIN_SRC emacs-lisp
+  (setq scroll-margin 5
+        scroll-conservatively 9999
+        scroll-step 1)
+#+END_SRC
+
+这个解决方案并不完美,有时你接近文件的首末时,它还是会继续滚动.
+
+* Powerline
+
+很简单,只需要安装 =powerline-evil= package,然后添加配置:
+
+#+BEGIN_SRC emacs-lisp
+  (require 'powerline)
+  (powerline-evil-vim-color-theme)
+  (display-time-mode t)
+#+END_SRC
+
+* Syntactic checking on the fly with Flycheck
+
+作为程序原来说,Syntastic是必不可少的Vim插件之一,它会在每次保存文件时检查语法检查工具作各种检查.
+Emacs也有类似的package,叫做 "Flycheck". 它甚至比Syntastic还好用,因为它是在你编辑的同时并发的进行检查,这样你根本无需像Vim一样等待它完成检查才能继续编辑.
+还有一个名为 =flycheck-pos-tip= 的package,它会将错误以tooltip的形式显示出来(当然前提是你运行的是GUI Emacs).
+我的相关配置如下:
+
+#+BEGIN_SRC emacs-lisp
+  ;; flycheck
+  (package 'flycheck)
+  (add-hook 'after-init-hook #'global-flycheck-mode)
+
+  (after 'flycheck
+         (setq flycheck-check-syntax-automatically '(save mode-enabled))
+         (setq flycheck-checkers (delq 'emacs-lisp-checkdoc flycheck-checkers))
+         (setq flycheck-checkers (delq 'html-tidy flycheck-checkers))
+         (setq flycheck-standard-error-navigation nil))
+
+  (global-flycheck-mode t)
+
+  ;; flycheck errors on a tooltip (doesnt work on console)
+  (when (display-graphic-p (selected-frame))
+    (eval-after-load 'flycheck
+      '(custom-set-variables
+        '(flycheck-display-errors-function #'flycheck-pos-tip-error-messages))))
+#+END_SRC
+
+* j/k for browsing wrapped lines
+
+Evil也跟Vim一样,在用j/k浏览很长的行时,会跳过整个"实际"的句子,而不是显示出来的行. 解决方法也很简单:
+
+#+BEGIN_SRC emacs-lisp
+  (define-key evil-normal-state-map (kbd "j") 'evil-next-visual-line)
+  (define-key evil-normal-state-map (kbd "k") 'evil-previous-visual-line)
+#+END_SRC
+
+* escape... escapes things
+
+Emacs里有一件事情很麻烦,当你在 M-x buffer (你调用Emacs函数的地方)中时,你需要按下 =C-g= 才能退出. 如果你像Vim那样想按 =escape= 退出的话,默认情况下你需要按很多次才行(印象里是3次,但记不太清了).
+我从 [[https://github.com/davvil/.emacs.d/blob/master/init.el][davvil init.el on Github]] 找到了解决方案:
+
+#+BEGIN_SRC emacs-lisp
+  ;; esc quits
+  (defun minibuffer-keyboard-quit ()
+    "Abort recursive edit.
+  In Delete Selection mode, if the mark is active, just deactivate it;
+  then it takes a second \\[keyboard-quit] to abort the minibuffer."
+    (interactive)
+    (if (and delete-selection-mode transient-mark-mode mark-active)
+        (setq deactivate-mark  t)
+      (when (get-buffer "*Completions*") (delete-windows-on "*Completions*"))
+      (abort-recursive-edit)))
+  (define-key evil-normal-state-map [escape] 'keyboard-quit)
+  (define-key evil-visual-state-map [escape] 'keyboard-quit)
+  (define-key minibuffer-local-map [escape] 'minibuffer-keyboard-quit)
+  (define-key minibuffer-local-ns-map [escape] 'minibuffer-keyboard-quit)
+  (define-key minibuffer-local-completion-map [escape] 'minibuffer-keyboard-quit)
+  (define-key minibuffer-local-must-match-map [escape] 'minibuffer-keyboard-quit)
+  (define-key minibuffer-local-isearch-map [escape] 'minibuffer-keyboard-quit)
+  (global-set-key [escape] 'evil-exit-emacs-state)
+#+END_SRC
+
+* Start maximized, please
+
+还有一件很麻烦的事情就是Emacs(GUI)默认启动时并不会最大化,解决方法也很容易:
+
+#+BEGIN_SRC emacs-lisp
+  (custom-set-variables
+   '(initial-frame-alist (quote ((fullscreen . maximized))))) ;; start maximized
+#+END_SRC
+
+* c-k/c-j for page down/up
+
+让我颇感意外的是,Evil不能像Vim那样用 =Control-u/Control-d= 来上下翻页. 估计是因为 =C-u= 对于Emacs来说太重要了吧(貌似该快捷键用来给其他命令提供数字参数用的).
+我在 =.vimrc= 中其实把这两个快捷键映射成了 =c-j/c-k= (我觉得这样就跟Vim的 j/k 移动键一致了). 因此我在Emacs中是怎么配置的:
+
+#+BEGIN_SRC emacs-lisp
+  (define-key evil-normal-state-map (kbd "C-k") (lambda ()
+                                                  (interactive)
+                                                  (evil-scroll-up nil)))
+  (define-key evil-normal-state-map (kbd "C-j") (lambda ()
+                                                  (interactive)
+                                                  (evil-scroll-down nil)))
+#+END_SRC
+
+* Coding Style and spaces instead of tabs
+
+Emacs默认情况下居然用tab键来缩进. 可以通过 ~(setq-default tab-width 4 indent-tabs-mode nil)~ 改成用空格来缩进并且设置每个tab表示4个空格. 
+另外,对于类C语言,我比较推崇"bsd"风格(除了tab要缩进4位而不是8位),因此我还需要设置这么一行: ~(setq-default c-basic-offset 4 c-default-style "bsd")~.
+
+还有一个很不错的package名叫 "dtrt-indent", 它会自动探测你当前编辑文件的缩进设置,然后以此修改Emacs的设置. 这在你编辑他人的文件时特别有用.
+
+#+BEGIN_SRC emacs-lisp
+  (package 'dtrt-indent)
+  (dtrt-indent-mode 1)
+#+END_SRC
+
+* Auto-indent with the Return key
+
+默认情况下,Emacs需要你手工按TAB键才会缩进新行. 这个不行. 要让它像Vim一样自动缩进每个新行也很容易:
+
+#+BEGIN_SRC emacs-lisp
+  (define-key global-map (kbd "RET") 'newline-and-indent)
+#+END_SRC
+
+* Show matching paren
+
+若你希望自动显示匹配的括号,只需执行: ~(show-paren-mode t)~. 你也可以安装Autopairs这个package来为你自动添加匹配的括号.
+我对此功能感觉很矛盾. 有时候觉得它很方便(尤其在写Lisp时),有时又觉得很麻烦(当你想要把某部分括起来时,一输入开括号就会自动插入一个无用的闭括号). 在这种情况下我本应该用 "Surround" 功能来实现的,但大多数情况下我都忘了这个功能.
+要启用autopair功能,安装好package后在你的配置文件中加上:
+
+#+BEGIN_SRC emacs-lisp
+  (require 'autopair)
+  (autopair-global-mode)
+#+END_SRC
+
+* Fill column, auto line breaking and column limit mark
+
+要为特定mode设置可视化地标记出所配置的fill-column(类似Vim中的colorcolumn选项),可以通过安装 =fill-column-indicator= package来实现.
+安装该package后,你就可以在想要的mode下通过启用 =fci-mode= 来显示fill-column了.
+
+假设要配置成编辑text和markdown文件时,超过82个字符的行会自动换行,那么可以这样:
+
+#+BEGIN_SRC emacs-lisp
+  (add-hook 'text-mode-hook (lambda ()
+                              (turn-on-auto-fill)
+                              (fci-mode)
+                              (set-fill-column 82)))
+  (add-hook 'markdown-mode-hook (lambda ()
+                                  (turn-on-auto-fill)
+                                  (fci-mode)
+                                  (set-fill-column 82)))
+#+END_SRC
+
+为Python和C mode设置成94个字符长度才换行:
+
+#+BEGIN_SRC emacs-lisp
+  (add-hook 'python-mode-hook (lambda ()
+                                (fci-mode)
+                                (set-fill-column 94)))
+  (add-hook 'c-mode-hook (lambda ()
+                           (fci-mode)
+                           (set-fill-column 94)))
+
+  (add-hook 'd-mode-hook (lambda ()
+                           (fci-mode)
+                           (set-fill-column 94)))
+#+END_SRC
+
+* Silver Searcher (ag)
+
+它的功能与Ack类似,但是比它快多了. "ag" package允许你不同离开Emacs就能用ag来进行搜索,并且会把搜索的结果显示在一个quickfix风格的window中,在那,你可以点击搜索结果就会跳转到指定文件的指定位置了.
+使用方法为: =M-x ag RET [search] RET [directory] RET=.
+
+* Spanish keyboard remaps
+
+我用的是西班牙语系的键盘. 使得,我知道,Vim要用英语系的键盘比较好,但是我从8岁开始使用西班牙键盘的键位,到现在已经36岁了,要换过去已经很难了.
+不过我做了一些映射,使得我的Vim体验要好很多. 我设置在normal mode下 - (减号) 的作用跟 / 一样(搜索), 同样的,我设置insert mode下 escape 键的作用跟normal mode下的 : 一样. 
+弱国你想要在Emacs中重新映射按键,你首先需要知道快捷键所指向的函数名称是什么才行. 好在获取映射的函数名称挺简单的,只需使用 =C-h k= (按下Control-h, 释放, 再按下k) 就可以获得你接下来按键所对应的函数名称.
+因此映射/ 和 : 蛮容易的:
+
+#+BEGIN_SRC emacs-lisp
+  (define-key evil-normal-state-map "-" 'evil-search-forward)
+  (define-key evil-normal-state-map " " 'evil-ex)
+  (define-key evil-insert-state-map " " 'evil-normal-state)
+#+END_SRC
+
+* Don't create backup files
+
+我有用版本控制,而且我经常会保存文件,因此我并不需要自动备份文件. 我在Vim中就禁用了此功能,我在Emacs也是如此:
+
+#+BEGIN_SRC emacs-lisp
+  (setq make-backup-files nil)
+#+END_SRC
+
+* Don't move back the cursor one position when exiting insert mode
+
+我不喜欢这样,因此我在 =.vimrc= 中添加了以下配置禁用了该功能.
+
+#+BEGIN_EXAMPLE
+  autocmd InsertEnter * let CursorColumnI = col('.')
+  autocmd CursorMovedI * let CursorColumnI = col('.')
+  autocmd InsertLeave * if col('.') != CursorColumnI | call cursor(0, col('.')+1) | endif
+#+END_EXAMPLE
+
+在Evil上你只需要设置一个选项就行:
+
+#+BEGIN_SRC emacs-lisp
+  (setq evil-move-cursor-back nil)
+#+END_SRC
+
+* Remember the cursor position of files when reopening them
+
+超级简单:
+
+#+BEGIN_SRC emacs-lisp
+  (setq save-place-file "~/.emacs.d/saveplace")
+  (setq-default save-place t)
+  (require 'saveplace)
+#+END_SRC
+
+* Disable scroll bars
+
+Emacs默认在每个Window上都有个滚动条,我觉得这太丑了. 我觉得既然在Powerline上已经有标示出当前位置的百分比就没有必要再放滚动条了: ~(scroll-bar-mode -1)~.
+
+* "Graphical" GDB
+
+Emacs GDB mode (启用方式为 =M-x gdb RET binary_path=) 非常酷炫. 它能像IDE调试器一样打开多个window. 只不过默认情况下它不会启用这个风格,你可以使用 ~(setq gdb-many-windows t)~ 来启用它.
+
+你在GDB mode装载可执行文件后,你可以切换到它的源代码窗口(i用 =C-x o= 来在不同窗口之间切换,也可以直接用鼠标点击. gdb mode不支持Vim风格的 =C-w= 快捷键).
+加载了你想设置断点的源码文件后,通过 =M-x gud-break= 来设置断点. 然后就可以在gdb window中用"run" (r) 指令运行该程序了.
+一旦程序到达断点处时,可以用 next(n)或step(s)指令来让程序一步步的往下执行.
+局部变量和寄存器会在一个window中显示,断点和栈帧会在另一个window中显示.
+
+* Color Identifiers Mode and Color Delimiters
+
+插件 colors-identifiers-mode 会用不同颜色来为每个变量标色. 我对它也很矛盾,一方面我觉得它让代码看起来乱糟糟的像水果沙拉一样,另一方面它也确实可以让我很容易的看出哪些地方用到了某个变量.
+目前我还是启用了该功能,相关配置如下:
+
+#+BEGIN_SRC emacs-lisp
+  (package 'color-identifiers-mode)
+  (global-color-identifiers-mode)
+#+END_SRC
+
+另一个类似的package是 =Rainbow Delimiters=, 它会将嵌套的括号设置为不同的颜色,这样你不用移动光标就可以很容易分辨出哪些括号是一对的.
+让涉及到很多嵌套括号时,特别有用.
+having to move the cursor over them.
+
+#+BEGIN_SRC emacs-lisp
+  (package 'rainbow-delimiters)
+  (add-hook 'prog-mode-hook 'rainbow-delimiters-mode)
+#+END_SRC
+
+* Diminish to clean clutter from the modeline
+
+=Diminish= 能从minor mode(或powerline)中删除minor mode的指示符. 我是这么配置的:
+
+#+BEGIN_SRC emacs-lisp
+  (require 'diminish)
+  (diminish 'visual-line-mode)
+  (after 'autopair (diminish 'autopair-mode))
+  (after 'undo-tree (diminish 'undo-tree-mode))
+  (after 'auto-complete (diminish 'auto-complete-mode))
+  (after 'projectile (diminish 'projectile-mode))
+  (after 'yasnippet (diminish 'yas-minor-mode))
+  (after 'guide-key (diminish 'guide-key-mode))
+  (after 'eldoc (diminish 'eldoc-mode))
+  (after 'smartparens (diminish 'smartparens-mode))
+  (after 'company (diminish 'company-mode))
+  (after 'elisp-slime-nav (diminish 'elisp-slime-nav-mode))
+  (after 'git-gutter+ (diminish 'git-gutter+-mode))
+  (after 'magit (diminish 'magit-auto-revert-mode))
+  (after 'hs-minor-mode (diminish 'hs-minor-mode))
+  (after 'color-identifiers-mode (diminish 'color-identifiers-mode))
+#+END_SRC
+
+* Select last yanked text
+
+我在 =.vimrc= 中配置了一个快捷方式来选择最后粘贴的文本,这个功能蛮有用的:
+
+#+BEGIN_EXAMPLE
+  nnoremap </leader><leader>V `[v`]
+#+END_EXAMPLE
+
+多谢delexi的浏览,我现在知道了Emacs中也有类似功能的函数叫做exchange-point-and-markwhich,默认快捷键为 =C-x C-x=. 不过我将之重新映射为 =leader-V=:
+
+#+BEGIN_SRC emacs-lisp
+  (evil-leader/set-key "V" 'exchange-point-and-mark)
+#+END_SRC
+
+* Other Emacs alternatives for popular Vim plugins
+
++ Powerline => Powerline-Evil
++ Emmet => emmet-mode. 我映射 "m" 为 "emmet-expand-line",因为它默认的快捷键 "C-j" 已经被Evil占用了.
++ Surround => evil-surround (操作都是一样的)
++ Tabular.vim => M-x align-regexp RET regexp RET (选择是可视化的)
++ Rename => M-x dired-jump, 按下R可以重命名文件,按下RET可以打开该文件.
++ jDaddy => 我只用它来美化json对象, 可以用 [[http://irreal.org/blog/?p=354#comment-79015][James P定义的这个函数来替代.]].
++ Autocomplete 和 company 跟Vim上的 YouCompleteMe 类似: 它们在你编程时能提供补全功能. 我不是很清楚这两个package有啥区别,貌似Company要新一点,但是只有Autocomplete能补全D语言(ac-dcd),因此我自己用的是Autocomplete.
++ Vimdiff => M-x ediff-files 或 M-x ediff-buffers. 两者很接近. 按下 ? 能查看帮助. 若你同时还使用 Helm (无需其他插件),那么在选择要比较的文件时,你可以按下TAB键帮你补全,这比你手工浏览文件要快得多.
++ netrw/nerdtree => M-x dired (Emacs内建) or M-x dired+ (需安装).
+
+* Other random thoughts about Emacs, Evil and Vim
+
++ 你无需通过寄存器"+或"*就能与系统粘贴板通讯. 粘贴板中的内容不仅保存在这两个寄存器中,同时也保存在默认的寄存器中. 这样当你从其他桌面上拷贝了一段内容后,可以直接粘贴到Emacs中,而无需指定寄存器. 太棒了.
++ Evil 没有 =:pu= / =:put= (粘贴到下一行).
++ Evil的有些窗口(比如 =:registers=) 使用Emacs风格的 =q= 退出,而不是Vim风格的 =esc=.
++ 工具栏对我们这种初学者来说挺有用的.你可以通过 =F10= 触发工具栏而无需用到鼠标.
++ 并行化很不错. 我很欣赏在作语法检查的同时而不会停止响应这一点. 然而...
++ Emacs上并不是所有的地方平行处理的都很完善. 比如,package管理器在加载某个package信息时(这个过程总要花点时间),所有的界面都挂起了. 不过好在在Emacs上,你几乎总是可以通过 =Control-G= 取消一个长时间的运行过程.
