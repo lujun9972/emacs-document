@@ -1,0 +1,84 @@
+#+TITLE: Quitting-to-command-loop-in-elisp
+#+URL: http://oremacs.com/2015/07/16/callback-quit/
+#+AUTHOR: lujun9972
+#+CATEGORY: raw
+#+DATE: [2016-09-25 日 13:36]
+#+OPTIONS: ^:{}
+
+Today I'd like to share an interesting bit of Elisp that comes up every now and then for me. Imagine that you
+have this:
+
+#+BEGIN_SRC emacs-lisp
+  (defun useful-command ()
+    (interactive)
+    (do-thing-1)
+    (do-thing-2 (funcall callback-function))
+    (do-thing-3))
+#+END_SRC
+
+Sometimes, when you are in callback-function, you might want to abandon the function that called you,
+useful-command in this case, and call a different function, with the current context.
+
+Here's what I've come up with to do just that:
+
+#+BEGIN_SRC emacs-lisp
+  (defmacro ivy-quit-and-run (&rest body)
+    "Quit the minibuffer and run BODY afterwards."
+    `(progn
+       (put 'quit 'error-message "")
+       (run-at-time nil nil
+                    (lambda ()
+                      (put 'quit 'error-message "Quit")
+                      ,@body))
+       (minibuffer-keyboard-quit)))
+#+END_SRC
+
+To break it up into parts:
+
+ + minibuffer-keyboard-quit will unwind the call stack all the way to the command loop, preventing e.g.
+    do-thing-3 from being called. Note that the call stack can be as deep as you like, e.g. useful-command
+    might be called by utility-command etc.
+   
+ + run-at-time with the argument nil will run the code as soon as possible, which is almost exactly after
+    we're back into the command loop.
+   
+ + The final trick is to prevent Quit from being displayed in the minibuffer.
+   
+* Sample application
+
+Suppose that I've called find-file when ivy-mode is active. Typically, I'd select a file and press C-m to open
+it. However, sometimes I just want to see the selected file in dired instead of opening it. This code is from
+before [[http://oremacs.com/2015/07/09/counsel-rhythmbox/][ivy multi-action interface]], it plainly binds a command in ivy-minibuffer-map:
+
+#+BEGIN_SRC emacs-lisp
+  (define-key ivy-minibuffer-map (kbd "C-:") 'ivy-dired)
+
+  (defun ivy-dired ()
+    (interactive)
+    (if ivy--directory
+        (ivy-quit-and-run
+         (dired ivy--directory)
+         (when (re-search-forward
+                (regexp-quote
+                 (substring ivy--current 0 -1)) nil t)
+           (goto-char (match-beginning 0))))
+      (user-error
+       "Not completing files currently")))
+#+END_SRC
+
+So at the moment when C-: is pressed, the call stack is:
+
+ + C-x C-f called find-file.
+ + find-file called completion-read-function which is set to ivy-completing-read.
+ + ivy-completing-read called ivy-read.
+ + ivy-read called read-from-minibuffer.
+
+Thanks to the new macro, I can unwind all of that stuff, making sure nothing extra will be executed that was
+supposed to be executed after read-from-minibuffer had returned. In other words, the file will not be opened.
+Instead, a dired buffer will be opened, centered on the selected candidate.
+
+What I described above can actually be a pretty common scenario, you could adapt it to helm or avy or
+projectile. Basically to anything that includes some form of completion (i.e. commands that wait for input)
+and offers you a customizable keymap. Small disclaimer: the above code falls into the quick-and-dirty
+category, I don't recommend it if you can do something smarter instead. But if you can't do anything smarter
+due to being constrained by an interface you don't control, this macro could help you out.
