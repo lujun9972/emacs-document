@@ -1,0 +1,91 @@
+#+TITLE: emacs-speed-up-1000%
+#+URl: http://blog.binchen.org/posts/emacs-speed-up-1000.html
+#+AUTHOR: lujun9972
+#+CATEGORY: raw
+#+DATE: [2016-09-25 日 13:55]
+#+OPTIONS: ^:{}
+
+
+I'm still NOT satisfied with my Emacs performance after applying below tricks:
+
++ autoload packages
++ idle-load packages
++ compiling *.el to *.elc
+
+After some research, I found I could make my Emacs 1000% fast in 1 minute.
+
+Please note I'm talking about the general performance not just startup time.
+
+The solution is really simple.
+
+Since I'm a Linux guy and my computer got enough (24G) memory. I can place my setup on [[http://en.wikipedia.org/wiki/Tmpfs][memory]] only.
+
+* Step 1, insert below line into /etc/fstab and restart computer:
+
+#+BEGIN_EXAMPLE
+  tmpfs       /tmp        tmpfs       nodev,nosuid,size=8G    0   0
+#+END_EXAMPLE
+
+* Step 2, run the script "emacs2ram":
+
+#+BEGIN_SRC sh :tangle "emacs2ram"
+  #!/bin/sh
+
+  if [ -z "$1" ];then
+      echo "Usage:"
+      echo "  emacs2ram start"
+      echo "  emacs2ram restore"
+      exit 1
+  fi
+
+  if [ "$1" == "start" ];then
+      backup=emacs.d-backup
+      link=.emacs.d
+      volatile=/tmp/.emacs.d-$USER
+
+      IFS=
+      set -efu
+
+      cd ~/
+
+      if [ ! -r $volatile ]; then
+          mkdir -m0700 $volatile
+      fi
+
+      # link -> volatie does not exist
+      if [ "$(readlink $link)" != "$volatile" ]; then
+          # backup project at first
+          mv $link $backup
+          # create the link
+          ln -s $volatile $link
+      fi
+
+      if [ -e $link/.unpacked ]; then
+          echo "Sync .emacs.d from memory to backup ..."
+          rsync -avq --delete --exclude .unpacked ./$link/ ./$backup/
+          echo "DONE!"
+      else
+          echo "Sync .emacs.d from disk to memory ..."
+          rsync -avq ./$backup/ ./$link/
+          touch $link/.unpacked
+          echo "DONE!"
+      fi
+  else
+      echo "Moving .emacs.d back to disk ..."
+      backup=$2-backup
+      link=$2
+      volatile=/tmp/$2-$USER
+      cd ~/projs
+      rm $link && mv $backup $link && rm -rf $volatile
+      echo "DONE!"
+  fi
+#+END_SRC
+
+That's all! Please enjoy Emacs as usual.
+
+The original script is from ArchLinux Wiki. I learned this technique eight years ago. I'm just wondering why I
+need eight years to apply it?
+
+BTW, I've also moved all my projects into memory, using similar scripts.
+
+UPDATE: I also publicize my project-managing script at [[https://gist.github.com/redguardtoo/596b1a9fd3eac1cedd13#file-proj2ram][gist]]. It's almost same as emacs2ram.
