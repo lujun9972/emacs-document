@@ -1,0 +1,98 @@
+#+TITLE: Command-Rhythmbox-from-Emacs
+#+URl: http://oremacs.com/2015/07/09/counsel-rhythmbox/
+#+AUTHOR: lujun9972
+#+CATEGORY: raw
+#+DATE: [2016-09-25 日 13:39]
+#+OPTIONS: ^:{}
+
+I might have mentioned before that I'm using GNU/Linux on all of my computers. The particular flavor is
+Ubuntu, although it shouldn't matter much, since I can count the graphical applications that I use at all,
+besides Emacs, on one hand. They are: Firefox, Evince, Rhythmbox and VLC. Of course, as most true Emacs-ers, I
+strive to reduce this number to zero. So I got quite excited when I saw [[https://github.com/mrBliss/helm-rhythmbox][helm-rhythmbox]] show up in my package
+list. It works great: you can play and enqueue tracks with completion without leaving Emacs. Big thanks to 
+[[https://github.com/mrBliss][@mrBliss]], and, of course, the authors for dbus.el which makes interaction with D-Bus possible through Elisp.
+
+I'm not as big a fan of Helm as I used to be, so I quickly implemented an Ivy equivalent:
+
+#+BEGIN_SRC emacs-lisp
+  (defun counsel-rhythmbox-enqueue-song (song)
+    "Let Rhythmbox enqueue SONG."
+    (let ((service "org.gnome.Rhythmbox3")
+          (path "/org/gnome/Rhythmbox3/PlayQueue")
+          (interface "org.gnome.Rhythmbox3.PlayQueue"))
+      (dbus-call-method :session service path interface
+                        "AddToQueue" (rhythmbox-song-uri song))))
+
+  ;;;###autoload
+  (defun counsel-rhythmbox ()
+    "Choose a song from the Rhythmbox library to play or enqueue."
+    (interactive)
+    (unless (require 'helm-rhythmbox nil t)
+      (error "Please install `helm-rhythmbox'"))
+    (unless rhythmbox-library
+      (rhythmbox-load-library)
+      (while (null rhythmbox-library)
+        (sit-for 0.1)))
+    (ivy-read "Rhythmbox: "
+              (helm-rhythmbox-candidates)
+              :action
+              '(1
+                ("Play song" helm-rhythmbox-play-song)
+                ("Enqueue song" counsel-rhythmbox-enqueue-song))))
+#+END_SRC
+
+I listed the whole code just to show how easy it is to interact with D-Bus, and also to show-off the shiny new
+multi-action interface of ivy-read. Besides being discoverable via C-o, the multi-action interface is
+extensible as well. Here's how to add a "Dequeue" action without touching the original code:
+
+#+BEGIN_SRC emacs-lisp
+  (defun counsel-rhythmbox-dequeue-song (song)
+    "Let Rhythmbox dequeue SONG."
+    (let ((service "org.gnome.Rhythmbox3")
+          (path "/org/gnome/Rhythmbox3/PlayQueue")
+          (interface "org.gnome.Rhythmbox3.PlayQueue"))
+      (dbus-call-method :session service path interface
+                        "RemoveFromQueue" (rhythmbox-song-uri song))))
+  (ivy-set-actions
+   'counsel-rhythmbox
+   '(("Dequeue song" counsel-rhythmbox-dequeue-song)))
+#+END_SRC
+
+Very simple, counsel-rhythmbox-dequeue-song is a clone of counsel-rhythmbox-enqueue-song with only the method
+change from AddToQueue to RemoveFromQueue (I blind-guessed the name, but there should be a reference
+somewhere). If you got tired of having a whole three actions to choose from, you can revert to the initial two
+with:
+
+#+BEGIN_SRC emacs-lisp
+  (ivy-set-actions 'counsel-rhythmbox nil)
+#+END_SRC
+
+And here's how the updated C-o option panel now looks like:
+
+counsel-
+
+A bit of descriptions:
+
+ + j moves to the next one of the 18 current candidates.
+ + k moves to the previous candidate.
+ + h moves to the first candidate.
+ + l moves to the last candidate.
+ + g calls the current action without exiting.
+ + d calls the current action and exits.
+ + s moves to the next action.
+ + w moves to the previous action.
+ + i and C-o close the options panel without exiting.
+ + o closes the panel and exits.
+
+Similarly to hydra, each action has a short docstring, like "Play song" that should describe what it does.
+Here are a few usage scenarios:
+
+ + If I wanted to play the first song and enqueue the third and the sixth and exit the minibuffer, I would
+    press gsjjgjjjd.
+ + If I wanted to play the third and enqueue all the following, I would press jjgsjcjjjjjjjjjjjo. The many j
+    is just me holding j until the selection reaches the end, then I simply exit without doing anything else
+    by pressing o. The way c works is that it toggles the "calling" state - a state where the current action
+    is called whenever a different candidate is selected.
+
+Almost forgot, if this little intro got you excited, the packages that you should install from MELPA are:
+helm-rhythmbox and counsel.
