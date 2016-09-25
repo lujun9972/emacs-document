@@ -1,0 +1,166 @@
+#+TITLE: Using-Recoll-desktop-search-database-with-Emacs
+#+URl: http://oremacs.com/2015/07/27/counsel-recoll/
+#+AUTHOR: lujun9972
+#+CATEGORY: raw
+#+DATE: [2016-09-25 日 13:41]
+#+OPTIONS: ^:{}
+
+
+I know that most Emacs hackers love the simplicity and usability of grep, but sometimes it just doesn't cut
+it. A specific use case is my Org-mode directory, which includes a lot of org files and PDF files. There are
+just too many files for grep to be efficient, plus the structure of PDF doesn't lend itself to grep, so
+another tool is required: a desktop database.
+
+I got into the topic by reading John Kitchin's post on [[http://kitchingroup.cheme.cmu.edu/blog/2015/07/06/Indexing-headlines-in-org-files-with-swish-e-with-laser-sharp-results/][swish-e]], however, I just couldn't get that software to
+work. But as a reply to his post, another tool - [[https://en.wikipedia.org/wiki/Recoll][recoll]] was mentioned on Org-mode's mailing list. In this
+post, I'll give step-by-step instructions to make Recoll work with Emacs.
+
+* Building Recoll
+
+I'm assuming that you're on a GNU/Linux system, since it's my impression is that it's the easiest system for
+building (as in make ...) software. Also, it's the only system that I've got, so it would be hard for me to
+explain other systems.
+
+If you want to toy around with the graphical back end of Recoll, you can install it with:
+
+#+BEGIN_SRC sh
+  sudo apt-get install recoll
+#+END_SRC
+
+Unfortunately, the shell tool recollq isn't bundled with that package, so we need to download [[http://www.lesbonscomptes.com/recoll/download.html][the sources]]. The
+current version is [[http://www.lesbonscomptes.com/recoll/recoll-1.20.6.tar.gz][1.20.6]].
+
+** Extract the archive
+
+After downloading the archive, I open ~/Downloads in dired and press & (dired-do-async-shell-command). It
+guesses from the tar.gz extension that the command should be tar zxvf. By pressing RET, I have the archive
+extracted to the current directory. I've actually allocated ~/Software/ for installing stuff from tarballs,
+since I don't want to put too much stuff in ~/Downloads.
+
+** Open ansi-term
+
+I navigate to the recoll-1.20.6/ directory using dired, then press ` to open an *ansi-term* buffer for the
+current directory.
+
+Here's the setup for that (part of [[https://github.com/abo-abo/oremacs][my full config]]):
+
+#+BEGIN_SRC emacs-lisp
+  (defun ora-terminal ()
+    "Switch to terminal. Launch if nonexistent."
+    (interactive)
+    (if (get-buffer "*ansi-term*")
+        (switch-to-buffer "*ansi-term*")
+      (ansi-term "/bin/bash"))
+    (get-buffer-process "*ansi-term*"))
+
+  (defun ora-dired-open-term ()
+    "Open an `ansi-term' that corresponds to current directory."
+    (interactive)
+    (let ((current-dir (dired-current-directory)))
+      (term-send-string
+       (ora-terminal)
+       (if (file-remote-p current-dir)
+           (let ((v (tramp-dissect-file-name current-dir t)))
+             (format "ssh %s@%s\n"
+                     (aref v 1) (aref v 2)))
+         (format "cd '%s'\n" current-dir)))
+      (setq default-directory current-dir)))
+
+  (define-key dired-mode-map (kbd "`") 'ora-dired-open-term)
+#+END_SRC
+
+** Configure and make
+
+Here's a typical sequence of shell commands.
+
+#+BEGIN_SRC sh
+  ./configure && make
+  sudo make install
+  cd query && make
+  which recoll
+  sudo cp recollq /usr/local/bin/
+#+END_SRC
+
+I was a total Linux newbie 5 years ago and had no idea about shell commands. Using only the first two lines,
+you can build and install a huge amount of software, so these are a great place to start if you want to learn
+these tools. I actually got by using only those two lines for a year a so.
+
+After the first run or ./configure it turned out that I was missing one library, so I had to do this one and
+redo the ./configure step.
+
+#+BEGIN_SRC sh
+  sudo apt-get install libqt5webkit5-dev
+#+END_SRC
+
+I think this one would work as well:
+
+#+BEGIN_SRC sh
+  sudo apt-get build-dep recoll
+#+END_SRC
+
+* Configuring Recoll
+
+I only launched the graphical interface to select the indexing directory. It's the home directory by default,
+I didn't want that so I chose ~/Dropbox/org/ instead. Apparently, there's a way to make the indexing automatic
+via a cron job; you can even configure it via the graphical interface: it's all good.
+
+* Using Recoll from Emacs
+
+Emacs has great options for processing output from a shell command. So first I had to figure out how the shell
+command should look like. This should be good enough to produce a list of indexed files that contain the word
+"Haskell":
+
+#+BEGIN_SRC sh
+  recollq -b 'haskell'
+#+END_SRC
+
+And there's how to adapt that command to the asynchronous ivy-read interface:
+
+#+BEGIN_SRC emacs-lisp
+  (defun counsel-recoll-function (string &rest _unused)
+    "Issue recallq for STRING."
+    (if (< (length string) 3)
+        (counsel-more-chars 3)
+      (counsel--async-command
+       (format "recollq -b '%s'" string))
+      nil))
+
+  (defun counsel-recoll (&optional initial-input)
+    "Search for a string in the recoll database.
+  You'll be given a list of files that match.
+  Selecting a file will launch `swiper' for that file.
+  INITIAL-INPUT can be given as the initial minibuffer input."
+    (interactive)
+    (ivy-read "recoll: " 'counsel-recoll-function
+              :initial-input initial-input
+              :dynamic-collection t
+              :history 'counsel-git-grep-history
+              :action (lambda (x)
+                        (when (string-match "file://\\(.*\\)\\'" x)
+                          (let ((file-name (match-string 1 x)))
+                            (find-file file-name)
+                            (unless (string-match "pdf$" x)
+                              (swiper ivy-text)))))))
+#+END_SRC
+
+The code here is pretty simple:
+
++ I don't start a search until at least 3 chars are entered, in order to not get too many results.
++ I mention :dynamic-collection t which means that recollq should be called after each new letter entered.
++ In :action, I specify to open the selected file and start a swiper with the current input in that file.
+
+* Outro
+
+I hope you found this info useful. It's certainly pretty cool:
+
+#+BEGIN_SRC sh
+  cd ~/Dropbox/org && du -hs
+  # 567M .
+#+END_SRC
+
+So there's half of a gigabyte of stuff, all of it indexed, and I'm getting a file list update after each new
+key press in Emacs.
+
+If you know of a better tool than recoll (I'm not too happy that match context that it gives via the -A
+command option), please do share. Also, I've just learned that there's [[https://github.com/emacs-helm/helm-recoll][helm-recoll]] out there, so you can use
+that if you like Helm.
