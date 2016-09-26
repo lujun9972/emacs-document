@@ -1,0 +1,49 @@
+#+TITLE: easily-repeat-emacs-function
+#+URL: http://zck.me/emacs-repeat-emacs-repeat
+#+AUTHOR: lujun9972
+#+CATEGORY: raw
+#+DATE: [2016-09-25 日 14:00]
+#+OPTIONS: ^:{}
+
+Sometimes you want to repeat an Emacs function, even when calling it originally took a few keystrokes. Here's
+how to make it easily repeatable. Say we have a simple function that inserts "here":
+
+#+BEGIN_SRC emacs-lisp
+  (defun insert-here ()
+    (interactive)
+    (insert "here"))
+#+END_SRC
+
+And bind it to C-c h h:
+
+#+BEGIN_SRC emacs-lisp
+  (global-set-key (kbd "C-c h h") #'insert-here)
+#+END_SRC
+
+This works; every time we type C-c h h, we insert "here" into the buffer. But often we want to repeat the
+command. Although we could use C-x z to repeat the last command, that's still two keypresses, and isn't the
+easiest thing to press once you've typed C-c h h. So instead, we can make a [[https://www.gnu.org/software/emacs/manual/html_node/elisp/Creating-Keymaps.html#index-make_002dsparse_002dkeymap][sparse keymap]] and in it, set "h"
+to this command.
+
+#+BEGIN_SRC emacs-lisp
+  (setq insert-here-keymap
+        (let ((map (make-sparse-keymap)))
+          (define-key map (kbd "h") #'insert-here)
+          map))
+#+END_SRC
+
+Now we just need to use this keymap inside #'insert-here. We can't use #'use-local-map, because that will mean
+we can never insert h again: we'd always call #'use-local-map. Instead, we can use #'set-transient-map, which
+still uses the local keymap, but deactivates the keymap after a single key is pressed.
+
+#+BEGIN_SRC emacs-lisp
+  (defun insert-here ()
+    (interactive)
+    (insert "here")
+    (set-transient-map
+     insert-here-keymap))
+#+END_SRC
+
+Now, after activating #'insert-here, we can repeat it by pressing h. But if anything else is pressed, the
+keymap disables. Further presses of h will insert the letter; the keymap is no longer used. So we've
+accomplished our goal of easily repeating this command with a single keypress.

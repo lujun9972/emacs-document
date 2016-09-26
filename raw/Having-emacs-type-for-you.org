@@ -1,0 +1,373 @@
+#+TITLE: Having-emacs-type-for-you
+#+URL: http://howardism.org/Technical/Emacs/templates-tutorial.html
+#+AUTHOR: lujun9972
+#+CATEGORY: raw
+#+DATE: [2016-09-25 日 13:29]
+#+OPTIONS: ^:{}
+
+We type too much. And with text files, much of the typing is just organizational support. Think of asterisks,
+spaces and #+ in org-mode, or all the parens, curly braces and do..end in your programming code.
+
+Just because you want those characters in your files doesn’t mean you have to physically type them all.
+
+The following are the major approaches to getting Emacs to do some of the heavy typing for you… like the
+boilerplate needed when creating a new file of a particular type, or large swatches of text (using templates).
+
+Just to focus this tutorial, I’m not going to cover context completion, like auto-complete or company.
+
+* Introduction to YAS
+
+The [[https://github.com/capitaomorte/yasnippet][yasnippet project]] lets you insert snippets of code. A snippet is a template that can have substitutions
+replaced either manually or programmatically. The choice of which template to choose and expand is based on
+the buffer’s mode.
+
+To begin, let’s try to configure YAS and insert static text. If you are using [[https://github.com/jwiegley/use-package][use-package]], let’s have it
+installed and set up a personal directory for our templates (I’ll use snippet and template interchangeably):
+
+#+BEGIN_SRC emacs-lisp
+  (use-package yasnippet
+    :ensure t
+    :init
+    (yas-global-mode 1)
+    :config
+    (add-to-list 'yas-snippet-dirs (locate-user-emacs-file "snippets")))
+#+END_SRC
+
+Let’s create a template by typing C-c & C-n … yeah, I never remember that either, so try: M-x yas-new-snippet
+(and with something like IDO, that can be just as fast).
+
+You should now be presented with a new template buffer, and since it is using YAS, you can fill in the
+individual fields and use Tab to jump to the next field. Try making it look like:
+
+#+BEGIN_SRC snippet
+  # -*- mode: snippet -*-
+  # name: blah
+  # key: blah
+  # --
+  Bling blargh-a bloo bloop!
+#+END_SRC
+
+Hit C-c C-c to install it. It will ask you what mode it should expect to expand it. At this point, hopefully
+you can just hit Return to accept the default.
+
+Why yes, you normally will want to save it. Notice the default may be exactly where you’ll want to keep it
+too: ~/.emacs.d/snippets
+
+Now, in a buffer of the same mode, type blah and hit Tab, and the text will be replaced with:
+
+Bling blargh-a bloo bloop!
+
+YAS comes with multiple ways of triggering a template, but let’s next talk about ways to make the results of
+the template more useful.
+
+* Interactive Snippets
+
+Replacing one word with several can be useful, but to make it truly helpful, we could have the result be more 
+context-aware. Let’s make it easy for us to manually change some of the template’s parts.
+
+Open up a code file in some programming language mode, and create a new snippet. I’m going to create an ifelse
+snippet for JavaScript:
+
+#+BEGIN_SRC snippet
+  # -*- mode: snippet -*-
+  # name: ifelse
+  # key: ife
+  # --
+  if ($1) {
+    $0;
+  }
+  else {
+  }
+#+END_SRC
+
+Now, I can type ife and have an if.. else template expanded in my JavaScript mode, and the cursor begins
+between the parens (due to the $1 label), allowing me to type the condition. Hitting Tab jumps between the
+curly braces allowing me to type the results of a positive condition (due to the $0 label which specifies
+where the field editing should end).
+
+I’m not finished with YAS yet, but let me take a bit of a detour so that my next YAS example will be more
+meaningful.
+
+* New Files
+
+Remember when your company thought it was a great idea to put their copyright notice at the beginning of every
+file in the code base? While I’m not sure how much legal weight that carries, Emacs has long had an [[https://www.emacswiki.org/emacs/AutoInsertMode][Auto]]
+[[https://www.emacswiki.org/emacs/AutoInsertMode][Insert]] feature for populating a new file of a particular mode with boilerplate goodness.
+
+A use-package approach to setting it up to dump the contents of a static file into your new file is:
+
+#+BEGIN_SRC emacs-lisp
+  (use-package autoinsert
+    :init
+    ;; Don't want to be prompted before insertion:
+    (setq auto-insert-query nil)
+
+    (setq auto-insert-directory (locate-user-emacs-file "templates"))
+    (add-hook 'find-file-hook 'auto-insert)
+    (auto-insert-mode 1)
+
+    :config
+    (define-auto-insert "\\.html?$" "default-html.html"))
+#+END_SRC
+
+Now, in this case, creating a file with an extension of .html will insert the contents of ~/.emacs.d/templates
+/default-html.html. A start, but hardly good enough for the power user.
+
+* Combining YAS and Auto Insert
+
+We can use a snippet as the default contents for a new file, which would allow us to tidy up some of that
+inserted boilerplate.
+
+YAS’s work-horse for expanding snippets is yas-expand-snippet, which takes, as input, the contents of the
+snippet to insert. Shove this in your *scratch* buffer, and evaluate it (with C-x C-e):
+
+#+BEGIN_SRC emacs-lisp
+  (yas-expand-snippet ";; Bah-da $1 Bing")
+#+END_SRC
+
+You can probably see where I’m going here, eh? Let’s create a helper function that takes the static text that
+auto-insert puts into a new file, but treat it as if it were a snippet:
+
+#+BEGIN_SRC emacs-lisp
+  (defun autoinsert-yas-expand()
+    "Replace text in yasnippet template."
+    (yas-expand-snippet (buffer-string) (point-min) (point-max)))
+#+END_SRC
+
+Here, the (buffer-string) is the contents of the buffer, and yas-expand-snippet takes two more parameters to
+specify the contents in the current buffer to replace with the results… for us, this will be the entire
+buffer: (point-min) and (point-max).
+
+The define-auto-insert function can take a vector, which it either includes (if it is a string) or executes
+(if it is a function name), so:
+
+#+BEGIN_SRC emacs-lisp
+  (define-auto-insert "\\.el$" [ "defaults-elisp.el" autoinsert-yas-expand ])
+#+END_SRC
+
+Will take new files ending in .el, insert the defaults-elisp.el file into it, and then execute our
+autoinsert-yas-expand function which will replace that template as if it were a YAS snippet.
+
+This allows you punctuate it with $1 and $2 and other field placeholders.
+
+I wrap up my templates with use-package, like:
+
+#+BEGIN_SRC emacs-lisp
+  (use-package autoinsert
+    :config
+    (define-auto-insert "\\.el$" ["default-lisp.el" ha/autoinsert-yas-expand])
+    (define-auto-insert "\\.sh$" ["default-sh.sh" ha/autoinsert-yas-expand])
+    (define-auto-insert "/bin/"  ["default-sh.sh" ha/autoinsert-yas-expand])
+    (define-auto-insert "\\.html?$" ["default-html.html" ha/autoinsert-yas-expand]))
+#+END_SRC
+
+* Programmatic Snippets
+
+Entering the field details by hand is pretty good, but what if a snippet could programmatically enter some of
+the information?
+
+For instance, we traditionally start our Emacs Lisp files like:
+
+#+BEGIN_SRC emacs-lisp
+  ;;; demo-it --- Utility functions for creating demonstrations
+  ;;
+  ;; Copyright (C) 2014  Howard Abrams
+  ;;
+  ;; Author: Howard Abrams [[mailto:howard.abrams%2540gmail.com][<howard.abrams@gmail.com>]]
+  ;; Keywords: demonstration presentation
+  ;;
+  ;; This program is free software; you can redistribute it and/or modify
+  ;; it under the terms of the GNU General Public License as published by
+  ;; the Free Software Foundation, either version 3 of the License, or
+  ;; ...
+#+END_SRC
+
+Where the first line contains the file’s name and a description. YAS will execute code within back-ticks as
+Emacs Lisp, so:
+
+#+BEGIN_SRC emacs-lisp
+  (yas-expand-snippet "`(buffer-file-name)`")
+#+END_SRC
+
+Will insert the complete file name of the buffer, and:
+
+#+BEGIN_SRC emacs-lisp
+  (yas-expand-snippet "`user-full-name`")
+#+END_SRC
+
+Will insert the contents of the variable, user-file-name (which should be your nom de plume). Our Emacs Lisp
+template could be this snippet:
+
+#+BEGIN_SRC emacs-lisp
+  ;;; `(upcase (file-name-nondirectory (file-name-sans-extension (buffer-file-name))))` --- $1
+  ;;
+  ;; Author: `user-full-name` <`user-mail-address`>
+  ;; Copyright © `(format-time-string "%Y")`, `user-full-name`, all rights reserved.
+  ;; Created: `(format-time-string "%e %B %Y")`
+  ;;
+  ;;; Commentary:
+  ;;
+  ;;  $2
+  ;;
+  ;;; Code:
+
+  $0
+
+  ;;; `(file-name-nondirectory (buffer-file-name))` ends here
+#+END_SRC
+
+* Full Programmatic Inserts
+
+For me, a journal is a file in the ~/journal directory that has the simple file format of YYYYMMDD. We might
+be tempted to create a YAS snippet to automatically include a title, like:
+
+#+BEGIN_SRC org
+  ,#+TITLE: Journal Entry for `(format-time-string "%e %B %Y")`
+#+END_SRC
+
+But that only works if I am really good and write in my journal each day. Perhaps I could create a snazzy
+title with the date based on the file name. Let’s define that format:
+
+#+BEGIN_SRC emacs-lisp
+  (setq org-journal-date-format "#+TITLE: Journal Entry- %e %B %Y")
+#+END_SRC
+
+And a function that will parse a buffer-file-name to the appropriate values for that format^[[http://howardism.org/Technical/Emacs/templates-tutorial.html#fn.1][1]]:
+
+#+BEGIN_SRC emacs-lisp
+  (defun journal-title ()
+    "The journal heading based on the file's name."
+    (interactive)
+    (let* ((year  (string-to-number (substring (buffer-name) 0 4)))
+           (month (string-to-number (substring (buffer-name) 4 6)))
+           (day   (string-to-number (substring (buffer-name) 6 8)))
+           (datim (encode-time 0 0 0 day month year)))
+      (format-time-string org-journal-date-format datim)))
+#+END_SRC
+
+Now, our template would be:
+
+#+BEGIN_SRC org
+  ,#+TITLE: Journal Entry for `(journal-title)`
+#+END_SRC
+
+Nice, but let’s level up on this…
+
+While I’m quite intrigued with [[http://www.habitica.com/][Habitica]], and am looking forward to better [[https://github.com/abrochard/emacs-habitica][Emacs integration]], what I really
+like, is the idea of Dailies… tasks checked-off each day come back the next day.
+
+I already have some good [[https://github.com/howardabrams/dot-files/blob/master/emacs-org.org#auto-note-capturing][task capturing]] code, but nothing that keeps coming back. Perhaps, I could have my
+daily journal entry track that.
+
+This idea of inserted daily information and check-lists should only happen if I am creating today’s journal
+(not catching up with the past), and I might have special dailies inserted based on the day of the week.
+
+I could use YAS snippets, but then the amount of `(...)` code may over-shadow the text, so I’ll create a small
+collection of templates:
+
++ journal-dailies.org to contain the real dailies
++ journal-dailies-end.org to contain any follow-up notes
++ journal-mon.org for additional text to be inserted on Monday journals
++ journal-tue.org for additional text to be inserted on Monday journals
++ And a journal-XYZ.org for each additional weekday
+
+With these files, editing my daily lists should be clear and straight-forward.
+
+Now, I just need to update my snippet-based template. Since I will need to create a fair amount of Emacs Lisp
+functions to support that, I might as well make the entire thing programmatic:
+
+#+BEGIN_SRC emacs-lisp
+  (define-auto-insert "/[0-9]\\{8\\}$" [journal-file-insert])
+#+END_SRC
+
+Now when I load up a file with a name that contains only 8 digits, it will run the function
+journal-file-insert:
+
+#+BEGIN_SRC emacs-lisp
+  (defun journal-file-insert ()
+    "Insert's the journal heading based on the file's name."
+    (interactive)
+    (insert (journal-title))
+    (insert "\n\n") ; Start with a blank separating the title
+
+    ;; If the journal entry I'm creating matches today's date:
+    (when (equal (file-name-base (buffer-file-name))
+                 (format-time-string "%Y%m%d"))
+
+      ;; Note: The `insert-file-contents' leaves the cursor at the
+      ;; beginning, so the easiest approach is to insert these files
+      ;; in reverse order:
+      (insert-file-contents "journal-dailies-end.org")
+      (insert "\n")
+
+      ;; Insert dailies that only happen once a week:
+      (let ((weekday-template (downcase
+                               (format-time-string "journal-%a.org"))))
+
+        (when (file-exists-p weekday-template)
+          (insert-file-contents weekday-template)))
+
+      (insert-file-contents "journal-dailies.org")
+      (previous-line 2)))
+#+END_SRC
+
+That’s all I know about [[https://www.emacswiki.org/emacs/AutoInsertMode][Auto Insert]] and the [[https://github.com/capitaomorte/yasnippet][yasnippet project]]. Do you have any questions or tips I could use?
+
+* Footnotes:
+
+^[[http://howardism.org/Technical/Emacs/templates-tutorial.html#fnr.1][1]]
+
+I generally don’t like using functions like substring for manipulating strings since such functions generally
+lack precision. Since my jounal-title function will not be called without a (buffer-name) that matches an 8
+digit pattern, I felt like I could get away.
+
+However, a version that uses regular expressions could be:
+
+#+BEGIN_SRC emacs-lisp
+  (defun journal-title ()
+    "The journal heading based on the file's name."
+    (interactive)
+    (when (string-match "\\([[:digit:]]\\{4\\}\\)\\([[:digit:]]\\{2\\}\\)\\([[:digit:]]\\{2\\}\\)" (buffer-name))
+      (let* ((year  (string-to-number (match-string 1 (buffer-name))))
+             (month (string-to-number (match-string 2 (buffer-name))))
+             (day   (string-to-number (match-string 3 (buffer-name))))
+             (datim (encode-time 0 0 0 day month year)))
+
+        (format-time-string org-journal-date-format datim))))
+#+END_SRC
+
+Hopefully, that regular expression isn’t too scary. Emacs’s version of regular expressions look a tad worse
+due to all the escaping. Might be better if I used concat and broke into three parts:
+
+#+BEGIN_SRC emacs-lisp
+  (concat "\\([[:digit:]]\\{4\\}\\)"   ; year
+          "\\([[:digit:]]\\{2\\}\\)"   ; month
+          "\\([[:digit:]]\\{2\\}\\)")  ; day
+#+END_SRC
+
+  * \\( \\) creates a group that match-string let’s me extract a part
+  * [:digit:] refers to any number, and putting it in another pair of brackets is… well, just a Emacsism.
+  * \\{ \\} specifies a repeating value, so \\{4\\} says, look for the previous pattern 4 times… in other
+    words, 4 numbers.
+
+However, as Jason Milkins [[https://twitter.com/emacs_gifs/status/776566508503781376][pointed out]], using rx would make that function much more readable:
+
+#+BEGIN_SRC emacs-lisp
+  (require 'rx)
+
+  (defun journal-title ()
+    "The journal heading based on the file's name."
+    (interactive)
+    (when (string-match (rx (group (= 4 digit))
+                            (group (= 2 digit))
+                            (group (= 2 digit))) (buffer-name))
+      (let* ((year  (string-to-number (match-string 1 (buffer-name))))
+             (month (string-to-number (match-string 2 (buffer-name))))
+             (day   (string-to-number (match-string 3 (buffer-name))))
+             (datim (encode-time 0 0 0 day month year)))
+
+        (format-time-string org-journal-date-format datim))))
+#+END_SRC
+
+As you can tell, a hairy regular expression, using string-to-number on a series of match-string seemed
+overkill for a tutorial.

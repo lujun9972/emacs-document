@@ -1,0 +1,90 @@
+#+TITLE: supler-splotlight-search-with-counsel
+#+URL: http://pragmaticemacs.com/emacs/super-spotlight-search-with-counsel/
+#+AUTHOR: lujun9972
+#+CATEGORY: raw
+#+DATE: [2016-09-25 日 13:53]
+#+OPTIONS: ^:{}
+
+
+Inspired by abo-abo‘s [[http://oremacs.com/2015/07/27/counsel-recoll/][post]] on using his [[https://github.com/abo-abo/swiper][excellent tools]] counsel, ivy and swiper to search the contents of
+files indexed by the [[http://www.lesbonscomptes.com/recoll/][recoll]] search tool, I tried to make something similar for spotlight on the Mac. My
+attempt is below.
+
+Using counsel gives us incremental updates of the spotlight search results (accessed using its command line
+interface mdfind). When a match is selected, it is opened in emacs, and (unless it is a pdf) a swiper search
+is launched on the search string.
+
+This works really nicely. The only problem I’ve had is that I wanted to sort the results to prioritise .org
+and .tex files, but my sort function is not being used correctly in ivy, but I can’t tell why. It gets passed
+the counsel prompt for more characters, but not the set of mdfind matches for sorting. My lisp skills have
+been exhausted at this point, but maybe someone else can see what I’ve done wrong! UPDATE: this problem was
+fixed with an update to ivy and counsel, and the sorting command below now works.
+
+#+BEGIN_SRC emacs-lisp
+  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  ;; counsel-spotlight                                                      ;;
+  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  ;; Incrementally search the Mac spotlight database and open matching
+  ;; files with a swiper search on the query text.
+  ;; Based on http://oremacs.com/2015/07/27/counsel-recoll/
+
+  (require 'counsel)
+
+  ;; Function to be called by counsel-spotlight
+  ;; The onlyin option limits results to my home directory
+  ;; and directories below that
+  ;; mdfind is the command-line interface to spotlight
+  (defun counsel-mdfind-function (string &rest _unused)
+    "Issue mdfind for STRING."
+    (if (< (length string) 4)
+        (counsel-more-chars 4)
+      (counsel--async-command
+       (format "mdfind -onlyin ~/ '%s'" string))
+      nil))
+
+  ;; Main function
+  (defun counsel-spotlight (&optional initial-input)
+    "Search for a string in the mdfind database.
+  You'll be given a list of files that match.
+  Selecting a file will launch `swiper' for that file.
+  INITIAL-INPUT can be given as the initial minibuffer input."
+    (interactive)
+    (ivy-read "spotlight: " 'counsel-mdfind-function
+              :initial-input initial-input
+              :dynamic-collection t
+              :sort t
+              :action (lambda (x)
+                        (when (string-match "\\(\/.*\\)\\'" x)
+                          (let ((file-name (match-string 1 x)))
+                            (find-file file-name)
+                            (unless (string-match "pdf$" x)
+                              (swiper ivy-text)))))))
+
+  ;; Define my sort function
+  (defun bjm-counsel-mdfind-sort-function (x y)
+    "Compare two files X and Y. Prioritise org then tex."
+    (if (string-match "org$" x)
+        t
+      (if (string-match "tex$" x)
+          (if (string-match "org$" y)
+              nil
+            t)
+        nil)))
+
+  ;; Add to list of ivy sorting functions
+  (add-to-list 'ivy-sort-functions-alist
+               '(counsel-mdfind-function . bjm-counsel-mdfind-sort-function))
+#+END_SRC
+
+In an ideal world, I’d like to be able to interactively narrow the matches from mdfind with a second counsel
+on the filenames. The selected file would then open with a swiper search for the first search term. For
+example, I would like to
+
+ 1. Call M-x counsel-spotlight and enter caustic (or enough characters to give me useful results) to get a
+    list of names of files which contain the text caustic somewhere inside them.
+ 2. Hit some keybinding and get a new counsel prompt and enter chandra to incrementally filter the list of
+    filenames to those containing the string chandra in the filename.
+ 3. Select the file I want and hit RET to have emacs open that with a swiper search of my original query
+    caustic.
+
+Given the state of my lisp skills, this might take me a while, but it is nice to dream!
