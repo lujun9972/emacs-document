@@ -5,8 +5,7 @@
 #+DATE: [2016-09-25 日 13:36]
 #+OPTIONS: ^:{}
 
-Today I'd like to share an interesting bit of Elisp that comes up every now and then for me. Imagine that you
-have this:
+今天我想要分享一段有趣的Elisp代码. 想象一下这么一段代码:
 
 #+BEGIN_SRC emacs-lisp
   (defun useful-command ()
@@ -16,10 +15,9 @@ have this:
     (do-thing-3))
 #+END_SRC
 
-Sometimes, when you are in callback-function, you might want to abandon the function that called you,
-useful-command in this case, and call a different function, with the current context.
+有时候会有这种需求, 你在执行 =callback-function= 的时间点上,想跳出正在执行的这个函数(本例中指的是那个 =useful-command=),在保持当前环境的情况下转而调用另一个函数.
 
-Here's what I've come up with to do just that:
+我是这样来实现这个需求的:
 
 #+BEGIN_SRC emacs-lisp
   (defmacro ivy-quit-and-run (&rest body)
@@ -33,22 +31,18 @@ Here's what I've come up with to do just that:
        (minibuffer-keyboard-quit)))
 #+END_SRC
 
-To break it up into parts:
+让我们仔细分析一下:
 
- + minibuffer-keyboard-quit will unwind the call stack all the way to the command loop, preventing e.g.
-    do-thing-3 from being called. Note that the call stack can be as deep as you like, e.g. useful-command
-    might be called by utility-command etc.
+ + =minibuffer-keyboard-quit= 会展开调用栈,并直接退出到command loop,从而阻止了 =do-thing-3= 的执行. 这里的调用栈可以任意深,比如 =useful-command= 可能又被 =utility-command= 所调用,诸如此类.
    
- + run-at-time with the argument nil will run the code as soon as possible, which is almost exactly after
-    we're back into the command loop.
+ + 带nil参数的 =run-at-time= 会尽可能快的运行后面的代码,几乎就在我们回到command loop的那一刻就会运行.
    
- + The final trick is to prevent Quit from being displayed in the minibuffer.
+ + 最后要留意的就是不要在minibuffer上显示Quit信息.
    
 * Sample application
 
-Suppose that I've called find-file when ivy-mode is active. Typically, I'd select a file and press C-m to open
-it. However, sometimes I just want to see the selected file in dired instead of opening it. This code is from
-before [[http://oremacs.com/2015/07/09/counsel-rhythmbox/][ivy multi-action interface]], it plainly binds a command in ivy-minibuffer-map:
+假设我在ivy-mode激活的情况下调用了 =find-file= 函数. 一般情况下, 我会选择一个文件,然后按下 =C-m= 打开这个文件. 然而, 有时候我只是想用 =dired= 看一下这个文件而不是想打开这个文件. 
+下面这段代码来至于[[http://oremacs.com/2015/07/09/counsel-rhythmbox/][ivy multi-action interface]], 它是 =ivy-minibuffer-map= 中绑定的一个命令:
 
 #+BEGIN_SRC emacs-lisp
   (define-key ivy-minibuffer-map (kbd "C-:") 'ivy-dired)
@@ -66,19 +60,15 @@ before [[http://oremacs.com/2015/07/09/counsel-rhythmbox/][ivy multi-action inte
        "Not completing files currently")))
 #+END_SRC
 
-So at the moment when C-: is pressed, the call stack is:
+那么,在 =C-:= 被按下的那一刻,调用栈是这样子的: is pressed, the call stack is:
 
- + C-x C-f called find-file.
- + find-file called completion-read-function which is set to ivy-completing-read.
- + ivy-completing-read called ivy-read.
- + ivy-read called read-from-minibuffer.
+ + =C-x C-f= 调用 =find-file= 函数.
+ + =find-file= 调用 =completion-read-function= 函数,不过实际上调用的是 =ivy-completing-read= 函数.
+ + =ivy-completing-read= 调用了 =ivy-read= 函数.
+ + =ivy-read= 调用了 =read-from-minibuffer=.
 
-Thanks to the new macro, I can unwind all of that stuff, making sure nothing extra will be executed that was
-supposed to be executed after read-from-minibuffer had returned. In other words, the file will not be opened.
-Instead, a dired buffer will be opened, centered on the selected candidate.
+宏 =ivy-quit-and-run= 让我能够展开所有的调用栈,确保从 =read-from-minibuffer= 退出后,不会再运行剩下的代码. 
+换句话说,Emacs不会打开该文件,反而会打开一个dired buffer,并选中这个文件.
 
-What I described above can actually be a pretty common scenario, you could adapt it to helm or avy or
-projectile. Basically to anything that includes some form of completion (i.e. commands that wait for input)
-and offers you a customizable keymap. Small disclaimer: the above code falls into the quick-and-dirty
-category, I don't recommend it if you can do something smarter instead. But if you can't do anything smarter
-due to being constrained by an interface you don't control, this macro could help you out.
+我上面所描述的场景应该蛮普遍的, 你可以用类似的方法改造 =helm=, =avy=,以及 =projectile=. 基本上,所有包含某种形式的补全(例如那些会等待输入的命令)并提供可定制keymap的东西,都能够应用这种方法.
+美中不足的是: 这种方法只是一种 quick-and-dirty 的解决方案. 如果可以的话,我并不推荐使用这种方法. 不过如果你别无他法,那么这个宏也许能够帮到你.
