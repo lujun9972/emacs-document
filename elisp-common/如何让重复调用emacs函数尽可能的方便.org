@@ -1,0 +1,44 @@
+#+TITLE: 如何让重复调用emacs函数尽可能的方便
+#+URL: http://zck.me/emacs-repeat-emacs-repeat
+#+AUTHOR: lujun9972
+#+CATEGORY: elisp-common
+#+DATE: [2016-10-07 五 21:20]
+#+OPTIONS: ^:{}
+
+有时我们会需要重复执行一些由快捷键出发的Emacs函数. 这里有一种很简单的实现方式. 假设有一个简单的函数它的功能就是插入"here":
+
+#+BEGIN_SRC emacs-lisp
+  (defun insert-here ()
+    (interactive)
+    (insert "here"))
+#+END_SRC
+
+它的快捷键为 =C-c h h=:
+
+#+BEGIN_SRC emacs-lisp
+  (global-set-key (kbd "C-c h h") #'insert-here)
+#+END_SRC
+
+好了; 现在每当我们按下 =C-c h h= 就会在当前buffer插入"here"了. 但是我们经常会需要重复执行该命令.
+诚然,我们可以通过 =C-x z= 来重复执行上一条命令,但是这需要我们按两下键盘呢,而且也不是特别的方便.
+不过,我们可以这样做, 先创建一个[[https://www.gnu.org/software/emacs/manual/html_node/elisp/Creating-Keymaps.html#index-make_002dsparse_002dkeymap][sparse keymap]] 然后再这个keymap中设置 =h= 为该命令的快捷键.
+
+#+BEGIN_SRC emacs-lisp
+  (setq insert-here-keymap
+        (let ((map (make-sparse-keymap)))
+          (define-key map (kbd "h") #'insert-here)
+          map))
+#+END_SRC
+
+现在我们只需要在 =#'insert-here= 中设置该keymap就行了. 我们不能用 =#'use-local-map= 来设置,因为这样一来我们就无法再插入字母h了:我们总是会优先使用 =#'use-local-map= 中的键绑定. 相反,我们需要用 =#'set-transient-map= 来设置,它会临时使用局部keymap,但在按下一个快捷键后就失效了.
+
+#+BEGIN_SRC emacs-lisp
+  (defun insert-here ()
+    (interactive)
+    (insert "here")
+    (set-transient-map
+     insert-here-keymap))
+#+END_SRC
+
+现在运行 =#'insert-here= 后, 我们可以通过按下 =h= 来重复执行该函数. 但若按下了其他的快捷键, 则该keymap会被禁用. 然后再按下 =h= 就会插入字母h了. 
+这样我们只需要按下一个键就能重复执行该命令了,很简单吧.
