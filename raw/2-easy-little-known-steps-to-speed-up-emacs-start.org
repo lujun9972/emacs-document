@@ -1,0 +1,38 @@
+#+TITLE: 2-easy-little-known-steps-to-speed-up-emacs-start
+#+URL: https://www.reddit.com/r/emacs/comments/3kqt6e/2_easy_little_known_steps_to_speed_up_emacs_start/
+#+AUTHOR: lujun9972
+#+CATEGORY: raw
+#+DATE: [2016-10-10 一 10:40]
+#+OPTIONS: ^:{}
+
+
+1: Add (set gc-cons-threshold 100000000) to the beginning of your init file.
+
+gc-cons-threshold is the number of bytes of consing before a garbage collection is invoked. It's normally set
+at 800,000 bytes, but for me that invokes the GC 39 times!!! during startup (gcs-done), and the GC is sloooow.
+I've set it to ~100MB above, because I have 16 GB of RAM. And now no GC invocations during startup, and 600ms
+shaved off my startup time.
+
+2: Wrap your init file inside (let ((file-name-handler-alist nil)) <init file>)
+
+Normally file-name-handler-alist is set to
+
+(("\\`/[^/]*\\'" . tramp-completion-file-name-handler)
+("\\`/[^/|:][^/|]*:" . tramp-file-name-handler)
+("\\`/:" . file-name-non-special))
+
+Which means on every .el and .elc file loaded during start up, it has to runs those regexps against the
+filename.
+
+This shaved another 200ms off my startup time.
+
+3: Bonus step if you're willing to recompile Emacs
+
+Apply this [[https://gist.github.com/bsuh/e7cba8a61f482b8d8687][diff]]
+
+Emacs uses getc to get characters from a FILE handle, when loading .el (and maybe .elc) files. getc is
+thread-safe by using locking mechanisms. Well when you are calling getc a lot in a loop and you have a
+single-threaded process, it doesn't make sense to pay the overhead of locking for thread safety. I replaced
+getc with getc_unlocked, and was rewarded with another 200ms shaved init time.
+
+Overall, my startup time went from 1.5 seconds to 0.5 seconds! Happy emacs'ing :)
