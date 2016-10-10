@@ -1,0 +1,78 @@
+#+TITLE: More-emacs-configuration-tweaks
+#+URL: http://www.mostlymaths.net/2016/09/more-emacs-configuration-tweaks.html
+#+AUTHOR: lujun9972
+#+CATEGORY: raw
+#+DATE: [2016-10-10 一 11:18]
+#+OPTIONS: ^:{}
+
+
+At [[http://www.affectv.com/][Affectv]] we use a wide range of editors: Sublime, Atom, Emacs, Pycharm, IntelliJ... Actually only two people
+use the same editor! As such, from time to time I see things in other people's editors that I would like to
+have as well. So, yesterday I decided to improve on some configuration settings on Spacemacs.
+
+* Click for multiple-cursors
+
+I saw this on Jordi's Sublime, and it is much more comfortable than using more-like-this or similar helper
+functions, even if I need to use the trackpad to do so. After all, a multi-cursor edit (proper edit, not as a
+substitute for a macro) is rare enough that I can tolerate leaving the home row. Easy enough to configure
+thanks to [[https://twitter.com/emacsrocks/status/304223468793237505][Magnar Sveen]].
+#+BEGIN_SRC emacs-lisp
+  (global-unset-key (kbd "M-<down-mouse-1>"))
+  (global-set-key (kbd "M-<mouse-1>") 'mc/add-cursor-on-click)
+#+END_SRC
+
+[[https://1.bp.blogspot.com/-a69eC9niTvQ/V9Vz4Yo7FOI/AAAAAAAAEYc/pyqcsOMr-p4bd48uYVCintKKFc9vNF3fgCLcB/s1600/MC.gif]]
+
+* Minimap
+
+Also from Sublime, I had this on my old emacs setup. As simple as adding minimap to the list of additional
+packages and configuring its property group. See animation below.
+
+#+BEGIN_SRC emacs-lisp
+  'dotspacemacs-additional-packages '(helm-dash key-chord pig-mode mmm-mode minimap origami ansible)
+#+END_SRC
+
+* Folding
+
+I have always loved how clean vim's folding works, and how Sublime has this nice folding. Then I found
+origami-mode and my emacs-life was complete. I tweaked a little the folding functions so that minimap was
+updated on fold (for some reason it is not, I guess minimap is tied to the "modified" hook or similar). I
+bound z and Z (and A-z which maps to æ in Colemak) to the basic fold operations.
+
+#+BEGIN_SRC emacs-lisp
+  (eval-after-load 'origami
+    '(progn
+       (defun rb-show-only (buffer point)
+         (interactive (list (current-buffer) (point)))
+         (progn (origami-show-only-node buffer point)
+                (minimap-new-minimap)))
+
+       (defun rb-toggle-rec (buffer point)
+         (interactive (list (current-buffer) (point)))
+         (progn (origami-recursively-toggle-node buffer point)
+                (minimap-new-minimap)))
+
+       (define-key evil-normal-state-map "æ" 'rb-show-only)
+       (define-key evil-normal-state-map "Z" 'origami-toggle-node)
+       (define-key evil-visual-state-map "Z" 'origami-toggle-node)
+       (define-key evil-insert-state-map "C-Z" 'origami-toggle-node)
+       (define-key evil-normal-state-map "z" 'rb-toggle-rec)
+       (define-key evil-visual-state-map "z" 'rb-toggle-rec)
+       (define-key evil-insert-state-map "C-z" 'rb-toggle-rec)
+       )))
+#+END_SRC
+
+For some reason just advising the functions with after didn't work, this is not great but does work. I left
+the Z bindings as they are, since I have not used them yet, and will probably delete them if I keep not using
+them.
+
+[[https://1.bp.blogspot.com/-B472yAC46lM/V9V1ks3gD9I/AAAAAAAAEYk/YxmCx7l3R1UUuY2m8hh4AqiBR-EYrSwWgCLcB/s1600/F.gif]]
+
+* Execution overlays in Ensime (Scala)
+
+I saw this for [[https://github.com/clojure-emacs/cider][Cider]] in the emacs church meeting from August, and heard [[https://twitter.com/fommil][@fommil]] (I think it was him) mention
+that it was coming to ensime. And [[https://twitter.com/fommil/status/766736564705759232?ref_src=twsrc%255Etfw][indeed it was]]. And it's easy enough to use C-c C-v C-r (thing of it as
+extended command, eval, region to remember), given an open inferior Scala interpreter. Symbol prettify does
+not apply to overlays, so you need to customise the arrow used therein.
+
+[[https://3.bp.blogspot.com/-Cr11eWs8n4k/V9V3UKHk4iI/AAAAAAAAEYs/e6ipa0-TM685903ruUhexQBODr-PRJUeQCLcB/s1600/EN.gif]]
