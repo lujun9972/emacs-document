@@ -6,33 +6,31 @@
 #+OPTIONS: ^:{}
 
 
-1: Add (set gc-cons-threshold 100000000) to the beginning of your init file.
+* 1: 在初始化文件的头部添加(set gc-cons-threshold 100000000)
 
-gc-cons-threshold is the number of bytes of consing before a garbage collection is invoked. It's normally set
-at 800,000 bytes, but for me that invokes the GC 39 times!!! during startup (gcs-done), and the GC is sloooow.
-I've set it to ~100MB above, because I have 16 GB of RAM. And now no GC invocations during startup, and 600ms
-shaved off my startup time.
+=gc-cons-threshold= 指定了垃圾回收前允许有多少d额consing的字节. 这个值一般是800000字bytes, 但是这会使得我在Emacs启动期间调用多达39次的垃圾回收!!!,而垃圾回收的过程又巨慢无比.
+我有16G的内存,因此我把这个值设置成了大约100MB. 现在我的Emacs在启动期间根本不会发生垃圾回收过程,这使得我的启动时间加快了600毫秒.
 
-2: Wrap your init file inside (let ((file-name-handler-alist nil)) <init file>)
+* 2: 将你的配置文件嵌入(let ((file-name-handler-alist nil)) <init file>)中
 
-Normally file-name-handler-alist is set to
+=file-name-handler-alist= 的默认值为
 
-(("\\`/[^/]*\\'" . tramp-completion-file-name-handler)
-("\\`/[^/|:][^/|]*:" . tramp-file-name-handler)
-("\\`/:" . file-name-non-special))
+#+BEGIN_SRC emacs-lisp
+  (("\\`/[^/]*\\'" . tramp-completion-file-name-handler)
+   ("\\`/[^/|:][^/|]*:" . tramp-file-name-handler)
+   ("\\`/:" . file-name-non-special))
+#+END_SRC
 
-Which means on every .el and .elc file loaded during start up, it has to runs those regexps against the
-filename.
+也就是说在Emacs在启动过程中加载el和elc文件时都会将其文件名与这些正则表达式进行匹配.
 
-This shaved another 200ms off my startup time.
+这使得我的启动时间又快乐200毫秒.
 
-3: Bonus step if you're willing to recompile Emacs
+* 3: 如果你愿意重现编译Emacs的话,你还可以这样做
 
-Apply this [[https://gist.github.com/bsuh/e7cba8a61f482b8d8687][diff]]
+应用这个[[https://gist.github.com/bsuh/e7cba8a61f482b8d8687][diff]]
 
-Emacs uses getc to get characters from a FILE handle, when loading .el (and maybe .elc) files. getc is
-thread-safe by using locking mechanisms. Well when you are calling getc a lot in a loop and you have a
-single-threaded process, it doesn't make sense to pay the overhead of locking for thread safety. I replaced
-getc with getc_unlocked, and was rewarded with another 200ms shaved init time.
+Emacs在加载el文件(也许加载elc文件时也是这样)时使用的,会用 =getc= 函数从FILE中读取字符. 
+=getc= 由于使用了锁机制因而是线程安全的. 然而在单线程中循环调用 =getc= 就显得没有必要了.
+我将 =getc= 替换成 =getc_unlocked= 之后,启动速度又提升了200毫秒.
 
-Overall, my startup time went from 1.5 seconds to 0.5 seconds! Happy emacs'ing :)
+整体来说,我的启动速度从1.5秒缩短到了0.5秒! 真爽啊 :)
