@@ -1,8 +1,8 @@
-#+TITLE: Having-emacs-type-for-you
+#+TITLE: 让Emacs为你自动插入模板
 #+URL: http://howardism.org/Technical/Emacs/templates-tutorial.html
 #+AUTHOR: lujun9972
-#+CATEGORY: raw
-#+DATE: [2016-09-25 日 13:29]
+#+CATEGORY: emacs-common
+#+DATE: [2016-10-12 周三 21:07]
 #+OPTIONS: ^:{}
 
 我们经常要打字. 而对于文本文件来说,很多的输出只是为了组织内容而已. 比如org-mode中的星号,空格以及 =#+=, 比如编程代码中的那些括号, =do..end= 之类的.
@@ -196,21 +196,19 @@ YAS实际上使用 =yas-expand-snippet= 来完成扩展动作的, 这个函数�
 
 * Full Programmatic Inserts
 
-For me, a journal is a file in the ~/journal directory that has the simple file format of YYYYMMDD. We might
-be tempted to create a YAS snippet to automatically include a title, like:
+我的日记文件存放在 =~/journal= 目录中,而且日志文件的名字就是 =YYYYMMDD= 格式的时间. 我们可以会尝试创建一个类似这样的模板来自动插入标题:
 
 #+BEGIN_SRC org
   ,#+TITLE: Journal Entry for `(format-time-string "%e %B %Y")`
 #+END_SRC
 
-But that only works if I am really good and write in my journal each day. Perhaps I could create a snazzy
-title with the date based on the file name. Let’s define that format:
+不过这要求我能够每天都准时地写日记才行. 更好的方式应该是根据文件名来插入标题. 我们可以这样来定义日期格式:
 
 #+BEGIN_SRC emacs-lisp
   (setq org-journal-date-format "#+TITLE: Journal Entry- %e %B %Y")
 #+END_SRC
 
-And a function that will parse a buffer-file-name to the appropriate values for that format^[[http://howardism.org/Technical/Emacs/templates-tutorial.html#fn.1][1]]:
+然后定义一个函数来解析 =buffer-file-name= 并填充上面定义的日期格式:
 
 #+BEGIN_SRC emacs-lisp
   (defun journal-title ()
@@ -223,43 +221,37 @@ And a function that will parse a buffer-file-name to the appropriate values for 
       (format-time-string org-journal-date-format datim)))
 #+END_SRC
 
-Now, our template would be:
+现在,我们的模板可以改写成:
 
 #+BEGIN_SRC org
   ,#+TITLE: Journal Entry for `(journal-title)`
 #+END_SRC
 
-Nice, but let’s level up on this…
+太棒了, 不过我们还可以更近一步…
 
-While I’m quite intrigued with [[http://www.habitica.com/][Habitica]], and am looking forward to better [[https://github.com/abrochard/emacs-habitica][Emacs integration]], what I really
-like, is the idea of Dailies… tasks checked-off each day come back the next day.
+我非常热衷于[[http://www.habitica.com/][Habitica]], 我一直在尝试将它与[[https://github.com/abrochard/emacs-habitica][Emacs结合的更紧密些]], 我好喜欢它的日常任务这个设计,我每天完成它们,然后它们在第二天又出现了.
 
-I already have some good [[https://github.com/howardabrams/dot-files/blob/master/emacs-org.org#auto-note-capturing][task capturing]] code, but nothing that keeps coming back. Perhaps, I could have my
-daily journal entry track that.
+我已经有了一些好用的[[https://github.com/howardabrams/dot-files/blob/master/emacs-org.org#auto-note-capturing][获取任务]] 的代码, 但是它做不到每天重复这些任务. 也许,我可以试试用我的每日日记来追踪这些任务.
 
-This idea of inserted daily information and check-lists should only happen if I am creating today’s journal
-(not catching up with the past), and I might have special dailies inserted based on the day of the week.
+只有在我创建的是今天的日记时才需要插入这些日常任务. 而且每天的日常任务可能还不一样.
 
-I could use YAS snippets, but then the amount of `(...)` code may over-shadow the text, so I’ll create a small
-collection of templates:
+我可以直接在YAS模板中插入相关实现,但是这样一来 =`(...)`= 中的代码会掩盖掉普通的文本结果,因此还是将它分解成一些小的模板好了:
 
-+ journal-dailies.org to contain the real dailies
-+ journal-dailies-end.org to contain any follow-up notes
-+ journal-mon.org for additional text to be inserted on Monday journals
-+ journal-tue.org for additional text to be inserted on Monday journals
-+ And a journal-XYZ.org for each additional weekday
++ journal-dailies.org 包含的是实际的日常任务to contain the real dailies
++ journal-dailies-end.org 包含的是后面的笔记
++ journal-mon.org 包含的是周一日记的额外内容
++ journal-tue.org 包含的是周二日记的额外内容
++ 以此类推 a journal-XYZ.org 表示的周N的外内容
 
-With these files, editing my daily lists should be clear and straight-forward.
+有了这些文件,编辑我的日常任务列表就很直观了.
 
-Now, I just need to update my snippet-based template. Since I will need to create a fair amount of Emacs Lisp
-functions to support that, I might as well make the entire thing programmatic:
+现在我需要更改一下我的目标了. 既然我需要创建一系列的辅组EmacsLisp函数,那我不如创建一个整体的函数来生成内容好了.
 
 #+BEGIN_SRC emacs-lisp
   (define-auto-insert "/[0-9]\\{8\\}$" [journal-file-insert])
 #+END_SRC
 
-Now when I load up a file with a name that contains only 8 digits, it will run the function
-journal-file-insert:
+当我新建一个仅仅由8个数字组成的文件时,就会调用函数 =journal-file-insert=:
 
 #+BEGIN_SRC emacs-lisp
   (defun journal-file-insert ()
@@ -268,17 +260,15 @@ journal-file-insert:
     (insert (journal-title))
     (insert "\n\n") ; Start with a blank separating the title
 
-    ;; If the journal entry I'm creating matches today's date:
+    ;; 若创建的刚好是今天的日记
     (when (equal (file-name-base (buffer-file-name))
                  (format-time-string "%Y%m%d"))
 
-      ;; Note: The `insert-file-contents' leaves the cursor at the
-      ;; beginning, so the easiest approach is to insert these files
-      ;; in reverse order:
+      ;; Note: `insert-file-contents' 函数会保持光标的位置在插入内容的前面,因此我们这里需要按相反的顺序以此插入文件内容
       (insert-file-contents "journal-dailies-end.org")
       (insert "\n")
 
-      ;; Insert dailies that only happen once a week:
+      ;; 插入那些每周只会发生一次的任务
       (let ((weekday-template (downcase
                                (format-time-string "journal-%a.org"))))
 
@@ -289,63 +279,4 @@ journal-file-insert:
       (previous-line 2)))
 #+END_SRC
 
-That’s all I know about [[https://www.emacswiki.org/emacs/AutoInsertMode][Auto Insert]] and the [[https://github.com/capitaomorte/yasnippet][yasnippet project]]. Do you have any questions or tips I could use?
-
-* Footnotes:
-
-^[[http://howardism.org/Technical/Emacs/templates-tutorial.html#fnr.1][1]]
-
-I generally don’t like using functions like substring for manipulating strings since such functions generally
-lack precision. Since my jounal-title function will not be called without a (buffer-name) that matches an 8
-digit pattern, I felt like I could get away.
-
-However, a version that uses regular expressions could be:
-
-#+BEGIN_SRC emacs-lisp
-  (defun journal-title ()
-    "The journal heading based on the file's name."
-    (interactive)
-    (when (string-match "\\([[:digit:]]\\{4\\}\\)\\([[:digit:]]\\{2\\}\\)\\([[:digit:]]\\{2\\}\\)" (buffer-name))
-      (let* ((year  (string-to-number (match-string 1 (buffer-name))))
-             (month (string-to-number (match-string 2 (buffer-name))))
-             (day   (string-to-number (match-string 3 (buffer-name))))
-             (datim (encode-time 0 0 0 day month year)))
-
-        (format-time-string org-journal-date-format datim))))
-#+END_SRC
-
-Hopefully, that regular expression isn’t too scary. Emacs’s version of regular expressions look a tad worse
-due to all the escaping. Might be better if I used concat and broke into three parts:
-
-#+BEGIN_SRC emacs-lisp
-  (concat "\\([[:digit:]]\\{4\\}\\)"   ; year
-          "\\([[:digit:]]\\{2\\}\\)"   ; month
-          "\\([[:digit:]]\\{2\\}\\)")  ; day
-#+END_SRC
-
-  * \\( \\) creates a group that match-string let’s me extract a part
-  * [:digit:] refers to any number, and putting it in another pair of brackets is… well, just a Emacsism.
-  * \\{ \\} specifies a repeating value, so \\{4\\} says, look for the previous pattern 4 times… in other
-    words, 4 numbers.
-
-However, as Jason Milkins [[https://twitter.com/emacs_gifs/status/776566508503781376][pointed out]], using rx would make that function much more readable:
-
-#+BEGIN_SRC emacs-lisp
-  (require 'rx)
-
-  (defun journal-title ()
-    "The journal heading based on the file's name."
-    (interactive)
-    (when (string-match (rx (group (= 4 digit))
-                            (group (= 2 digit))
-                            (group (= 2 digit))) (buffer-name))
-      (let* ((year  (string-to-number (match-string 1 (buffer-name))))
-             (month (string-to-number (match-string 2 (buffer-name))))
-             (day   (string-to-number (match-string 3 (buffer-name))))
-             (datim (encode-time 0 0 0 day month year)))
-
-        (format-time-string org-journal-date-format datim))))
-#+END_SRC
-
-As you can tell, a hairy regular expression, using string-to-number on a series of match-string seemed
-overkill for a tutorial.
+我对[[https://www.emacswiki.org/emacs/AutoInsertMode][Auto Insert]] 与 [[https://github.com/capitaomorte/yasnippet][yasnippet project]] 的了解就这么多了. 你们有什么问题或者技巧可以分享的么?
