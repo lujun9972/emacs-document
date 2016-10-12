@@ -5,24 +5,21 @@
 #+DATE: [2016-09-25 日 13:29]
 #+OPTIONS: ^:{}
 
-We type too much. And with text files, much of the typing is just organizational support. Think of asterisks,
-spaces and #+ in org-mode, or all the parens, curly braces and do..end in your programming code.
+我们经常要打字. 而对于文本文件来说,很多的输出只是为了组织内容而已. 比如org-mode中的星号,空格以及 =#+=, 比如编程代码中的那些括号, =do..end= 之类的.
 
-Just because you want those characters in your files doesn’t mean you have to physically type them all.
+不过也没谁规定这些内容必须是由你手工输入的呀.
 
-The following are the major approaches to getting Emacs to do some of the heavy typing for you… like the
-boilerplate needed when creating a new file of a particular type, or large swatches of text (using templates).
+下面介绍几种让Emacs为你自动输入的几种方法… 比如我们可以在新建某类文件时自动插入一份样板文.
 
-Just to focus this tutorial, I’m not going to cover context completion, like auto-complete or company.
+注意,在本教材中,我不会将关于自动补全的内容,所以不会讲到 =auto-complete= 或 =company=.
 
 * Introduction to YAS
 
-The [[https://github.com/capitaomorte/yasnippet][yasnippet project]] lets you insert snippets of code. A snippet is a template that can have substitutions
-replaced either manually or programmatically. The choice of which template to choose and expand is based on
-the buffer’s mode.
+[[https://github.com/capitaomorte/yasnippet][yasnippet]] 可以让你快速插入代码片段. 所谓片段是指一份模板,你可以手工或用程序来替换模板中的某些内容. 
+至于会选择哪个模板来扩展则要看buffer的mode了.
 
-To begin, let’s try to configure YAS and insert static text. If you are using [[https://github.com/jwiegley/use-package][use-package]], let’s have it
-installed and set up a personal directory for our templates (I’ll use snippet and template interchangeably):
+刚开始的时候, 让我们先配置一下YAS让它插入一段固定的文本吧. 
+我这里假设你安装了[[https://github.com/jwiegley/use-package][use-package]], 让我们先安装yasnippet然后为我们的模板设置一个独立的目录(接下来我这里会混用片段和模板这两种说法):
 
 #+BEGIN_SRC emacs-lisp
   (use-package yasnippet
@@ -33,11 +30,10 @@ installed and set up a personal directory for our templates (I’ll use snippet 
     (add-to-list 'yas-snippet-dirs (locate-user-emacs-file "snippets")))
 #+END_SRC
 
-Let’s create a template by typing C-c & C-n … yeah, I never remember that either, so try: M-x yas-new-snippet
-(and with something like IDO, that can be just as fast).
+然后我们可以按下 =C-c C-n= 来创建一个模板了,如果记不住快捷键的话也没关系,输入 =M-x yas-new-snippet= 也行(而且如果你开启了类似IDO的插件,这个速度也不慢).
 
-You should now be presented with a new template buffer, and since it is using YAS, you can fill in the
-individual fields and use Tab to jump to the next field. Try making it look like:
+你应该会进入一个新的template buffer中了, 而且由于它还使用了YAS,你可以输入一个域的内容后,按下 =Tab= 键来跳转到下一个域的位置.
+假设你输入的内容是这样的:
 
 #+BEGIN_SRC snippet
   # -*- mode: snippet -*-
@@ -47,26 +43,20 @@ individual fields and use Tab to jump to the next field. Try making it look like
   Bling blargh-a bloo bloop!
 #+END_SRC
 
-Hit C-c C-c to install it. It will ask you what mode it should expect to expand it. At this point, hopefully
-you can just hit Return to accept the default.
+按下 =C-c C-c= 来应用该模板. Emacs会询问你这个模板需要在哪个mode下使用. 基本上你只需要直接按下回车就行了.
 
-Why yes, you normally will want to save it. Notice the default may be exactly where you’ll want to keep it
-too: ~/.emacs.d/snippets
+如果你想保存下来这个模板,推荐你保存到 =~/.emacs.d/snippets= 目录下,这也是默认的保存地址.
 
-Now, in a buffer of the same mode, type blah and hit Tab, and the text will be replaced with:
+现在,在相同mode的buffer中输入 =blah= 然后按下 =Tab=, =blah= 会被扩展为: =Bling blargh-a bloo bloop!=
 
-Bling blargh-a bloo bloop!
-
-YAS comes with multiple ways of triggering a template, but let’s next talk about ways to make the results of
-the template more useful.
+YAS还提供了多种触发模板的方法,不过下一步让我们修改模板让它变得更有用一些吧.
 
 * Interactive Snippets
 
-Replacing one word with several can be useful, but to make it truly helpful, we could have the result be more 
-context-aware. Let’s make it easy for us to manually change some of the template’s parts.
+将一个简短的内容扩充为一长段内容当然很有用,若能让模板扩展的结果能适应上下文环境那就更好了.
+首先我们让模板的某些内容变得容易修改起来.
 
-Open up a code file in some programming language mode, and create a new snippet. I’m going to create an ifelse
-snippet for JavaScript:
+在某个编程语言的mode下打开一份代码文件,然后新建一个模板. 比如我要为JavaScript创建一份ifelse的代码片段:
 
 #+BEGIN_SRC snippet
   # -*- mode: snippet -*-
@@ -80,21 +70,17 @@ snippet for JavaScript:
   }
 #+END_SRC
 
-Now, I can type ife and have an if.. else template expanded in my JavaScript mode, and the cursor begins
-between the parens (due to the $1 label), allowing me to type the condition. Hitting Tab jumps between the
-curly braces allowing me to type the results of a positive condition (due to the $0 label which specifies
-where the field editing should end).
+现在我在JavaScript mode下输入 =ife= 按下 =Tab= 就能扩展出一个 =if.. else= 模板了, 而且你会看到光标定位到了括号中间($1指定了光标位置), 我们可以直接输入条件了. 
+按下 =Tab= 后会跳转到大括号之间,这样我iu可以直接输入符合条件的执行语句了(因为$0标示了域编辑结束的地方)
 
-I’m not finished with YAS yet, but let me take a bit of a detour so that my next YAS example will be more
-meaningful.
+关于YAS,我还没讲完了,不过让我们先讲点其他的,这样我的下一个YAS例子才显得有意义.
 
 * New Files
 
-Remember when your company thought it was a great idea to put their copyright notice at the beginning of every
-file in the code base? While I’m not sure how much legal weight that carries, Emacs has long had an [[https://www.emacswiki.org/emacs/AutoInsertMode][Auto]]
-[[https://www.emacswiki.org/emacs/AutoInsertMode][Insert]] feature for populating a new file of a particular mode with boilerplate goodness.
+还记得公司突然要求在每个文件头部加上版权声明的那个时候吗? 我是不太清楚这样做有多大的法律效力啦,不过Emacs很早以前就自带了 [[https://www.emacswiki.org/emacs/AutoInsertMode][Auto Insert]] 功能了.
+它可以为某种特定mode的新文件设置一个样板文件.
 
-A use-package approach to setting it up to dump the contents of a static file into your new file is:
+下面配置使用 =use-package= 来为你的新文件配置样板文件:
 
 #+BEGIN_SRC emacs-lisp
   (use-package autoinsert
@@ -110,23 +96,20 @@ A use-package approach to setting it up to dump the contents of a static file in
     (define-auto-insert "\\.html?$" "default-html.html"))
 #+END_SRC
 
-Now, in this case, creating a file with an extension of .html will insert the contents of ~/.emacs.d/templates
-/default-html.html. A start, but hardly good enough for the power user.
+这样配置后,创建一个以 =.html= 为后缀的文件会插入 =~/.emacs.d/templates/default-html.html= 的内容. 
+这个功能很不错,不过对于资深用户还不太够用.
 
 * Combining YAS and Auto Insert
 
-We can use a snippet as the default contents for a new file, which would allow us to tidy up some of that
-inserted boilerplate.
+我们可以用一个模板作为新文件的默认内容, 这样我们还可以对插入的样板作一些修改.
 
-YAS’s work-horse for expanding snippets is yas-expand-snippet, which takes, as input, the contents of the
-snippet to insert. Shove this in your *scratch* buffer, and evaluate it (with C-x C-e):
+YAS实际上使用 =yas-expand-snippet= 来完成扩展动作的, 这个函数接受一个参数,那就是要插入模板的内容. 你可以将下面代码放入 =*scratch*= buffer中,然后执行这条语句试试(用C-x C-e)来执行:
 
 #+BEGIN_SRC emacs-lisp
-  (yas-expand-snippet ";; Bah-da $1 Bing")
+(yas-expand-snippet ";; Bah-da $1 Bing")  
 #+END_SRC
 
-You can probably see where I’m going here, eh? Let’s create a helper function that takes the static text that
-auto-insert puts into a new file, but treat it as if it were a snippet:
+你大概能够猜到我下一步要干嘛了对吧? 让我们来创建一个辅组函数,这个辅组函数将auto-insert自动插入新文件的内容作为模板来进行扩展.
 
 #+BEGIN_SRC emacs-lisp
   (defun autoinsert-yas-expand()
@@ -134,23 +117,19 @@ auto-insert puts into a new file, but treat it as if it were a snippet:
     (yas-expand-snippet (buffer-string) (point-min) (point-max)))
 #+END_SRC
 
-Here, the (buffer-string) is the contents of the buffer, and yas-expand-snippet takes two more parameters to
-specify the contents in the current buffer to replace with the results… for us, this will be the entire
-buffer: (point-min) and (point-max).
+上面 =(buffer-string)= 会返回buffer的整个内容, 而yas-expand-snippet接受的额外两个参数指明了用结果替代当前buffer的哪些内容. 在上例中的 =(point-min)= 和 =(point-max)= 表示替换整个buffer的内容.
 
-The define-auto-insert function can take a vector, which it either includes (if it is a string) or executes
-(if it is a function name), so:
+=define-auto-insert= 函数能够接受一个数组为参数,数组中的元素若为字符串,则表示引入相应文件的内容,若元素为一个函数名称,则表示执行该函数:.
 
 #+BEGIN_SRC emacs-lisp
   (define-auto-insert "\\.el$" [ "defaults-elisp.el" autoinsert-yas-expand ])
 #+END_SRC
 
-Will take new files ending in .el, insert the defaults-elisp.el file into it, and then execute our
-autoinsert-yas-expand function which will replace that template as if it were a YAS snippet.
+上面的设置表示,当新建一个以 =.el= 为后缀的文件时,先插入 =defaults-elisp.el= 文件中的内容,然后执行函数 =autoinsert-yas-expand=,这个函数会扩展该模板并替代原模板的内容.
 
-This allows you punctuate it with $1 and $2 and other field placeholders.
+你甚至还可以在模板中添加 =$1= , =$2= 这样的域占位符.
 
-I wrap up my templates with use-package, like:
+我是用use-package来封装这些模板的,像这样:
 
 #+BEGIN_SRC emacs-lisp
   (use-package autoinsert
@@ -163,10 +142,9 @@ I wrap up my templates with use-package, like:
 
 * Programmatic Snippets
 
-Entering the field details by hand is pretty good, but what if a snippet could programmatically enter some of
-the information?
+手工输入域的内容当然可以,不过若是能用程序自动输入某些信息不是更好吗?
 
-For instance, we traditionally start our Emacs Lisp files like:
+比如, 一般来说,我们的Emacs Lisp文件头部都是这样的:
 
 #+BEGIN_SRC emacs-lisp
   ;;; demo-it --- Utility functions for creating demonstrations
@@ -182,21 +160,21 @@ For instance, we traditionally start our Emacs Lisp files like:
   ;; ...
 #+END_SRC
 
-Where the first line contains the file’s name and a description. YAS will execute code within back-ticks as
-Emacs Lisp, so:
+这里第一行包含了文件的名称及其描述. YAS会将反引号中的代码作为Emacs Lisp来执行,因此执行:
 
 #+BEGIN_SRC emacs-lisp
-  (yas-expand-snippet "`(buffer-file-name)`")
+(yas-expand-snippet "`(buffer-file-name)`")  
 #+END_SRC
 
-Will insert the complete file name of the buffer, and:
+会插入buffer所示文件名的完整路径, 而执行:
 
 #+BEGIN_SRC emacs-lisp
-  (yas-expand-snippet "`user-full-name`")
+(yas-expand-snippet "`user-full-name`")  
 #+END_SRC
 
-Will insert the contents of the variable, user-file-name (which should be your nom de plume). Our Emacs Lisp
-template could be this snippet:
+会插入变量 =user-file-name= 的值. 
+
+我们的Emacs Lisp模板可以设置成这样:
 
 #+BEGIN_SRC emacs-lisp
   ;;; `(upcase (file-name-nondirectory (file-name-sans-extension (buffer-file-name))))` --- $1
