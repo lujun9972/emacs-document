@@ -1,0 +1,54 @@
+#+TITLE: 如何自定义org-mode链接(你可以通过org-mode链接做任何事情)
+#+URL: http://endlessparentheses.com/use-org-mode-links-for-absolutely-anything.html
+#+AUTHOR: lujun9972
+#+CATEGORY: org-mode
+#+DATE: [2016-10-14 五 07:37]
+#+OPTIONS: ^:{}
+
+[[http://orgmode.org/][org-mode]] 有一个鲜为人知的功能,那就是你可以用[[http://doc.endlessparentheses.com/Fun/org-add-link-type][org-add-link-type]] 来自定义新的链接类型. 你可以用它来做很多事, 比如, 可以创建一种链接,点击这种链接就会在整个代码库中搜索指定的正则表达式.
+
+#+BEGIN_SRC emacs-lisp
+  (org-add-link-type
+   "grep" 'endless/follow-grep-link)
+
+  (defun endless/follow-grep-link (regexp)
+    "Run `rgrep' with REGEXP as argument."
+    (grep-compute-defaults)
+    (rgrep regexp "*" (expand-file-name "./")))
+#+END_SRC
+
+这样, 当你在org-mode下点击类似下面的链接时,你会看到一个搜索结果的列表.
+
+#+BEGIN_SRC org
+  ,** TODO Refactor [[grep:OldClassName][OldClassName]] into NewClassName 
+#+END_SRC
+
+* LINK header arguments
+
+正如 [[http://www.reddit.com/r/emacs/comments/2d6hjs/use_orgmode_links_for_absolutely_anything/cjmyxfm][/u/blue1_ 中所指出的]], 若你新创建的链接仅仅是对URL做一些替换操作,那你还可以用 =#+LINK headers= 来实现.
+
+#+BEGIN_SRC org
+  ,#+LINK: isbn http://www.amazon.com/dp/%s
+#+END_SRC
+
+* Tag Searches
+
+让我们来看看另一个使用场景, 下面代码定义了一种链接,它会搜索你的标题来查找特定的tags.
+
+#+BEGIN_SRC org
+  (org-add-link-type
+   "tag" 'endless/follow-tag-link)
+
+  (defun endless/follow-tag-link (tag)
+    "Display a list of TODO headlines with tag TAG.
+  With prefix argument, also display headlines without a TODO keyword."
+    (org-tags-view (null current-prefix-arg) tag))
+#+END_SRC
+
+然后你可以这一条这样的链接了
+
+#+BEGIN_SRC org
+  [[tag:work+phonenumber-boss][Optional Description]]
+#+END_SRC
+
+其中搜索的语法可以参见 [[http://orgmode.org/manual/Matching-tags-and-properties.html#Match-syntax][这里]], 与[[http://doc.endlessparentheses.com/Fun/org-tags-view][ org-tags-view]] 命令中的用法一样.
