@@ -1,0 +1,93 @@
+#+TITLE: el-search:为emacs-lisp-mode提供基于表达式的增量搜索
+#+URL: http://elpa.gnu.org/packages/el-search.html
+#+AUTHOR: lujun9972
+#+CATEGORY: elisp-common
+#+DATE: [2016-09-07 周三 12:56]
+#+OPTIONS: ^:{}
+
+* Introduction
+
+最常用的命令是 =el-search-pattern=. 该命令提示你输入一个 =pcase= 模式然后通过反复"读取"当前buffer内容的方式搜索匹配的表达式.
+若找到了匹配的表达式,则会将光标放在匹配表达式的开头部分(与isearch不同,isearch会将光标放在匹配结果的末尾).
+
+为什么 =el-search-pattern= 要基于 =pcase= 呢? 因为模式匹配(以及这种整合destructuring 与 condition testing的能力)很适合于完成这项任务.
+而且pcase允许添加专门的模式类型,还能以一种自然而透明的方式将这些模式类型整合起来.
+
+=el-search-pattern= 并不关心代码的组织格式. 它在搜索时会自动忽略代码中的注释,并将字符串当作原子对象来处理而不会去搜索它的具体内容.
+
+案例1: 假设你在提示符中输入 =97=, 它会在代码中搜索所有出现数字97的地方,但是不会搜索出 =977= 或 =(+ 90 7)= 或 "My string containing 97" 这些内容.
+相对的,它所搜索的是所有read后 `eq` 97的内容,例如 =#x61= 或 =?a=.
+
+案例2: 如果你输入模式 =`(defvar ,_)=, 你会搜索出所有没有指定初始值的 =defvar= 语句.
+
+下面的模式会搜索出所有docstring的第一行超过70字符的 =defvar= 语句.
+
+#+BEGIN_SRC emacs-lisp
+  `(defvar ,_ ,_
+     ,(and s (guard (< 70 (length (car (split-string s "\n")))))))
+#+END_SRC
+
+在搜索过程中,会看到光标不断的跳跃到正在被测试的表达式前.
+
+* Convenience
+
+在输入要匹配的模式时,minibuffer会进入emacs-lisp-mode.
+
+任何输入的模式都会被转换成(and exp PATTERN)这种格式,因此你可以在模式中用变量 =exp= 来指代当前测试的表达式.
+
+案例3:
+
+假设你想在buffer中搜索在 =cl-lib= 中定义的符号,你可以这些些匹配模式:
+
+#+BEGIN_SRC emacs-lisp
+  (guard (and (symbolp exp)
+              (when-let ((file (symbol-file exp)))
+                        (string-match-p "cl-lib\\.elc?$" file))))
+#+END_SRC
+
+,----------------------------------------------------------------------
+| Q: "But I hate `pcase'!  Can't we just do without?"                 |
+|                                                                     |
+| A: Respect that you kept up until here! Just use (guard CODE), where|
+| CODE is any normal Elisp expression that returns non-nil when and   |
+| only when you have a match.  Use the variable `exp' to refer to     |
+| the currently tested expression.  Just like in the last example!    |
+`----------------------------------------------------------------------
+
+要一遍又一遍地在minibuffer中输入相同的复杂模式是一件很烦人的事情. 幸运的是,你可以用 =el-search-defpattern= 来为el-search定义自己的pcase模式类型.
+它的语法与 =pcase-defmacro= 一样,但是只会对本package起作用. 可以用 =C-h f el-search-pattern= 来查看预定义的附加的模式列表.
+
+"el-search-x.el"中定义了其他更多的模式.
+
+* Replacing
+
+你可以用命令 =el-search-query-replace= 来替换表达式. 你会被要求输入一个pcase模式,以及一个替换表达式. 每次找到一个匹配模式的表达式,就会在pcase匹配环境下执行替换表达式,并将原表达式替换成其返回值.
+
+举个例子: 若你想交换所有foo函数中头两个参数的位置, 例如将 =(foo 'a (* 2 (+ 3 4)) t)= 替换成 =(foo (* 2 (+ 3 4)) 'a t)=, 你可以这样做:
+
+#+BEGIN_EXAMPLE
+  M-x el-search-query-replace RET
+  `(foo ,a ,b . ,rest) RET
+  `(foo ,b ,a . ,rest) RET
+#+END_EXAMPLE
+
+按下 =y= 会替换匹配值然后跳到下一个匹配的地方, =r= 则表示只替换匹配值而不会移动光标位置, =SPC= 会跳到下一个匹配位置不替换, =!= 会自动替换剩下的所有匹配值. =q= 表示退出替换过长. =n= 的效果与 =SPC= 是一样的.
+如果你熟悉isearch的话,就会发现 =y= 和 =n= 的用法与isearch是一样的,分别表示"yes"和"no".
+
+通过启用 =splicing mode= 还可以将一个匹配的表达式替换为多个表达式. 当启用了 =splicing mode= 之后,替换表达式的计算结果必须是一个list,然后这个list的内容(而不是这个list本身)会被用于替代匹配的表达式.
+在 =el-search-query-replace= 的session中按下 =s= 可以切换 =splicing mode=.
+
+* Suggested key bindings
+
+#+BEGIN_SRC emacs-lisp
+  (define-key emacs-lisp-mode-map [(control ?S)] #'el-search-pattern)
+  (define-key emacs-lisp-mode-map [(control ?%)] #'el-search-query-replace)
+
+  (define-key isearch-mode-map [(control ?S)] #'el-search-search-from-isearch)
+  (define-key isearch-mode-map [(control ?%)] #'el-search-replace-from-isearch)
+
+  (define-key el-search-read-expression-map [(control ?S)] #'exit-minibuffer)
+#+END_SRC
+
+=isearch-mode-map= 中的快捷键设置让你可以很容易的从isearch切换到el-search. 
+=el-search-read-expression-map= 中的快捷键设置则允许你通过按两次 =C-S= 重复上一次的模式搜索.
