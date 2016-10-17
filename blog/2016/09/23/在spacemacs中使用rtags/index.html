@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>在spacemacs中使用rtags - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <style>
+   #ds-thread #ds-reset .ds-comment-body p {color: #ffffff;}
+   #ds-thread #ds-reset .ds-comment-body p a {color: #ff0;}
+   #ds-thread #ds-reset .ds-comment-body p a:hover {color: #0ff;}
+   #disqus_thread a {color: #00ffff;}
+  </style>
+  <link rel="stylesheet" href="http://lujun9972.github.io/emacs-document/media/css/main.css" type="text/css"/>
+  <link rel="stylesheet" href="http://lujun9972.github.io/emacs-document/media/css/comment.css" type="text/css"/>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="http://lujun9972.github.io/emacs-document/">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;集思广益</p>
+    <nav class="site-nav">
+      <div class="menu-icon">
+        <svg viewBox="0 0 18 15">
+          <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.031C17.335,0,18,0.665,18,1.484L18,1.484z" fill="#ffff00"/>
+          <path d="M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0c0-0.82,0.665-1.484,1.484-1.484 h15.031C17.335,6.031,18,6.696,18,7.516L18,7.516z" fill="#ffff00"/>
+          <path d="M18,13.516C18,14.335,17.335,15,16.516,15H1.484C0.665,15,0,14.335,0,13.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.031C17.335,12.031,18,12.696,18,13.516L18,13.516z" fill="#ffff00"/>
+        </svg>
+      </div>
+      <ul class="trigger">
+        <li><a href="http://lujun9972.github.io/emacs-document/years/">Years</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/authors/">Authors</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/tags/">Tags</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document">Github</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="http://www.google.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">在spacemacs中使用rtags</h1>
+<div id="table-of-contents">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#orgheadline1">1. Dependencies</a></li>
+<li><a href="#orgheadline5">2. Configure a service in systemd</a>
+<ul>
+<li><a href="#orgheadline2">2.1. 为你的用户创建systemd配置目录</a></li>
+<li><a href="#orgheadline3">2.2. 创建RTags daemon socket service配置文件</a></li>
+<li><a href="#orgheadline4">2.3. 创建 the RTags daemon service配置文件</a></li>
+</ul>
+</li>
+<li><a href="#orgheadline6">3. Build an RTags database for your project</a></li>
+<li><a href="#orgheadline8">4. Enable RTags in spacemacs</a>
+<ul>
+<li><a href="#orgheadline7">4.1. 在spacemacs中启用mineo-rtags layer</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+<p>
+这是一篇教你怎么在linux上安装<a href="https://github.com/Andersbakken/rtags">RTags</a>, 然后将之用到<a href="http://spacemacs.org/">spacemacs</a> 上的说明.
+</p>
+
+<p>
+我用的发行版是Ubuntu16.04,不过该过程应该基本适用于所有的发行版.
+</p>
+
+<p>
+我们要做的事情包括安装RTags的依赖,构建并安装RTags,为项目创建RTags标签数据库,最后在spacemacs中启用rtags layer.
+</p>
+
+<div id="outline-container-orgheadline1" class="outline-2">
+<h2 id="orgheadline1"><span class="section-number-2">1</span> Dependencies</h2>
+<div class="outline-text-2" id="text-1">
+<p>
+根据Readme中<a href="https://github.com/Andersbakken/rtags#installing-rtags">Installing rtags</a>的内容, 我们需要如下依赖(带星号的表示可选的):
+</p>
+
+<ul class="org-ul">
+<li>clang-3.3 or higher</li>
+<li>cmake-2.8 or higher</li>
+<li>pkg-config*</li>
+<li>bash-completion*</li>
+<li>lua*</li>
+</ul>
+
+<p>
+我用的是Ubuntu 16.04, 直接使用Ubuntu包管理器中的默认版本就行了.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">sudo apt install -y clang libclang-dev cmake pkg-config bash-completion lua5.3
+</pre>
+</div>
+
+<p>
+下载, 构建, 然后安装RTags
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #4f97d7;">cd</span> /tmp
+git clone --recursive git@github.com:Andersbakken/rtags.git
+<span style="color: #4f97d7;">cd</span> rtags
+mkdir build &amp;&amp; <span style="color: #4f97d7;">cd</span> build
+cmake ..
+make -j8
+sudo make install
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgheadline5" class="outline-2">
+<h2 id="orgheadline5"><span class="section-number-2">2</span> Configure a service in systemd</h2>
+<div class="outline-text-2" id="text-2">
+</div><div id="outline-container-orgheadline2" class="outline-3">
+<h3 id="orgheadline2"><span class="section-number-3">2.1</span> 为你的用户创建systemd配置目录</h3>
+<div class="outline-text-3" id="text-2-1">
+<div class="org-src-container">
+
+<pre class="src src-sh">mkdir -p ~/.config/systemd/user
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgheadline3" class="outline-3">
+<h3 id="orgheadline3"><span class="section-number-3">2.2</span> 创建RTags daemon socket service配置文件</h3>
+<div class="outline-text-3" id="text-2-2">
+<p>
+Add the following to <code>~/.config/systemd/user/rdm.socket</code>:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-conf">[<span style="color: #ce537a; font-weight: bold;">Unit</span>]
+<span style="color: #7590db;">Description</span>=RTags daemon socket
+
+[<span style="color: #ce537a; font-weight: bold;">Socket</span>]
+<span style="color: #7590db;">ListenStream</span>=%h/.rdm
+
+[<span style="color: #ce537a; font-weight: bold;">Install</span>]
+<span style="color: #7590db;">WantedBy</span>=multi-user.target
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgheadline4" class="outline-3">
+<h3 id="orgheadline4"><span class="section-number-3">2.3</span> 创建 the RTags daemon service配置文件</h3>
+<div class="outline-text-3" id="text-2-3">
+<p>
+Add the following to <code>~/.config/systemd/user/rdm.service</code>:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-conf">[<span style="color: #ce537a; font-weight: bold;">Unit</span>]
+<span style="color: #7590db;">Description</span>=RTags daemon
+
+<span style="color: #7590db;">Requires</span>=rdm.socketp
+
+[<span style="color: #ce537a; font-weight: bold;">Service</span>]
+<span style="color: #7590db;">Type</span>=simple
+<span style="color: #7590db;">ExecStart</span>=/usr/local/bin/rdm --log-file=%h/.rtags/rdm.log --data-dir=%h/.rtags/rtags-cache --verbose --inactivity-timeout 300
+</pre>
+</div>
+
+<p>
+启用socket service
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">systemctl --user enable rdm.socket
+systemctl --user start rdm.socket
+</pre>
+</div>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgheadline6" class="outline-2">
+<h2 id="orgheadline6"><span class="section-number-2">3</span> Build an RTags database for your project</h2>
+<div class="outline-text-2" id="text-3">
+<p>
+RTags使用的是clang来解析代码, 它需要知道项目使用的编译器flags.
+</p>
+
+<p>
+<a href="https://github.com/Andersbakken/rtags#setup">有多种途径能</a> 告诉RTags你使用的flags是什么.
+</p>
+
+<p>
+我的项目用的时cmake,所以我可以生成一个 <code>compile_commands.json</code> 文件,这样RTags会从中获取信息.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #4f97d7;">cd</span> ~/src/project
+mkdir build &amp;&amp; <span style="color: #4f97d7;">cd</span> build
+cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=<span style="color: #a45bad;">1</span> ..
+</pre>
+</div>
+
+<p>
+现在可以用RTags来为代码生成索引了
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">rc -J ./compile_commands.json
+</pre>
+</div>
+
+<p>
+这得花点儿时间, 我们可以通过查看日志文件的方式来了解进度,日志文件的地址可以在 <code>~/.config/systemd/user/rdm.service</code> 中配置.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">tail -f ~/.rtags/rdm.log
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgheadline8" class="outline-2">
+<h2 id="orgheadline8"><span class="section-number-2">4</span> Enable RTags in spacemacs</h2>
+<div class="outline-text-2" id="text-4">
+<p>
+现在开始让emacs支持RTags,然后分配一些快捷键.
+</p>
+
+<p>
+这里用到的layer是<a href="https://github.com/mineo/dotfiles/tree/master/spacemacs/.emacs.d/private/layers/mineo-rtags">mineo-rtags</a>
+</p>
+
+<p>
+我将这两个文件下载到我的spacemacs配置目录中
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">mkdir ~/.spacemacs.d/mineo-rtags &amp;&amp; <span style="color: #4f97d7;">cd</span> ~/.spacemacs.d/mineo-rtags
+wget https://raw.githubusercontent.com/mineo/dotfiles/master/spacemacs/.emacs.d/private/layers/mineo-rtags/packages.el
+wget https://raw.githubusercontent.com/mineo/dotfiles/master/spacemacs/.emacs.d/private/layers/mineo-rtags/keybindings.el
+</pre>
+</div>
+
+<p>
+为了以防万一,我这里也把两个文件的内容列出来:
+</p>
+
+<p>
+packages.el:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">defconst</span> <span style="color: #7590db;">mineo-rtags-packages</span>
+  '<span style="color: #bc6ec5;">(</span>cmake-ide
+    rtags<span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+
+<span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">defun</span> <span style="color: #bc6ec5; font-weight: bold;">mineo-rtags/init-cmake-ide</span> <span style="color: #bc6ec5;">()</span>
+  <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">use-package</span> <span style="color: #a45bad;">cmake-ide</span>
+    <span style="color: #4f97d7;">:config</span>
+    <span style="color: #2d9574;">(</span>cmake-ide-setup<span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+
+<span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">defun</span> <span style="color: #bc6ec5; font-weight: bold;">mineo-rtags/init-rtags</span> <span style="color: #bc6ec5;">()</span>
+  <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">use-package</span> <span style="color: #a45bad;">rtags</span>
+    <span style="color: #4f97d7;">:config</span>
+    <span style="color: #2d9574;">(</span><span style="color: #4f97d7; font-weight: bold;">setq</span> rtags-autostart-diagnostics t
+          rtags-completions-enabled t
+          rtags-use-helm t<span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span><span style="color: #4f97d7; font-weight: bold;">push</span> '<span style="color: #67b11d;">(</span>company-rtags<span style="color: #67b11d;">)</span>
+          company-backends-c-mode-common<span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span>rtags-enable-standard-keybindings<span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span>add-hook 'c-mode-common-hook 'rtags-start-process-unless-running<span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">use-package</span> <span style="color: #a45bad;">flycheck-rtags</span>
+    <span style="color: #4f97d7;">:ensure</span> rtags<span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+keybindings.el:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">defconst</span> <span style="color: #7590db;">mineo-rtags-overrides</span>
+  '<span style="color: #bc6ec5;">(</span><span style="color: #2d9574;">(</span><span style="color: #2d9574;">"C-]"</span> 'rtags-find-symbol-at-point<span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span><span style="color: #2d9574;">"M-."</span> 'rtags-find-symbol-at-point<span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+
+<span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">defun</span> <span style="color: #bc6ec5; font-weight: bold;">mineo-rtags-set-evil-keys</span> <span style="color: #bc6ec5;">()</span>
+  <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">dolist</span> <span style="color: #2d9574;">(</span>override mineo-rtags-overrides<span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span>evil-local-set-key 'normal <span style="color: #67b11d;">(</span>car override<span style="color: #67b11d;">)</span> <span style="color: #67b11d;">(</span>cdr override<span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+
+<span style="color: #4f97d7;">(</span>add-hook 'c-mode-common-hook 'mineo-rtags-set-evil-keys<span style="color: #4f97d7;">)</span>
+
+<span style="color: #2aa1ae; background-color: #292e34;">;;; </span><span style="color: #2aa1ae; background-color: #292e34;">https://github.com/mheathr/spacemacs/blob/develop/contrib/!lang/c-c%2B%2B/packages.el</span>
+
+<span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">dolist</span> <span style="color: #bc6ec5;">(</span>mode '<span style="color: #2d9574;">(</span>c-mode c++-mode<span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span>evil-leader/set-key-for-mode mode
+    <span style="color: #2d9574;">"g ."</span> 'rtags-find-symbol-at-point
+    <span style="color: #2d9574;">"g ,"</span> 'rtags-find-references-at-point
+    <span style="color: #2d9574;">"g v"</span> 'rtags-find-virtuals-at-point
+    <span style="color: #2d9574;">"g V"</span> 'rtags-print-enum-value-at-point
+    <span style="color: #2d9574;">"g /"</span> 'rtags-find-all-references-at-point
+    <span style="color: #2d9574;">"g Y"</span> 'rtags-cycle-overlays-on-screen
+    <span style="color: #2d9574;">"g &gt;"</span> 'rtags-find-symbol
+    <span style="color: #2d9574;">"g &lt;"</span> 'rtags-find-references
+    <span style="color: #2d9574;">"g ["</span> 'rtags-location-stack-back
+    <span style="color: #2d9574;">"g ]"</span> 'rtags-location-stack-forward
+    <span style="color: #2d9574;">"g D"</span> 'rtags-diagnostics
+    <span style="color: #2d9574;">"g G"</span> 'rtags-guess-function-at-point
+    <span style="color: #2d9574;">"g p"</span> 'rtags-set-current-project
+    <span style="color: #2d9574;">"g P"</span> 'rtags-print-dependencies
+    <span style="color: #2d9574;">"g e"</span> 'rtags-reparse-file
+    <span style="color: #2d9574;">"g E"</span> 'rtags-preprocess-file
+    <span style="color: #2d9574;">"g R"</span> 'rtags-rename-symbol
+    <span style="color: #2d9574;">"g M"</span> 'rtags-symbol-info
+    <span style="color: #2d9574;">"g S"</span> 'rtags-display-summary
+    <span style="color: #2d9574;">"g O"</span> 'rtags-goto-offset
+    <span style="color: #2d9574;">"g ;"</span> 'rtags-find-file
+    <span style="color: #2d9574;">"g F"</span> 'rtags-fixit
+    <span style="color: #2d9574;">"g L"</span> 'rtags-copy-and-print-current-location
+    <span style="color: #2d9574;">"g X"</span> 'rtags-fix-fixit-at-point
+    <span style="color: #2d9574;">"g B"</span> 'rtags-show-rtags-buffer
+    <span style="color: #2d9574;">"g I"</span> 'rtags-imenu
+    <span style="color: #2d9574;">"g T"</span> 'rtags-taglist
+    <span style="color: #2d9574;">"g h"</span> 'rtags-print-class-hierarchy
+    <span style="color: #2d9574;">"g a"</span> 'rtags-print-source-arguments<span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+
+<span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">provide</span> '<span style="color: #a45bad;">keybindings</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+</div>
+
+<div id="outline-container-orgheadline7" class="outline-3">
+<h3 id="orgheadline7"><span class="section-number-3">4.1</span> 在spacemacs中启用mineo-rtags layer</h3>
+<div class="outline-text-3" id="text-4-1">
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp">dotspacemacs-configuration-layers
+'<span style="color: #4f97d7;">(</span>
+  <span style="color: #bc6ec5;">(</span>c-c++
+   <span style="color: #4f97d7;">:variables</span>
+   c-c++-enable-clang-support t
+   <span style="color: #bc6ec5;">)</span>
+  syntax-checking
+  mineo-rtags
+  <span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+重启spacemacs,它会自动安装rtags这个package及其依赖.
+</p>
+
+<p>
+所有的快捷键都以 ", g" 开头的
+</p>
+
+<p>
+写于2016年8月26日
+</p>
+</div>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2016-09-23</span>
+            <span title="last modification date" class="post-info">2016-09-23</span>
+            <span title="tags" class="post-info">:N/A:</span>
+            <span title="author" class="post-info"><a href="mailto:lujun9972 &lt;at&gt; lujun9972-F41">lujun9972</a></span>
+        </div>
+    <script src="http://lujun9972.github.io/emacs-document/media/js/jquery-2.1.3.min.js"></script>
+        <section>
+            <h1>Comments</h1>
+            <div id="comment-wrap">
+                    <a class="disqus_label">使用 Disqus 评论</a>
+                    <a class="ds-label">使用多说评论</a>
+    </ul>
+        <div id="disqus_thread"></div>
+        <script type="text/javascript">
+         //var disqus_developer = 1;
+         var preempt_signal=false;
+         var disqus_identifier = "/blog/2016/09/23/在spacemacs中使用rtags/";
+         var disqus_url = "http://lujun9972.github.io/emacs-document/blog/2016/09/23/在spacemacs中使用rtags/";
+         var disqus_shortname = 'emacs-document';
+         /* * * DON'T EDIT BELOW THIS LINE * * */
+         (function() {
+             var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+             dsq.src = 'http://' + disqus_shortname + '.disqus.com/embed.js';
+             (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+             $('#disqus_thread').css('display','none');
+         })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+        <div class="ds-thread"></div>
+        <script type="text/javascript">
+         var duoshuoQuery = {short_name:'emacs-document'};
+         (function() {
+             var ds = document.createElement('script');
+             ds.type = 'text/javascript';ds.async = true;
+             ds.src = 'http://static.duoshuo.com/embed.js';
+             ds.charset = 'UTF-8';
+             (document.getElementsByTagName('head')[0]
+           || document.getElementsByTagName('body')[0]).appendChild(ds);
+             $('.ds-thread').css('display','block');
+         })();
+        </script>
+    <script>
+     /* comments */
+     var ego_disqus_thread=$('#disqus_thread');
+     var ego_ds_label=$('.ds-thread');
+     $('.disqus_label').click(function(){
+         ego_disqus_thread.show();
+         ego_ds_label.hide();
+     });
+     $('.ds-label').click(function(){
+         ego_disqus_thread.hide();
+         ego_ds_label.show();
+     });
+    </script>
+        </section>
+    <script src="http://lujun9972.github.io/emacs-document/media/js/main.js"></script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 25.x(<a href="http://orgmode.org">Org mode</a> 8.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:lujun9972 &lt;at&gt; lujun9972-F41">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div></body>
+</html>

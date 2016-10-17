@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>让Emacs为你自动插入内容(Emacs模板使用指南) - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <style>
+   #ds-thread #ds-reset .ds-comment-body p {color: #ffffff;}
+   #ds-thread #ds-reset .ds-comment-body p a {color: #ff0;}
+   #ds-thread #ds-reset .ds-comment-body p a:hover {color: #0ff;}
+   #disqus_thread a {color: #00ffff;}
+  </style>
+  <link rel="stylesheet" href="http://lujun9972.github.io/emacs-document/media/css/main.css" type="text/css"/>
+  <link rel="stylesheet" href="http://lujun9972.github.io/emacs-document/media/css/comment.css" type="text/css"/>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="http://lujun9972.github.io/emacs-document/">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;集思广益</p>
+    <nav class="site-nav">
+      <div class="menu-icon">
+        <svg viewBox="0 0 18 15">
+          <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.031C17.335,0,18,0.665,18,1.484L18,1.484z" fill="#ffff00"/>
+          <path d="M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0c0-0.82,0.665-1.484,1.484-1.484 h15.031C17.335,6.031,18,6.696,18,7.516L18,7.516z" fill="#ffff00"/>
+          <path d="M18,13.516C18,14.335,17.335,15,16.516,15H1.484C0.665,15,0,14.335,0,13.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.031C17.335,12.031,18,12.696,18,13.516L18,13.516z" fill="#ffff00"/>
+        </svg>
+      </div>
+      <ul class="trigger">
+        <li><a href="http://lujun9972.github.io/emacs-document/years/">Years</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/authors/">Authors</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/tags/">Tags</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document">Github</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="http://www.google.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">让Emacs为你自动插入内容(Emacs模板使用指南)</h1>
+<div id="table-of-contents">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#orgheadline1">1. Introduction to YAS</a></li>
+<li><a href="#orgheadline2">2. Interactive Snippets</a></li>
+<li><a href="#orgheadline3">3. New Files</a></li>
+<li><a href="#orgheadline4">4. Combining YAS and Auto Insert</a></li>
+<li><a href="#orgheadline5">5. Programmatic Snippets</a></li>
+<li><a href="#orgheadline6">6. Full Programmatic Inserts</a></li>
+</ul>
+</div>
+</div>
+<p>
+我们经常要打字. 而对于文本文件来说,很多的输出只是为了组织内容而已. 比如org-mode中的星号,空格以及 <code>#+</code>, 比如编程代码中的那些括号, <code>do..end</code> 之类的.
+</p>
+
+<p>
+不过也没谁规定这些内容必须是由你手工输入的呀.
+</p>
+
+<p>
+下面介绍几种让Emacs为你自动输入的几种方法… 比如我们可以在新建某类文件时自动插入一份样板文.
+</p>
+
+<p>
+注意,在本教材中,我不会将关于自动补全的内容,所以不会讲到 <code>auto-complete</code> 或 <code>company</code>.
+</p>
+
+<div id="outline-container-orgheadline1" class="outline-2">
+<h2 id="orgheadline1"><span class="section-number-2">1</span> Introduction to YAS</h2>
+<div class="outline-text-2" id="text-1">
+<p>
+<a href="https://github.com/capitaomorte/yasnippet">yasnippet</a> 可以让你快速插入代码片段. 所谓片段是指一份模板,你可以手工或用程序来替换模板中的某些内容. 
+至于会选择哪个模板来扩展则要看buffer的mode了.
+</p>
+
+<p>
+刚开始的时候, 让我们先配置一下YAS让它插入一段固定的文本吧. 
+我这里假设你安装了<a href="https://github.com/jwiegley/use-package">use-package</a>, 让我们先安装yasnippet然后为我们的模板设置一个独立的目录(接下来我这里会混用片段和模板这两种说法):
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">use-package</span> <span style="color: #a45bad;">yasnippet</span>
+  <span style="color: #4f97d7;">:ensure</span> t
+  <span style="color: #4f97d7;">:init</span>
+  <span style="color: #bc6ec5;">(</span>yas-global-mode <span style="color: #a45bad;">1</span><span style="color: #bc6ec5;">)</span>
+  <span style="color: #4f97d7;">:config</span>
+  <span style="color: #bc6ec5;">(</span>add-to-list 'yas-snippet-dirs <span style="color: #2d9574;">(</span>locate-user-emacs-file <span style="color: #2d9574;">"snippets"</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+然后我们可以按下 <code>C-c C-n</code> 来创建一个模板了,如果记不住快捷键的话也没关系,输入 <code>M-x yas-new-snippet</code> 也行(而且如果你开启了类似IDO的插件,这个速度也不慢).
+</p>
+
+<p>
+你应该会进入一个新的template buffer中了, 而且由于它还使用了YAS,你可以输入一个域的内容后,按下 <code>Tab</code> 键来跳转到下一个域的位置.
+假设你输入的内容是这样的:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-snippet"><span style="color: #2aa1ae; background-color: #292e34;"># -*- mode: snippet -*-</span>
+<span style="color: #2aa1ae; background-color: #292e34;"># name: blah</span>
+<span style="color: #2aa1ae; background-color: #292e34;"># key: blah</span>
+<span style="color: #2aa1ae; background-color: #292e34;"># --</span>
+Bling blargh-a bloo bloop!
+</pre>
+</div>
+
+<p>
+按下 <code>C-c C-c</code> 来应用该模板. Emacs会询问你这个模板需要在哪个mode下使用. 基本上你只需要直接按下回车就行了.
+</p>
+
+<p>
+如果你想保存下来这个模板,推荐你保存到 <code>~/.emacs.d/snippets</code> 目录下,这也是默认的保存地址.
+</p>
+
+<p>
+现在,在相同mode的buffer中输入 <code>blah</code> 然后按下 <code>Tab</code>, <code>blah</code> 会被扩展为: <code>Bling blargh-a bloo bloop!</code>
+</p>
+
+<p>
+YAS还提供了多种触发模板的方法,不过下一步让我们修改模板让它变得更有用一些吧.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgheadline2" class="outline-2">
+<h2 id="orgheadline2"><span class="section-number-2">2</span> Interactive Snippets</h2>
+<div class="outline-text-2" id="text-2">
+<p>
+将一个简短的内容扩充为一长段内容当然很有用,若能让模板扩展的结果能适应上下文环境那就更好了.
+首先我们让模板的某些内容变得容易修改起来.
+</p>
+
+<p>
+在某个编程语言的mode下打开一份代码文件,然后新建一个模板. 比如我要为JavaScript创建一份ifelse的代码片段:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-snippet"><span style="color: #2aa1ae; background-color: #292e34;"># -*- mode: snippet -*-</span>
+<span style="color: #2aa1ae; background-color: #292e34;"># name: ifelse</span>
+<span style="color: #2aa1ae; background-color: #292e34;"># key: ife</span>
+<span style="color: #2aa1ae; background-color: #292e34;"># --</span>
+if (<span style="color: #4f97d7; font-weight: bold;">$</span><span style="color: #2d9574;">1</span>) {
+  <span style="color: #4f97d7; font-weight: bold;">$</span><span style="color: #2d9574;">0</span>;
+<span style="color: #4f97d7; font-weight: bold;">}</span>
+<span style="color: #dc752f; background-color: #292b2e;">else {</span>
+<span style="color: #4f97d7; font-weight: bold;">}</span>
+</pre>
+</div>
+
+<p>
+现在我在JavaScript mode下输入 <code>ife</code> 按下 <code>Tab</code> 就能扩展出一个 <code>if.. else</code> 模板了, 而且你会看到光标定位到了括号中间($1指定了光标位置), 我们可以直接输入条件了. 
+按下 <code>Tab</code> 后会跳转到大括号之间,这样我iu可以直接输入符合条件的执行语句了(因为$0标示了域编辑结束的地方)
+</p>
+
+<p>
+关于YAS,我还没讲完了,不过让我们先讲点其他的,这样我的下一个YAS例子才显得有意义.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgheadline3" class="outline-2">
+<h2 id="orgheadline3"><span class="section-number-2">3</span> New Files</h2>
+<div class="outline-text-2" id="text-3">
+<p>
+还记得公司突然要求在每个文件头部加上版权声明的那个时候吗? 我是不太清楚这样做有多大的法律效力啦,不过Emacs很早以前就自带了 <a href="https://www.emacswiki.org/emacs/AutoInsertMode">Auto Insert</a> 功能了.
+它可以为某种特定mode的新文件设置一个样板文件.
+</p>
+
+<p>
+下面配置使用 <code>use-package</code> 来为你的新文件配置样板文件:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">use-package</span> <span style="color: #a45bad;">autoinsert</span>
+  <span style="color: #4f97d7;">:init</span>
+  <span style="color: #2aa1ae; background-color: #292e34;">;; </span><span style="color: #2aa1ae; background-color: #292e34;">Don't want to be prompted before insertion:</span>
+  <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">setq</span> auto-insert-query nil<span style="color: #bc6ec5;">)</span>
+
+  <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">setq</span> auto-insert-directory <span style="color: #2d9574;">(</span>locate-user-emacs-file <span style="color: #2d9574;">"templates"</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span>add-hook 'find-file-hook 'auto-insert<span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span>auto-insert-mode <span style="color: #a45bad;">1</span><span style="color: #bc6ec5;">)</span>
+
+  <span style="color: #4f97d7;">:config</span>
+  <span style="color: #bc6ec5;">(</span>define-auto-insert <span style="color: #2d9574;">"\\.html?$"</span> <span style="color: #2d9574;">"default-html.html"</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+这样配置后,创建一个以 <code>.html</code> 为后缀的文件会插入 <code>~/.emacs.d/templates/default-html.html</code> 的内容. 
+这个功能很不错,不过对于资深用户还不太够用.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgheadline4" class="outline-2">
+<h2 id="orgheadline4"><span class="section-number-2">4</span> Combining YAS and Auto Insert</h2>
+<div class="outline-text-2" id="text-4">
+<p>
+我们可以用一个模板作为新文件的默认内容, 这样我们还可以对插入的样板作一些修改.
+</p>
+
+<p>
+YAS实际上使用 <code>yas-expand-snippet</code> 来完成扩展动作的, 这个函数接受一个参数,那就是要插入模板的内容. 你可以将下面代码放入 <code>*scratch*</code> buffer中,然后执行这条语句试试(用C-x C-e)来执行:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span>yas-expand-snippet <span style="color: #2d9574;">";; Bah-da $1 Bing"</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+你大概能够猜到我下一步要干嘛了对吧? 让我们来创建一个辅组函数,这个辅组函数将auto-insert自动插入新文件的内容作为模板来进行扩展.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">defun</span> <span style="color: #bc6ec5; font-weight: bold;">autoinsert-yas-expand</span><span style="color: #bc6ec5;">()</span>
+  <span style="color: #2aa1ae;">"Replace text in yasnippet template."</span>
+  <span style="color: #bc6ec5;">(</span>yas-expand-snippet <span style="color: #2d9574;">(</span>buffer-string<span style="color: #2d9574;">)</span> <span style="color: #2d9574;">(</span>point-min<span style="color: #2d9574;">)</span> <span style="color: #2d9574;">(</span>point-max<span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+上面 <code>(buffer-string)</code> 会返回buffer的整个内容, 而yas-expand-snippet接受的额外两个参数指明了用结果替代当前buffer的哪些内容. 在上例中的 <code>(point-min)</code> 和 <code>(point-max)</code> 表示替换整个buffer的内容.
+</p>
+
+<p>
+<code>define-auto-insert</code> 函数能够接受一个数组为参数,数组中的元素若为字符串,则表示引入相应文件的内容,若元素为一个函数名称,则表示执行该函数:.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span>define-auto-insert <span style="color: #2d9574;">"\\.el$"</span> <span style="color: #bc6ec5;">[</span> <span style="color: #2d9574;">"defaults-elisp.el"</span> autoinsert-yas-expand <span style="color: #bc6ec5;">]</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+上面的设置表示,当新建一个以 <code>.el</code> 为后缀的文件时,先插入 <code>defaults-elisp.el</code> 文件中的内容,然后执行函数 <code>autoinsert-yas-expand</code>,这个函数会扩展该模板并替代原模板的内容.
+</p>
+
+<p>
+你甚至还可以在模板中添加 <code>$1</code> , <code>$2</code> 这样的域占位符.
+</p>
+
+<p>
+我是用use-package来封装这些模板的,像这样:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">use-package</span> <span style="color: #a45bad;">autoinsert</span>
+  <span style="color: #4f97d7;">:config</span>
+  <span style="color: #bc6ec5;">(</span>define-auto-insert <span style="color: #2d9574;">"\\.el$"</span> <span style="color: #2d9574;">[</span><span style="color: #2d9574;">"default-lisp.el"</span> ha/autoinsert-yas-expand<span style="color: #2d9574;">]</span><span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span>define-auto-insert <span style="color: #2d9574;">"\\.sh$"</span> <span style="color: #2d9574;">[</span><span style="color: #2d9574;">"default-sh.sh"</span> ha/autoinsert-yas-expand<span style="color: #2d9574;">]</span><span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span>define-auto-insert <span style="color: #2d9574;">"/bin/"</span>  <span style="color: #2d9574;">[</span><span style="color: #2d9574;">"default-sh.sh"</span> ha/autoinsert-yas-expand<span style="color: #2d9574;">]</span><span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span>define-auto-insert <span style="color: #2d9574;">"\\.html?$"</span> <span style="color: #2d9574;">[</span><span style="color: #2d9574;">"default-html.html"</span> ha/autoinsert-yas-expand<span style="color: #2d9574;">]</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgheadline5" class="outline-2">
+<h2 id="orgheadline5"><span class="section-number-2">5</span> Programmatic Snippets</h2>
+<div class="outline-text-2" id="text-5">
+<p>
+手工输入域的内容当然可以,不过若是能用程序自动输入某些信息不是更好吗?
+</p>
+
+<p>
+比如, 一般来说,我们的Emacs Lisp文件头部都是这样的:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #2aa1ae; background-color: #292e34;">;;; </span><span style="color: #2aa1ae; background-color: #292e34;">demo-it --- Utility functions for creating demonstrations</span>
+<span style="color: #2aa1ae; background-color: #292e34;">;;</span>
+<span style="color: #2aa1ae; background-color: #292e34;">;; </span><span style="color: #2aa1ae; background-color: #292e34;">Copyright (C) 2014  Howard Abrams</span>
+<span style="color: #2aa1ae; background-color: #292e34;">;;</span>
+<span style="color: #2aa1ae; background-color: #292e34;">;; </span><span style="color: #2aa1ae; background-color: #292e34;">Author: Howard Abrams [[mailto:howard.abrams%2540gmail.com][<a href="mailto:howard.abrams%40gmail.com">&lt;howard.abrams@gmail.com&gt;</a>]]</span>
+<span style="color: #2aa1ae; background-color: #292e34;">;; </span><span style="color: #2aa1ae; background-color: #292e34;">Keywords: demonstration presentation</span>
+<span style="color: #2aa1ae; background-color: #292e34;">;;</span>
+<span style="color: #2aa1ae; background-color: #292e34;">;; </span><span style="color: #2aa1ae; background-color: #292e34;">This program is free software; you can redistribute it and/or modify</span>
+<span style="color: #2aa1ae; background-color: #292e34;">;; </span><span style="color: #2aa1ae; background-color: #292e34;">it under the terms of the GNU General Public License as published by</span>
+<span style="color: #2aa1ae; background-color: #292e34;">;; </span><span style="color: #2aa1ae; background-color: #292e34;">the Free Software Foundation, either version 3 of the License, or</span>
+<span style="color: #2aa1ae; background-color: #292e34;">;; </span><span style="color: #2aa1ae; background-color: #292e34;">...</span>
+</pre>
+</div>
+
+<p>
+这里第一行包含了文件的名称及其描述. YAS会将反引号中的代码作为Emacs Lisp来执行,因此执行:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span>yas-expand-snippet <span style="color: #2d9574;">"`(buffer-file-name)`"</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+会插入buffer所示文件名的完整路径, 而执行:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span>yas-expand-snippet <span style="color: #2d9574;">"`user-full-name`"</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+会插入变量 <code>user-file-name</code> 的值. 
+</p>
+
+<p>
+我们的Emacs Lisp模板可以设置成这样:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #2aa1ae; background-color: #292e34;">;;; </span><span style="color: #2aa1ae; background-color: #292e34;">`(upcase (file-name-nondirectory (file-name-sans-extension (buffer-file-name))))` --- $1</span>
+<span style="color: #2aa1ae; background-color: #292e34;">;;</span>
+<span style="color: #2aa1ae; background-color: #292e34;">;; </span><span style="color: #2aa1ae; background-color: #292e34;">Author: `user-full-name` &lt;`user-mail-address`&gt;</span>
+<span style="color: #2aa1ae; background-color: #292e34;">;; </span><span style="color: #2aa1ae; background-color: #292e34;">Copyright &#169; `(format-time-string "%Y")`, `user-full-name`, all rights reserved.</span>
+<span style="color: #2aa1ae; background-color: #292e34;">;; </span><span style="color: #2aa1ae; background-color: #292e34;">Created: `(format-time-string "%e %B %Y")`</span>
+<span style="color: #2aa1ae; background-color: #292e34;">;;</span>
+<span style="color: #2aa1ae; background-color: #292e34;">;;; </span><span style="color: #2aa1ae; background-color: #292e34;">Commentary:</span>
+<span style="color: #2aa1ae; background-color: #292e34;">;;</span>
+<span style="color: #2aa1ae; background-color: #292e34;">;;  </span><span style="color: #2aa1ae; background-color: #292e34;">$2</span>
+<span style="color: #2aa1ae; background-color: #292e34;">;;</span>
+<span style="color: #2aa1ae; background-color: #292e34;">;;; </span><span style="color: #2aa1ae; background-color: #292e34;">Code:</span>
+
+$0
+
+<span style="color: #2aa1ae; background-color: #292e34;">;;; </span><span style="color: #2aa1ae; background-color: #292e34;">`(file-name-nondirectory (buffer-file-name))` ends here</span>
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgheadline6" class="outline-2">
+<h2 id="orgheadline6"><span class="section-number-2">6</span> Full Programmatic Inserts</h2>
+<div class="outline-text-2" id="text-6">
+<p>
+我的日记文件存放在 <code>~/journal</code> 目录中,而且日志文件的名字就是 <code>YYYYMMDD</code> 格式的时间. 我们可以会尝试创建一个类似这样的模板来自动插入标题:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-org"><span style="color: #9f8766;">#+TITLE:</span> <span style="color: #bc6ec5; font-size: 140%; font-weight: bold; text-decoration: underline;">Journal Entry for `(format-time-string "%e %B %Y")`</span>
+</pre>
+</div>
+
+<p>
+不过这要求我能够每天都准时地写日记才行. 更好的方式应该是根据文件名来插入标题. 我们可以这样来定义日期格式:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">setq</span> org-journal-date-format <span style="color: #2d9574;">"#+TITLE: Journal Entry- %e %B %Y"</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+然后定义一个函数来解析 <code>buffer-file-name</code> 并填充上面定义的日期格式:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">defun</span> <span style="color: #bc6ec5; font-weight: bold;">journal-title</span> <span style="color: #bc6ec5;">()</span>
+  <span style="color: #2aa1ae;">"The journal heading based on the file's name."</span>
+  <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">interactive</span><span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">let*</span> <span style="color: #2d9574;">(</span><span style="color: #67b11d;">(</span>year  <span style="color: #b1951d;">(</span>string-to-number <span style="color: #4f97d7;">(</span>substring <span style="color: #bc6ec5;">(</span>buffer-name<span style="color: #bc6ec5;">)</span> <span style="color: #a45bad;">0</span> <span style="color: #a45bad;">4</span><span style="color: #4f97d7;">)</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span>
+         <span style="color: #67b11d;">(</span>month <span style="color: #b1951d;">(</span>string-to-number <span style="color: #4f97d7;">(</span>substring <span style="color: #bc6ec5;">(</span>buffer-name<span style="color: #bc6ec5;">)</span> <span style="color: #a45bad;">4</span> <span style="color: #a45bad;">6</span><span style="color: #4f97d7;">)</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span>
+         <span style="color: #67b11d;">(</span>day   <span style="color: #b1951d;">(</span>string-to-number <span style="color: #4f97d7;">(</span>substring <span style="color: #bc6ec5;">(</span>buffer-name<span style="color: #bc6ec5;">)</span> <span style="color: #a45bad;">6</span> <span style="color: #a45bad;">8</span><span style="color: #4f97d7;">)</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span>
+         <span style="color: #67b11d;">(</span>datim <span style="color: #b1951d;">(</span>encode-time <span style="color: #a45bad;">0</span> <span style="color: #a45bad;">0</span> <span style="color: #a45bad;">0</span> day month year<span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span>format-time-string org-journal-date-format datim<span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+现在,我们的模板可以改写成:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-org"><span style="color: #9f8766;">#+TITLE:</span> <span style="color: #bc6ec5; font-size: 140%; font-weight: bold; text-decoration: underline;">Journal Entry for `(journal-title)`</span>
+</pre>
+</div>
+
+<p>
+太棒了, 不过我们还可以更近一步…
+</p>
+
+<p>
+我非常热衷于<a href="http://www.habitica.com/">Habitica</a>, 我一直在尝试将它与<a href="https://github.com/abrochard/emacs-habitica">Emacs结合的更紧密些</a>, 我好喜欢它的日常任务这个设计,我每天完成它们,然后它们在第二天又出现了.
+</p>
+
+<p>
+我已经有了一些好用的<a href="https://github.com/howardabrams/dot-files/blob/master/emacs-org.org#auto-note-capturing">获取任务</a> 的代码, 但是它做不到每天重复这些任务. 也许,我可以试试用我的每日日记来追踪这些任务.
+</p>
+
+<p>
+只有在我创建的是今天的日记时才需要插入这些日常任务. 而且每天的日常任务可能还不一样.
+</p>
+
+<p>
+我可以直接在YAS模板中插入相关实现,但是这样一来 <code>`(...)`</code> 中的代码会掩盖掉普通的文本结果,因此还是将它分解成一些小的模板好了:
+</p>
+
+<ul class="org-ul">
+<li>journal-dailies.org 包含的是实际的日常任务to contain the real dailies</li>
+<li>journal-dailies-end.org 包含的是后面的笔记</li>
+<li>journal-mon.org 包含的是周一日记的额外内容</li>
+<li>journal-tue.org 包含的是周二日记的额外内容</li>
+<li>以此类推 a journal-XYZ.org 表示的周N的外内容</li>
+</ul>
+
+<p>
+有了这些文件,编辑我的日常任务列表就很直观了.
+</p>
+
+<p>
+现在我需要更改一下我的目标了. 既然我需要创建一系列的辅组EmacsLisp函数,那我不如创建一个整体的函数来生成内容好了.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span>define-auto-insert <span style="color: #2d9574;">"/[0-9]\\{8\\}$"</span> <span style="color: #bc6ec5;">[</span>journal-file-insert<span style="color: #bc6ec5;">]</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+当我新建一个仅仅由8个数字组成的文件时,就会调用函数 <code>journal-file-insert</code>:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">defun</span> <span style="color: #bc6ec5; font-weight: bold;">journal-file-insert</span> <span style="color: #bc6ec5;">()</span>
+  <span style="color: #2aa1ae;">"Insert's the journal heading based on the file's name."</span>
+  <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">interactive</span><span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span>insert <span style="color: #2d9574;">(</span>journal-title<span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span>insert <span style="color: #2d9574;">"\n\n"</span><span style="color: #bc6ec5;">)</span> <span style="color: #2aa1ae; background-color: #292e34;">; </span><span style="color: #2aa1ae; background-color: #292e34;">Start with a blank separating the title</span>
+
+  <span style="color: #2aa1ae; background-color: #292e34;">;; </span><span style="color: #2aa1ae; background-color: #292e34;">&#33509;&#21019;&#24314;&#30340;&#21018;&#22909;&#26159;&#20170;&#22825;&#30340;&#26085;&#35760;</span>
+  <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">when</span> <span style="color: #2d9574;">(</span>equal <span style="color: #67b11d;">(</span>file-name-base <span style="color: #b1951d;">(</span>buffer-file-name<span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span>
+               <span style="color: #67b11d;">(</span>format-time-string <span style="color: #2d9574;">"%Y%m%d"</span><span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span>
+
+    <span style="color: #2aa1ae; background-color: #292e34;">;; </span><span style="color: #2aa1ae; background-color: #292e34;">Note: `</span><span style="color: #a45bad; background-color: #292e34;">insert-file-contents</span><span style="color: #2aa1ae; background-color: #292e34;">' &#20989;&#25968;&#20250;&#20445;&#25345;&#20809;&#26631;&#30340;&#20301;&#32622;&#22312;&#25554;&#20837;&#20869;&#23481;&#30340;&#21069;&#38754;,&#22240;&#27492;&#25105;&#20204;&#36825;&#37324;&#38656;&#35201;&#25353;&#30456;&#21453;&#30340;&#39034;&#24207;&#20197;&#27492;&#25554;&#20837;&#25991;&#20214;&#20869;&#23481;</span>
+    <span style="color: #2d9574;">(</span>insert-file-contents <span style="color: #2d9574;">"journal-dailies-end.org"</span><span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span>insert <span style="color: #2d9574;">"\n"</span><span style="color: #2d9574;">)</span>
+
+    <span style="color: #2aa1ae; background-color: #292e34;">;; </span><span style="color: #2aa1ae; background-color: #292e34;">&#25554;&#20837;&#37027;&#20123;&#27599;&#21608;&#21482;&#20250;&#21457;&#29983;&#19968;&#27425;&#30340;&#20219;&#21153;</span>
+    <span style="color: #2d9574;">(</span><span style="color: #4f97d7; font-weight: bold;">let</span> <span style="color: #67b11d;">(</span><span style="color: #b1951d;">(</span>weekday-template <span style="color: #4f97d7;">(</span>downcase
+                             <span style="color: #bc6ec5;">(</span>format-time-string <span style="color: #2d9574;">"journal-%a.org"</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span>
+
+      <span style="color: #67b11d;">(</span><span style="color: #4f97d7; font-weight: bold;">when</span> <span style="color: #b1951d;">(</span>file-exists-p weekday-template<span style="color: #b1951d;">)</span>
+        <span style="color: #b1951d;">(</span>insert-file-contents weekday-template<span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span>
+
+    <span style="color: #2d9574;">(</span>insert-file-contents <span style="color: #2d9574;">"journal-dailies.org"</span><span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span>previous-line <span style="color: #a45bad;">2</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+我对<a href="https://www.emacswiki.org/emacs/AutoInsertMode">Auto Insert</a> 与 <a href="https://github.com/capitaomorte/yasnippet">yasnippet project</a> 的了解就这么多了. 你们有什么问题或者技巧可以分享的么?
+</p>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2016-10-12</span>
+            <span title="last modification date" class="post-info">2016-10-12</span>
+            <span title="tags" class="post-info">:N/A:</span>
+            <span title="author" class="post-info"><a href="mailto:lujun9972 &lt;at&gt; lujun9972-F41">lujun9972</a></span>
+        </div>
+    <script src="http://lujun9972.github.io/emacs-document/media/js/jquery-2.1.3.min.js"></script>
+        <section>
+            <h1>Comments</h1>
+            <div id="comment-wrap">
+                    <a class="disqus_label">使用 Disqus 评论</a>
+                    <a class="ds-label">使用多说评论</a>
+    </ul>
+        <div id="disqus_thread"></div>
+        <script type="text/javascript">
+         //var disqus_developer = 1;
+         var preempt_signal=false;
+         var disqus_identifier = "/blog/2016/10/12/让emacs为你自动插入内容(emacs模板使用指南)/";
+         var disqus_url = "http://lujun9972.github.io/emacs-document/blog/2016/10/12/让emacs为你自动插入内容(emacs模板使用指南)/";
+         var disqus_shortname = 'emacs-document';
+         /* * * DON'T EDIT BELOW THIS LINE * * */
+         (function() {
+             var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+             dsq.src = 'http://' + disqus_shortname + '.disqus.com/embed.js';
+             (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+             $('#disqus_thread').css('display','none');
+         })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+        <div class="ds-thread"></div>
+        <script type="text/javascript">
+         var duoshuoQuery = {short_name:'emacs-document'};
+         (function() {
+             var ds = document.createElement('script');
+             ds.type = 'text/javascript';ds.async = true;
+             ds.src = 'http://static.duoshuo.com/embed.js';
+             ds.charset = 'UTF-8';
+             (document.getElementsByTagName('head')[0]
+           || document.getElementsByTagName('body')[0]).appendChild(ds);
+             $('.ds-thread').css('display','block');
+         })();
+        </script>
+    <script>
+     /* comments */
+     var ego_disqus_thread=$('#disqus_thread');
+     var ego_ds_label=$('.ds-thread');
+     $('.disqus_label').click(function(){
+         ego_disqus_thread.show();
+         ego_ds_label.hide();
+     });
+     $('.ds-label').click(function(){
+         ego_disqus_thread.hide();
+         ego_ds_label.show();
+     });
+    </script>
+        </section>
+    <script src="http://lujun9972.github.io/emacs-document/media/js/main.js"></script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 25.x(<a href="http://orgmode.org">Org mode</a> 8.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:lujun9972 &lt;at&gt; lujun9972-F41">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div></body>
+</html>

@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>EmacsLisp中的模式匹配 - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <style>
+   #ds-thread #ds-reset .ds-comment-body p {color: #ffffff;}
+   #ds-thread #ds-reset .ds-comment-body p a {color: #ff0;}
+   #ds-thread #ds-reset .ds-comment-body p a:hover {color: #0ff;}
+   #disqus_thread a {color: #00ffff;}
+  </style>
+  <link rel="stylesheet" href="http://lujun9972.github.io/emacs-document/media/css/main.css" type="text/css"/>
+  <link rel="stylesheet" href="http://lujun9972.github.io/emacs-document/media/css/comment.css" type="text/css"/>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="http://lujun9972.github.io/emacs-document/">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;集思广益</p>
+    <nav class="site-nav">
+      <div class="menu-icon">
+        <svg viewBox="0 0 18 15">
+          <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.031C17.335,0,18,0.665,18,1.484L18,1.484z" fill="#ffff00"/>
+          <path d="M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0c0-0.82,0.665-1.484,1.484-1.484 h15.031C17.335,6.031,18,6.696,18,7.516L18,7.516z" fill="#ffff00"/>
+          <path d="M18,13.516C18,14.335,17.335,15,16.516,15H1.484C0.665,15,0,14.335,0,13.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.031C17.335,12.031,18,12.696,18,13.516L18,13.516z" fill="#ffff00"/>
+        </svg>
+      </div>
+      <ul class="trigger">
+        <li><a href="http://lujun9972.github.io/emacs-document/years/">Years</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/authors/">Authors</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/tags/">Tags</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document">Github</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="http://www.google.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">EmacsLisp中的模式匹配</h1>
+<p>
+Emacs自带了一个库 <a href="http://repo.or.cz/w/emacs.git/blob/HEAD:/lisp/emacs-lisp/pcase.el">GIT:emacs-lisp/pcase.el</a> 可以为Elisp提供ML风格的模式匹配宏. 该宏是<a href="https://www.emacswiki.org/emacs/AutoLoad">自动加载的</a>, 因此你无需显式的require它.
+</p>
+
+<p>
+下面倒数的函数中使用了 <code>if</code>.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">defun</span> <span style="color: #bc6ec5; font-weight: bold;">recip</span> <span style="color: #bc6ec5;">(</span>n<span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">if</span> <span style="color: #2d9574;">(</span>zerop n<span style="color: #2d9574;">)</span>
+      <span style="color: #2d9574;">(</span><span style="color: #dc752f; background-color: #292b2e;">error</span> <span style="color: #2d9574;">"Can't divide by zero"</span><span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span>/ <span style="color: #a45bad;">1.0</span> n<span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+可以使用 <code>pcase</code> 改写成使用模式匹配的版本.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">defun</span> <span style="color: #bc6ec5; font-weight: bold;">recip</span> <span style="color: #bc6ec5;">(</span>n<span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">pcase</span> n
+    <span style="color: #2d9574;">(</span>`<span style="color: #a45bad;">0</span> <span style="color: #67b11d;">(</span><span style="color: #dc752f; background-color: #292b2e;">error</span> <span style="color: #2d9574;">"Can't divide by zero"</span><span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span>n <span style="color: #67b11d;">(</span>/ <span style="color: #a45bad;">1.0</span> n<span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+
+<span style="color: #4f97d7;">(</span>recip <span style="color: #a45bad;">0</span><span style="color: #4f97d7;">)</span>
+==&gt; <span style="color: #4f97d7;">(</span><span style="color: #dc752f; background-color: #292b2e;">error</span> <span style="color: #2d9574;">"Can't divide by zero"</span><span style="color: #4f97d7;">)</span>
+<span style="color: #4f97d7;">(</span>recip <span style="color: #a45bad;">2</span><span style="color: #4f97d7;">)</span>
+==&gt; <span style="color: #a45bad;">0.5</span>
+</pre>
+</div>
+
+<p>
+下面是另一个使用 <code>pcase</code> 的例子,是一个取绝对值的函数,其中用到了该宏中定义的 <code>pred</code> 符号
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">defun</span> <span style="color: #bc6ec5; font-weight: bold;">absval</span> <span style="color: #bc6ec5;">(</span>x<span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">pcase</span> x
+    <span style="color: #2d9574;">(</span><span style="color: #67b11d;">(</span>pred <span style="color: #b1951d;">(</span>&lt; <span style="color: #a45bad;">0</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span> x<span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span><span style="color: #67b11d;">(</span>pred <span style="color: #b1951d;">(</span>= <span style="color: #a45bad;">0</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span> <span style="color: #a45bad;">0</span><span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span><span style="color: #67b11d;">(</span>pred <span style="color: #b1951d;">(</span>&gt; <span style="color: #a45bad;">0</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span> <span style="color: #67b11d;">(</span>- x<span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+<span style="color: #4f97d7;">(</span>absval <span style="color: #a45bad;">1</span><span style="color: #4f97d7;">)</span>
+==&gt; <span style="color: #a45bad;">1</span>
+<span style="color: #4f97d7;">(</span>absval <span style="color: #a45bad;">0</span><span style="color: #4f97d7;">)</span>
+==&gt; <span style="color: #a45bad;">0</span>
+<span style="color: #4f97d7;">(</span>absval <span style="color: #a45bad;">-1</span><span style="color: #4f97d7;">)</span>
+==&gt; <span style="color: #a45bad;">1</span>
+</pre>
+</div>
+
+<p>
+下面函数实现了 <code>car</code> 的功能,找出list的头元素.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">defun</span> <span style="color: #bc6ec5; font-weight: bold;">newcar</span> <span style="color: #bc6ec5;">(</span>list<span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">pcase</span> list
+    <span style="color: #2d9574;">(</span>`<span style="color: #67b11d;">(</span>,l . ,ll<span style="color: #67b11d;">)</span> l<span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+<span style="color: #4f97d7;">(</span>newcar '<span style="color: #bc6ec5;">(</span>a b c<span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+==&gt; a
+</pre>
+</div>
+
+<p>
+下面函数实现了 <code>cdr</code> 的功能,找出list的尾部.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">defun</span> <span style="color: #bc6ec5; font-weight: bold;">newcdr</span> <span style="color: #bc6ec5;">(</span>list<span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">pcase</span> list
+    <span style="color: #2d9574;">(</span>`<span style="color: #67b11d;">(</span>,l . ,ll<span style="color: #67b11d;">)</span> ll<span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+<span style="color: #4f97d7;">(</span>newcdr '<span style="color: #bc6ec5;">(</span>a b c<span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+==&gt; <span style="color: #4f97d7;">(</span>b c<span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+下面函数取出list中的第二个元素.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">defun</span> <span style="color: #bc6ec5; font-weight: bold;">2nd</span> <span style="color: #bc6ec5;">(</span>list<span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">pcase</span> list
+    <span style="color: #2d9574;">(</span>`<span style="color: #67b11d;">(</span>,l ,l2 . ,_<span style="color: #67b11d;">)</span> l2<span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+<span style="color: #4f97d7;">(</span>2nd '<span style="color: #bc6ec5;">(</span><span style="color: #a45bad;">1</span> <span style="color: #a45bad;">2</span> <span style="color: #a45bad;">3</span> <span style="color: #a45bad;">4</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+==&gt; <span style="color: #a45bad;">2</span>
+</pre>
+</div>
+
+<p>
+上面函数在处理长度小于2的list时会返回nil.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span>2nd '<span style="color: #bc6ec5;">(</span><span style="color: #a45bad;">1</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+==&gt; nil
+</pre>
+</div>
+
+<p>
+下面函数取出list中的第三个元素.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">defun</span> <span style="color: #bc6ec5; font-weight: bold;">3rd</span> <span style="color: #bc6ec5;">(</span>list<span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">pcase</span> list
+    <span style="color: #2d9574;">(</span>`<span style="color: #67b11d;">(</span>,l ,l2 ,l3 . ,_<span style="color: #67b11d;">)</span> l3<span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+<span style="color: #4f97d7;">(</span>3rd '<span style="color: #bc6ec5;">(</span><span style="color: #a45bad;">1</span> <span style="color: #a45bad;">2</span> <span style="color: #a45bad;">3</span> <span style="color: #a45bad;">4</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+==&gt; <span style="color: #a45bad;">3</span>
+</pre>
+</div>
+
+<p>
+没有模式来匹配list中的最后那个元素,因此你需要递归的用 <code>cdr</code> 截取list的尾部,直到最后一个元素.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">defun</span> <span style="color: #bc6ec5; font-weight: bold;">thelast</span> <span style="color: #bc6ec5;">(</span>list<span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">pcase</span> list
+    <span style="color: #2d9574;">(</span>`<span style="color: #67b11d;">(</span>,l . nil<span style="color: #67b11d;">)</span> l<span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span>_ <span style="color: #67b11d;">(</span>thelast <span style="color: #b1951d;">(</span>cdr list<span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>          <span style="color: #2aa1ae; background-color: #292e34;">;</span><span style="color: #2aa1ae; background-color: #292e34;">_&#34920;&#31034;default/otherwise</span>
+<span style="color: #4f97d7;">(</span>thelast '<span style="color: #bc6ec5;">(</span><span style="color: #a45bad;">1</span> <span style="color: #a45bad;">2</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+==&gt; <span style="color: #a45bad;">2</span>
+<span style="color: #4f97d7;">(</span>thelast '<span style="color: #bc6ec5;">(</span><span style="color: #a45bad;">1</span> <span style="color: #a45bad;">2</span> <span style="color: #a45bad;">3</span> <span style="color: #a45bad;">4</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+==&gt; <span style="color: #a45bad;">4</span>
+</pre>
+</div>
+
+<p>
+累加1到N的整数.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">defun</span> <span style="color: #bc6ec5; font-weight: bold;">sum-to</span> <span style="color: #bc6ec5;">(</span>n<span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">pcase</span> n
+    <span style="color: #2d9574;">(</span>`<span style="color: #a45bad;">1</span> <span style="color: #a45bad;">1</span><span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span>n <span style="color: #67b11d;">(</span>+ n <span style="color: #b1951d;">(</span>sum-to <span style="color: #4f97d7;">(</span>1- n<span style="color: #4f97d7;">)</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+<span style="color: #4f97d7;">(</span>sum-to <span style="color: #a45bad;">1</span><span style="color: #4f97d7;">)</span>
+==&gt; <span style="color: #a45bad;">1</span>
+<span style="color: #4f97d7;">(</span>sum-to <span style="color: #a45bad;">2</span><span style="color: #4f97d7;">)</span>
+==&gt; <span style="color: #a45bad;">3</span>
+<span style="color: #4f97d7;">(</span>sum-to <span style="color: #a45bad;">3</span><span style="color: #4f97d7;">)</span>
+==&gt; <span style="color: #a45bad;">6</span>
+<span style="color: #4f97d7;">(</span>sum-to <span style="color: #a45bad;">5</span><span style="color: #4f97d7;">)</span>
+==&gt; <span style="color: #a45bad;">15</span>
+<span style="color: #4f97d7;">(</span>sum-to <span style="color: #a45bad;">8</span><span style="color: #4f97d7;">)</span>
+==&gt; <span style="color: #a45bad;">36</span>
+<span style="color: #4f97d7;">(</span>mapcar 'sum-to <span style="color: #bc6ec5;">(</span>number-sequence <span style="color: #a45bad;">1</span> <span style="color: #a45bad;">119</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+==&gt; <span style="color: #4f97d7;">(</span><span style="color: #a45bad;">1</span> <span style="color: #a45bad;">3</span> <span style="color: #a45bad;">6</span> <span style="color: #a45bad;">10</span> <span style="color: #a45bad;">15</span> <span style="color: #a45bad;">21</span> <span style="color: #a45bad;">28</span> <span style="color: #a45bad;">36</span> <span style="color: #a45bad;">45</span> <span style="color: #a45bad;">55</span> <span style="color: #a45bad;">66</span> <span style="color: #a45bad;">78</span> <span style="color: #a45bad;">91</span> <span style="color: #a45bad;">105</span> <span style="color: #a45bad;">120</span> <span style="color: #a45bad;">136</span> <span style="color: #a45bad;">153</span> <span style="color: #a45bad;">171</span> <span style="color: #a45bad;">190</span>
+       <span style="color: #a45bad;">210</span> <span style="color: #a45bad;">231</span> <span style="color: #a45bad;">253</span> <span style="color: #a45bad;">276</span> <span style="color: #a45bad;">300</span> <span style="color: #a45bad;">325</span> <span style="color: #a45bad;">351</span> <span style="color: #a45bad;">378</span> <span style="color: #a45bad;">406</span> <span style="color: #a45bad;">435</span> <span style="color: #a45bad;">465</span> <span style="color: #a45bad;">496</span> <span style="color: #a45bad;">528</span> <span style="color: #a45bad;">561</span> <span style="color: #a45bad;">595</span> <span style="color: #a45bad;">630</span>
+       <span style="color: #a45bad;">666</span> <span style="color: #a45bad;">703</span> <span style="color: #a45bad;">741</span> <span style="color: #a45bad;">780</span> <span style="color: #a45bad;">820</span> <span style="color: #a45bad;">861</span> <span style="color: #a45bad;">903</span> <span style="color: #a45bad;">946</span> <span style="color: #a45bad;">990</span> <span style="color: #a45bad;">1035</span> <span style="color: #a45bad;">1081</span> <span style="color: #a45bad;">1128</span> <span style="color: #a45bad;">1176</span> <span style="color: #a45bad;">1225</span> <span style="color: #a45bad;">1275</span>
+       <span style="color: #a45bad;">1326</span> <span style="color: #a45bad;">1378</span> <span style="color: #a45bad;">1431</span> <span style="color: #a45bad;">1485</span> <span style="color: #a45bad;">1540</span> <span style="color: #a45bad;">1596</span> <span style="color: #a45bad;">1653</span> <span style="color: #a45bad;">1711</span> <span style="color: #a45bad;">1770</span> <span style="color: #a45bad;">1830</span> <span style="color: #a45bad;">1891</span> <span style="color: #a45bad;">1953</span> <span style="color: #a45bad;">2016</span>
+       <span style="color: #a45bad;">2080</span> <span style="color: #a45bad;">2145</span> <span style="color: #a45bad;">2211</span> <span style="color: #a45bad;">2278</span> <span style="color: #a45bad;">2346</span> <span style="color: #a45bad;">2415</span> <span style="color: #a45bad;">2485</span> <span style="color: #a45bad;">2556</span> <span style="color: #a45bad;">2628</span> <span style="color: #a45bad;">2701</span> <span style="color: #a45bad;">2775</span> <span style="color: #a45bad;">2850</span> <span style="color: #a45bad;">2926</span>
+       <span style="color: #a45bad;">3003</span> <span style="color: #a45bad;">3081</span> <span style="color: #a45bad;">3160</span> <span style="color: #a45bad;">3240</span> <span style="color: #a45bad;">3321</span> <span style="color: #a45bad;">3403</span> <span style="color: #a45bad;">3486</span> <span style="color: #a45bad;">3570</span> <span style="color: #a45bad;">3655</span> <span style="color: #a45bad;">3741</span> <span style="color: #a45bad;">3828</span> <span style="color: #a45bad;">3916</span> <span style="color: #a45bad;">4005</span>
+       <span style="color: #a45bad;">4095</span> <span style="color: #a45bad;">4186</span> <span style="color: #a45bad;">4278</span> <span style="color: #a45bad;">4371</span> <span style="color: #a45bad;">4465</span> <span style="color: #a45bad;">4560</span> <span style="color: #a45bad;">4656</span> <span style="color: #a45bad;">4753</span> <span style="color: #a45bad;">4851</span> <span style="color: #a45bad;">4950</span> <span style="color: #a45bad;">5050</span> <span style="color: #a45bad;">5151</span> <span style="color: #a45bad;">5253</span>
+       <span style="color: #a45bad;">5356</span> <span style="color: #a45bad;">5460</span> <span style="color: #a45bad;">5565</span> <span style="color: #a45bad;">5671</span> <span style="color: #a45bad;">5778</span> <span style="color: #a45bad;">5886</span> <span style="color: #a45bad;">5995</span> <span style="color: #a45bad;">6105</span> <span style="color: #a45bad;">6216</span> <span style="color: #a45bad;">6328</span> <span style="color: #a45bad;">6441</span> <span style="color: #a45bad;">6555</span> <span style="color: #a45bad;">6670</span>
+       <span style="color: #a45bad;">6786</span> <span style="color: #a45bad;">6903</span> <span style="color: #a45bad;">7021</span> <span style="color: #a45bad;">7140</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+计算第N个Fibonacci数.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">defun</span> <span style="color: #bc6ec5; font-weight: bold;">fib</span> <span style="color: #bc6ec5;">(</span>n<span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">pcase</span> n
+    <span style="color: #2d9574;">(</span>`<span style="color: #a45bad;">0</span> <span style="color: #a45bad;">1</span><span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span>`<span style="color: #a45bad;">1</span> <span style="color: #a45bad;">1</span><span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span>n <span style="color: #67b11d;">(</span>+ <span style="color: #b1951d;">(</span>fib <span style="color: #4f97d7;">(</span>- n <span style="color: #a45bad;">1</span><span style="color: #4f97d7;">)</span><span style="color: #b1951d;">)</span> <span style="color: #b1951d;">(</span>fib <span style="color: #4f97d7;">(</span>- n <span style="color: #a45bad;">2</span><span style="color: #4f97d7;">)</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+<span style="color: #4f97d7;">(</span>mapcar 'fib <span style="color: #bc6ec5;">(</span>number-sequence <span style="color: #a45bad;">0</span> <span style="color: #a45bad;">6</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+==&gt; <span style="color: #4f97d7;">(</span><span style="color: #a45bad;">1</span> <span style="color: #a45bad;">1</span> <span style="color: #a45bad;">2</span> <span style="color: #a45bad;">3</span> <span style="color: #a45bad;">5</span> <span style="color: #a45bad;">8</span> <span style="color: #a45bad;">13</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+计算N的阶乘(N!)
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">defun</span> <span style="color: #bc6ec5; font-weight: bold;">fac</span> <span style="color: #bc6ec5;">(</span>n<span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">pcase</span> n
+    <span style="color: #2d9574;">(</span>`<span style="color: #a45bad;">0</span> <span style="color: #a45bad;">1</span><span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span>n <span style="color: #67b11d;">(</span>* n <span style="color: #b1951d;">(</span>fac <span style="color: #4f97d7;">(</span>1- n<span style="color: #4f97d7;">)</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span><span style="color: #e0211d; text-decoration: overline;">)</span>
+<span style="color: #e0211d; text-decoration: overline;">(</span>mapcar 'fac <span style="color: #4f97d7;">(</span>number-sequence <span style="color: #a45bad;">1</span> <span style="color: #a45bad;">12</span><span style="color: #4f97d7;">)</span><span style="color: #e0211d; text-decoration: overline;">)</span>
+==&gt; <span style="color: #e0211d; text-decoration: overline;">(</span><span style="color: #a45bad;">1</span> <span style="color: #a45bad;">2</span> <span style="color: #a45bad;">6</span> <span style="color: #a45bad;">24</span> <span style="color: #a45bad;">120</span> <span style="color: #a45bad;">720</span> <span style="color: #a45bad;">5040</span> <span style="color: #a45bad;">40320</span> <span style="color: #a45bad;">362880</span> <span style="color: #a45bad;">3628800</span> <span style="color: #a45bad;">39916800</span> <span style="color: #a45bad;">479001600</span><span style="color: #e0211d; text-decoration: overline;">)</span>
+</pre>
+</div>
+
+<p>
+计算最大公约数的欧几里得算法. 通过将多个参数整合为一个list,可以将模式匹配用于多个参数.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">defun</span> <span style="color: #bc6ec5; font-weight: bold;">gcd</span> <span style="color: #bc6ec5;">(</span>x y<span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">pcase</span> <span style="color: #2d9574;">(</span>list x y<span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span>`<span style="color: #67b11d;">(</span>,x <span style="color: #a45bad;">0</span><span style="color: #67b11d;">)</span> x<span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span>`<span style="color: #67b11d;">(</span>,x ,y<span style="color: #67b11d;">)</span> <span style="color: #67b11d;">(</span>gcd y <span style="color: #b1951d;">(</span>% x y<span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+<span style="color: #4f97d7;">(</span>gcd <span style="color: #a45bad;">12</span> <span style="color: #a45bad;">8</span><span style="color: #4f97d7;">)</span>
+==&gt; <span style="color: #a45bad;">4</span>
+</pre>
+</div>
+
+<p>
+另一种将同时匹配多参数模式的方法是使用<a href="https://www.emacswiki.org/emacs/BackquoteSyntax">反引用符号`</a>. 要注意它与模式符号用的同一个符号. 下面计算X的N次方.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">defun</span> <span style="color: #bc6ec5; font-weight: bold;">pow</span> <span style="color: #bc6ec5;">(</span>x n<span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">pcase</span> `<span style="color: #2d9574;">(</span>,x ,n<span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span>`<span style="color: #67b11d;">(</span>,x <span style="color: #a45bad;">0</span><span style="color: #67b11d;">)</span> <span style="color: #a45bad;">1</span><span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span>`<span style="color: #67b11d;">(</span>,x ,n<span style="color: #67b11d;">)</span>
+     <span style="color: #67b11d;">(</span>* x <span style="color: #b1951d;">(</span>pow x <span style="color: #4f97d7;">(</span>1- n<span style="color: #4f97d7;">)</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+下面是一个优化后的版本.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">defun</span> <span style="color: #bc6ec5; font-weight: bold;">pow-fast</span> <span style="color: #bc6ec5;">(</span>x n<span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">pcase</span> `<span style="color: #2d9574;">(</span>,x ,n<span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span>`<span style="color: #67b11d;">(</span>,x <span style="color: #a45bad;">0</span><span style="color: #67b11d;">)</span> <span style="color: #a45bad;">1</span><span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span><span style="color: #67b11d;">(</span><span style="color: #4f97d7; font-weight: bold;">and</span> <span style="color: #b1951d;">(</span><span style="color: #4f97d7; font-weight: bold;">let</span> <span style="color: #4f97d7;">(</span>pred oddp<span style="color: #4f97d7;">)</span> n<span style="color: #b1951d;">)</span> `<span style="color: #b1951d;">(</span>,x ,n<span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span>
+     <span style="color: #67b11d;">(</span>* x <span style="color: #b1951d;">(</span>pow-fast <span style="color: #4f97d7;">(</span>* x x<span style="color: #4f97d7;">)</span> <span style="color: #4f97d7;">(</span>/ n <span style="color: #a45bad;">2</span><span style="color: #4f97d7;">)</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span>`<span style="color: #67b11d;">(</span>,x ,n<span style="color: #67b11d;">)</span>
+     <span style="color: #67b11d;">(</span>pow-fast <span style="color: #b1951d;">(</span>* x x<span style="color: #b1951d;">)</span> <span style="color: #b1951d;">(</span>/ n <span style="color: #a45bad;">2</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+<span style="color: #4f97d7;">(</span>pow-fast <span style="color: #a45bad;">2</span> <span style="color: #a45bad;">5</span><span style="color: #4f97d7;">)</span>
+==&gt; <span style="color: #a45bad;">32</span>
+</pre>
+</div>
+
+<p>
+Ackermann函数的实现:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">defun</span> <span style="color: #bc6ec5; font-weight: bold;">ackermann</span> <span style="color: #bc6ec5;">(</span>m n<span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">pcase</span> <span style="color: #2d9574;">(</span>list m n<span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span>`<span style="color: #67b11d;">(</span><span style="color: #a45bad;">0</span> ,n<span style="color: #67b11d;">)</span> <span style="color: #67b11d;">(</span>1+ n<span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span>`<span style="color: #67b11d;">(</span>,m <span style="color: #a45bad;">0</span><span style="color: #67b11d;">)</span> <span style="color: #67b11d;">(</span>ackermann <span style="color: #b1951d;">(</span>1- m<span style="color: #b1951d;">)</span> <span style="color: #a45bad;">1</span><span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span>`<span style="color: #67b11d;">(</span>,m ,n<span style="color: #67b11d;">)</span> <span style="color: #67b11d;">(</span>ackermann <span style="color: #b1951d;">(</span>1- m<span style="color: #b1951d;">)</span>
+                         <span style="color: #b1951d;">(</span>ackermann m <span style="color: #4f97d7;">(</span>1- n<span style="color: #4f97d7;">)</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+<span style="color: #4f97d7;">(</span>ackermann <span style="color: #a45bad;">0</span> <span style="color: #a45bad;">0</span><span style="color: #4f97d7;">)</span>
+==&gt; <span style="color: #a45bad;">1</span>
+<span style="color: #4f97d7;">(</span>ackermann <span style="color: #a45bad;">0</span> <span style="color: #a45bad;">1</span><span style="color: #4f97d7;">)</span>
+==&gt; <span style="color: #a45bad;">2</span>
+<span style="color: #4f97d7;">(</span>ackermann <span style="color: #a45bad;">0</span> <span style="color: #a45bad;">2</span><span style="color: #4f97d7;">)</span>
+==&gt; <span style="color: #a45bad;">3</span>
+<span style="color: #4f97d7;">(</span>ackermann <span style="color: #a45bad;">1</span> <span style="color: #a45bad;">1</span><span style="color: #4f97d7;">)</span>
+==&gt; <span style="color: #a45bad;">3</span>
+<span style="color: #4f97d7;">(</span>ackermann <span style="color: #a45bad;">1</span> <span style="color: #a45bad;">2</span><span style="color: #4f97d7;">)</span>
+==&gt; <span style="color: #a45bad;">4</span>
+<span style="color: #4f97d7;">(</span>ackermann <span style="color: #a45bad;">1</span> <span style="color: #a45bad;">3</span><span style="color: #4f97d7;">)</span>
+==&gt; <span style="color: #a45bad;">5</span>
+<span style="color: #4f97d7;">(</span>ackermann <span style="color: #a45bad;">2</span> <span style="color: #a45bad;">1</span><span style="color: #4f97d7;">)</span>
+==&gt; <span style="color: #a45bad;">5</span>
+<span style="color: #4f97d7;">(</span>ackermann <span style="color: #a45bad;">2</span> <span style="color: #a45bad;">2</span><span style="color: #4f97d7;">)</span>
+==&gt; <span style="color: #a45bad;">7</span>
+<span style="color: #4f97d7;">(</span>ackermann <span style="color: #a45bad;">2</span> <span style="color: #a45bad;">3</span><span style="color: #4f97d7;">)</span>
+==&gt; <span style="color: #a45bad;">9</span>
+<span style="color: #4f97d7;">(</span>ackermann <span style="color: #a45bad;">2</span> <span style="color: #a45bad;">4</span><span style="color: #4f97d7;">)</span>
+==&gt; <span style="color: #a45bad;">11</span>
+<span style="color: #4f97d7;">(</span>ackermann <span style="color: #a45bad;">2</span> <span style="color: #a45bad;">5</span><span style="color: #4f97d7;">)</span>
+==&gt; <span style="color: #a45bad;">13</span>
+<span style="color: #4f97d7;">(</span>ackermann <span style="color: #a45bad;">3</span> <span style="color: #a45bad;">1</span><span style="color: #4f97d7;">)</span>
+==&gt; <span style="color: #a45bad;">13</span>
+<span style="color: #4f97d7;">(</span>ackermann <span style="color: #a45bad;">3</span> <span style="color: #a45bad;">2</span><span style="color: #4f97d7;">)</span>
+==&gt; <span style="color: #a45bad;">29</span>
+<span style="color: #4f97d7;">(</span>ackermann <span style="color: #a45bad;">3</span> <span style="color: #a45bad;">3</span><span style="color: #4f97d7;">)</span>
+==&gt; <span style="color: #a45bad;">61</span>
+<span style="color: #4f97d7;">(</span>ackermann <span style="color: #a45bad;">4</span> <span style="color: #a45bad;">1</span><span style="color: #4f97d7;">)</span>
+==&gt; <span style="color: #a45bad;">65533</span>
+</pre>
+</div>
+
+<p>
+用递归的方式将数字转换为英文书写形式.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">defun</span> <span style="color: #bc6ec5; font-weight: bold;">int-to-words</span> <span style="color: #bc6ec5;">(</span>n<span style="color: #bc6ec5;">)</span>
+  <span style="color: #2aa1ae;">"List of English groupings for number N."</span>
+  <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">let*</span> <span style="color: #2d9574;">(</span><span style="color: #67b11d;">(</span>pow10 <span style="color: #b1951d;">(</span><span style="color: #4f97d7; font-weight: bold;">pcase</span> <span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">if</span> <span style="color: #bc6ec5;">(</span>zerop n<span style="color: #bc6ec5;">)</span> <span style="color: #a45bad;">1</span> <span style="color: #bc6ec5;">(</span>floor <span style="color: #2d9574;">(</span>log10 <span style="color: #9cb6ad;">(</span>abs n<span style="color: #9cb6ad;">)</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+                  <span style="color: #4f97d7;">(</span>`<span style="color: #a45bad;">1</span> <span style="color: #a45bad;">1</span><span style="color: #4f97d7;">)</span>
+                  <span style="color: #4f97d7;">(</span>`<span style="color: #a45bad;">2</span> <span style="color: #a45bad;">2</span><span style="color: #4f97d7;">)</span>
+                  <span style="color: #4f97d7;">(</span>`<span style="color: #a45bad;">3</span> <span style="color: #a45bad;">3</span><span style="color: #4f97d7;">)</span>
+                  <span style="color: #4f97d7;">(</span>n <span style="color: #bc6ec5;">(</span>- n <span style="color: #2d9574;">(</span>% n <span style="color: #a45bad;">3</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span>
+         <span style="color: #67b11d;">(</span>base10 <span style="color: #b1951d;">(</span>expt <span style="color: #a45bad;">10.0</span> pow10<span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span><span style="color: #4f97d7; font-weight: bold;">pcase</span> n
+      <span style="color: #67b11d;">(</span>`nil <span style="color: #b1951d;">(</span><span style="color: #dc752f; background-color: #292b2e;">error</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span>
+      <span style="color: #67b11d;">(</span><span style="color: #b1951d;">(</span>pred <span style="color: #4f97d7;">(</span>&gt; <span style="color: #a45bad;">0</span><span style="color: #4f97d7;">)</span><span style="color: #b1951d;">)</span> <span style="color: #b1951d;">(</span>cons <span style="color: #2d9574;">"negative"</span> <span style="color: #4f97d7;">(</span>int-to-words <span style="color: #bc6ec5;">(</span>- n<span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span>
+      <span style="color: #67b11d;">(</span>`<span style="color: #a45bad;">0</span> '<span style="color: #b1951d;">(</span><span style="color: #2d9574;">"zero"</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span>
+      <span style="color: #67b11d;">(</span>`<span style="color: #a45bad;">1</span> '<span style="color: #b1951d;">(</span><span style="color: #2d9574;">"one"</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span>
+      <span style="color: #67b11d;">(</span>`<span style="color: #a45bad;">2</span> '<span style="color: #b1951d;">(</span><span style="color: #2d9574;">"two"</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span>
+      <span style="color: #67b11d;">(</span>`<span style="color: #a45bad;">3</span> '<span style="color: #b1951d;">(</span><span style="color: #2d9574;">"three"</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span>
+      <span style="color: #67b11d;">(</span>`<span style="color: #a45bad;">4</span> '<span style="color: #b1951d;">(</span><span style="color: #2d9574;">"four"</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span>
+      <span style="color: #67b11d;">(</span>`<span style="color: #a45bad;">5</span> '<span style="color: #b1951d;">(</span><span style="color: #2d9574;">"five"</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span>
+      <span style="color: #67b11d;">(</span>`<span style="color: #a45bad;">6</span> '<span style="color: #b1951d;">(</span><span style="color: #2d9574;">"six"</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span>
+      <span style="color: #67b11d;">(</span>`<span style="color: #a45bad;">7</span> '<span style="color: #b1951d;">(</span><span style="color: #2d9574;">"seven"</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span>
+      <span style="color: #67b11d;">(</span>`<span style="color: #a45bad;">8</span> '<span style="color: #b1951d;">(</span><span style="color: #2d9574;">"eight"</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span>
+      <span style="color: #67b11d;">(</span>`<span style="color: #a45bad;">9</span> '<span style="color: #b1951d;">(</span><span style="color: #2d9574;">"nine"</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span>
+      <span style="color: #67b11d;">(</span>`<span style="color: #a45bad;">10</span> '<span style="color: #b1951d;">(</span><span style="color: #2d9574;">"ten"</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span>
+      <span style="color: #67b11d;">(</span>`<span style="color: #a45bad;">11</span> '<span style="color: #b1951d;">(</span><span style="color: #2d9574;">"eleven"</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span>
+      <span style="color: #67b11d;">(</span>`<span style="color: #a45bad;">12</span> '<span style="color: #b1951d;">(</span><span style="color: #2d9574;">"twelve"</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span>
+      <span style="color: #67b11d;">(</span>`<span style="color: #a45bad;">13</span> '<span style="color: #b1951d;">(</span><span style="color: #2d9574;">"thirteen"</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span>
+      <span style="color: #67b11d;">(</span>`<span style="color: #a45bad;">14</span> '<span style="color: #b1951d;">(</span><span style="color: #2d9574;">"fourteen"</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span>
+      <span style="color: #67b11d;">(</span>`<span style="color: #a45bad;">15</span> '<span style="color: #b1951d;">(</span><span style="color: #2d9574;">"fifteen"</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span>
+      <span style="color: #67b11d;">(</span>`<span style="color: #a45bad;">16</span> '<span style="color: #b1951d;">(</span><span style="color: #2d9574;">"sixteen"</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span>
+      <span style="color: #67b11d;">(</span>`<span style="color: #a45bad;">17</span> '<span style="color: #b1951d;">(</span><span style="color: #2d9574;">"seventeen"</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span>
+      <span style="color: #67b11d;">(</span>`<span style="color: #a45bad;">18</span> '<span style="color: #b1951d;">(</span><span style="color: #2d9574;">"eighteen"</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span>
+      <span style="color: #67b11d;">(</span>`<span style="color: #a45bad;">19</span> '<span style="color: #b1951d;">(</span><span style="color: #2d9574;">"nineteen"</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span>
+      <span style="color: #67b11d;">(</span>`<span style="color: #a45bad;">20</span> '<span style="color: #b1951d;">(</span><span style="color: #2d9574;">"twenty"</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span>
+      <span style="color: #67b11d;">(</span>`<span style="color: #a45bad;">30</span> '<span style="color: #b1951d;">(</span><span style="color: #2d9574;">"thirty"</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span>
+      <span style="color: #67b11d;">(</span>`<span style="color: #a45bad;">40</span> '<span style="color: #b1951d;">(</span><span style="color: #2d9574;">"forty"</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span>
+      <span style="color: #67b11d;">(</span>`<span style="color: #a45bad;">50</span> '<span style="color: #b1951d;">(</span><span style="color: #2d9574;">"fifty"</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span>
+      <span style="color: #67b11d;">(</span>`<span style="color: #a45bad;">60</span> '<span style="color: #b1951d;">(</span><span style="color: #2d9574;">"sixty"</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span>
+      <span style="color: #67b11d;">(</span>`<span style="color: #a45bad;">70</span> '<span style="color: #b1951d;">(</span><span style="color: #2d9574;">"seventy"</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span>
+      <span style="color: #67b11d;">(</span>`<span style="color: #a45bad;">80</span> '<span style="color: #b1951d;">(</span><span style="color: #2d9574;">"eighty"</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span>
+      <span style="color: #67b11d;">(</span>`<span style="color: #a45bad;">90</span> '<span style="color: #b1951d;">(</span><span style="color: #2d9574;">"ninety"</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span>
+      <span style="color: #2aa1ae; background-color: #292e34;">;; </span><span style="color: #2aa1ae; background-color: #292e34;">Less than 100</span>
+      <span style="color: #67b11d;">(</span><span style="color: #b1951d;">(</span>pred <span style="color: #4f97d7;">(</span>&gt; <span style="color: #a45bad;">100</span><span style="color: #4f97d7;">)</span><span style="color: #b1951d;">)</span>
+       <span style="color: #b1951d;">(</span>list <span style="color: #4f97d7;">(</span>mapconcat 'identity
+                        <span style="color: #bc6ec5;">(</span>cons <span style="color: #2d9574;">(</span>car <span style="color: #9cb6ad;">(</span>int-to-words <span style="color: #4f97d7;">(</span>- n <span style="color: #bc6ec5;">(</span>% n <span style="color: #a45bad;">10</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span><span style="color: #9cb6ad;">)</span><span style="color: #2d9574;">)</span>
+                              <span style="color: #2d9574;">(</span>int-to-words <span style="color: #9cb6ad;">(</span>% n <span style="color: #a45bad;">10</span><span style="color: #9cb6ad;">)</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span> <span style="color: #2d9574;">"-"</span><span style="color: #4f97d7;">)</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span>
+      <span style="color: #2aa1ae; background-color: #292e34;">;; </span><span style="color: #2aa1ae; background-color: #292e34;">Equal to a base ten</span>
+      <span style="color: #67b11d;">(</span><span style="color: #b1951d;">(</span>pred <span style="color: #4f97d7;">(</span>= base10<span style="color: #4f97d7;">)</span><span style="color: #b1951d;">)</span> <span style="color: #b1951d;">(</span><span style="color: #4f97d7; font-weight: bold;">pcase</span> pow10
+                           <span style="color: #4f97d7;">(</span>`<span style="color: #a45bad;">2</span>  '<span style="color: #bc6ec5;">(</span><span style="color: #2d9574;">"hundred"</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+                           <span style="color: #4f97d7;">(</span>`<span style="color: #a45bad;">3</span>  '<span style="color: #bc6ec5;">(</span><span style="color: #2d9574;">"thousand"</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+                           <span style="color: #4f97d7;">(</span>`<span style="color: #a45bad;">6</span>  '<span style="color: #bc6ec5;">(</span><span style="color: #2d9574;">"million"</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+                           <span style="color: #4f97d7;">(</span>`<span style="color: #a45bad;">9</span>  '<span style="color: #bc6ec5;">(</span><span style="color: #2d9574;">"billion"</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+                           <span style="color: #4f97d7;">(</span>`<span style="color: #a45bad;">12</span> '<span style="color: #bc6ec5;">(</span><span style="color: #2d9574;">"trillion"</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+                           <span style="color: #4f97d7;">(</span>`<span style="color: #a45bad;">15</span> '<span style="color: #bc6ec5;">(</span><span style="color: #2d9574;">"quadrillion"</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+                           <span style="color: #4f97d7;">(</span>`<span style="color: #a45bad;">18</span> '<span style="color: #bc6ec5;">(</span><span style="color: #2d9574;">"quintillion"</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+                           <span style="color: #4f97d7;">(</span>`<span style="color: #a45bad;">21</span> '<span style="color: #bc6ec5;">(</span><span style="color: #2d9574;">"sextillion"</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+                           <span style="color: #4f97d7;">(</span>`<span style="color: #a45bad;">24</span> '<span style="color: #bc6ec5;">(</span><span style="color: #2d9574;">"septillion"</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+                           <span style="color: #4f97d7;">(</span>`<span style="color: #a45bad;">27</span> '<span style="color: #bc6ec5;">(</span><span style="color: #2d9574;">"octillion"</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+                           <span style="color: #4f97d7;">(</span>`<span style="color: #a45bad;">30</span> '<span style="color: #bc6ec5;">(</span><span style="color: #2d9574;">"nonillion"</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+                           <span style="color: #4f97d7;">(</span>`<span style="color: #a45bad;">33</span> '<span style="color: #bc6ec5;">(</span><span style="color: #2d9574;">"decillion"</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+                           <span style="color: #4f97d7;">(</span>`<span style="color: #a45bad;">36</span> '<span style="color: #bc6ec5;">(</span><span style="color: #2d9574;">"undecillion"</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+                           <span style="color: #4f97d7;">(</span>`<span style="color: #a45bad;">39</span> '<span style="color: #bc6ec5;">(</span><span style="color: #2d9574;">"duodecillion"</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+                           <span style="color: #4f97d7;">(</span>`<span style="color: #a45bad;">42</span> '<span style="color: #bc6ec5;">(</span><span style="color: #2d9574;">"tredecillion"</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+                           <span style="color: #4f97d7;">(</span>`<span style="color: #a45bad;">45</span> '<span style="color: #bc6ec5;">(</span><span style="color: #2d9574;">"quattuordecillion"</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+                           <span style="color: #4f97d7;">(</span>`<span style="color: #a45bad;">48</span> '<span style="color: #bc6ec5;">(</span><span style="color: #2d9574;">"quindecillion"</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+                           <span style="color: #4f97d7;">(</span>`<span style="color: #a45bad;">51</span> '<span style="color: #bc6ec5;">(</span><span style="color: #2d9574;">"sexdecillion"</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+                           <span style="color: #4f97d7;">(</span>`<span style="color: #a45bad;">54</span> '<span style="color: #bc6ec5;">(</span><span style="color: #2d9574;">"septendecillion"</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+                           <span style="color: #4f97d7;">(</span>`<span style="color: #a45bad;">57</span> '<span style="color: #bc6ec5;">(</span><span style="color: #2d9574;">"octodecillion"</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+                           <span style="color: #4f97d7;">(</span>`<span style="color: #a45bad;">60</span> '<span style="color: #bc6ec5;">(</span><span style="color: #2d9574;">"novemdecillion"</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+                           <span style="color: #4f97d7;">(</span>`<span style="color: #a45bad;">63</span> '<span style="color: #bc6ec5;">(</span><span style="color: #2d9574;">"vigintillion"</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+                           <span style="color: #4f97d7;">(</span>_ <span style="color: #bc6ec5;">(</span><span style="color: #dc752f; background-color: #292b2e;">signal</span> 'domain-error <span style="color: #2d9574;">(</span>list n<span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span>
+      <span style="color: #2aa1ae; background-color: #292e34;">;; </span><span style="color: #2aa1ae; background-color: #292e34;">Greater than a base ten</span>
+      <span style="color: #67b11d;">(</span><span style="color: #b1951d;">(</span>pred <span style="color: #4f97d7;">(</span>&lt; base10<span style="color: #4f97d7;">)</span><span style="color: #b1951d;">)</span>
+       <span style="color: #b1951d;">(</span>cons <span style="color: #4f97d7;">(</span>mapconcat 'identity
+                        <span style="color: #bc6ec5;">(</span>append <span style="color: #2d9574;">(</span>int-to-words <span style="color: #9cb6ad;">(</span>floor <span style="color: #4f97d7;">(</span>/ n base10<span style="color: #4f97d7;">)</span><span style="color: #9cb6ad;">)</span><span style="color: #2d9574;">)</span>
+                                <span style="color: #2d9574;">(</span>int-to-words base10<span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span>
+                        <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">if</span> <span style="color: #2d9574;">(</span>&lt; <span style="color: #9cb6ad;">(</span>/ n base10<span style="color: #9cb6ad;">)</span> <span style="color: #a45bad;">20</span><span style="color: #2d9574;">)</span> <span style="color: #2d9574;">"-"</span> <span style="color: #2d9574;">" "</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+             <span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">if</span> <span style="color: #bc6ec5;">(</span>zerop <span style="color: #2d9574;">(</span>mod n base10<span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span>
+                 nil
+               <span style="color: #bc6ec5;">(</span>int-to-words <span style="color: #2d9574;">(</span><span style="color: #4f97d7; font-weight: bold;">if</span> <span style="color: #9cb6ad;">(</span>&lt; n most-positive-fixnum<span style="color: #9cb6ad;">)</span>
+                                 <span style="color: #9cb6ad;">(</span>% <span style="color: #4f97d7;">(</span>floor n<span style="color: #4f97d7;">)</span> <span style="color: #4f97d7;">(</span>floor base10<span style="color: #4f97d7;">)</span><span style="color: #9cb6ad;">)</span>
+                               <span style="color: #9cb6ad;">(</span>mod n base10<span style="color: #9cb6ad;">)</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+
+<span style="color: #4f97d7;">(</span>int-to-words <span style="color: #a45bad;">333</span><span style="color: #4f97d7;">)</span>
+==&gt; <span style="color: #4f97d7;">(</span><span style="color: #2d9574;">"three-hundred"</span> <span style="color: #2d9574;">"thirty-three"</span><span style="color: #4f97d7;">)</span>
+
+<span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">defun</span> <span style="color: #bc6ec5; font-weight: bold;">int-to-phrase</span> <span style="color: #bc6ec5;">(</span>n<span style="color: #bc6ec5;">)</span>
+  <span style="color: #2aa1ae;">"Number N in English."</span>
+  <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">let</span> <span style="color: #2d9574;">(</span><span style="color: #67b11d;">(</span>words <span style="color: #b1951d;">(</span>int-to-words n<span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span><span style="color: #4f97d7; font-weight: bold;">cond</span>
+     <span style="color: #67b11d;">(</span><span style="color: #b1951d;">(</span>equal <span style="color: #2d9574;">"negative"</span> <span style="color: #4f97d7;">(</span>car words<span style="color: #4f97d7;">)</span><span style="color: #b1951d;">)</span>
+      <span style="color: #b1951d;">(</span>mapconcat 'identity
+                 <span style="color: #4f97d7;">(</span>append
+                  <span style="color: #bc6ec5;">(</span>list <span style="color: #2d9574;">(</span>car words<span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span> <span style="color: #2aa1ae; background-color: #292e34;">;; </span><span style="color: #2aa1ae; background-color: #292e34;">'("negative")</span>
+                  <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">if</span> <span style="color: #2d9574;">(</span>&gt; <span style="color: #9cb6ad;">(</span>length <span style="color: #4f97d7;">(</span>cdr words<span style="color: #4f97d7;">)</span><span style="color: #9cb6ad;">)</span> <span style="color: #a45bad;">1</span><span style="color: #2d9574;">)</span>
+                      <span style="color: #2d9574;">(</span>list <span style="color: #9cb6ad;">(</span>mapconcat 'identity <span style="color: #4f97d7;">(</span>butlast <span style="color: #bc6ec5;">(</span>cdr words<span style="color: #bc6ec5;">)</span> <span style="color: #a45bad;">1</span><span style="color: #4f97d7;">)</span> <span style="color: #2d9574;">", "</span><span style="color: #9cb6ad;">)</span><span style="color: #2d9574;">)</span>
+                    nil<span style="color: #bc6ec5;">)</span>
+                  <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">if</span> <span style="color: #2d9574;">(</span>&gt; <span style="color: #9cb6ad;">(</span>length <span style="color: #4f97d7;">(</span>cdr words<span style="color: #4f97d7;">)</span><span style="color: #9cb6ad;">)</span> <span style="color: #a45bad;">1</span><span style="color: #2d9574;">)</span> '<span style="color: #2d9574;">(</span><span style="color: #2d9574;">"and"</span><span style="color: #2d9574;">)</span> nil<span style="color: #bc6ec5;">)</span>
+                  <span style="color: #bc6ec5;">(</span>last <span style="color: #2d9574;">(</span>cdr words<span style="color: #2d9574;">)</span> <span style="color: #a45bad;">1</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+                 <span style="color: #2d9574;">" "</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span>
+     <span style="color: #67b11d;">(</span><span style="color: #b1951d;">(</span>&gt; <span style="color: #4f97d7;">(</span>length words<span style="color: #4f97d7;">)</span> <span style="color: #a45bad;">1</span><span style="color: #b1951d;">)</span>
+      <span style="color: #b1951d;">(</span>mapconcat 'identity
+                 <span style="color: #4f97d7;">(</span>append
+                  <span style="color: #bc6ec5;">(</span>list <span style="color: #2d9574;">(</span>mapconcat 'identity <span style="color: #9cb6ad;">(</span>butlast words <span style="color: #a45bad;">1</span><span style="color: #9cb6ad;">)</span> <span style="color: #2d9574;">", "</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span>
+                  '<span style="color: #bc6ec5;">(</span><span style="color: #2d9574;">"and"</span><span style="color: #bc6ec5;">)</span>
+                  <span style="color: #bc6ec5;">(</span>last words <span style="color: #a45bad;">1</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span> <span style="color: #2d9574;">" "</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span>
+     <span style="color: #67b11d;">(</span>t <span style="color: #b1951d;">(</span>car words<span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+
+<span style="color: #4f97d7;">(</span>int-to-phrase <span style="color: #a45bad;">-4444</span><span style="color: #4f97d7;">)</span>
+==&gt; <span style="color: #2d9574;">"negative four-thousand, four-hundred and forty-four"</span>
+</pre>
+</div>
+
+<p>
+另外关于 <a href="http://en.wikipedia.org/wiki/Pattern%20matching">WikiPedia:Pattern matching</a>, <a href="http://nic.ferrier.me.uk/blog/2013_03/refactoring-elisp-polymorphically">Nic Ferrier on using pcase for refactoring</a>
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-org">&#25105;&#35797;&#20102;&#19968;&#19979;&#19979;&#38754;&#30340;&#20195;&#30721;,&#23436;&#20840;&#27809;&#38382;&#39064;.
+
+<span style="color: #827591; background-color: #373040;">#+BEGIN_SRC emacs-lisp</span>
+  <span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">pcase</span> '<span style="color: #bc6ec5;">(</span>apple . <span style="color: #2d9574;">(</span>banana orange<span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span>
+    <span style="color: #bc6ec5;">(</span>`<span style="color: #2d9574;">(</span>,a . <span style="color: #67b11d;">(</span>,b ,c<span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span> <span style="color: #2d9574;">(</span>list a b c<span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+  ==&gt; <span style="color: #4f97d7;">(</span>apple banana orange<span style="color: #4f97d7;">)</span>
+<span style="color: #827591; background-color: #373040;">#+END_SRC</span>
+
+&#20294;&#26159;&#24403;&#25105;&#23558;&#36825;&#20010;&#34920;&#36798;&#24335;&#36827;&#34892;&#23439;&#23637;&#24320;&#21518;,&#24471;&#21040;&#30340;&#32467;&#26524;&#26159;:
+
+<span style="color: #827591; background-color: #373040;">#+BEGIN_SRC emacs-lisp</span>
+  <span style="color: #4f97d7;">(</span>pp-macroexpand-expression 
+   '<span style="color: #bc6ec5;">(</span>pcase '<span style="color: #2d9574;">(</span>apple . <span style="color: #67b11d;">(</span>banana orange<span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span>
+      <span style="color: #2d9574;">(</span>`<span style="color: #67b11d;">(</span>,a . <span style="color: #b1951d;">(</span>,b ,c<span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span> <span style="color: #67b11d;">(</span>list a b c<span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+
+  ==&gt; 
+  <span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">if</span> <span style="color: #bc6ec5;">(</span>consp '<span style="color: #2d9574;">(</span>apple banana orange<span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span>
+      <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">let*</span> <span style="color: #2d9574;">(</span><span style="color: #67b11d;">(</span>xcar <span style="color: #b1951d;">(</span>car '<span style="color: #4f97d7;">(</span>apple banana orange<span style="color: #4f97d7;">)</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span>
+             <span style="color: #67b11d;">(</span>xcdr <span style="color: #b1951d;">(</span>cdr '<span style="color: #4f97d7;">(</span>apple banana orange<span style="color: #4f97d7;">)</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span>
+        <span style="color: #2d9574;">(</span><span style="color: #4f97d7; font-weight: bold;">if</span> <span style="color: #67b11d;">(</span>consp xcdr<span style="color: #67b11d;">)</span>
+            <span style="color: #67b11d;">(</span><span style="color: #4f97d7; font-weight: bold;">let*</span> <span style="color: #b1951d;">(</span><span style="color: #4f97d7;">(</span>xcar <span style="color: #bc6ec5;">(</span>car xcdr<span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+                   <span style="color: #4f97d7;">(</span>xcdr <span style="color: #bc6ec5;">(</span>cdr xcdr<span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span><span style="color: #b1951d;">)</span>
+              <span style="color: #b1951d;">(</span><span style="color: #4f97d7; font-weight: bold;">if</span> <span style="color: #4f97d7;">(</span>consp xcdr<span style="color: #4f97d7;">)</span>
+                  <span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">let*</span> <span style="color: #bc6ec5;">(</span><span style="color: #2d9574;">(</span>xcar <span style="color: #9cb6ad;">(</span>car xcdr<span style="color: #9cb6ad;">)</span><span style="color: #2d9574;">)</span>
+                         <span style="color: #2d9574;">(</span>xcdr <span style="color: #9cb6ad;">(</span>cdr xcdr<span style="color: #9cb6ad;">)</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span>
+                    <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">if</span> <span style="color: #2d9574;">(</span>null xcdr<span style="color: #2d9574;">)</span>
+                        <span style="color: #2d9574;">(</span><span style="color: #4f97d7; font-weight: bold;">let</span> <span style="color: #9cb6ad;">(</span><span style="color: #4f97d7;">(</span>c xcar<span style="color: #4f97d7;">)</span>
+                              <span style="color: #4f97d7;">(</span>b xcar<span style="color: #4f97d7;">)</span>
+                              <span style="color: #4f97d7;">(</span>a xcar<span style="color: #4f97d7;">)</span><span style="color: #9cb6ad;">)</span>
+                          <span style="color: #9cb6ad;">(</span>list a b c<span style="color: #9cb6ad;">)</span><span style="color: #2d9574;">)</span>
+                      nil<span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+                nil<span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span>
+          nil<span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span>
+    nil<span style="color: #4f97d7;">)</span>
+<span style="color: #827591; background-color: #373040;">#+END_SRC</span>
+
+&#24456;&#26126;&#26174;&#19981;&#21487;&#33021;&#23558;&#8216;a&#8217;, &#8216;b&#8217;, &#8216;c&#8217;&#37117;&#32465;&#23450;&#21040;&#8216;xcar&#8217;,&#21542;&#21017;&#32467;&#26524;&#24212;&#35813;&#26159;&#8220;(orange orange orange)&#8221;. 
+&#25105;&#24863;&#21040;&#24456;&#36855;&#24785;,&#36825;&#26159;Emacs&#20013; <span style="color: #4f97d7;">=macroexpand=</span> &#30340;BUG&#21527;? &#36824;&#26159;&#25105;&#29702;&#35299;&#26377;&#38382;&#39064;?&#25105;&#30340;Emacs&#29256;&#26412;&#26159; &#8220;GNU Emacs 24.3.1&#8221;
+
+--xiepan
+</pre>
+</div>
+
+
+<p>
+事实上,所有这些‘xcar’都是不同的symbol,只不过恰巧有同一个名字而已. 若你执行过 <code>(setq print-gensym t)</code>, 你就会发现这些xcar输出为 <code>#:xcar</code> ,也就是说它们是uninterned symbols.
+</p>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2016-07-18</span>
+            <span title="last modification date" class="post-info">2016-07-18</span>
+            <span title="tags" class="post-info">:N/A:</span>
+            <span title="author" class="post-info"><a href="mailto:lujun9972 &lt;at&gt; lujun9972-F41">lujun9972</a></span>
+        </div>
+    <script src="http://lujun9972.github.io/emacs-document/media/js/jquery-2.1.3.min.js"></script>
+        <section>
+            <h1>Comments</h1>
+            <div id="comment-wrap">
+                    <a class="disqus_label">使用 Disqus 评论</a>
+                    <a class="ds-label">使用多说评论</a>
+    </ul>
+        <div id="disqus_thread"></div>
+        <script type="text/javascript">
+         //var disqus_developer = 1;
+         var preempt_signal=false;
+         var disqus_identifier = "/blog/2016/07/18/emacslisp中的模式匹配/";
+         var disqus_url = "http://lujun9972.github.io/emacs-document/blog/2016/07/18/emacslisp中的模式匹配/";
+         var disqus_shortname = 'emacs-document';
+         /* * * DON'T EDIT BELOW THIS LINE * * */
+         (function() {
+             var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+             dsq.src = 'http://' + disqus_shortname + '.disqus.com/embed.js';
+             (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+             $('#disqus_thread').css('display','none');
+         })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+        <div class="ds-thread"></div>
+        <script type="text/javascript">
+         var duoshuoQuery = {short_name:'emacs-document'};
+         (function() {
+             var ds = document.createElement('script');
+             ds.type = 'text/javascript';ds.async = true;
+             ds.src = 'http://static.duoshuo.com/embed.js';
+             ds.charset = 'UTF-8';
+             (document.getElementsByTagName('head')[0]
+           || document.getElementsByTagName('body')[0]).appendChild(ds);
+             $('.ds-thread').css('display','block');
+         })();
+        </script>
+    <script>
+     /* comments */
+     var ego_disqus_thread=$('#disqus_thread');
+     var ego_ds_label=$('.ds-thread');
+     $('.disqus_label').click(function(){
+         ego_disqus_thread.show();
+         ego_ds_label.hide();
+     });
+     $('.ds-label').click(function(){
+         ego_disqus_thread.hide();
+         ego_ds_label.show();
+     });
+    </script>
+        </section>
+    <script src="http://lujun9972.github.io/emacs-document/media/js/main.js"></script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 25.x(<a href="http://orgmode.org">Org mode</a> 8.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:lujun9972 &lt;at&gt; lujun9972-F41">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div></body>
+</html>

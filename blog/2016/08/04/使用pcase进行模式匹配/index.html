@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>使用pcase进行模式匹配 - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <style>
+   #ds-thread #ds-reset .ds-comment-body p {color: #ffffff;}
+   #ds-thread #ds-reset .ds-comment-body p a {color: #ff0;}
+   #ds-thread #ds-reset .ds-comment-body p a:hover {color: #0ff;}
+   #disqus_thread a {color: #00ffff;}
+  </style>
+  <link rel="stylesheet" href="http://lujun9972.github.io/emacs-document/media/css/main.css" type="text/css"/>
+  <link rel="stylesheet" href="http://lujun9972.github.io/emacs-document/media/css/comment.css" type="text/css"/>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="http://lujun9972.github.io/emacs-document/">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;集思广益</p>
+    <nav class="site-nav">
+      <div class="menu-icon">
+        <svg viewBox="0 0 18 15">
+          <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.031C17.335,0,18,0.665,18,1.484L18,1.484z" fill="#ffff00"/>
+          <path d="M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0c0-0.82,0.665-1.484,1.484-1.484 h15.031C17.335,6.031,18,6.696,18,7.516L18,7.516z" fill="#ffff00"/>
+          <path d="M18,13.516C18,14.335,17.335,15,16.516,15H1.484C0.665,15,0,14.335,0,13.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.031C17.335,12.031,18,12.696,18,13.516L18,13.516z" fill="#ffff00"/>
+        </svg>
+      </div>
+      <ul class="trigger">
+        <li><a href="http://lujun9972.github.io/emacs-document/years/">Years</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/authors/">Authors</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/tags/">Tags</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document">Github</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="http://www.google.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">使用pcase进行模式匹配</h1>
+<div id="table-of-contents">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#orgheadline1">1. 精确匹配</a></li>
+<li><a href="#orgheadline2">2. 模式匹配</a></li>
+<li><a href="#orgheadline3">3. 捕获匹配的值</a></li>
+<li><a href="#orgheadline4">4. Logical and literal patterns</a></li>
+<li><a href="#orgheadline12">5. More on logical patterns</a>
+<ul>
+<li><a href="#orgheadline5">5.1. 下划线 _</a></li>
+<li><a href="#orgheadline6">5.2. Symbol</a></li>
+<li><a href="#orgheadline7">5.3. (or PAT &#x2026;) and (and PAT &#x2026;)</a></li>
+<li><a href="#orgheadline8">5.4. pred 判断式</a></li>
+<li><a href="#orgheadline9">5.5. guard 表达式</a></li>
+<li><a href="#orgheadline10">5.6. Pattern let bindings</a></li>
+<li><a href="#orgheadline11">5.7. pcase-let and pcase-let*</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+<p>
+这是一篇关于如何使用pcase宏的指南.
+</p>
+
+<div id="outline-container-orgheadline1" class="outline-2">
+<h2 id="orgheadline1"><span class="section-number-2">1</span> 精确匹配</h2>
+<div class="outline-text-2" id="text-1">
+<p>
+任何数据都准从某种模式. 最精确的模式就是描述要匹配的数据它自己. 让我们看下面这个例子:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp">'<span style="color: #4f97d7;">(</span><span style="color: #a45bad;">1</span> <span style="color: #a45bad;">2</span> <span style="color: #bc6ec5;">(</span><span style="color: #a45bad;">4</span> . <span style="color: #a45bad;">5</span><span style="color: #bc6ec5;">)</span> <span style="color: #2d9574;">"Hello"</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+上面这个例子明确指明了这是一个由4元素组成的list, 其中前两个元素分别是数字1和2; 第三个元素是一个cons cell,它的car是4,cdr是5; 第四个元素则是字符串"Hello". 
+这是一个很明确的模式,我们可以直接用它来作相等测试(equality test):
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span>equal value '<span style="color: #bc6ec5;">(</span><span style="color: #a45bad;">1</span> <span style="color: #a45bad;">2</span> <span style="color: #2d9574;">(</span><span style="color: #a45bad;">4</span> . <span style="color: #a45bad;">5</span><span style="color: #2d9574;">)</span> <span style="color: #2d9574;">"Hello"</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgheadline2" class="outline-2">
+<h2 id="orgheadline2"><span class="section-number-2">2</span> 模式匹配</h2>
+<div class="outline-text-2" id="text-2">
+<p>
+模式只有通用一点的才有用. 假设我们想作一个类似的相等性测试,但是我们不关心最后一个字符串的内容是什么,只要它是字符串就行. 虽然这是一个很简单的模式声明,但是要用相等性测试来实现确很困难.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">and</span> <span style="color: #bc6ec5;">(</span>equal <span style="color: #2d9574;">(</span>subseq value <span style="color: #a45bad;">0</span> <span style="color: #a45bad;">3</span><span style="color: #2d9574;">)</span> '<span style="color: #2d9574;">(</span><span style="color: #a45bad;">1</span> <span style="color: #a45bad;">2</span> <span style="color: #67b11d;">(</span><span style="color: #a45bad;">4</span> <span style="color: #a45bad;">.5</span><span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span>
+     <span style="color: #bc6ec5;">(</span>stringp <span style="color: #2d9574;">(</span>nth <span style="color: #a45bad;">3</span> value<span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+我们希望能有一种更直观的方法来描述我们想要匹配的那些值. 就好像我们用自然语言那么描述一样的:前三个元素要一模一样,最后一个元素可以是任意字符串. 借助`pcase`我们也能这样表示:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">pcase</span> value
+  <span style="color: #bc6ec5;">(</span>`<span style="color: #2d9574;">(</span><span style="color: #a45bad;">1</span> <span style="color: #a45bad;">2</span> <span style="color: #67b11d;">(</span><span style="color: #a45bad;">4</span> . <span style="color: #a45bad;">5</span><span style="color: #67b11d;">)</span> ,<span style="color: #67b11d;">(</span>pred stringp<span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span>
+   <span style="color: #2d9574;">(</span>message <span style="color: #2d9574;">"It matched!"</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+可以把pcase看成是某种cond语句,只不过匹配条件不是测试是否为非nil,而是将值与一系列的模式进行匹配. 跟cond一样,若有多个模式都能匹配,则只触发第一个匹配模式的语句.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgheadline3" class="outline-2">
+<h2 id="orgheadline3"><span class="section-number-2">3</span> 捕获匹配的值</h2>
+<div class="outline-text-2" id="text-3">
+<p>
+pcase还能更进一步: 我们不仅仅可以进行模式匹配,还能从模式中捕获匹配的值供后续使用.
+</p>
+
+<p>
+让我们继续上一个案例,假设我们想输出匹配出来的字符串内容:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">pcase</span> value
+  <span style="color: #bc6ec5;">(</span>`<span style="color: #2d9574;">(</span><span style="color: #a45bad;">1</span> <span style="color: #a45bad;">2</span> <span style="color: #67b11d;">(</span><span style="color: #a45bad;">4</span> . <span style="color: #a45bad;">5</span><span style="color: #67b11d;">)</span> ,<span style="color: #67b11d;">(</span><span style="color: #4f97d7; font-weight: bold;">and</span> <span style="color: #b1951d;">(</span>pred stringp<span style="color: #b1951d;">)</span> foo<span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span>
+   <span style="color: #2d9574;">(</span>message <span style="color: #2d9574;">"It matched, and the string was %s"</span> foo<span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+当出现像上例中foo那样的裸符号(没有被引用的符号)时,匹配的值会被绑定到与该符号同名的局部变量中. 这种模式我们称之为logic pattern(逻辑模式).
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgheadline4" class="outline-2">
+<h2 id="orgheadline4"><span class="section-number-2">4</span> Logical and literal patterns</h2>
+<div class="outline-text-2" id="text-4">
+<p>
+要掌握pcase,有两类模式你必须要知道: Logical patterns, 以及 literal 或者说 quoted patterns(字面模式或引用模式). Logical patterns 说明我们想匹配某一类数据,并会对匹配的这些数据进行某些操作. 而quoted patterns的重点在于它的"字面意义",表示匹配的时候要与它的字面说明一模一样.
+</p>
+
+<p>
+Literal patterns是目前为止最容易理解的了. 要匹配任何atom,string或list的值,对应的literal pattern就是值本身. 也就是说literal pattern "foo" 匹配字符串 "foo", 1 匹配 1, 诸如此类.
+</p>
+
+<p>
+pcase默认匹配logical patterns,如果你想匹配literal pattern,则需要将之引用起来,除非该模式完全是由自引用的atom组成的:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">pcase</span> value
+  <span style="color: #bc6ec5;">(</span>'sym <span style="color: #2d9574;">(</span>message <span style="color: #2d9574;">"Matched the symbol `</span><span style="color: #a45bad;">sym</span><span style="color: #2d9574;">'"</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span><span style="color: #2d9574;">(</span><span style="color: #a45bad;">1</span> <span style="color: #a45bad;">2</span><span style="color: #2d9574;">)</span> <span style="color: #2d9574;">(</span>message <span style="color: #2d9574;">"Matched the list (1 2)"</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+Literal patterns也可以用反引号来引用,这种情况下可以用逗号在其中插入一个logical patterns,就跟宏中的引用和反引用一样的. 例如:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">pcase</span> value
+  <span style="color: #bc6ec5;">(</span>`<span style="color: #2d9574;">(</span><span style="color: #a45bad;">1</span> <span style="color: #a45bad;">2</span> ,<span style="color: #67b11d;">(</span><span style="color: #4f97d7; font-weight: bold;">or</span> <span style="color: #a45bad;">3</span> <span style="color: #a45bad;">4</span><span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span>
+   <span style="color: #2d9574;">(</span>message <span style="color: #2d9574;">"Matched either the list (1 2 3) or (1 2 4)"</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgheadline12" class="outline-2">
+<h2 id="orgheadline12"><span class="section-number-2">5</span> More on logical patterns</h2>
+<div class="outline-text-2" id="text-5">
+<p>
+logical patterns也分很多种. 让我们逐一了解下.
+</p>
+</div>
+
+<div id="outline-container-orgheadline5" class="outline-3">
+<h3 id="orgheadline5"><span class="section-number-3">5.1</span> 下划线 _</h3>
+<div class="outline-text-3" id="text-5-1">
+<p>
+下划线匹配任意元素,而不管这个元素的类型和值是时候那么. 例如,要匹配一个list,而不关心它的头元素是什么可以怎么作:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">pcase</span> value
+  <span style="color: #bc6ec5;">(</span>`<span style="color: #2d9574;">(</span>,_ <span style="color: #a45bad;">1</span> <span style="color: #a45bad;">2</span><span style="color: #2d9574;">)</span>
+   <span style="color: #2d9574;">(</span>message <span style="color: #2d9574;">"Matched a list of anything followed by (2 3)"</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgheadline6" class="outline-3">
+<h3 id="orgheadline6"><span class="section-number-3">5.2</span> Symbol</h3>
+<div class="outline-text-3" id="text-5-2">
+<p>
+当执行匹配动作时,logical pattern中的符号会匹配该位置的任意元素,并且并且会将该元素作为同名局部变量的绑定值. 为了让你更容易理解一些,下面是一些例子:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">pcase</span> value
+  <span style="color: #bc6ec5;">(</span>`<span style="color: #2d9574;">(</span><span style="color: #a45bad;">1</span> <span style="color: #a45bad;">2</span> ,foo <span style="color: #a45bad;">3</span><span style="color: #2d9574;">)</span>
+   <span style="color: #2d9574;">(</span>message <span style="color: #2d9574;">"Matched 1, 2, something now bound to foo, and 3"</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span>foo
+   <span style="color: #2d9574;">(</span>message <span style="color: #2d9574;">"Match anything at all, and bind it to foo!"</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span>`<span style="color: #2d9574;">(</span>,the-car . ,the-cdr<span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span>message <span style="color: #2d9574;">"Match any cons cell, binding the car and cdr locally"</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+这项功能有两个作用:你可以在模式后面的匹配中引用前面的匹配(这里两者比较的条件是eq). 还可以在后面的相关代码中使用匹配的值.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">pcase</span> value
+  <span style="color: #bc6ec5;">(</span>`<span style="color: #2d9574;">(</span><span style="color: #a45bad;">1</span> <span style="color: #a45bad;">2</span> ,foo ,foo <span style="color: #a45bad;">3</span><span style="color: #2d9574;">)</span>
+   <span style="color: #2d9574;">(</span>message <span style="color: #2d9574;">"Matched (1 2 %s %s 3)"</span> foo<span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgheadline7" class="outline-3">
+<h3 id="orgheadline7"><span class="section-number-3">5.3</span> (or PAT &#x2026;) and (and PAT &#x2026;)</h3>
+<div class="outline-text-3" id="text-5-3">
+<p>
+我们还可以使用or和and来对各个模式进行布尔逻辑运算:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">pcase</span> value
+  <span style="color: #bc6ec5;">(</span>`<span style="color: #2d9574;">(</span><span style="color: #a45bad;">1</span> <span style="color: #a45bad;">2</span> ,<span style="color: #67b11d;">(</span><span style="color: #4f97d7; font-weight: bold;">or</span> <span style="color: #a45bad;">3</span> <span style="color: #a45bad;">4</span><span style="color: #67b11d;">)</span>
+       ,<span style="color: #67b11d;">(</span><span style="color: #4f97d7; font-weight: bold;">and</span> <span style="color: #b1951d;">(</span>pred stringp<span style="color: #b1951d;">)</span>
+             <span style="color: #b1951d;">(</span>pred <span style="color: #4f97d7;">(</span>string&gt; <span style="color: #2d9574;">"aaa"</span><span style="color: #4f97d7;">)</span><span style="color: #b1951d;">)</span>
+             <span style="color: #b1951d;">(</span>pred <span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">lambda</span> <span style="color: #bc6ec5;">(</span>x<span style="color: #bc6ec5;">)</span> <span style="color: #bc6ec5;">(</span>&gt; <span style="color: #2d9574;">(</span>length x<span style="color: #2d9574;">)</span> <span style="color: #a45bad;">10</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span>
+   <span style="color: #2d9574;">(</span>message <span style="color: #2d9574;">"Matched 1, 2, 3 or 4, and a long string "</span>
+            <span style="color: #2d9574;">"that is lexically greater than 'aaa'"</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgheadline8" class="outline-3">
+<h3 id="orgheadline8"><span class="section-number-3">5.4</span> pred 判断式</h3>
+<div class="outline-text-3" id="text-5-4">
+<p>
+可以用任意的判断式来对待匹配的元素进行过滤,只有通过判断式的元素才被认为是匹配上了. 正如上个例子中所显示的,可以用lambda函数来组成任意复杂的判断式.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgheadline9" class="outline-3">
+<h3 id="orgheadline9"><span class="section-number-3">5.5</span> guard 表达式</h3>
+<div class="outline-text-3" id="text-5-5">
+<p>
+在匹配的任何一个位置,你都可以插入一个guard表达式来保证某些条件是成立的. 它可以用来约束模式中的其他变量以保证某种模式的有效性,而且在guard表达式中还可以引用之前匹配时所绑定的局部变量. 参见下面的例子:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">pcase</span> value
+  <span style="color: #bc6ec5;">(</span>`<span style="color: #2d9574;">(</span><span style="color: #a45bad;">1</span> <span style="color: #a45bad;">2</span> ,foo ,<span style="color: #67b11d;">(</span>guard <span style="color: #b1951d;">(</span><span style="color: #4f97d7; font-weight: bold;">and</span> <span style="color: #4f97d7;">(</span>not <span style="color: #bc6ec5;">(</span>numberp foo<span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span> <span style="color: #4f97d7;">(</span>/= foo <span style="color: #a45bad;">10</span><span style="color: #4f97d7;">)</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span>
+       <span style="color: #67b11d;">(</span>message <span style="color: #2d9574;">"Matched 1, 2, anything, and then anything again, "</span>
+                <span style="color: #2d9574;">"but only if the first anything wasn't the number 10"</span><span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+注意到在上面这个例子中,guard表达式是作为一个单独的匹配项存在的. 也就是说,虽然guard表达式本身并没有引用到它所匹配的元素上,但若guard表达式中的条件是成立的, 则该位置上的元素(即列表中的第四个元素)依然会被作为一个未命名的匹配项. 这是个相当不好的匹配形式,我们可以让这里的逻辑更明确一些:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">pcase</span> value
+  <span style="color: #bc6ec5;">(</span>`<span style="color: #2d9574;">(</span><span style="color: #a45bad;">1</span> <span style="color: #a45bad;">2</span> ,<span style="color: #67b11d;">(</span><span style="color: #4f97d7; font-weight: bold;">and</span> foo <span style="color: #b1951d;">(</span>guard <span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">and</span> <span style="color: #bc6ec5;">(</span>not <span style="color: #2d9574;">(</span>numberp foo<span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span> <span style="color: #bc6ec5;">(</span>/= foo <span style="color: #a45bad;">10</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span> _<span style="color: #2d9574;">)</span>
+   <span style="color: #2d9574;">(</span>message <span style="color: #2d9574;">"Matched 1, 2, anything, and then anything again, "</span>
+            <span style="color: #2d9574;">"but only if the first anything wasn't the number 10"</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span><span style="color: #e0211d; text-decoration: overline;">)</span>
+</pre>
+</div>
+
+<p>
+这个例子的意思是一样,但是将guard表达式与其要测试的值联系在一起了,这样就更明确的表示我们不关心第四个元素是什么,只要存在就可以了.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgheadline10" class="outline-3">
+<h3 id="orgheadline10"><span class="section-number-3">5.6</span> Pattern let bindings</h3>
+<div class="outline-text-3" id="text-5-6">
+<p>
+在一个模式中,还可以通过let语句来匹配子模式:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">pcase</span> value
+  <span style="color: #bc6ec5;">(</span>`<span style="color: #2d9574;">(</span><span style="color: #a45bad;">1</span> <span style="color: #a45bad;">2</span> ,<span style="color: #67b11d;">(</span><span style="color: #4f97d7; font-weight: bold;">and</span> foo <span style="color: #b1951d;">(</span><span style="color: #4f97d7; font-weight: bold;">let</span> <span style="color: #a45bad;">3</span> foo<span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span>
+   <span style="color: #2d9574;">(</span>message <span style="color: #2d9574;">"A weird way of matching (1 2 3)"</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+这个例子看起来有点怪,但是let语句允许我们创建一个复杂的guard patterns用于匹配在别处捕获到的值:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">pcase</span> value1
+  <span style="color: #bc6ec5;">(</span>`<span style="color: #2d9574;">(</span><span style="color: #a45bad;">1</span> <span style="color: #a45bad;">2</span> ,foo<span style="color: #2d9574;">)</span>
+   <span style="color: #2d9574;">(</span><span style="color: #4f97d7; font-weight: bold;">pcase</span> value2
+     <span style="color: #67b11d;">(</span>`<span style="color: #b1951d;">(</span><span style="color: #a45bad;">1</span> <span style="color: #a45bad;">2</span> ,<span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">and</span> <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">let</span> <span style="color: #2d9574;">(</span><span style="color: #4f97d7; font-weight: bold;">or</span> <span style="color: #a45bad;">3</span> <span style="color: #a45bad;">4</span><span style="color: #2d9574;">)</span> foo<span style="color: #bc6ec5;">)</span> bar<span style="color: #4f97d7;">)</span><span style="color: #b1951d;">)</span>
+      <span style="color: #b1951d;">(</span>message <span style="color: #2d9574;">"A nested pcase depends on the results of the first"</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+这里value2肯定是一个由三个元素组成的list,且它的前两个元素肯定是1和2. 且value2的第三个元素在foo为3或4的情况下会被绑定到局部变量bar上. 实际上有很多种方法都能够表示这个逻辑,但是这个例子向你展示了在logical pattern中允许对其他值作任意的子模式匹配是多么的具有灵活性.(but this gives you a test of how flexibly you can introduce arbitrary pattern matching of other values within any logical pattern.)
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgheadline11" class="outline-3">
+<h3 id="orgheadline11"><span class="section-number-3">5.7</span> pcase-let and pcase-let*</h3>
+<div class="outline-text-3" id="text-5-7">
+<p>
+这一章是关于pcase的最后内容了! 另外两个常用的语句是 <code>pcase-let</code> 和 <code>pcase-let*</code>,他们的功能与logical pattern中的let语句类似,但是形式上更像是普通的lisp语句:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">pcase-let</span> <span style="color: #bc6ec5;">(</span><span style="color: #2d9574;">(</span>`<span style="color: #67b11d;">(</span><span style="color: #a45bad;">1</span> <span style="color: #a45bad;">2</span> ,foo<span style="color: #67b11d;">)</span> value1<span style="color: #2d9574;">)</span>
+            <span style="color: #2d9574;">(</span>`<span style="color: #67b11d;">(</span><span style="color: #a45bad;">3</span> <span style="color: #a45bad;">4</span> ,bar<span style="color: #67b11d;">)</span> value2<span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span>message <span style="color: #2d9574;">"value1 is a list of (1 2 %s); value2 ends with %s"</span>
+           foo bar<span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+需要注意的是, <code>pcase-let</code> 除非是匹配的类型是错的,否则并不存在匹配失败的情况,也就是说它总会去执行对应的语句. 比如,上面例子中的value1并不要求严格的遵循匹配的形式. 任何符号都会与它对应的元素相绑定. 若某个符号无法找到其对应的元素,则该符号的绑定值为nil.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">pcase-let</span> <span style="color: #bc6ec5;">(</span><span style="color: #2d9574;">(</span>`<span style="color: #67b11d;">(</span><span style="color: #a45bad;">1</span> <span style="color: #a45bad;">2</span> ,foo<span style="color: #67b11d;">)</span> '<span style="color: #67b11d;">(</span><span style="color: #a45bad;">10</span><span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span>message <span style="color: #2d9574;">"foo = %s"</span> foo<span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>   =&gt; prints <span style="color: #2d9574;">"foo = nil"</span>
+
+<span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">pcase-let</span> <span style="color: #bc6ec5;">(</span><span style="color: #2d9574;">(</span>`<span style="color: #67b11d;">(</span><span style="color: #a45bad;">1</span> <span style="color: #a45bad;">2</span> ,foo<span style="color: #67b11d;">)</span> <span style="color: #a45bad;">10</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span>message <span style="color: #2d9574;">"foo = %s"</span> foo<span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>   =&gt; Lisp error, <span style="color: #a45bad;">10</span> is not a list
+
+<span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">pcase-let</span> <span style="color: #bc6ec5;">(</span><span style="color: #2d9574;">(</span>`<span style="color: #67b11d;">(</span><span style="color: #a45bad;">1</span> <span style="color: #a45bad;">2</span> ,foo<span style="color: #67b11d;">)</span> '<span style="color: #67b11d;">(</span><span style="color: #a45bad;">3</span> <span style="color: #a45bad;">4</span> <span style="color: #a45bad;">10</span><span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span>message <span style="color: #2d9574;">"foo = %s"</span> foo<span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>   =&gt; prints <span style="color: #2d9574;">"foo = 10"</span>
+</pre>
+</div>
+
+<p>
+因此, <code>pcase-let</code> 可以认为是 <code>destructuring-bind</code> 的加强版.
+</p>
+
+<p>
+<code>pcase-let*</code> 变体跟 <code>let*</code> 一样, 允许你在后面的待匹配数据中引用前面匹配中的局部变量
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">pcase-let*</span> <span style="color: #bc6ec5;">(</span><span style="color: #2d9574;">(</span>`<span style="color: #67b11d;">(</span><span style="color: #a45bad;">1</span> <span style="color: #a45bad;">2</span> ,foo<span style="color: #67b11d;">)</span> '<span style="color: #67b11d;">(</span><span style="color: #a45bad;">1</span> <span style="color: #a45bad;">2</span> <span style="color: #a45bad;">3</span><span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span>
+             <span style="color: #2d9574;">(</span>`<span style="color: #67b11d;">(</span><span style="color: #a45bad;">3</span> <span style="color: #a45bad;">4</span> ,bar<span style="color: #67b11d;">)</span> <span style="color: #67b11d;">(</span>list <span style="color: #a45bad;">3</span> <span style="color: #a45bad;">4</span> foo<span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span>message <span style="color: #2d9574;">"foo = %s, bar = %s"</span> foo bar<span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>  =&gt; foo = <span style="color: #a45bad;">3</span>, bar = <span style="color: #a45bad;">3</span>
+</pre>
+</div>
+
+<p>
+但若你是在后面的模式中用了与前面同名的symbol的话,则该symbol不是用来做eq测试的,它反而会屏蔽之前的那个同名symbol:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">pcase-let*</span> <span style="color: #bc6ec5;">(</span><span style="color: #2d9574;">(</span>`<span style="color: #67b11d;">(</span><span style="color: #a45bad;">1</span> <span style="color: #a45bad;">2</span> ,foo<span style="color: #67b11d;">)</span> '<span style="color: #67b11d;">(</span><span style="color: #a45bad;">1</span> <span style="color: #a45bad;">2</span> <span style="color: #a45bad;">3</span><span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span>
+             <span style="color: #2d9574;">(</span>`<span style="color: #67b11d;">(</span><span style="color: #a45bad;">3</span> <span style="color: #a45bad;">4</span> ,foo<span style="color: #67b11d;">)</span> '<span style="color: #67b11d;">(</span><span style="color: #a45bad;">3</span> <span style="color: #a45bad;">4</span> <span style="color: #a45bad;">5</span><span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span>message <span style="color: #2d9574;">"1 2 %s"</span> foo<span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+上面的例子中输出为"1 2 5".
+</p>
+</div>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2016-08-04</span>
+            <span title="last modification date" class="post-info">2016-08-04</span>
+            <span title="tags" class="post-info">:N/A:</span>
+            <span title="author" class="post-info"><a href="mailto:lujun9972 &lt;at&gt; lujun9972-F41">lujun9972</a></span>
+        </div>
+    <script src="http://lujun9972.github.io/emacs-document/media/js/jquery-2.1.3.min.js"></script>
+        <section>
+            <h1>Comments</h1>
+            <div id="comment-wrap">
+                    <a class="disqus_label">使用 Disqus 评论</a>
+                    <a class="ds-label">使用多说评论</a>
+    </ul>
+        <div id="disqus_thread"></div>
+        <script type="text/javascript">
+         //var disqus_developer = 1;
+         var preempt_signal=false;
+         var disqus_identifier = "/blog/2016/08/04/使用pcase进行模式匹配/";
+         var disqus_url = "http://lujun9972.github.io/emacs-document/blog/2016/08/04/使用pcase进行模式匹配/";
+         var disqus_shortname = 'emacs-document';
+         /* * * DON'T EDIT BELOW THIS LINE * * */
+         (function() {
+             var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+             dsq.src = 'http://' + disqus_shortname + '.disqus.com/embed.js';
+             (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+             $('#disqus_thread').css('display','none');
+         })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+        <div class="ds-thread"></div>
+        <script type="text/javascript">
+         var duoshuoQuery = {short_name:'emacs-document'};
+         (function() {
+             var ds = document.createElement('script');
+             ds.type = 'text/javascript';ds.async = true;
+             ds.src = 'http://static.duoshuo.com/embed.js';
+             ds.charset = 'UTF-8';
+             (document.getElementsByTagName('head')[0]
+           || document.getElementsByTagName('body')[0]).appendChild(ds);
+             $('.ds-thread').css('display','block');
+         })();
+        </script>
+    <script>
+     /* comments */
+     var ego_disqus_thread=$('#disqus_thread');
+     var ego_ds_label=$('.ds-thread');
+     $('.disqus_label').click(function(){
+         ego_disqus_thread.show();
+         ego_ds_label.hide();
+     });
+     $('.ds-label').click(function(){
+         ego_disqus_thread.hide();
+         ego_ds_label.show();
+     });
+    </script>
+        </section>
+    <script src="http://lujun9972.github.io/emacs-document/media/js/main.js"></script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 25.x(<a href="http://orgmode.org">Org mode</a> 8.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:lujun9972 &lt;at&gt; lujun9972-F41">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div></body>
+</html>

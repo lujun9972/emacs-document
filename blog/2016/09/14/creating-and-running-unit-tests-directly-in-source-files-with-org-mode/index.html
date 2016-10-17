@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Creating-and-Running-Unit-Tests-Directly-in-Source-Files-with-Org-mode - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <style>
+   #ds-thread #ds-reset .ds-comment-body p {color: #ffffff;}
+   #ds-thread #ds-reset .ds-comment-body p a {color: #ff0;}
+   #ds-thread #ds-reset .ds-comment-body p a:hover {color: #0ff;}
+   #disqus_thread a {color: #00ffff;}
+  </style>
+  <link rel="stylesheet" href="http://lujun9972.github.io/emacs-document/media/css/main.css" type="text/css"/>
+  <link rel="stylesheet" href="http://lujun9972.github.io/emacs-document/media/css/comment.css" type="text/css"/>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="http://lujun9972.github.io/emacs-document/">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;集思广益</p>
+    <nav class="site-nav">
+      <div class="menu-icon">
+        <svg viewBox="0 0 18 15">
+          <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.031C17.335,0,18,0.665,18,1.484L18,1.484z" fill="#ffff00"/>
+          <path d="M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0c0-0.82,0.665-1.484,1.484-1.484 h15.031C17.335,6.031,18,6.696,18,7.516L18,7.516z" fill="#ffff00"/>
+          <path d="M18,13.516C18,14.335,17.335,15,16.516,15H1.484C0.665,15,0,14.335,0,13.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.031C17.335,12.031,18,12.696,18,13.516L18,13.516z" fill="#ffff00"/>
+        </svg>
+      </div>
+      <ul class="trigger">
+        <li><a href="http://lujun9972.github.io/emacs-document/years/">Years</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/authors/">Authors</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/tags/">Tags</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document">Github</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="http://www.google.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">Creating-and-Running-Unit-Tests-Directly-in-Source-Files-with-Org-mode</h1>
+<div id="table-of-contents">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#orgheadline1">1. Literate Programming</a></li>
+<li><a href="#orgheadline2">2. Unit Testing in Org-mode (for Clojure)</a></li>
+<li><a href="#orgheadline3">3. Running One or Multiple Tests</a></li>
+<li><a href="#orgheadline4">4. Conclusion</a></li>
+</ul>
+</div>
+</div>
+<p>
+Developing a computer program is not an easy task. The process needs a constant focus. Any interruption of
+that process means that time is spent re-focusing on it and errors are more prone to be introduced. The
+process involves analyzing a problem to solve by executing a series of steps. It involves writing about the
+problem we are trying to solve and writing about the solution we found to solve it. Finally it involves
+writing test procedures that can run to make sure that the current state of the implementation of the solution
+behaves as expected and that expected behavior is not altered by subsequent modifications.
+</p>
+
+<p>
+The problem I have been struggling with for the past 19 years — common to all programmers — is that each part
+of this development process was performed in a cascade. The tools available, and the methods employed, forced
+me to perform each of these steps in isolation and then to iterate how to:
+</p>
+
+<ol class="org-ol">
+<li>Analyze a problem</li>
+<li>Code a solution to the problem</li>
+<li>Document the implementation</li>
+<li>Create tests for the implementation</li>
+<li>If the problem changed, or the solution needed fixing, iterate these same isolated steps from from 1 to 4.</li>
+</ol>
+
+<p>
+The problem is that keeping the focus, and more importantly having the willpower (literally) to perform each
+step under the pressure of deadlines, between meetings, etc., is nearly impossible to do right. Normally the
+steps 1 and 2 will be done, but then steps 3 and 4 will be postponed until tomorrow (which never comes…)
+</p>
+
+<p>
+I don’t think there is any definitive solution to solve this situation. Developing computer programs won’t
+ever be an easy task, and focus will always be warranted. However I think there are methodologies and tools
+that can be adopted to smooth the process. But one best practice that I think goes quite a bit of the way to
+address this problem is to have a single document become the focal point of the overall process.
+</p>
+
+<p>
+What we want is to be able to perform the process with a single tool and in a single document such that we
+only have to focus on it without having to refocus on different tools in different windows all the time during
+the development process.
+</p>
+
+<p>
+In this blog post, I will describe a way to develop, and run, the unit tests (step 4) while keeping the focus
+on writing about the solution and implementing it, all in the same (Org-mode) document.
+</p>
+
+<p>
+This blog post belong to a series of posts about Literate [Clojure] Programming:
+</p>
+
+<ul class="org-ul">
+<li><a href="http://fgiasson.com/blog/index.php/2016/07/06/literate-clojure-programming-using-org-mode/">Project folder structure</a></li>
+<li><a href="http://fgiasson.com/blog/index.php/2016/08/11/literate-clojure-programming-anatomy-of-a-org-mode-file/">Anatomy of a Org-mode file</a></li>
+<li>Tangling all project files</li>
+<li>Publishing documentation in multiple formats</li>
+<li><a href="http://fgiasson.com/blog/index.php/2016/05/30/creating-and-running-unit-tests-directly-in-source-files-with-org-mode/">Unit Testing</a> (this post)</li>
+</ul>
+
+<div id="outline-container-orgheadline1" class="outline-2">
+<h2 id="orgheadline1"><span class="section-number-2">1</span> Literate Programming</h2>
+<div class="outline-text-2" id="text-1">
+<p>
+Literate programming is many things to many people. I started to write about it on this blog and I will
+continue in the coming months. However what I want to do with this blog post is to discuss another important
+aspect (at least to me) of Literate Programming, which is that literate programming concepts and principles
+leads to create tools (such as Org-mode with Emacs) that help developers to perform the development process in
+a single document such that their focus is not distracted.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgheadline2" class="outline-2">
+<h2 id="orgheadline2"><span class="section-number-2">2</span> Unit Testing in Org-mode (for Clojure)</h2>
+<div class="outline-text-2" id="text-2">
+<p>
+What I want to show in this blog post is how we can use Org-mode to:
+</p>
+
+<ol class="org-ol">
+<li>Create a series of unit tests directly where it matters (right below the function to test)</li>
+<li>Run the tests when it matters (all the time, while developing or improving the tested function).</li>
+</ol>
+
+<p>
+Unit tests can be used for a lot of different tasks. The main task is to test the behavior of a function and
+to make sure that any future improvements to that function ends up with the expected behavior. But unit tests
+can also be used as documentation about all of the ways that a function can be used in code, how their
+parameters work and what is expected, etc. Whatever the reason, it is really helpful to have the tests
+side-by-side with the function’s code. In most, if not almost all, development environments this is impossible
+to get. However, this is really possible with Org-mode and I think this is a really effective way to develop
+computer software.
+</p>
+
+<p>
+Now, let’s figure out how we could properly define unit tests directly into Org-mode files while developing an
+application. The goal is to let unit tests be developed at the same time as we develop the code and the
+discussions surrounding the code. We shouldn’t have 4 distinct steps: we should do all of them, at the same
+time, in the same document. The goal is that all this should happen at the same time such that the focus
+doesn’t change all the time.
+</p>
+
+<p>
+Let’s start with a simple function that gives the factorial of a number n.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-clojure">(defn n!
+  [n]
+  (loop [x n 
+         f 1]
+    (if (or (= x 1)
+            (= x 0))
+      f
+      (recur (dec x) (* f x)))))
+</pre>
+</div>
+
+<p>
+Now let’s use the function to see what it returns:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-clojure">(n! 10)
+
+3628800
+</pre>
+</div>
+
+<p>
+Now let’s define some tests to make sure that this implementation works as expected:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-clojure">(require '[clojure.test :refer :all])
+
+(deftest test-n!-0
+  (testing "Testing the n! function for the value 0"
+    (is (= 1 (n! 0)))))
+
+(deftest test-n!-1
+  (testing "Testing the n! function for the value 1"
+    (is (= 1 (n! 1)))))
+
+(deftest test-n!-2
+  (testing "Testing the n! function for the value 2"
+    (is (= 2 (n! 2)))))
+
+(deftest test-n!-4
+  (testing "Testing the n! function for the value 4"
+    (is (= 24 (n! 4)))))
+
+(deftest test-n!-5
+  (testing "Testing the n! function for the value 5"
+    (is (= 120 (n! 5)))))
+
+(deftest test-n!-5-fails
+  (testing "Testing the n! function for the value 5 that fails"
+    (is (= 121 (n! 5)))))
+</pre>
+</div>
+
+<p>
+Then we can run all the tests at once:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-clojure">(run-tests)
+</pre>
+</div>
+
+<pre class="example">
+Testing user
+
+FAIL in (test-n!-5-fails) (form-init2702185496610974397.clj:25)
+Testing the n! function for the value 5 that fails
+expected: (= 121 (n! 5))
+  actual: (not (= 121 120))
+
+Ran 6 tests containing 6 assertions.
+1 failures, 0 errors.
+</pre>
+
+<p>
+There are a few things we have to understand regarding how org-mode and clojure work together. When code
+blocks are executed directly from a Org-mode document, all of the Clojure code is executed in the namespace
+started by Cider, namely the user namespace. When we first define the n! function then it gets defined in the
+user namespace, and then when we define the tests, they get defined in that namespace as well. Finally when we
+call the run-tests function without any parameter, then it runs the tests from the current namespace, which is
+user.
+</p>
+
+<p>
+This is why it works flawlessly: because each block is executed from the same Clojure namespace; everything
+runs from there. If I update that function in the future, I will be able to re-run the tests directly from
+that same development context without having to switch to another file or anything.
+</p>
+
+<p>
+This is really interesting since we can define the functions that compose our application, then we can
+immediately start writing the tests to make sure that the function behaves appropriately as expected, and we
+can run the tests as often as we want, directly from the same context (development document). Then every time
+I save the Org-mode document, then it gets “tangled” into the tests suites that will be normally be run when
+the application get compiled, or used in other contexts that requires these tests to run. (Note that “tangle”
+is an Org-mode term for generating only the code from an Org-mode document.)
+</p>
+
+<p>
+What is fantastic with Org-mode is that every time you execute every code block in the document by pressing
+C-c C-v b you define the functions and the unit tests in the default namespace, you tangle the code, and you
+execute all the code which includes the tests and immediately see, contextually in your work, if any
+modifications you made to your code broke some earlier assumptions.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgheadline3" class="outline-2">
+<h2 id="orgheadline3"><span class="section-number-2">3</span> Running One or Multiple Tests</h2>
+<div class="outline-text-2" id="text-3">
+<p>
+It is often the case that you write a function and then want to test it right away. And then you write another
+one and test it, too. You will end up with multiple code blocks where you want to test the inner test(s) and
+get the results for those only.
+</p>
+
+<p>
+With clojure.test we are limited in our options: we have run-tests and run-all-tests which provide a summary
+report of the executed tests. Since Clojure 1.6 we have access to the test-vars function that we can use to
+test one or multiple test cases. However, the usage of that function is a bit complex (in its syntax) and no
+reporting is provided except if the tests fails.
+</p>
+
+<p>
+So what I choose to do is to change this situation by creating a macro that greatly simplifies the code used
+to run a specific set of tests and that reports failures and successes.
+</p>
+
+<p>
+I created a really small and simple application for that purpose called <a href="https://github.com/structureddynamics/org-mode-clj-tests-utils">org-mode-clj-tests-utils</a>. You can
+easily use it in your Org-mode document just by making sure that the underlying project uses it.
+</p>
+
+<p>
+Here is the macro. What it does is simply to take a series of symbols as input and use test-vars to run the
+tests and then report failures and successes.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-clojure">(defmacro tests
+  "Run one or multiple tests with fixtures. Returns successes or failures. 
+   Tests should be in the same namespace."
+  [&amp; args]  
+  `(binding [clojure.test/*test-out* (java.io.StringWriter.)]
+     (clojure.test/test-vars [~@(mapv (fn [tname]
+                                        `(var ~tname))
+                                      args)])
+     (if (empty? (str clojure.test/*test-out*))
+       (println "All tests succeeded.")
+       (println (str clojure.test/*test-out*)))))
+</pre>
+</div>
+
+<p>
+Another option would be to define the tests in a specific namespace and then to use run-tests on that
+namespace only. But that is cumbersome since you would have to use in-ns to define that new namespace and to
+revert it back to the default namespace once you are done with the tests.
+</p>
+
+<p>
+Now let’s see how this new macro can be used. Let’s say we just want to run the test test-n!-0:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-clojure">(tests test-n!-0)
+</pre>
+</div>
+
+<pre class="example">
+All tests succeeded.
+</pre>
+
+<p>
+Then let’s see what it looks like if a test fails:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-clojure">(tests test-n!-5-fails)
+</pre>
+</div>
+
+<pre class="example">
+FAIL in (test-n!-5-fails) (form-init2702185496610974397.clj:25)
+Testing the n! function for the value 5 that fails
+expected: (= 121 (n! 5))
+  actual: (not (= 121 120))
+</pre>
+
+<p>
+Then we can run any number of tests:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-clojure">(tests test-n!-0
+       test-n!-1
+       test-n!-2
+       test-n!-5-fails)
+</pre>
+</div>
+
+<pre class="example">
+FAIL in (test-n!-5-fails) (form-init2702185496610974397.clj:25)
+Testing the n! function for the value 5 that fails
+expected: (= 121 (n! 5))
+  actual: (not (= 121 120))
+</pre>
+
+<p>
+As you can notice, the syntax for calling specific tests has been greatly simplified. We only have a write
+tests followed by the name of the tests you want to test in that code block. Then every time you press C-c C-v
+b you will re-run every code block of the document and all the results of the tests will be updated.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgheadline4" class="outline-2">
+<h2 id="orgheadline4"><span class="section-number-2">4</span> Conclusion</h2>
+<div class="outline-text-2" id="text-4">
+<p>
+Many people think that Literate Programming is only about typesetting and writing documents as books. However
+I think this perception (or at least the general understanding) is wrong. I think the historic context of
+Literate Programming influenced that perception but it is really much broader and important (at least to me)
+than that. It is about the process of writing computer software, similar to the process of writing books,
+articles, blog posts, etc., which includes documentation and testing, more than the task of simply coding.
+</p>
+
+<p>
+Unit testing is one integral part of this process.
+</p>
+
+<p>
+Note that you can take a look at the org-html-htmlize-output-type <a href="https://github.com/structureddynamics/org-mode-clj-tests-utils/blob/master/org/core.org">Org file to see a really simple example of a</a>
+<a href="https://github.com/structureddynamics/org-mode-clj-tests-utils/blob/master/org/core.org">Clojure Org-mode project</a>.
+</p>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2016-09-14</span>
+            <span title="last modification date" class="post-info">2016-09-14</span>
+            <span title="tags" class="post-info">:N/A:</span>
+            <span title="author" class="post-info"><a href="mailto:lujun9972 &lt;at&gt; lujun9972-F41">lujun9972</a></span>
+        </div>
+    <script src="http://lujun9972.github.io/emacs-document/media/js/jquery-2.1.3.min.js"></script>
+        <section>
+            <h1>Comments</h1>
+            <div id="comment-wrap">
+                    <a class="disqus_label">使用 Disqus 评论</a>
+                    <a class="ds-label">使用多说评论</a>
+    </ul>
+        <div id="disqus_thread"></div>
+        <script type="text/javascript">
+         //var disqus_developer = 1;
+         var preempt_signal=false;
+         var disqus_identifier = "/blog/2016/09/14/creating-and-running-unit-tests-directly-in-source-files-with-org-mode/";
+         var disqus_url = "http://lujun9972.github.io/emacs-document/blog/2016/09/14/creating-and-running-unit-tests-directly-in-source-files-with-org-mode/";
+         var disqus_shortname = 'emacs-document';
+         /* * * DON'T EDIT BELOW THIS LINE * * */
+         (function() {
+             var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+             dsq.src = 'http://' + disqus_shortname + '.disqus.com/embed.js';
+             (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+             $('#disqus_thread').css('display','none');
+         })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+        <div class="ds-thread"></div>
+        <script type="text/javascript">
+         var duoshuoQuery = {short_name:'emacs-document'};
+         (function() {
+             var ds = document.createElement('script');
+             ds.type = 'text/javascript';ds.async = true;
+             ds.src = 'http://static.duoshuo.com/embed.js';
+             ds.charset = 'UTF-8';
+             (document.getElementsByTagName('head')[0]
+           || document.getElementsByTagName('body')[0]).appendChild(ds);
+             $('.ds-thread').css('display','block');
+         })();
+        </script>
+    <script>
+     /* comments */
+     var ego_disqus_thread=$('#disqus_thread');
+     var ego_ds_label=$('.ds-thread');
+     $('.disqus_label').click(function(){
+         ego_disqus_thread.show();
+         ego_ds_label.hide();
+     });
+     $('.ds-label').click(function(){
+         ego_disqus_thread.hide();
+         ego_ds_label.show();
+     });
+    </script>
+        </section>
+    <script src="http://lujun9972.github.io/emacs-document/media/js/main.js"></script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 25.x(<a href="http://orgmode.org">Org mode</a> 8.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:lujun9972 &lt;at&gt; lujun9972-F41">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div></body>
+</html>

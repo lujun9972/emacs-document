@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>基于counsel的超级好用的高亮搜索功能 - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <style>
+   #ds-thread #ds-reset .ds-comment-body p {color: #ffffff;}
+   #ds-thread #ds-reset .ds-comment-body p a {color: #ff0;}
+   #ds-thread #ds-reset .ds-comment-body p a:hover {color: #0ff;}
+   #disqus_thread a {color: #00ffff;}
+  </style>
+  <link rel="stylesheet" href="http://lujun9972.github.io/emacs-document/media/css/main.css" type="text/css"/>
+  <link rel="stylesheet" href="http://lujun9972.github.io/emacs-document/media/css/comment.css" type="text/css"/>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="http://lujun9972.github.io/emacs-document/">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;集思广益</p>
+    <nav class="site-nav">
+      <div class="menu-icon">
+        <svg viewBox="0 0 18 15">
+          <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.031C17.335,0,18,0.665,18,1.484L18,1.484z" fill="#ffff00"/>
+          <path d="M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0c0-0.82,0.665-1.484,1.484-1.484 h15.031C17.335,6.031,18,6.696,18,7.516L18,7.516z" fill="#ffff00"/>
+          <path d="M18,13.516C18,14.335,17.335,15,16.516,15H1.484C0.665,15,0,14.335,0,13.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.031C17.335,12.031,18,12.696,18,13.516L18,13.516z" fill="#ffff00"/>
+        </svg>
+      </div>
+      <ul class="trigger">
+        <li><a href="http://lujun9972.github.io/emacs-document/years/">Years</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/authors/">Authors</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/tags/">Tags</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document">Github</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="http://www.google.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">基于counsel的超级好用的高亮搜索功能</h1>
+<p>
+abo-abo写过一篇<a href="http://oremacs.com/2015/07/27/counsel-recoll/">博文</a>, 阐述了如何利用 counsel, ivy 以及 swiper来搜索由<a href="http://www.lesbonscomptes.com/recoll/">recoll</a>(一种搜索工具) 索引过的文件的内容. 受此文的影响,我也尝试将之迁移到Mac上. 下面是我的尝试说明.
+</p>
+
+<p>
+使用counsel能够让我们以递增的方式更新搜索结果(该搜索结果由命令行工具mdfind返回). 选中一个文件后,emacs会打开它,并且若该文件不是pdf的话,还会调用swiper来搜索该文件.
+</p>
+
+<p>
+一切都很顺利. 唯一的问题是,我想优先显示org文件,然后再是tex文件.但是不知道为何,我的排序函数在ivy中不太正常. 我的Lisp水平不是很高,希望其他人可以帮忙看出问题所在! 
+UPDATE: 在问题在更新ivy和counsel后已经被修复了,下面的排序命令可以正常是用了.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #2aa1ae; background-color: #292e34;">;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;</span>
+<span style="color: #2aa1ae; background-color: #292e34;">;; </span><span style="color: #2aa1ae; background-color: #292e34;">counsel-spotlight                                                      ;;</span>
+<span style="color: #2aa1ae; background-color: #292e34;">;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;</span>
+<span style="color: #2aa1ae; background-color: #292e34;">;; </span><span style="color: #2aa1ae; background-color: #292e34;">Incrementally search the Mac spotlight database and open matching</span>
+<span style="color: #2aa1ae; background-color: #292e34;">;; </span><span style="color: #2aa1ae; background-color: #292e34;">files with a swiper search on the query text.</span>
+<span style="color: #2aa1ae; background-color: #292e34;">;; </span><span style="color: #2aa1ae; background-color: #292e34;">Based on http://oremacs.com/2015/07/27/counsel-recoll/</span>
+
+<span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">require</span> '<span style="color: #a45bad;">counsel</span><span style="color: #4f97d7;">)</span>
+
+<span style="color: #2aa1ae; background-color: #292e34;">;; </span><span style="color: #2aa1ae; background-color: #292e34;">Function to be called by counsel-spotlight</span>
+<span style="color: #2aa1ae; background-color: #292e34;">;; </span><span style="color: #2aa1ae; background-color: #292e34;">The onlyin option limits results to my home directory</span>
+<span style="color: #2aa1ae; background-color: #292e34;">;; </span><span style="color: #2aa1ae; background-color: #292e34;">and directories below that</span>
+<span style="color: #2aa1ae; background-color: #292e34;">;; </span><span style="color: #2aa1ae; background-color: #292e34;">mdfind is the command-line interface to spotlight</span>
+<span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">defun</span> <span style="color: #bc6ec5; font-weight: bold;">counsel-mdfind-function</span> <span style="color: #bc6ec5;">(</span>string <span style="color: #ce537a; font-weight: bold;">&amp;rest</span> _unused<span style="color: #bc6ec5;">)</span>
+  <span style="color: #2aa1ae;">"Issue mdfind for STRING."</span>
+  <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">if</span> <span style="color: #2d9574;">(</span>&lt; <span style="color: #67b11d;">(</span>length string<span style="color: #67b11d;">)</span> <span style="color: #a45bad;">4</span><span style="color: #2d9574;">)</span>
+      <span style="color: #2d9574;">(</span>counsel-more-chars <span style="color: #a45bad;">4</span><span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span>counsel--async-command
+     <span style="color: #67b11d;">(</span>format <span style="color: #2d9574;">"mdfind -onlyin ~/ '%s'"</span> string<span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span>
+    nil<span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+
+<span style="color: #2aa1ae; background-color: #292e34;">;; </span><span style="color: #2aa1ae; background-color: #292e34;">Main function</span>
+<span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">defun</span> <span style="color: #bc6ec5; font-weight: bold;">counsel-spotlight</span> <span style="color: #bc6ec5;">(</span><span style="color: #ce537a; font-weight: bold;">&amp;optional</span> initial-input<span style="color: #bc6ec5;">)</span>
+  <span style="color: #2aa1ae;">"Search for a string in the mdfind database.</span>
+<span style="color: #2aa1ae;">You'll be given a list of files that match.</span>
+<span style="color: #2aa1ae;">Selecting a file will launch `</span><span style="color: #a45bad;">swiper</span><span style="color: #2aa1ae;">' for that file.</span>
+<span style="color: #2aa1ae;">INITIAL-INPUT can be given as the initial minibuffer input."</span>
+  <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">interactive</span><span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span>ivy-read <span style="color: #2d9574;">"spotlight: "</span> 'counsel-mdfind-function
+            <span style="color: #4f97d7;">:initial-input</span> initial-input
+            <span style="color: #4f97d7;">:dynamic-collection</span> t
+            <span style="color: #4f97d7;">:sort</span> t
+            <span style="color: #4f97d7;">:action</span> <span style="color: #2d9574;">(</span><span style="color: #4f97d7; font-weight: bold;">lambda</span> <span style="color: #67b11d;">(</span>x<span style="color: #67b11d;">)</span>
+                      <span style="color: #67b11d;">(</span><span style="color: #4f97d7; font-weight: bold;">when</span> <span style="color: #b1951d;">(</span>string-match <span style="color: #2d9574;">"</span><span style="color: #2d9574; font-weight: bold;">\\</span><span style="color: #2d9574; font-weight: bold;">(</span><span style="color: #2d9574;">\/.*</span><span style="color: #2d9574; font-weight: bold;">\\</span><span style="color: #2d9574; font-weight: bold;">)</span><span style="color: #2d9574;">\\'"</span> x<span style="color: #b1951d;">)</span>
+                        <span style="color: #b1951d;">(</span><span style="color: #4f97d7; font-weight: bold;">let</span> <span style="color: #4f97d7;">(</span><span style="color: #bc6ec5;">(</span>file-name <span style="color: #2d9574;">(</span>match-string <span style="color: #a45bad;">1</span> x<span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+                          <span style="color: #4f97d7;">(</span>find-file file-name<span style="color: #4f97d7;">)</span>
+                          <span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">unless</span> <span style="color: #bc6ec5;">(</span>string-match <span style="color: #2d9574;">"pdf$"</span> x<span style="color: #bc6ec5;">)</span>
+                            <span style="color: #bc6ec5;">(</span>swiper ivy-text<span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+
+<span style="color: #2aa1ae; background-color: #292e34;">;; </span><span style="color: #2aa1ae; background-color: #292e34;">Define my sort function</span>
+<span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">defun</span> <span style="color: #bc6ec5; font-weight: bold;">bjm-counsel-mdfind-sort-function</span> <span style="color: #bc6ec5;">(</span>x y<span style="color: #bc6ec5;">)</span>
+  <span style="color: #2aa1ae;">"Compare two files X and Y. Prioritise org then tex."</span>
+  <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">if</span> <span style="color: #2d9574;">(</span>string-match <span style="color: #2d9574;">"org$"</span> x<span style="color: #2d9574;">)</span>
+      t
+    <span style="color: #2d9574;">(</span><span style="color: #4f97d7; font-weight: bold;">if</span> <span style="color: #67b11d;">(</span>string-match <span style="color: #2d9574;">"tex$"</span> x<span style="color: #67b11d;">)</span>
+        <span style="color: #67b11d;">(</span><span style="color: #4f97d7; font-weight: bold;">if</span> <span style="color: #b1951d;">(</span>string-match <span style="color: #2d9574;">"org$"</span> y<span style="color: #b1951d;">)</span>
+            nil
+          t<span style="color: #67b11d;">)</span>
+      nil<span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+
+<span style="color: #2aa1ae; background-color: #292e34;">;; </span><span style="color: #2aa1ae; background-color: #292e34;">Add to list of ivy sorting functions</span>
+<span style="color: #4f97d7;">(</span>add-to-list 'ivy-sort-functions-alist
+             '<span style="color: #bc6ec5;">(</span>counsel-mdfind-function . bjm-counsel-mdfind-sort-function<span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+在理想情况下,我希望能够实现用另一个counsel来减少mdfind搜索出文件名的匹配项. 然后在第二个counsel中选中的文件会通过swiper搜索第一个counsel中的关键字.
+举个例子,我希望能做到
+</p>
+
+<ol class="org-ol">
+<li>执行 <code>M-x counsel-spotlight</code> 然后输入 <code>caustic</code> 会返回一堆内容中包含 <code>caustic</code> 的文件.</li>
+<li>按下某个快捷键,会弹出一个新的counsel,输入 <code>chandra</code> 会搜索出文件名中包含 <code>chandra</code> 的那些文件.</li>
+<li>选中文件后按下回车,Emacs会打开该文件,并用swiper搜索原始的那个搜索关键字 <code>caustic</code>.</li>
+</ol>
+
+<p>
+基于我目前lisp的能力,还难以实现这一功能,不过就是想想也不错!
+</p>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2016-10-09</span>
+            <span title="last modification date" class="post-info">2016-10-09</span>
+            <span title="tags" class="post-info">:N/A:</span>
+            <span title="author" class="post-info"><a href="mailto:lujun9972 &lt;at&gt; lujun9972-F41">lujun9972</a></span>
+        </div>
+    <script src="http://lujun9972.github.io/emacs-document/media/js/jquery-2.1.3.min.js"></script>
+        <section>
+            <h1>Comments</h1>
+            <div id="comment-wrap">
+                    <a class="disqus_label">使用 Disqus 评论</a>
+                    <a class="ds-label">使用多说评论</a>
+    </ul>
+        <div id="disqus_thread"></div>
+        <script type="text/javascript">
+         //var disqus_developer = 1;
+         var preempt_signal=false;
+         var disqus_identifier = "/blog/2016/10/09/基于counsel的超级好用的高亮搜索功能/";
+         var disqus_url = "http://lujun9972.github.io/emacs-document/blog/2016/10/09/基于counsel的超级好用的高亮搜索功能/";
+         var disqus_shortname = 'emacs-document';
+         /* * * DON'T EDIT BELOW THIS LINE * * */
+         (function() {
+             var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+             dsq.src = 'http://' + disqus_shortname + '.disqus.com/embed.js';
+             (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+             $('#disqus_thread').css('display','none');
+         })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+        <div class="ds-thread"></div>
+        <script type="text/javascript">
+         var duoshuoQuery = {short_name:'emacs-document'};
+         (function() {
+             var ds = document.createElement('script');
+             ds.type = 'text/javascript';ds.async = true;
+             ds.src = 'http://static.duoshuo.com/embed.js';
+             ds.charset = 'UTF-8';
+             (document.getElementsByTagName('head')[0]
+           || document.getElementsByTagName('body')[0]).appendChild(ds);
+             $('.ds-thread').css('display','block');
+         })();
+        </script>
+    <script>
+     /* comments */
+     var ego_disqus_thread=$('#disqus_thread');
+     var ego_ds_label=$('.ds-thread');
+     $('.disqus_label').click(function(){
+         ego_disqus_thread.show();
+         ego_ds_label.hide();
+     });
+     $('.ds-label').click(function(){
+         ego_disqus_thread.hide();
+         ego_ds_label.show();
+     });
+    </script>
+        </section>
+    <script src="http://lujun9972.github.io/emacs-document/media/js/main.js"></script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 25.x(<a href="http://orgmode.org">Org mode</a> 8.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:lujun9972 &lt;at&gt; lujun9972-F41">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div></body>
+</html>

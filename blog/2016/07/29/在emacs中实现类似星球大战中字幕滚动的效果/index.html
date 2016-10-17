@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>在Emacs中实现类似星球大战中字幕滚动的效果 - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <style>
+   #ds-thread #ds-reset .ds-comment-body p {color: #ffffff;}
+   #ds-thread #ds-reset .ds-comment-body p a {color: #ff0;}
+   #ds-thread #ds-reset .ds-comment-body p a:hover {color: #0ff;}
+   #disqus_thread a {color: #00ffff;}
+  </style>
+  <link rel="stylesheet" href="http://lujun9972.github.io/emacs-document/media/css/main.css" type="text/css"/>
+  <link rel="stylesheet" href="http://lujun9972.github.io/emacs-document/media/css/comment.css" type="text/css"/>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="http://lujun9972.github.io/emacs-document/">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;集思广益</p>
+    <nav class="site-nav">
+      <div class="menu-icon">
+        <svg viewBox="0 0 18 15">
+          <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.031C17.335,0,18,0.665,18,1.484L18,1.484z" fill="#ffff00"/>
+          <path d="M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0c0-0.82,0.665-1.484,1.484-1.484 h15.031C17.335,6.031,18,6.696,18,7.516L18,7.516z" fill="#ffff00"/>
+          <path d="M18,13.516C18,14.335,17.335,15,16.516,15H1.484C0.665,15,0,14.335,0,13.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.031C17.335,12.031,18,12.696,18,13.516L18,13.516z" fill="#ffff00"/>
+        </svg>
+      </div>
+      <ul class="trigger">
+        <li><a href="http://lujun9972.github.io/emacs-document/years/">Years</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/authors/">Authors</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/tags/">Tags</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document">Github</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="http://www.google.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">在Emacs中实现类似星球大战中字幕滚动的效果</h1>
+<p>
+<a href="http://mbork.pl/2013-09-19_That's_no_moon_(en)">正如不久前我提到过的</a>, 我并不是严格意义上的星球大战的粉丝. 我从小的梦想其实是从政. 当然,即使我对星球大战第7季并不抱太大希望,我还是会去看它的.
+另外,作为Emacs的超级大粉丝,我无法拒绝下面这一小端代码. 你可以试试,选中buffer中的一些文本,然后运行 <code>star-wars-scroll</code> 看看效果.
+(一开始我是想录一段视频的,但是最终还是没有这样做: 毕竟你只需要拷贝这段代码到你的Emacs中就能自己看到笑过了. 当然如果你没有安装Emacs,那我也没有办法了)
+</p>
+
+<p>
+这段代码还能在文本终端环境执行,这样效果更酷.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">defvar</span> <span style="color: #7590db;">sw/substitution-list</span>
+  '<span style="color: #bc6ec5;">(</span><span style="color: #2d9574;">(</span><span style="color: #2d9574;">"."</span> . <span style="color: #a45bad;">0</span><span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span><span style="color: #2d9574;">" "</span> . <span style="color: #a45bad;">0</span><span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span><span style="color: #2d9574;">"[.,;:!?] "</span> . <span style="color: #a45bad;">1</span><span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span><span style="color: #2d9574;">"\\B[aeiou]\\B"</span> . <span style="color: #a45bad;">0</span><span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span><span style="color: #2d9574;">"\\B[bcdfghjklmnpqrstvwxyz]\\B"</span> . <span style="color: #a45bad;">0</span><span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span><span style="color: #2d9574;">"\\w\\b"</span> . <span style="color: #a45bad;">0</span><span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span><span style="color: #2d9574;">"[.,;:!?]"</span> . <span style="color: #a45bad;">0</span><span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span><span style="color: #2d9574;">"[</span><span style="color: #a45bad;">^</span><span style="color: #2d9574;">.,;:!?] "</span> . <span style="color: #a45bad;">1</span><span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span><span style="color: #2d9574;">"\\b\\w"</span> . <span style="color: #a45bad;">0</span><span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span><span style="color: #2d9574;">".$"</span> . <span style="color: #a45bad;">0</span><span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span><span style="color: #2d9574;">"^."</span> . <span style="color: #a45bad;">0</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span>
+  <span style="color: #2aa1ae;">"A list of dotted pairs with car equal to the regex matching</span>
+<span style="color: #2aa1ae;">the character we want to delete and cdr equal to how many</span>
+<span style="color: #2aa1ae;">characters we want to move the point forward before actually</span>
+<span style="color: #2aa1ae;">deleting a character (useful in the case of space after a</span>
+<span style="color: #2aa1ae;">punctuation).  We begin with the substitutions we want to perform</span>
+<span style="color: #2aa1ae;">first.  If more than one regex matches, the last one is valid, so</span>
+<span style="color: #2aa1ae;">it is probably a good idea to begin with \".\"."</span><span style="color: #4f97d7;">)</span>
+
+<span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">defun</span> <span style="color: #bc6ec5; font-weight: bold;">center-line-no-tabs</span> <span style="color: #bc6ec5;">()</span>
+  <span style="color: #2aa1ae;">"A simplified version of center-line, using no tabs (and not</span>
+<span style="color: #2aa1ae;">taking into account leading/trailing whitespace."</span>
+  <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">save-excursion</span>
+    <span style="color: #2d9574;">(</span><span style="color: #4f97d7; font-weight: bold;">let</span> <span style="color: #67b11d;">(</span><span style="color: #b1951d;">(</span>length <span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">progn</span> <span style="color: #bc6ec5;">(</span>end-of-line<span style="color: #bc6ec5;">)</span>
+                         <span style="color: #bc6ec5;">(</span>current-column<span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span>
+      <span style="color: #67b11d;">(</span>beginning-of-line<span style="color: #67b11d;">)</span>
+      <span style="color: #67b11d;">(</span>insert <span style="color: #b1951d;">(</span>make-string <span style="color: #4f97d7;">(</span>max <span style="color: #a45bad;">0</span> <span style="color: #bc6ec5;">(</span>/ <span style="color: #2d9574;">(</span>- fill-column length<span style="color: #2d9574;">)</span> <span style="color: #a45bad;">2</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span> ?\s<span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+
+<span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">defun</span> <span style="color: #bc6ec5; font-weight: bold;">sw/scroll-prepare-marker-list</span> <span style="color: #bc6ec5;">()</span>
+  <span style="color: #2aa1ae;">"Prepare (and return) a list of markers pointing at characters</span>
+<span style="color: #2aa1ae;">to delete from the current line, in the \"right\" order."</span>
+  <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">save-excursion</span>
+    <span style="color: #2d9574;">(</span><span style="color: #4f97d7; font-weight: bold;">let</span> <span style="color: #67b11d;">(</span><span style="color: #b1951d;">(</span>limit <span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">progn</span>
+                   <span style="color: #bc6ec5;">(</span>center-line-no-tabs<span style="color: #bc6ec5;">)</span> <span style="color: #2aa1ae; background-color: #292e34;">; </span><span style="color: #2aa1ae; background-color: #292e34;">this may use tabs!</span>
+                   <span style="color: #bc6ec5;">(</span>back-to-indentation<span style="color: #bc6ec5;">)</span>
+                   <span style="color: #bc6ec5;">(</span>point<span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span><span style="color: #b1951d;">)</span>
+          <span style="color: #b1951d;">(</span>subst-list sw/substitution-list<span style="color: #b1951d;">)</span>
+          <span style="color: #b1951d;">(</span>marker-list nil<span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span>
+      <span style="color: #67b11d;">(</span><span style="color: #4f97d7; font-weight: bold;">while</span> subst-list
+        <span style="color: #b1951d;">(</span>end-of-line<span style="color: #b1951d;">)</span>
+        <span style="color: #b1951d;">(</span><span style="color: #4f97d7; font-weight: bold;">while</span> <span style="color: #4f97d7;">(</span>re-search-backward <span style="color: #bc6ec5;">(</span>caar subst-list<span style="color: #bc6ec5;">)</span> limit t<span style="color: #4f97d7;">)</span>
+          <span style="color: #4f97d7;">(</span>forward-char <span style="color: #bc6ec5;">(</span>cdar subst-list<span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+          <span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">push</span> <span style="color: #bc6ec5;">(</span>point-marker<span style="color: #bc6ec5;">)</span> marker-list<span style="color: #4f97d7;">)</span><span style="color: #b1951d;">)</span>
+        <span style="color: #b1951d;">(</span><span style="color: #4f97d7; font-weight: bold;">setq</span> subst-list <span style="color: #4f97d7;">(</span>cdr subst-list<span style="color: #4f97d7;">)</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span>
+      <span style="color: #67b11d;">(</span>delete-dups marker-list<span style="color: #67b11d;">)</span>
+      <span style="color: #67b11d;">(</span><span style="color: #4f97d7; font-weight: bold;">setq</span> marker-list <span style="color: #b1951d;">(</span>nreverse marker-list<span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+
+<span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">defvar</span> <span style="color: #7590db;">sw/untouched-lines</span> <span style="color: #a45bad;">3</span>
+  <span style="color: #2aa1ae;">"Number of lines at the bottom of the window which should not</span>
+<span style="color: #2aa1ae;">  be touched by character deletion."</span><span style="color: #4f97d7;">)</span>
+
+<span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">defvar</span> <span style="color: #7590db;">sw/delay</span> <span style="color: #a45bad;">.5</span>
+  <span style="color: #2aa1ae;">"Delay (in seconds) between frames of animation."</span><span style="color: #4f97d7;">)</span>
+
+<span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">defun</span> <span style="color: #bc6ec5; font-weight: bold;">sw/scroll-current-buffer</span> <span style="color: #bc6ec5;">()</span>
+  <span style="color: #2aa1ae;">"Actually do SW-like scroll in the current buffer."</span>
+  <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">let</span> <span style="color: #2d9574;">(</span>marker-list-list<span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span>beginning-of-buffer<span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span>open-line <span style="color: #67b11d;">(</span>window-height<span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span>goto-char <span style="color: #67b11d;">(</span>point-max<span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span>move-beginning-of-line <span style="color: #a45bad;">0</span><span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span><span style="color: #4f97d7; font-weight: bold;">while</span> <span style="color: #67b11d;">(</span><span style="color: #4f97d7; font-weight: bold;">progn</span>
+             <span style="color: #b1951d;">(</span><span style="color: #4f97d7; font-weight: bold;">push</span> <span style="color: #4f97d7;">(</span>sw/scroll-prepare-marker-list<span style="color: #4f97d7;">)</span> marker-list-list<span style="color: #b1951d;">)</span>
+             <span style="color: #b1951d;">(</span>&gt; <span style="color: #4f97d7;">(</span>point<span style="color: #4f97d7;">)</span> <span style="color: #4f97d7;">(</span>+ <span style="color: #bc6ec5;">(</span>point-min<span style="color: #bc6ec5;">)</span> <span style="color: #bc6ec5;">(</span>window-height<span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span>
+      <span style="color: #67b11d;">(</span>previous-line<span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span><span style="color: #4f97d7; font-weight: bold;">while</span> <span style="color: #67b11d;">(</span>&lt; <span style="color: #b1951d;">(</span>point-min<span style="color: #b1951d;">)</span> <span style="color: #b1951d;">(</span>point-max<span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span> <span style="color: #2aa1ae; background-color: #292e34;">; </span><span style="color: #2aa1ae; background-color: #292e34;">here the actual scroll begins</span>
+      <span style="color: #67b11d;">(</span>goto-char <span style="color: #b1951d;">(</span>point-min<span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span>
+      <span style="color: #67b11d;">(</span>kill-line <span style="color: #a45bad;">1</span><span style="color: #67b11d;">)</span>
+      <span style="color: #67b11d;">(</span>redisplay t<span style="color: #67b11d;">)</span>
+      <span style="color: #67b11d;">(</span>sleep-for sw/delay<span style="color: #67b11d;">)</span>
+      <span style="color: #67b11d;">(</span><span style="color: #4f97d7; font-weight: bold;">let</span> <span style="color: #b1951d;">(</span><span style="color: #4f97d7;">(</span>walker marker-list-list<span style="color: #4f97d7;">)</span><span style="color: #b1951d;">)</span>
+        <span style="color: #b1951d;">(</span><span style="color: #4f97d7; font-weight: bold;">while</span> <span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">progn</span> <span style="color: #2aa1ae; background-color: #292e34;">;</span>
+                 <span style="color: #bc6ec5;">(</span>goto-char <span style="color: #2d9574;">(</span><span style="color: #4f97d7; font-weight: bold;">or</span> <span style="color: #9cb6ad;">(</span>caar walker<span style="color: #9cb6ad;">)</span> <span style="color: #9cb6ad;">(</span>point-min<span style="color: #9cb6ad;">)</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span>
+                 <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">and</span> walker <span style="color: #2d9574;">(</span>&lt; <span style="color: #9cb6ad;">(</span>line-number-at-pos<span style="color: #9cb6ad;">)</span> <span style="color: #9cb6ad;">(</span>- <span style="color: #4f97d7;">(</span>window-height<span style="color: #4f97d7;">)</span> sw/untouched-lines<span style="color: #9cb6ad;">)</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+          <span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">when</span> <span style="color: #bc6ec5;">(</span>car walker<span style="color: #bc6ec5;">)</span>
+            <span style="color: #bc6ec5;">(</span>goto-char <span style="color: #2d9574;">(</span>caar walker<span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span>
+            <span style="color: #bc6ec5;">(</span>delete-char <span style="color: #a45bad;">1</span><span style="color: #bc6ec5;">)</span>
+            <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">setf</span> <span style="color: #2d9574;">(</span>car walker<span style="color: #2d9574;">)</span> <span style="color: #2d9574;">(</span>cdar walker<span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+          <span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">when</span> <span style="color: #bc6ec5;">(</span>car walker<span style="color: #bc6ec5;">)</span>
+            <span style="color: #bc6ec5;">(</span>goto-char <span style="color: #2d9574;">(</span>caar walker<span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span>
+            <span style="color: #bc6ec5;">(</span>delete-char <span style="color: #a45bad;">1</span><span style="color: #bc6ec5;">)</span>
+            <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">setf</span> <span style="color: #2d9574;">(</span>car walker<span style="color: #2d9574;">)</span> <span style="color: #2d9574;">(</span>cdar walker<span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span>
+            <span style="color: #bc6ec5;">(</span>beginning-of-line<span style="color: #bc6ec5;">)</span>
+            <span style="color: #bc6ec5;">(</span>insert <span style="color: #2d9574;">" "</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+          <span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">setq</span> walker <span style="color: #bc6ec5;">(</span>cdr walker<span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+
+<span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">defun</span> <span style="color: #bc6ec5; font-weight: bold;">star-wars-scroll</span> <span style="color: #bc6ec5;">()</span>
+  <span style="color: #2aa1ae;">"Do Star-Wars-like scroll of the region, or the whole buffer if</span>
+<span style="color: #2aa1ae;">  no region is active, in a temporary buffer, and delete it</span>
+<span style="color: #2aa1ae;">  afterwards.  Special care is taken to make the lines more or</span>
+<span style="color: #2aa1ae;">  less legible as long as possible, for example spaces after</span>
+<span style="color: #2aa1ae;">  punctuation are deleted before vowels, vowels are deleted</span>
+<span style="color: #2aa1ae;">  before consonants etc."</span>
+  <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">interactive</span><span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">save-excursion</span>
+    <span style="color: #2d9574;">(</span><span style="color: #4f97d7; font-weight: bold;">let</span> <span style="color: #67b11d;">(</span><span style="color: #b1951d;">(</span>begin <span style="color: #4f97d7;">(</span>point-min<span style="color: #4f97d7;">)</span><span style="color: #b1951d;">)</span> <span style="color: #b1951d;">(</span>end <span style="color: #4f97d7;">(</span>point-max<span style="color: #4f97d7;">)</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span>
+      <span style="color: #67b11d;">(</span><span style="color: #4f97d7; font-weight: bold;">when</span> <span style="color: #b1951d;">(</span>region-active-p<span style="color: #b1951d;">)</span>
+        <span style="color: #b1951d;">(</span><span style="color: #4f97d7; font-weight: bold;">setq</span> begin <span style="color: #4f97d7;">(</span>region-beginning<span style="color: #4f97d7;">)</span><span style="color: #b1951d;">)</span>
+        <span style="color: #b1951d;">(</span><span style="color: #4f97d7; font-weight: bold;">setq</span> end <span style="color: #4f97d7;">(</span>region-end<span style="color: #4f97d7;">)</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span>
+      <span style="color: #67b11d;">(</span>copy-region-as-kill begin end<span style="color: #67b11d;">)</span>
+      <span style="color: #67b11d;">(</span><span style="color: #4f97d7; font-weight: bold;">with-temp-buffer</span>
+        <span style="color: #b1951d;">(</span>switch-to-buffer <span style="color: #4f97d7;">(</span>current-buffer<span style="color: #4f97d7;">)</span><span style="color: #b1951d;">)</span>
+        <span style="color: #b1951d;">(</span>rename-buffer <span style="color: #2d9574;">"*Star Wars Scroll*"</span><span style="color: #b1951d;">)</span>
+  <span style="color: #b1951d;">(</span>untabify <span style="color: #4f97d7;">(</span>point-min<span style="color: #4f97d7;">)</span> <span style="color: #4f97d7;">(</span>point-max<span style="color: #4f97d7;">)</span><span style="color: #b1951d;">)</span>
+        <span style="color: #b1951d;">(</span><span style="color: #4f97d7; font-weight: bold;">save-window-excursion</span>
+          <span style="color: #4f97d7;">(</span>delete-other-windows<span style="color: #4f97d7;">)</span>
+          <span style="color: #4f97d7;">(</span>yank<span style="color: #4f97d7;">)</span>
+          <span style="color: #4f97d7;">(</span>sw/scroll-current-buffer<span style="color: #4f97d7;">)</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+这段代码还远远谈不上完美,代码凌乱而不好懂. 我是在几年前写得这段代码,当时我的Elisp知识远不及现在. 
+(那时候我的博客elegant-code-fu也远没有现在这么多内容-至少我是这么认为的. 这些年来我学到很多东西; 毕竟,通过学习Lisp使我掌握了许多他人觉得不自然的能力.)
+但是我还是保留了代码的原样,以此证明<a href="http://blog.codinghorror.com/sucking-less-every-year/">我每年都有进步</a>: 我现在不会再写这么混乱的代码了. 你知道其他人是怎么评论这段代码的吗? - 这段代码的质量简直不敢恭维. 
+而且这段代码可能还有很多的BUG.(比如,不知道为什么,我总觉得这段代码在处理太长的行时会有问题. 我简直不能相信我三年前写得代码能这么烂&#x2026;)
+但是写这段代码的过程还是给我带来了许多乐趣. (我以后可能会从头重写这份代码,毕竟我觉得从这份代码目前的状态来看,重写比修改还来得更容易些…)
+</p>
+
+<p>
+这段代码还有一个有趣的特点: 它会尽可能的保持文本的可读性. 例如它会先删除元音字母再删除辅音字母,先删除单词中间的字母再删除单词两端的单词.
+</p>
+
+<p>
+玩的开心点,另外不要太把星球大战当回事了.
+</p>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2016-07-29</span>
+            <span title="last modification date" class="post-info">2016-07-29</span>
+            <span title="tags" class="post-info">:N/A:</span>
+            <span title="author" class="post-info"><a href="mailto:lujun9972 &lt;at&gt; lujun9972-F41">lujun9972</a></span>
+        </div>
+    <script src="http://lujun9972.github.io/emacs-document/media/js/jquery-2.1.3.min.js"></script>
+        <section>
+            <h1>Comments</h1>
+            <div id="comment-wrap">
+                    <a class="disqus_label">使用 Disqus 评论</a>
+                    <a class="ds-label">使用多说评论</a>
+    </ul>
+        <div id="disqus_thread"></div>
+        <script type="text/javascript">
+         //var disqus_developer = 1;
+         var preempt_signal=false;
+         var disqus_identifier = "/blog/2016/07/29/在emacs中实现类似星球大战中字幕滚动的效果/";
+         var disqus_url = "http://lujun9972.github.io/emacs-document/blog/2016/07/29/在emacs中实现类似星球大战中字幕滚动的效果/";
+         var disqus_shortname = 'emacs-document';
+         /* * * DON'T EDIT BELOW THIS LINE * * */
+         (function() {
+             var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+             dsq.src = 'http://' + disqus_shortname + '.disqus.com/embed.js';
+             (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+             $('#disqus_thread').css('display','none');
+         })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+        <div class="ds-thread"></div>
+        <script type="text/javascript">
+         var duoshuoQuery = {short_name:'emacs-document'};
+         (function() {
+             var ds = document.createElement('script');
+             ds.type = 'text/javascript';ds.async = true;
+             ds.src = 'http://static.duoshuo.com/embed.js';
+             ds.charset = 'UTF-8';
+             (document.getElementsByTagName('head')[0]
+           || document.getElementsByTagName('body')[0]).appendChild(ds);
+             $('.ds-thread').css('display','block');
+         })();
+        </script>
+    <script>
+     /* comments */
+     var ego_disqus_thread=$('#disqus_thread');
+     var ego_ds_label=$('.ds-thread');
+     $('.disqus_label').click(function(){
+         ego_disqus_thread.show();
+         ego_ds_label.hide();
+     });
+     $('.ds-label').click(function(){
+         ego_disqus_thread.hide();
+         ego_ds_label.show();
+     });
+    </script>
+        </section>
+    <script src="http://lujun9972.github.io/emacs-document/media/js/main.js"></script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 25.x(<a href="http://orgmode.org">Org mode</a> 8.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:lujun9972 &lt;at&gt; lujun9972-F41">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div></body>
+</html>

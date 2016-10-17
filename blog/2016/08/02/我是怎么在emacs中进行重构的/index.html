@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>我是怎么在Emacs中进行重构的 - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <style>
+   #ds-thread #ds-reset .ds-comment-body p {color: #ffffff;}
+   #ds-thread #ds-reset .ds-comment-body p a {color: #ff0;}
+   #ds-thread #ds-reset .ds-comment-body p a:hover {color: #0ff;}
+   #disqus_thread a {color: #00ffff;}
+  </style>
+  <link rel="stylesheet" href="http://lujun9972.github.io/emacs-document/media/css/main.css" type="text/css"/>
+  <link rel="stylesheet" href="http://lujun9972.github.io/emacs-document/media/css/comment.css" type="text/css"/>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="http://lujun9972.github.io/emacs-document/">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;集思广益</p>
+    <nav class="site-nav">
+      <div class="menu-icon">
+        <svg viewBox="0 0 18 15">
+          <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.031C17.335,0,18,0.665,18,1.484L18,1.484z" fill="#ffff00"/>
+          <path d="M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0c0-0.82,0.665-1.484,1.484-1.484 h15.031C17.335,6.031,18,6.696,18,7.516L18,7.516z" fill="#ffff00"/>
+          <path d="M18,13.516C18,14.335,17.335,15,16.516,15H1.484C0.665,15,0,14.335,0,13.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.031C17.335,12.031,18,12.696,18,13.516L18,13.516z" fill="#ffff00"/>
+        </svg>
+      </div>
+      <ul class="trigger">
+        <li><a href="http://lujun9972.github.io/emacs-document/years/">Years</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/authors/">Authors</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/tags/">Tags</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document">Github</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="http://www.google.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">我是怎么在Emacs中进行重构的</h1>
+<div id="table-of-contents">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#orgheadline1">1. My Github setup</a></li>
+<li><a href="#orgheadline2">2. 声明废弃的函数</a></li>
+<li><a href="#orgheadline7">3. 修改文档中的废弃函数名</a>
+<ul>
+<li><a href="#orgheadline3">3.1. Step 1: call rgrep</a></li>
+<li><a href="#orgheadline4">3.2. Step 2: call wgrep</a></li>
+<li><a href="#orgheadline5">3.3. Step 3: call iedit</a></li>
+<li><a href="#orgheadline6">3.4. Step 4: exiting</a></li>
+</ul>
+</li>
+<li><a href="#orgheadline8">4. Outro</a></li>
+</ul>
+</div>
+</div>
+<p>
+好吧,只有写Java的人才会重构,我只是重命名而已. 今天,由于<a href="https://github.com/abo-abo/lispy/releases">要发布lispy 0.22.0</a> ,我不得不进行大量的重命名操作. 下面我会分享我所用到的那些函数和package.
+</p>
+
+<div id="outline-container-orgheadline1" class="outline-2">
+<h2 id="orgheadline1"><span class="section-number-2">1</span> My Github setup</h2>
+<div class="outline-text-2" id="text-1">
+<p>
+我的仓库结构如下(tree -da -L 1):
+</p>
+
+<pre class="example">
+.
+├── .cask
+├── gh-pages
+├── .git
+└── images
+</pre>
+
+<p>
+我将gh-pages分支也作为独立的git仓库克隆到了原始的lispy仓库中了. 这样我就可以同时重命名代码和文档中的函数了.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgheadline2" class="outline-2">
+<h2 id="orgheadline2"><span class="section-number-2">2</span> 声明废弃的函数</h2>
+<div class="outline-text-2" id="text-2">
+<p>
+可以用类似下面的方法来声明废弃的函数:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">define-obsolete-function-alias</span> 'lispy-out-forward
+  'lispy-right <span style="color: #2d9574;">"0.21.0"</span><span style="color: #4f97d7;">)</span>
+<span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">define-obsolete-function-alias</span> 'lispy-out-backward
+  'lispy-left <span style="color: #2d9574;">"0.21.0"</span><span style="color: #4f97d7;">)</span>
+<span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">define-obsolete-function-alias</span> 'lispy-out-forward-nostring
+  'lispy-right-nostring <span style="color: #2d9574;">"0.21.0"</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+这样在"0.21.0"及其以后的版本中, <code>lispy-out-backward</code> 作为 <code>lispy-left</code> 被废弃的别名,在调用时会有以下提醒:
+</p>
+
+<pre class="example">
+`lispy-out-forward' is an obsolete command (as of 0.21.0); use `lispy-right' instead.
+</pre>
+
+<p>
+现在,在发布"0.22.0"版本时,我完全可以删掉这些别名的声明了. 毕竟我已经給他们予警告并预留了一个星期的时间来让他们把代码中的废弃函数名改为新的名字了.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgheadline7" class="outline-2">
+<h2 id="orgheadline7"><span class="section-number-2">3</span> 修改文档中的废弃函数名</h2>
+<div class="outline-text-2" id="text-3">
+<p>
+给予仓库的结果,我可以通过下面几步来进行:
+</p>
+</div>
+
+<div id="outline-container-orgheadline3" class="outline-3">
+<h3 id="orgheadline3"><span class="section-number-3">3.1</span> Step 1: call rgrep</h3>
+<div class="outline-text-3" id="text-3-1">
+<p>
+<code>rgrep</code> 是一个很好用的函数, 我都觉得好奇怪,为什么默认没有为它分配一个快捷键呢; 考虑到我的键映射十分古怪,我将它的快捷键设置为 <code>C-&lt;</code>,这样实际上我要按下的键是 <code>C-;-l</code>
+</p>
+
+<p>
+<code>rgrep</code> 函数接受三个参数:
+</p>
+
+<ol class="org-ol">
+<li>要搜索的符号: 我将光标定位到 <code>define-obsolete-function-alias</code> 语句中要重命名的那个符号上,然后调用该 <code>rgrep</code>. 这样 <code>rgrep</code> 会将该symbol名来作为搜索的默认正则表达式的值,而我要作的仅仅是按下回车就行了.</li>
+<li>文件模式: 默认情况下使用的是当前文件的扩展名,即 <code>*.el</code>. 我输入的是 <code>* RET</code>,因为我还要搜索org和html文件.</li>
+<li>基线目录: rgrep会在该目录下递归地搜索符合文件模式的文件; 这里的默认值为 <code>~/git/lispy/</code>, 没问题,直接按 <code>RET</code>.</li>
+</ol>
+</div>
+</div>
+
+<div id="outline-container-orgheadline4" class="outline-3">
+<h3 id="orgheadline4"><span class="section-number-3">3.2</span> Step 2: call wgrep</h3>
+<div class="outline-text-3" id="text-3-2">
+<p>
+<a href="https://github.com/mhayashi1120/Emacs-wgrep">wgrep</a> 是一个很棒的package,它本应该更加的流行的. 由于它与wdired这个package及其类似,因此我也将它的启动热键设为 <code>C-x C-q</code>,退出热键设为 <code>C-c C-c</code>:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span>eval-after-load 'grep
+  '<span style="color: #bc6ec5;">(</span>define-key grep-mode-map
+     <span style="color: #2d9574;">(</span>kbd <span style="color: #2d9574;">"C-x C-q"</span><span style="color: #2d9574;">)</span> 'wgrep-change-to-wgrep-mode<span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+
+<span style="color: #4f97d7;">(</span>eval-after-load 'wgrep
+  '<span style="color: #bc6ec5;">(</span>define-key grep-mode-map
+     <span style="color: #2d9574;">(</span>kbd <span style="color: #2d9574;">"C-c C-c"</span><span style="color: #2d9574;">)</span> 'wgrep-finish-edit<span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgheadline5" class="outline-3">
+<h3 id="orgheadline5"><span class="section-number-3">3.3</span> Step 3: call iedit</h3>
+<div class="outline-text-3" id="text-3-3">
+<p>
+<a href="https://github.com/victorhge/iedit">iedit</a> 是一个令人震惊的package,它太TMD好用了. 我为它设置快捷键的配置如下所示,在开启了iedit-mode的情况下,你可以用 <code>C-i</code> 移动到下一个同名symbol出现的地方.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span>global-set-key <span style="color: #bc6ec5;">(</span>kbd <span style="color: #2d9574;">"C-M-i"</span><span style="color: #bc6ec5;">)</span> 'iedit-mode<span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+为了更改buffer中所有搜索出的同名symbol,我需要在按下 <code>C-M-i</code> 之前mark好所有我想修改的地方. 否则的话,iedit会自动为搜索的symbol加上分隔标示(事实上,这本是一个很棒的功能), 这样的话=lispy-out-forward=和lispy-out-forward就不被iedit认为是匹配的了.
+</p>
+
+<p>
+最终,我可以交互式的,一个字一个字的将所有的 <code>lispy-out-forward</code> 改为 <code>lispy-right</code>. 这个体验类似于<a href="https://github.com/magnars/multiple-cursors.el">multiple-cursors</a>, (我也挺喜欢这个package的), 只是目的不一样而已.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgheadline6" class="outline-3">
+<h3 id="orgheadline6"><span class="section-number-3">3.4</span> Step 4: exiting</h3>
+<div class="outline-text-3" id="text-3-4">
+<p>
+我做完这些修改之后:
+</p>
+
+<ul class="org-ul">
+<li>按下 <code>C-M-i</code> 退出iedit-mode</li>
+<li>按下 <code>C-c C-c</code> 退出wgrep</li>
+<li>检查无误后保持被修改的文件, 在没有保存前,你还可以将文件回退回原来的内容.</li>
+</ul>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgheadline8" class="outline-2">
+<h2 id="orgheadline8"><span class="section-number-2">4</span> Outro</h2>
+<div class="outline-text-2" id="text-4">
+<blockquote>
+<p>
+我靠,这么多步骤!
+</p>
+</blockquote>
+
+<p>
+没错,但是请注意,这三个工具可以分开来完成各自不同的任务. 例如在我的另一个<a href="http://youtu.be/DFTXnC1scno?t=3m49s">"refactoring" demo</a>中, 我使用iedit-mode来为一个Elisp中的let-boud变量解绑(该操作为Common Lisp也应该生效,毕竟这两者的符号都是一样的).
+</p>
+
+<p>
+拥有这种可以相互配合的工具是一件很棒的事情. 在大多数情况下,这笔只有一个"Rename"功能要好. 
+例如若你只想在一个buffe的范围内重命名,则可以跳过rgrep和wgrep的步骤,而只使用iedit-mode就行了. 
+而若修改的范围只是bufer的一部分,则我只需要:
+</p>
+
+<ol class="org-ol">
+<li>按下 <code>C-x nd</code> 调用 <code>narrow-to-defun</code> 函数 或者 按下 <code>C-x nn</code> 调用 <code>narrow-to-region</code> 函数(两个都对应lispy中的N键)</li>
+<li>调用 <code>iedit-mode</code></li>
+<li>按下 <code>C-x nw</code> 调用 <code>widen</code> (在lispy中按下W键)</li>
+</ol>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2016-08-02</span>
+            <span title="last modification date" class="post-info">2016-08-04</span>
+            <span title="tags" class="post-info">:N/A:</span>
+            <span title="author" class="post-info"><a href="mailto:lujun9972 &lt;at&gt; lujun9972-F41">lujun9972</a></span>
+        </div>
+    <script src="http://lujun9972.github.io/emacs-document/media/js/jquery-2.1.3.min.js"></script>
+        <section>
+            <h1>Comments</h1>
+            <div id="comment-wrap">
+                    <a class="disqus_label">使用 Disqus 评论</a>
+                    <a class="ds-label">使用多说评论</a>
+    </ul>
+        <div id="disqus_thread"></div>
+        <script type="text/javascript">
+         //var disqus_developer = 1;
+         var preempt_signal=false;
+         var disqus_identifier = "/blog/2016/08/02/我是怎么在emacs中进行重构的/";
+         var disqus_url = "http://lujun9972.github.io/emacs-document/blog/2016/08/02/我是怎么在emacs中进行重构的/";
+         var disqus_shortname = 'emacs-document';
+         /* * * DON'T EDIT BELOW THIS LINE * * */
+         (function() {
+             var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+             dsq.src = 'http://' + disqus_shortname + '.disqus.com/embed.js';
+             (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+             $('#disqus_thread').css('display','none');
+         })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+        <div class="ds-thread"></div>
+        <script type="text/javascript">
+         var duoshuoQuery = {short_name:'emacs-document'};
+         (function() {
+             var ds = document.createElement('script');
+             ds.type = 'text/javascript';ds.async = true;
+             ds.src = 'http://static.duoshuo.com/embed.js';
+             ds.charset = 'UTF-8';
+             (document.getElementsByTagName('head')[0]
+           || document.getElementsByTagName('body')[0]).appendChild(ds);
+             $('.ds-thread').css('display','block');
+         })();
+        </script>
+    <script>
+     /* comments */
+     var ego_disqus_thread=$('#disqus_thread');
+     var ego_ds_label=$('.ds-thread');
+     $('.disqus_label').click(function(){
+         ego_disqus_thread.show();
+         ego_ds_label.hide();
+     });
+     $('.ds-label').click(function(){
+         ego_disqus_thread.hide();
+         ego_ds_label.show();
+     });
+    </script>
+        </section>
+    <script src="http://lujun9972.github.io/emacs-document/media/js/main.js"></script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 25.x(<a href="http://orgmode.org">Org mode</a> 8.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:lujun9972 &lt;at&gt; lujun9972-F41">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div></body>
+</html>

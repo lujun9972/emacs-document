@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>在Elisp中退出当前调用栈并执行另一个函数的方法 - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <style>
+   #ds-thread #ds-reset .ds-comment-body p {color: #ffffff;}
+   #ds-thread #ds-reset .ds-comment-body p a {color: #ff0;}
+   #ds-thread #ds-reset .ds-comment-body p a:hover {color: #0ff;}
+   #disqus_thread a {color: #00ffff;}
+  </style>
+  <link rel="stylesheet" href="http://lujun9972.github.io/emacs-document/media/css/main.css" type="text/css"/>
+  <link rel="stylesheet" href="http://lujun9972.github.io/emacs-document/media/css/comment.css" type="text/css"/>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="http://lujun9972.github.io/emacs-document/">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;集思广益</p>
+    <nav class="site-nav">
+      <div class="menu-icon">
+        <svg viewBox="0 0 18 15">
+          <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.031C17.335,0,18,0.665,18,1.484L18,1.484z" fill="#ffff00"/>
+          <path d="M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0c0-0.82,0.665-1.484,1.484-1.484 h15.031C17.335,6.031,18,6.696,18,7.516L18,7.516z" fill="#ffff00"/>
+          <path d="M18,13.516C18,14.335,17.335,15,16.516,15H1.484C0.665,15,0,14.335,0,13.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.031C17.335,12.031,18,12.696,18,13.516L18,13.516z" fill="#ffff00"/>
+        </svg>
+      </div>
+      <ul class="trigger">
+        <li><a href="http://lujun9972.github.io/emacs-document/years/">Years</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/authors/">Authors</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/tags/">Tags</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document">Github</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="http://www.google.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">在Elisp中退出当前调用栈并执行另一个函数的方法</h1>
+<div id="table-of-contents">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#orgheadline1">1. Sample application</a></li>
+</ul>
+</div>
+</div>
+<p>
+今天我想要分享一段有趣的Elisp代码. 想象一下这么一段代码:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">defun</span> <span style="color: #bc6ec5; font-weight: bold;">useful-command</span> <span style="color: #bc6ec5;">()</span>
+  <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">interactive</span><span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span>do-thing-1<span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span>do-thing-2 <span style="color: #2d9574;">(</span>funcall callback-function<span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span>do-thing-3<span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+有时候会有这种需求, 你在执行 <code>callback-function</code> 的时间点上,想跳出正在执行的这个函数(本例中指的是那个 <code>useful-command</code>),在保持当前环境的情况下转而调用另一个函数.
+</p>
+
+<p>
+我是这样来实现这个需求的:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">defmacro</span> <span style="color: #bc6ec5; font-weight: bold;">ivy-quit-and-run</span> <span style="color: #bc6ec5;">(</span><span style="color: #ce537a; font-weight: bold;">&amp;rest</span> body<span style="color: #bc6ec5;">)</span>
+  <span style="color: #2aa1ae;">"Quit the minibuffer and run BODY afterwards."</span>
+  `<span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">progn</span>
+     <span style="color: #2d9574;">(</span>put 'quit 'error-message <span style="color: #2d9574;">""</span><span style="color: #2d9574;">)</span>
+     <span style="color: #2d9574;">(</span>run-at-time nil nil
+                  <span style="color: #67b11d;">(</span><span style="color: #4f97d7; font-weight: bold;">lambda</span> <span style="color: #b1951d;">()</span>
+                    <span style="color: #b1951d;">(</span>put 'quit 'error-message <span style="color: #2d9574;">"Quit"</span><span style="color: #b1951d;">)</span>
+                    ,@body<span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span>
+     <span style="color: #2d9574;">(</span>minibuffer-keyboard-quit<span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+让我们仔细分析一下:
+</p>
+
+<ul class="org-ul">
+<li><code>minibuffer-keyboard-quit</code> 会展开调用栈,并直接退出到command loop,从而阻止了 <code>do-thing-3</code> 的执行. 这里的调用栈可以任意深,比如 <code>useful-command</code> 可能又被 <code>utility-command</code> 所调用,诸如此类.</li>
+
+<li>带nil参数的 <code>run-at-time</code> 会尽可能快的运行后面的代码,几乎就在我们回到command loop的那一刻就会运行.</li>
+
+<li>最后要留意的就是不要在minibuffer上显示Quit信息.</li>
+</ul>
+
+<div id="outline-container-orgheadline1" class="outline-2">
+<h2 id="orgheadline1"><span class="section-number-2">1</span> Sample application</h2>
+<div class="outline-text-2" id="text-1">
+<p>
+假设我在ivy-mode激活的情况下调用了 <code>find-file</code> 函数. 一般情况下, 我会选择一个文件,然后按下 <code>C-m</code> 打开这个文件. 然而, 有时候我只是想用 <code>dired</code> 看一下这个文件而不是想打开这个文件. 
+下面这段代码来至于<a href="http://oremacs.com/2015/07/09/counsel-rhythmbox/">ivy multi-action interface</a>, 它是 <code>ivy-minibuffer-map</code> 中绑定的一个命令:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span>define-key ivy-minibuffer-map <span style="color: #bc6ec5;">(</span>kbd <span style="color: #2d9574;">"C-:"</span><span style="color: #bc6ec5;">)</span> 'ivy-dired<span style="color: #4f97d7;">)</span>
+
+<span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">defun</span> <span style="color: #bc6ec5; font-weight: bold;">ivy-dired</span> <span style="color: #bc6ec5;">()</span>
+  <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">interactive</span><span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">if</span> ivy--directory
+      <span style="color: #2d9574;">(</span><span style="color: #4f97d7; font-weight: bold;">ivy-quit-and-run</span>
+       <span style="color: #67b11d;">(</span>dired ivy--directory<span style="color: #67b11d;">)</span>
+       <span style="color: #67b11d;">(</span><span style="color: #4f97d7; font-weight: bold;">when</span> <span style="color: #b1951d;">(</span>re-search-forward
+              <span style="color: #4f97d7;">(</span>regexp-quote
+               <span style="color: #bc6ec5;">(</span>substring ivy--current <span style="color: #a45bad;">0</span> <span style="color: #a45bad;">-1</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span> <span style="color: #dc752f; background-color: #292b2e;">nil t</span><span style="color: #b1951d; background-color: #292b2e;">)</span>
+         <span style="color: #b1951d;">(</span>goto-char <span style="color: #4f97d7;">(</span>match-beginning <span style="color: #a45bad;">0</span><span style="color: #4f97d7;">)</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span><span style="color: #dc752f; background-color: #292b2e;">user-error</span>
+     <span style="color: #2d9574;">"Not completing files currently"</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+那么,在 <code>C-:</code> 被按下的那一刻,调用栈是这样子的: is pressed, the call stack is:
+</p>
+
+<ul class="org-ul">
+<li><code>C-x C-f</code> 调用 <code>find-file</code> 函数.</li>
+<li><code>find-file</code> 调用 <code>completion-read-function</code> 函数,不过实际上调用的是 <code>ivy-completing-read</code> 函数.</li>
+<li><code>ivy-completing-read</code> 调用了 <code>ivy-read</code> 函数.</li>
+<li><code>ivy-read</code> 调用了 <code>read-from-minibuffer</code>.</li>
+</ul>
+
+<p>
+宏 <code>ivy-quit-and-run</code> 让我能够展开所有的调用栈,确保从 <code>read-from-minibuffer</code> 退出后,不会再运行剩下的代码. 
+换句话说,Emacs不会打开该文件,反而会打开一个dired buffer,并选中这个文件.
+</p>
+
+<p>
+我上面所描述的场景应该蛮普遍的, 你可以用类似的方法改造 <code>helm</code>, <code>avy</code>,以及 <code>projectile</code>. 基本上,所有包含某种形式的补全(例如那些会等待输入的命令)并提供可定制keymap的东西,都能够应用这种方法.
+美中不足的是: 这种方法只是一种 quick-and-dirty 的解决方案. 如果可以的话,我并不推荐使用这种方法. 不过如果你别无他法,那么这个宏也许能够帮到你.
+</p>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2016-09-28</span>
+            <span title="last modification date" class="post-info">2016-09-28</span>
+            <span title="tags" class="post-info">:N/A:</span>
+            <span title="author" class="post-info"><a href="mailto:lujun9972 &lt;at&gt; lujun9972-F41">lujun9972</a></span>
+        </div>
+    <script src="http://lujun9972.github.io/emacs-document/media/js/jquery-2.1.3.min.js"></script>
+        <section>
+            <h1>Comments</h1>
+            <div id="comment-wrap">
+                    <a class="disqus_label">使用 Disqus 评论</a>
+                    <a class="ds-label">使用多说评论</a>
+    </ul>
+        <div id="disqus_thread"></div>
+        <script type="text/javascript">
+         //var disqus_developer = 1;
+         var preempt_signal=false;
+         var disqus_identifier = "/blog/2016/09/28/在elisp中退出当前调用栈并执行另一个函数的方法/";
+         var disqus_url = "http://lujun9972.github.io/emacs-document/blog/2016/09/28/在elisp中退出当前调用栈并执行另一个函数的方法/";
+         var disqus_shortname = 'emacs-document';
+         /* * * DON'T EDIT BELOW THIS LINE * * */
+         (function() {
+             var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+             dsq.src = 'http://' + disqus_shortname + '.disqus.com/embed.js';
+             (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+             $('#disqus_thread').css('display','none');
+         })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+        <div class="ds-thread"></div>
+        <script type="text/javascript">
+         var duoshuoQuery = {short_name:'emacs-document'};
+         (function() {
+             var ds = document.createElement('script');
+             ds.type = 'text/javascript';ds.async = true;
+             ds.src = 'http://static.duoshuo.com/embed.js';
+             ds.charset = 'UTF-8';
+             (document.getElementsByTagName('head')[0]
+           || document.getElementsByTagName('body')[0]).appendChild(ds);
+             $('.ds-thread').css('display','block');
+         })();
+        </script>
+    <script>
+     /* comments */
+     var ego_disqus_thread=$('#disqus_thread');
+     var ego_ds_label=$('.ds-thread');
+     $('.disqus_label').click(function(){
+         ego_disqus_thread.show();
+         ego_ds_label.hide();
+     });
+     $('.ds-label').click(function(){
+         ego_disqus_thread.hide();
+         ego_ds_label.show();
+     });
+    </script>
+        </section>
+    <script src="http://lujun9972.github.io/emacs-document/media/js/main.js"></script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 25.x(<a href="http://orgmode.org">Org mode</a> 8.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:lujun9972 &lt;at&gt; lujun9972-F41">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div></body>
+</html>

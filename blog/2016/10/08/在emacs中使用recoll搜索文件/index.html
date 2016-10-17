@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>在Emacs中使用recoll搜索文件 - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <style>
+   #ds-thread #ds-reset .ds-comment-body p {color: #ffffff;}
+   #ds-thread #ds-reset .ds-comment-body p a {color: #ff0;}
+   #ds-thread #ds-reset .ds-comment-body p a:hover {color: #0ff;}
+   #disqus_thread a {color: #00ffff;}
+  </style>
+  <link rel="stylesheet" href="http://lujun9972.github.io/emacs-document/media/css/main.css" type="text/css"/>
+  <link rel="stylesheet" href="http://lujun9972.github.io/emacs-document/media/css/comment.css" type="text/css"/>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="http://lujun9972.github.io/emacs-document/">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;集思广益</p>
+    <nav class="site-nav">
+      <div class="menu-icon">
+        <svg viewBox="0 0 18 15">
+          <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.031C17.335,0,18,0.665,18,1.484L18,1.484z" fill="#ffff00"/>
+          <path d="M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0c0-0.82,0.665-1.484,1.484-1.484 h15.031C17.335,6.031,18,6.696,18,7.516L18,7.516z" fill="#ffff00"/>
+          <path d="M18,13.516C18,14.335,17.335,15,16.516,15H1.484C0.665,15,0,14.335,0,13.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.031C17.335,12.031,18,12.696,18,13.516L18,13.516z" fill="#ffff00"/>
+        </svg>
+      </div>
+      <ul class="trigger">
+        <li><a href="http://lujun9972.github.io/emacs-document/years/">Years</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/authors/">Authors</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/tags/">Tags</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document">Github</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="http://www.google.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">在Emacs中使用recoll搜索文件</h1>
+<div id="table-of-contents">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#orgheadline4">1. Building Recoll</a>
+<ul>
+<li><a href="#orgheadline1">1.1. Extract the archive</a></li>
+<li><a href="#orgheadline2">1.2. Open ansi-term</a></li>
+<li><a href="#orgheadline3">1.3. Configure and make</a></li>
+</ul>
+</li>
+<li><a href="#orgheadline5">2. Configuring Recoll</a></li>
+<li><a href="#orgheadline6">3. Using Recoll from Emacs</a></li>
+<li><a href="#orgheadline7">4. Outro</a></li>
+</ul>
+</div>
+</div>
+<p>
+我知道大多数Emacs hackers都很喜欢grep的简洁性和可用性,但是它也有不好用的时候. 比如在我的Org-mode目录下包含了许多的org文件和PDF文件. 这些文件太多了即使用grep也不够快,而且PDF的结构使之也不能用grep来搜索内容. 在这种情况下,我们需要另一种工具:desktop database.
+</p>
+
+<p>
+我是在阅读了John Kitchin一篇关于<a href="http://kitchingroup.cheme.cmu.edu/blog/2015/07/06/Indexing-headlines-in-org-files-with-swish-e-with-laser-sharp-results/">swish-e</a> 的博文后才了解这个领域的, 然而这个软件在我这一直不能正常运作.
+好在,作为对他这篇博文的回应,我在Org-mode的mailing list中发现了另一个工具 - <a href="https://en.wikipedia.org/wiki/Recoll">recoll</a>. 
+在本文中,我将会一步步的指引你在Emacs中使用Recoll.
+</p>
+
+<div id="outline-container-orgheadline4" class="outline-2">
+<h2 id="orgheadline4"><span class="section-number-2">1</span> Building Recoll</h2>
+<div class="outline-text-2" id="text-1">
+<p>
+我假设你使用的是GNU/Linux操作系统, 毕竟在我印象中,这是最适合用来构建软件的操作系统了. 而且我也只用过这个操作系统,要我说其他操作系统上的步骤会很困难.
+</p>
+
+<p>
+如果你只想玩玩Recoll的图形端,你可以用下面语句来安装:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">sudo apt-get install recoll
+</pre>
+</div>
+
+<p>
+然而可惜的是,这个package并不包含 <code>recollq</code> 这个shell工具, 我们需要下载<a href="http://www.lesbonscomptes.com/recoll/download.html">源代码</a>来编译. 当前版本是<a href="http://www.lesbonscomptes.com/recoll/recoll-1.20.6.tar.gz">1.20.6</a>.
+</p>
+</div>
+
+<div id="outline-container-orgheadline1" class="outline-3">
+<h3 id="orgheadline1"><span class="section-number-3">1.1</span> Extract the archive</h3>
+<div class="outline-text-3" id="text-1-1">
+<p>
+下载压缩包后, 我在 <code>dired</code> 中打开 <code>~/Downloads</code> 这儿目录然后按下 <code>&amp;</code> (dired-do-async-shell-command). 
+Emacs会根据tar.gz的后者推测要执行的命令应该是 <code>tar zxvf</code>. 直接按下回车后,压缩包就解压缩到当前目录中了.
+事实上,我用 <code>~/Software/</code> 来存放那些从tar包中安装的东西,因为我不希望 <code>~/Downloads</code> 目录下有太多的东西.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgheadline2" class="outline-3">
+<h3 id="orgheadline2"><span class="section-number-3">1.2</span> Open ansi-term</h3>
+<div class="outline-text-3" id="text-1-2">
+<p>
+在 <code>dired</code> 中进入 <code>recoll-1.20.6/</code> 目录,然后按下 <code>`</code> 键,在当前目录下打开一个 <code>*ansi-term*</code> buffer.
+</p>
+
+<p>
+下面是相关配置(摘自于<a href="https://github.com/abo-abo/oremacs">我的完整配置</a>):
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">defun</span> <span style="color: #bc6ec5; font-weight: bold;">ora-terminal</span> <span style="color: #bc6ec5;">()</span>
+  <span style="color: #2aa1ae;">"Switch to terminal. Launch if nonexistent."</span>
+  <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">interactive</span><span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">if</span> <span style="color: #2d9574;">(</span>get-buffer <span style="color: #2d9574;">"*ansi-term*"</span><span style="color: #2d9574;">)</span>
+      <span style="color: #2d9574;">(</span>switch-to-buffer <span style="color: #2d9574;">"*ansi-term*"</span><span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span>ansi-term <span style="color: #2d9574;">"/bin/bash"</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span>get-buffer-process <span style="color: #2d9574;">"*ansi-term*"</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+
+<span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">defun</span> <span style="color: #bc6ec5; font-weight: bold;">ora-dired-open-term</span> <span style="color: #bc6ec5;">()</span>
+  <span style="color: #2aa1ae;">"Open an `</span><span style="color: #a45bad;">ansi-term</span><span style="color: #2aa1ae;">' that corresponds to current directory."</span>
+  <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">interactive</span><span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">let</span> <span style="color: #2d9574;">(</span><span style="color: #67b11d;">(</span>current-dir <span style="color: #b1951d;">(</span>dired-current-directory<span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span>term-send-string
+     <span style="color: #67b11d;">(</span>ora-terminal<span style="color: #67b11d;">)</span>
+     <span style="color: #67b11d;">(</span><span style="color: #4f97d7; font-weight: bold;">if</span> <span style="color: #b1951d;">(</span>file-remote-p current-dir<span style="color: #b1951d;">)</span>
+         <span style="color: #b1951d;">(</span><span style="color: #4f97d7; font-weight: bold;">let</span> <span style="color: #4f97d7;">(</span><span style="color: #bc6ec5;">(</span>v <span style="color: #2d9574;">(</span>tramp-dissect-file-name current-dir t<span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+           <span style="color: #4f97d7;">(</span>format <span style="color: #2d9574;">"ssh %s@%s\n"</span>
+                   <span style="color: #bc6ec5;">(</span>aref v <span style="color: #a45bad;">1</span><span style="color: #bc6ec5;">)</span> <span style="color: #bc6ec5;">(</span>aref v <span style="color: #a45bad;">2</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span><span style="color: #b1951d;">)</span>
+       <span style="color: #b1951d;">(</span>format <span style="color: #2d9574;">"cd '%s'\n"</span> current-dir<span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span><span style="color: #4f97d7; font-weight: bold;">setq</span> default-directory current-dir<span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+
+<span style="color: #4f97d7;">(</span>define-key dired-mode-map <span style="color: #bc6ec5;">(</span>kbd <span style="color: #2d9574;">"`"</span><span style="color: #bc6ec5;">)</span> 'ora-dired-open-term<span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgheadline3" class="outline-3">
+<h3 id="orgheadline3"><span class="section-number-3">1.3</span> Configure and make</h3>
+<div class="outline-text-3" id="text-1-3">
+<p>
+下面是典型的构建过程.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">./configure &amp;&amp; make
+sudo make install
+<span style="color: #4f97d7;">cd</span> query &amp;&amp; make
+which recoll
+sudo cp recollq /usr/local/bin/
+</pre>
+</div>
+
+<p>
+我在5年前完全是个Linux新手,对这些shell命令完全无感. 仅仅运行前两个命令你应该就能构建并安装大部分的软件了,如果你想要学习一些软件的话,你一般需要先通过这两句命令来构建出这些软件来.
+</p>
+
+<p>
+在执行第一条命令(事实上仅仅在执行./configure)时报了一个错误说我缺少一个库,我需要先安装好这个库然后重新执行一次 <code>./configure</code>.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">sudo apt-get install libqt5webkit5-dev
+</pre>
+</div>
+
+<p>
+我想,下面这条命令应该也行:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">sudo apt-get build-dep recoll
+</pre>
+</div>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgheadline5" class="outline-2">
+<h2 id="orgheadline5"><span class="section-number-2">2</span> Configuring Recoll</h2>
+<div class="outline-text-2" id="text-2">
+<p>
+我仅仅在选择索引目录时才运行图形界面. 默认情况下它使用的是home目录,我不想这样所以把它替换成了 <code>~/Dropbox/org/</code>.
+很明显,通过cron job,我们可以让recoll自动生成索引; 你甚至可以在图形界面中配置自动生成索引的时间.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgheadline6" class="outline-2">
+<h2 id="orgheadline6"><span class="section-number-2">3</span> Using Recoll from Emacs</h2>
+<div class="outline-text-2" id="text-3">
+<p>
+Emacs有大量的选项用于处理shell命令的输出结果. 所以第一步,我需要搞清楚这个shell命令的数据结果是怎么样的. 我们试试用它来输出一系列包含"Haskell"的文件:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">recollq -b <span style="color: #2d9574;">'haskell'</span>
+</pre>
+</div>
+
+<p>
+之后就可以将该命令的结果通过异步的 <code>ivy-read</code> 界面来展示:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">defun</span> <span style="color: #bc6ec5; font-weight: bold;">counsel-recoll-function</span> <span style="color: #bc6ec5;">(</span>string <span style="color: #ce537a; font-weight: bold;">&amp;rest</span> _unused<span style="color: #bc6ec5;">)</span>
+  <span style="color: #2aa1ae;">"Issue recallq for STRING."</span>
+  <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">if</span> <span style="color: #2d9574;">(</span>&lt; <span style="color: #67b11d;">(</span>length string<span style="color: #67b11d;">)</span> <span style="color: #a45bad;">3</span><span style="color: #2d9574;">)</span>
+      <span style="color: #2d9574;">(</span>counsel-more-chars <span style="color: #a45bad;">3</span><span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span>counsel--async-command
+     <span style="color: #67b11d;">(</span>format <span style="color: #2d9574;">"recollq -b '%s'"</span> string<span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span>
+    nil<span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+
+<span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">defun</span> <span style="color: #bc6ec5; font-weight: bold;">counsel-recoll</span> <span style="color: #bc6ec5;">(</span><span style="color: #ce537a; font-weight: bold;">&amp;optional</span> initial-input<span style="color: #bc6ec5;">)</span>
+  <span style="color: #2aa1ae;">"Search for a string in the recoll database.</span>
+<span style="color: #2aa1ae;">You'll be given a list of files that match.</span>
+<span style="color: #2aa1ae;">Selecting a file will launch `</span><span style="color: #a45bad;">swiper</span><span style="color: #2aa1ae;">' for that file.</span>
+<span style="color: #2aa1ae;">INITIAL-INPUT can be given as the initial minibuffer input."</span>
+  <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">interactive</span><span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span>ivy-read <span style="color: #2d9574;">"recoll: "</span> 'counsel-recoll-function
+            <span style="color: #4f97d7;">:initial-input</span> initial-input
+            <span style="color: #4f97d7;">:dynamic-collection</span> t
+            <span style="color: #4f97d7;">:history</span> 'counsel-git-grep-history
+            <span style="color: #4f97d7;">:action</span> <span style="color: #2d9574;">(</span><span style="color: #4f97d7; font-weight: bold;">lambda</span> <span style="color: #67b11d;">(</span>x<span style="color: #67b11d;">)</span>
+                      <span style="color: #67b11d;">(</span><span style="color: #4f97d7; font-weight: bold;">when</span> <span style="color: #b1951d;">(</span>string-match <span style="color: #2d9574;">"file://</span><span style="color: #2d9574; font-weight: bold;">\\</span><span style="color: #2d9574; font-weight: bold;">(</span><span style="color: #2d9574;">.*</span><span style="color: #2d9574; font-weight: bold;">\\</span><span style="color: #2d9574; font-weight: bold;">)</span><span style="color: #2d9574;">\\'"</span> x<span style="color: #b1951d;">)</span>
+                        <span style="color: #b1951d;">(</span><span style="color: #4f97d7; font-weight: bold;">let</span> <span style="color: #4f97d7;">(</span><span style="color: #bc6ec5;">(</span>file-name <span style="color: #2d9574;">(</span>match-string <span style="color: #a45bad;">1</span> x<span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+                          <span style="color: #4f97d7;">(</span>find-file file-name<span style="color: #4f97d7;">)</span>
+                          <span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">unless</span> <span style="color: #bc6ec5;">(</span>string-match <span style="color: #2d9574;">"pdf$"</span> x<span style="color: #bc6ec5;">)</span>
+                            <span style="color: #bc6ec5;">(</span>swiper ivy-text<span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+这段代码挺简单的:
+</p>
+
+<ul class="org-ul">
+<li>输入至少3个字符后才开始搜索,这样能避免产生太多的结果.</li>
+<li><code>:dynamic-collection t</code> 意味着每次输入一个新字符都会调用一次 <code>recollq</code>.</li>
+<li>在 <code>:action</code> 参数中,我指定一个函数打开选中的文件,然后在该文件中用当前的输入作为参数运行swiper.</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-orgheadline7" class="outline-2">
+<h2 id="orgheadline7"><span class="section-number-2">4</span> Outro</h2>
+<div class="outline-text-2" id="text-4">
+<p>
+有一些东西希望你能注意到:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #4f97d7;">cd</span> ~/Dropbox/org &amp;&amp; du -hs
+<span style="color: #2aa1ae; background-color: #292e34;"># </span><span style="color: #2aa1ae; background-color: #292e34;">567M .</span>
+</pre>
+</div>
+
+<p>
+我的目录下有近半个G的文件,所有这些文件都被索引了,而且在Emacs中每输入一个新字符都需要更新一下文件列表.
+</p>
+
+<p>
+如果你还知道什么工具要搞过recoll的(我对它通过 <code>-A</code> 选项的输出内容不是很满意), 定一定分享出来. 而且, 我才发现已经有了一个<a href="https://github.com/emacs-helm/helm-recoll">helm-recoll</a> package了,如果你喜欢Helm的话可以直接使用它.
+</p>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2016-10-08</span>
+            <span title="last modification date" class="post-info">2016-10-08</span>
+            <span title="tags" class="post-info">:N/A:</span>
+            <span title="author" class="post-info"><a href="mailto:lujun9972 &lt;at&gt; lujun9972-F41">lujun9972</a></span>
+        </div>
+    <script src="http://lujun9972.github.io/emacs-document/media/js/jquery-2.1.3.min.js"></script>
+        <section>
+            <h1>Comments</h1>
+            <div id="comment-wrap">
+                    <a class="disqus_label">使用 Disqus 评论</a>
+                    <a class="ds-label">使用多说评论</a>
+    </ul>
+        <div id="disqus_thread"></div>
+        <script type="text/javascript">
+         //var disqus_developer = 1;
+         var preempt_signal=false;
+         var disqus_identifier = "/blog/2016/10/08/在emacs中使用recoll搜索文件/";
+         var disqus_url = "http://lujun9972.github.io/emacs-document/blog/2016/10/08/在emacs中使用recoll搜索文件/";
+         var disqus_shortname = 'emacs-document';
+         /* * * DON'T EDIT BELOW THIS LINE * * */
+         (function() {
+             var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+             dsq.src = 'http://' + disqus_shortname + '.disqus.com/embed.js';
+             (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+             $('#disqus_thread').css('display','none');
+         })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+        <div class="ds-thread"></div>
+        <script type="text/javascript">
+         var duoshuoQuery = {short_name:'emacs-document'};
+         (function() {
+             var ds = document.createElement('script');
+             ds.type = 'text/javascript';ds.async = true;
+             ds.src = 'http://static.duoshuo.com/embed.js';
+             ds.charset = 'UTF-8';
+             (document.getElementsByTagName('head')[0]
+           || document.getElementsByTagName('body')[0]).appendChild(ds);
+             $('.ds-thread').css('display','block');
+         })();
+        </script>
+    <script>
+     /* comments */
+     var ego_disqus_thread=$('#disqus_thread');
+     var ego_ds_label=$('.ds-thread');
+     $('.disqus_label').click(function(){
+         ego_disqus_thread.show();
+         ego_ds_label.hide();
+     });
+     $('.ds-label').click(function(){
+         ego_disqus_thread.hide();
+         ego_ds_label.show();
+     });
+    </script>
+        </section>
+    <script src="http://lujun9972.github.io/emacs-document/media/js/main.js"></script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 25.x(<a href="http://orgmode.org">Org mode</a> 8.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:lujun9972 &lt;at&gt; lujun9972-F41">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div></body>
+</html>

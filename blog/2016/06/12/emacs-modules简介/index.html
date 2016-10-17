@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>emacs-modules简介 - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <style>
+   #ds-thread #ds-reset .ds-comment-body p {color: #ffffff;}
+   #ds-thread #ds-reset .ds-comment-body p a {color: #ff0;}
+   #ds-thread #ds-reset .ds-comment-body p a:hover {color: #0ff;}
+   #disqus_thread a {color: #00ffff;}
+  </style>
+  <link rel="stylesheet" href="http://lujun9972.github.io/emacs-document/media/css/main.css" type="text/css"/>
+  <link rel="stylesheet" href="http://lujun9972.github.io/emacs-document/media/css/comment.css" type="text/css"/>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="http://lujun9972.github.io/emacs-document/">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;集思广益</p>
+    <nav class="site-nav">
+      <div class="menu-icon">
+        <svg viewBox="0 0 18 15">
+          <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.031C17.335,0,18,0.665,18,1.484L18,1.484z" fill="#ffff00"/>
+          <path d="M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0c0-0.82,0.665-1.484,1.484-1.484 h15.031C17.335,6.031,18,6.696,18,7.516L18,7.516z" fill="#ffff00"/>
+          <path d="M18,13.516C18,14.335,17.335,15,16.516,15H1.484C0.665,15,0,14.335,0,13.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.031C17.335,12.031,18,12.696,18,13.516L18,13.516z" fill="#ffff00"/>
+        </svg>
+      </div>
+      <ul class="trigger">
+        <li><a href="http://lujun9972.github.io/emacs-document/years/">Years</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/authors/">Authors</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/tags/">Tags</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document">Github</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="http://www.google.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">emacs-modules简介</h1>
+<div id="table-of-contents">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#orgheadline1">1. dynamic-module的工作原理</a></li>
+<li><a href="#orgheadline5">2. 一个module的简单例子</a>
+<ul>
+<li><a href="#orgheadline2">2.1. Makefile</a></li>
+<li><a href="#orgheadline3">2.2. mymod.c</a></li>
+<li><a href="#orgheadline4">2.3. 测试</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-orgheadline1" class="outline-2">
+<h2 id="orgheadline1"><span class="section-number-2">1</span> dynamic-module的工作原理</h2>
+<div class="outline-text-2" id="text-1">
+<p>
+Emacs25新增了一个新功能就是允许你加载动态模块. 也就是说,除了Emacs Lisp,你可以使用原生编译的代码来扩展Emacs, 使用原生代码扩展Emacs的两个优势在于:能够更好与Emacs进行整合,而且速度也更快.
+</p>
+
+<p>
+所谓模块,类似于其他程序中的插件. 每个模块都被编译成共享库的形式(根据操作系统的不同,它的文件后缀可能为.so, .dylib 或 .dll). 这种共享库提供了一些函数可以供Emacs主程序调用. 插件API或者说模块的接口描述了主程序的入口点是怎样的,以及模块可以用哪些东西来与主程序进行交互.
+</p>
+
+<p>
+具体来说,该API原型定义在 <code>emacs-module.h</code> 头文件中. 要创建一个Emacs模块无需链接任何Emacs的库或者执行程序,只需要引用该头文件然后实现该API即可.
+</p>
+
+<p>
+<code>emacs-module.h</code> 文件定义了很多东西,其中最重要的是以下几点:
+</p>
+
+<ul class="org-ul">
+<li>一种名叫 <code>emacs_value</code> 的类型,用于表示与Emacs传递Lisp类型的值.</li>
+<li>一个名为 <code>emacs_runtime</code> 的结构体,用于获取一个指向环境的指针.</li>
+<li>一个名为 <code>emacs_env</code> 的结构体,该结构体包含了各种指向API的函数指针.</li>
+<li><p>
+模块主入口点的函数原型.
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #4f97d7; font-weight: bold;">extern</span> <span style="color: #ce537a; font-weight: bold;">int</span> <span style="color: #bc6ec5; font-weight: bold;">emacs_module_init</span> <span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">struct</span> <span style="color: #ce537a; font-weight: bold;">emacs_runtime</span> *<span style="color: #7590db;">ert</span><span style="color: #4f97d7;">)</span>;
+</pre>
+</div></li>
+</ul>
+
+<p>
+当加载动态模块时,Emacs会调用模块主入口点的函数,并传递給该函数一个指向"emacs运行期"的指针作为参数. 
+通过该指针,你可以获取到指向"emacs环境"的指针: 
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ce537a; font-weight: bold;">emacs_env</span> *<span style="color: #7590db;">env</span> = ert-&gt;get_environment<span style="color: #4f97d7;">(</span>ert<span style="color: #4f97d7;">)</span>;
+</pre>
+</div>
+
+<p>
+"emacs环境"中提供了许多函数来让你与lisp解析器进行交互. 所有的这些函数的第一个参数都需要是指向"emacs环境"的指针.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgheadline5" class="outline-2">
+<h2 id="orgheadline5"><span class="section-number-2">2</span> 一个module的简单例子</h2>
+<div class="outline-text-2" id="text-2">
+<p>
+下面我们会定义一个名为 <code>mymode</code> 的模块,该模块中定义了一个函数 <code>mymod-test</code>, 该函数返回整数42.
+</p>
+
+<p>
+首先我们需要得到一份Emacs源码的拷贝. 因为你需要以支持module的方式来编译Emacs(默认是不支持module的), 同时你也需要 <code>emacs_module.h</code> 头文件.
+</p>
+
+<p>
+Emacs源代码可以从这里下载: <a href="http://alpha.gnu.org/gnu/emacs/pretest/emacs-25.0.92.tar.xz">http://alpha.gnu.org/gnu/emacs/pretest/emacs-25.0.92.tar.xz</a>
+</p>
+
+<p>
+编译的命令为 <code>./configure --with-modules &amp;&amp; make</code>. 你可以通过运行 <code>./src/emacs -Q</code> 来测试刚编译出来的emacs. 这里 <code>-Q</code> 表示Emacs启动时不要加载初始化文件. 
+</p>
+</div>
+
+<div id="outline-container-orgheadline2" class="outline-3">
+<h3 id="orgheadline2"><span class="section-number-3">2.1</span> Makefile</h3>
+<div class="outline-text-3" id="text-2-1">
+<div class="org-src-container">
+
+<pre class="src src-makefile"><span style="color: #2aa1ae; background-color: #292e34;"># </span><span style="color: #2aa1ae; background-color: #292e34;">&#35774;&#32622;emacs&#28304;&#20195;&#30721;&#36335;&#24452;</span>
+<span style="color: #2aa1ae; background-color: #292e34;"># </span><span style="color: #2aa1ae; background-color: #292e34;">(&#20320;&#21487;&#20197;&#22312;makefile&#20013;&#30452;&#25509;&#35774;&#32622;,&#20063;&#21487;&#20197;make&#26102;&#22312;&#21629;&#20196;&#34892;&#20013;&#25552;&#20379;)</span>
+<span style="color: #2aa1ae; background-color: #292e34;">#</span><span style="color: #2aa1ae; background-color: #292e34;">ROOT    =</span>
+<span style="color: #7590db;">CC</span>      = gcc
+<span style="color: #7590db;">LD</span>      = gcc
+<span style="color: #7590db;">CFLAGS</span>  = -ggdb3 -Wall
+<span style="color: #7590db;">LDFLAGS</span> =
+
+<span style="color: #bc6ec5; font-weight: bold;">all</span>: mymod.so
+
+<span style="color: #2aa1ae; background-color: #292e34;"># </span><span style="color: #2aa1ae; background-color: #292e34;">make shared library out of the object file</span>
+<span style="color: #bc6ec5; font-weight: bold;">%.so</span>: %.o
+    $<span style="color: #4f97d7;">(</span><span style="color: #7590db;">LD</span><span style="color: #4f97d7;">)</span> -shared $<span style="color: #4f97d7;">(</span><span style="color: #7590db;">LDFLAGS</span><span style="color: #4f97d7;">)</span> -o <span style="color: #bc6ec5; font-weight: bold;">$</span><span style="color: #a45bad; font-weight: bold;">@</span> $<span style="color: #a45bad;">&lt;</span>
+
+<span style="color: #2aa1ae; background-color: #292e34;"># </span><span style="color: #2aa1ae; background-color: #292e34;">compile source file to object file</span>
+<span style="color: #bc6ec5; font-weight: bold;">%.o</span>: %.c
+    $<span style="color: #4f97d7;">(</span><span style="color: #7590db;">CC</span><span style="color: #4f97d7;">)</span> $<span style="color: #4f97d7;">(</span><span style="color: #7590db;">CFLAGS</span><span style="color: #4f97d7;">)</span> -I$<span style="color: #4f97d7;">(</span><span style="color: #7590db;">ROOT</span><span style="color: #4f97d7;">)</span>/src -fPIC -c $<span style="color: #a45bad;">&lt;</span>
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgheadline3" class="outline-3">
+<h3 id="orgheadline3"><span class="section-number-3">2.2</span> mymod.c</h3>
+<div class="outline-text-3" id="text-2-2">
+<p>
+Emacs模块必须遵循GPL协议. 为了保证这一点,Emacs在加载模块之前,会监测该模块是否包含有名为 <code>plugin_is_GPL_compatible</code> 的变量.
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #bc6ec5;">#include</span> <span style="color: #4f97d7;">&lt;</span><span style="color: #2d9574;">emacs-module.h</span><span style="color: #4f97d7;">&gt;</span>
+
+<span style="color: #2aa1ae; background-color: #292e34;">/* </span><span style="color: #2aa1ae; background-color: #292e34;">&#24378;&#21046;&#30003;&#26126;GPL&#31526;&#21495; </span><span style="color: #2aa1ae; background-color: #292e34;">*/</span>
+<span style="color: #ce537a; font-weight: bold;">int</span> <span style="color: #7590db;">plugin_is_GPL_compatible</span>;
+
+<span style="color: #2aa1ae; background-color: #292e34;">/* </span><span style="color: #2aa1ae; background-color: #292e34;">&#23450;&#20041;&#26032;emacs lisp&#20989;&#25968;. &#25152;&#26377;&#26292;&#38706;&#32102;Emacs&#20351;&#29992;&#30340;&#20989;&#25968;&#37117;&#24517;&#39035;&#31526;&#21512;&#35813;&#21407;&#22411; </span><span style="color: #2aa1ae; background-color: #292e34;">*/</span>
+<span style="color: #4f97d7; font-weight: bold;">static</span> <span style="color: #ce537a; font-weight: bold;">emacs_value</span>
+<span style="color: #bc6ec5; font-weight: bold;">Fmymod_test</span> <span style="color: #4f97d7;">(</span><span style="color: #ce537a; font-weight: bold;">emacs_env</span> *<span style="color: #7590db;">env</span>, <span style="color: #ce537a; font-weight: bold;">ptrdiff_t</span> <span style="color: #7590db;">nargs</span>, <span style="color: #ce537a; font-weight: bold;">emacs_value</span> <span style="color: #7590db;">args</span><span style="color: #bc6ec5;">[]</span>, <span style="color: #ce537a; font-weight: bold;">void</span> *<span style="color: #7590db;">data</span><span style="color: #4f97d7;">)</span>
+<span style="color: #4f97d7;">{</span>
+  <span style="color: #4f97d7; font-weight: bold;">return</span> env-&gt;make_integer <span style="color: #bc6ec5;">(</span>env, <span style="color: #a45bad;">42</span><span style="color: #bc6ec5;">)</span>;
+<span style="color: #4f97d7;">}</span>
+
+<span style="color: #2aa1ae; background-color: #292e34;">/* </span><span style="color: #2aa1ae; background-color: #292e34;">&#23558;&#20989;&#25968;Sfun&#20197;name&#20026;&#21517;&#31216;,&#26292;&#38706;&#32102;emacs&#20351;&#29992; </span><span style="color: #2aa1ae; background-color: #292e34;">*/</span>
+<span style="color: #4f97d7; font-weight: bold;">static</span> <span style="color: #ce537a; font-weight: bold;">void</span>
+<span style="color: #bc6ec5; font-weight: bold;">bind_function</span> <span style="color: #4f97d7;">(</span><span style="color: #ce537a; font-weight: bold;">emacs_env</span> *<span style="color: #7590db;">env</span>, <span style="color: #4f97d7; font-weight: bold;">const</span> <span style="color: #ce537a; font-weight: bold;">char</span> *<span style="color: #7590db;">name</span>, <span style="color: #ce537a; font-weight: bold;">emacs_value</span> <span style="color: #7590db;">Sfun</span><span style="color: #4f97d7;">)</span>
+<span style="color: #4f97d7;">{</span>
+  <span style="color: #2aa1ae; background-color: #292e34;">/* </span><span style="color: #2aa1ae; background-color: #292e34;">&#20351;&#29992;fset&#20989;&#25968;&#26469;&#23558;SFUN&#20989;&#25968;&#32465;&#23450;&#21040;&#21517;&#20026;NAME&#30340;&#31526;&#21495; </span><span style="color: #2aa1ae; background-color: #292e34;">*/</span>
+
+  <span style="color: #2aa1ae; background-color: #292e34;">/* </span><span style="color: #2aa1ae; background-color: #292e34;">&#36890;&#36807;intern&#23558;&#23383;&#31526;&#20018;&#36716;&#25442;&#20026;symbol </span><span style="color: #2aa1ae; background-color: #292e34;">*/</span>
+  <span style="color: #ce537a; font-weight: bold;">emacs_value</span> <span style="color: #7590db;">Qfset</span> = env-&gt;intern <span style="color: #bc6ec5;">(</span>env, <span style="color: #2d9574;">"fset"</span><span style="color: #bc6ec5;">)</span>;
+  <span style="color: #ce537a; font-weight: bold;">emacs_value</span> <span style="color: #7590db;">Qsym</span> = env-&gt;intern <span style="color: #bc6ec5;">(</span>env, name<span style="color: #bc6ec5;">)</span>;
+
+  <span style="color: #2aa1ae; background-color: #292e34;">/* </span><span style="color: #2aa1ae; background-color: #292e34;">&#20934;&#22791;&#22909;&#21442;&#25968;&#25968;&#32452;</span><span style="color: #2aa1ae; background-color: #292e34;">*/</span>
+  <span style="color: #ce537a; font-weight: bold;">emacs_value</span> <span style="color: #7590db;">args</span><span style="color: #bc6ec5;">[]</span> = <span style="color: #bc6ec5;">{</span> Qsym, Sfun <span style="color: #bc6ec5;">}</span>;
+
+  <span style="color: #2aa1ae; background-color: #292e34;">/* </span><span style="color: #2aa1ae; background-color: #292e34;">&#35843;&#29992;fset&#20989;&#25968;,&#36825;&#37324;&#30340;2&#20026;&#21442;&#25968;&#30340;&#20010;&#25968;</span><span style="color: #2aa1ae; background-color: #292e34;">*/</span>
+  env-&gt;funcall <span style="color: #bc6ec5;">(</span>env, Qfset, <span style="color: #a45bad;">2</span>, args<span style="color: #bc6ec5;">)</span>;
+<span style="color: #4f97d7;">}</span>
+
+<span style="color: #2aa1ae; background-color: #292e34;">/* </span><span style="color: #2aa1ae; background-color: #292e34;">Provide FEATURE to Emacs.  </span><span style="color: #2aa1ae; background-color: #292e34;">*/</span>
+<span style="color: #4f97d7; font-weight: bold;">static</span> <span style="color: #ce537a; font-weight: bold;">void</span>
+<span style="color: #bc6ec5; font-weight: bold;">provide</span> <span style="color: #4f97d7;">(</span><span style="color: #ce537a; font-weight: bold;">emacs_env</span> *<span style="color: #7590db;">env</span>, <span style="color: #4f97d7; font-weight: bold;">const</span> <span style="color: #ce537a; font-weight: bold;">char</span> *<span style="color: #7590db;">feature</span><span style="color: #4f97d7;">)</span>
+<span style="color: #4f97d7;">{</span>
+  <span style="color: #2aa1ae; background-color: #292e34;">/* </span><span style="color: #2aa1ae; background-color: #292e34;">call 'provide' with FEATURE converted to a symbol </span><span style="color: #2aa1ae; background-color: #292e34;">*/</span>
+
+  <span style="color: #ce537a; font-weight: bold;">emacs_value</span> <span style="color: #7590db;">Qfeat</span> = env-&gt;intern <span style="color: #bc6ec5;">(</span>env, feature<span style="color: #bc6ec5;">)</span>;
+  <span style="color: #ce537a; font-weight: bold;">emacs_value</span> <span style="color: #7590db;">Qprovide</span> = env-&gt;intern <span style="color: #bc6ec5;">(</span>env, <span style="color: #2d9574;">"provide"</span><span style="color: #bc6ec5;">)</span>;
+  <span style="color: #ce537a; font-weight: bold;">emacs_value</span> <span style="color: #7590db;">args</span><span style="color: #bc6ec5;">[]</span> = <span style="color: #bc6ec5;">{</span> Qfeat <span style="color: #bc6ec5;">}</span>;
+
+  env-&gt;funcall <span style="color: #bc6ec5;">(</span>env, Qprovide, <span style="color: #a45bad;">1</span>, args<span style="color: #bc6ec5;">)</span>;
+<span style="color: #4f97d7;">}</span>
+
+<span style="color: #ce537a; font-weight: bold;">int</span>
+<span style="color: #bc6ec5; font-weight: bold;">emacs_module_init</span> <span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">struct</span> <span style="color: #ce537a; font-weight: bold;">emacs_runtime</span> *<span style="color: #7590db;">ert</span><span style="color: #4f97d7;">)</span>
+<span style="color: #4f97d7;">{</span>
+  <span style="color: #ce537a; font-weight: bold;">emacs_env</span> *<span style="color: #7590db;">env</span> = ert-&gt;get_environment <span style="color: #bc6ec5;">(</span>ert<span style="color: #bc6ec5;">)</span>;
+
+  <span style="color: #2aa1ae; background-color: #292e34;">/* </span><span style="color: #2aa1ae; background-color: #292e34;">&#21019;&#24314;&#21311;&#21517;&#20989;&#25968;,&#35813;&#21311;&#21517;&#20989;&#25968;&#34987;&#23553;&#35013;&#25104;&#19968;&#20010;emacs_value</span><span style="color: #2aa1ae; background-color: #292e34;">*/</span>
+  <span style="color: #ce537a; font-weight: bold;">emacs_value</span> <span style="color: #7590db;">fun</span> = env-&gt;make_function <span style="color: #bc6ec5;">(</span>env,
+              <span style="color: #a45bad;">0</span>,            <span style="color: #2aa1ae; background-color: #292e34;">/* </span><span style="color: #2aa1ae; background-color: #292e34;">&#26368;&#23569;&#38656;&#35201;&#30340;&#21442;&#25968;&#20010;&#25968;</span><span style="color: #2aa1ae; background-color: #292e34;">*/</span>
+              <span style="color: #a45bad;">0</span>,            <span style="color: #2aa1ae; background-color: #292e34;">/* </span><span style="color: #2aa1ae; background-color: #292e34;">&#25903;&#25345;&#30340;&#26368;&#22823;&#21442;&#25968;&#20010;&#25968;</span><span style="color: #2aa1ae; background-color: #292e34;">*/</span>
+              Fmymod_test,  <span style="color: #2aa1ae; background-color: #292e34;">/* </span><span style="color: #2aa1ae; background-color: #292e34;">&#23454;&#38469;&#20989;&#25968;&#30340;&#25351;&#38024;</span><span style="color: #2aa1ae; background-color: #292e34;">*/</span>
+              <span style="color: #2d9574;">"doc"</span>,        <span style="color: #2aa1ae; background-color: #292e34;">/* </span><span style="color: #2aa1ae; background-color: #292e34;">docstring </span><span style="color: #2aa1ae; background-color: #292e34;">*/</span>
+              <span style="color: #a45bad;">NULL</span>          <span style="color: #2aa1ae; background-color: #292e34;">/* </span><span style="color: #2aa1ae; background-color: #292e34;">user pointer of your choice (data param in Fmymod_test) </span><span style="color: #2aa1ae; background-color: #292e34;">*/</span>
+  <span style="color: #bc6ec5;">)</span>;
+
+  bind_function <span style="color: #bc6ec5;">(</span>env, <span style="color: #2d9574;">"mymod-test"</span>, fun<span style="color: #bc6ec5;">)</span>;
+  provide <span style="color: #bc6ec5;">(</span>env, <span style="color: #2d9574;">"mymod"</span><span style="color: #bc6ec5;">)</span>;
+
+  <span style="color: #2aa1ae; background-color: #292e34;">/* </span><span style="color: #2aa1ae; background-color: #292e34;">loaded successfully </span><span style="color: #2aa1ae; background-color: #292e34;">*/</span>
+  <span style="color: #4f97d7; font-weight: bold;">return</span> <span style="color: #a45bad;">0</span>;
+<span style="color: #4f97d7;">}</span>
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgheadline4" class="outline-3">
+<h3 id="orgheadline4"><span class="section-number-3">2.3</span> 测试</h3>
+<div class="outline-text-3" id="text-2-3">
+<p>
+编译该模块,编译时需要将ROOT变量指向Emacs源代码目录(可以直接修改makefile,或者用类似下面的命令编译)
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">make <span style="color: #7590db;">ROOT</span>=$<span style="color: #7590db;">HOME</span>/prog/emacs-25.0.92
+<span style="color: #2aa1ae; background-color: #292e34;"># </span><span style="color: #2aa1ae; background-color: #292e34;">gcc -ggdb3 -Wall -I/home/aaptel/prog/emacs-25.0.92/src -fPIC -c mymod.c</span>
+<span style="color: #2aa1ae; background-color: #292e34;"># </span><span style="color: #2aa1ae; background-color: #292e34;">gcc -shared  -o mymod.so mymod.o</span>
+<span style="color: #2aa1ae; background-color: #292e34;"># </span><span style="color: #2aa1ae; background-color: #292e34;">rm mymod.o</span>
+</pre>
+</div>
+
+<p>
+然后可以在Emacs加载并测试该模块了. 使用 <code>-L</code> 来将模块所在目录添加到load-path变量后.
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">~/prog/emacs-25.0.92/src/emacs -Q -L $<span style="color: #7590db;">PWD</span>
+</pre>
+</div>
+
+<p>
+在*scratch* buffer中加载该模块,然后调用 <code>mymod-test</code> 方法. 若一切顺利的话,应该有以下结果(一种,C-j为快捷键表示执行前面的S-Form并插入运算结果):
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">require</span> '<span style="color: #a45bad;">mymod</span><span style="color: #4f97d7;">)</span> &lt;C-j&gt;
+<span style="color: #2aa1ae; background-color: #292e34;">;; </span><span style="color: #2aa1ae; background-color: #292e34;">mymod</span>
+
+<span style="color: #4f97d7;">(</span>mymod-test<span style="color: #4f97d7;">)</span> &lt;C-j&gt;
+<span style="color: #2aa1ae; background-color: #292e34;">;; </span><span style="color: #2aa1ae; background-color: #292e34;">42</span>
+</pre>
+</div>
+</div>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2016-06-12</span>
+            <span title="last modification date" class="post-info">2016-06-12</span>
+            <span title="tags" class="post-info">:N/A:</span>
+            <span title="author" class="post-info"><a href="mailto:lujun9972 &lt;at&gt; lujun9972-F41">lujun9972</a></span>
+        </div>
+    <script src="http://lujun9972.github.io/emacs-document/media/js/jquery-2.1.3.min.js"></script>
+        <section>
+            <h1>Comments</h1>
+            <div id="comment-wrap">
+                    <a class="disqus_label">使用 Disqus 评论</a>
+                    <a class="ds-label">使用多说评论</a>
+    </ul>
+        <div id="disqus_thread"></div>
+        <script type="text/javascript">
+         //var disqus_developer = 1;
+         var preempt_signal=false;
+         var disqus_identifier = "/blog/2016/06/12/emacs-modules简介/";
+         var disqus_url = "http://lujun9972.github.io/emacs-document/blog/2016/06/12/emacs-modules简介/";
+         var disqus_shortname = 'emacs-document';
+         /* * * DON'T EDIT BELOW THIS LINE * * */
+         (function() {
+             var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+             dsq.src = 'http://' + disqus_shortname + '.disqus.com/embed.js';
+             (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+             $('#disqus_thread').css('display','none');
+         })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+        <div class="ds-thread"></div>
+        <script type="text/javascript">
+         var duoshuoQuery = {short_name:'emacs-document'};
+         (function() {
+             var ds = document.createElement('script');
+             ds.type = 'text/javascript';ds.async = true;
+             ds.src = 'http://static.duoshuo.com/embed.js';
+             ds.charset = 'UTF-8';
+             (document.getElementsByTagName('head')[0]
+           || document.getElementsByTagName('body')[0]).appendChild(ds);
+             $('.ds-thread').css('display','block');
+         })();
+        </script>
+    <script>
+     /* comments */
+     var ego_disqus_thread=$('#disqus_thread');
+     var ego_ds_label=$('.ds-thread');
+     $('.disqus_label').click(function(){
+         ego_disqus_thread.show();
+         ego_ds_label.hide();
+     });
+     $('.ds-label').click(function(){
+         ego_disqus_thread.hide();
+         ego_ds_label.show();
+     });
+    </script>
+        </section>
+    <script src="http://lujun9972.github.io/emacs-document/media/js/main.js"></script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 25.x(<a href="http://orgmode.org">Org mode</a> 8.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:lujun9972 &lt;at&gt; lujun9972-F41">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div></body>
+</html>

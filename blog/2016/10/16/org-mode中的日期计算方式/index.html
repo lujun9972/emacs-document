@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Org-mode中的日期计算方式 - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <style>
+   #ds-thread #ds-reset .ds-comment-body p {color: #ffffff;}
+   #ds-thread #ds-reset .ds-comment-body p a {color: #ff0;}
+   #ds-thread #ds-reset .ds-comment-body p a:hover {color: #0ff;}
+   #disqus_thread a {color: #00ffff;}
+  </style>
+  <link rel="stylesheet" href="http://lujun9972.github.io/emacs-document/media/css/main.css" type="text/css"/>
+  <link rel="stylesheet" href="http://lujun9972.github.io/emacs-document/media/css/comment.css" type="text/css"/>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="http://lujun9972.github.io/emacs-document/">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;集思广益</p>
+    <nav class="site-nav">
+      <div class="menu-icon">
+        <svg viewBox="0 0 18 15">
+          <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.031C17.335,0,18,0.665,18,1.484L18,1.484z" fill="#ffff00"/>
+          <path d="M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0c0-0.82,0.665-1.484,1.484-1.484 h15.031C17.335,6.031,18,6.696,18,7.516L18,7.516z" fill="#ffff00"/>
+          <path d="M18,13.516C18,14.335,17.335,15,16.516,15H1.484C0.665,15,0,14.335,0,13.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.031C17.335,12.031,18,12.696,18,13.516L18,13.516z" fill="#ffff00"/>
+        </svg>
+      </div>
+      <ul class="trigger">
+        <li><a href="http://lujun9972.github.io/emacs-document/years/">Years</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/authors/">Authors</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/tags/">Tags</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document">Github</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="http://www.google.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">Org-mode中的日期计算方式</h1>
+<p>
+我总是使用 <code>org-read-date</code> 来输入日期或时间(不一定非的是Org相关的),因为我觉得它相当的灵活.
+你可以用 <code>+3</code> 来表示三天后, <code>fri</code> 表示下周五, <code>+2tue</code> 表示下下个星期二, <code>+1w</code> 表示一周后, <code>+1m</code> 表示一个月后.
+在Emacs Lisp中调用 <code>org-read-date</code> 也很简单. 只需要 <code>(org-read-date)</code> 就行了,它会返回一个类似 <code>2015-08-06</code> 这样格式的时间.
+</p>
+
+<p>
+我也用 <code>org-read-date</code> 来进行日期相关的计算. 比如,我想知道明天是什么时候,我可以给 <code>org-read-date</code> 的第三个参数赋值(字符串):
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span>org-read-date nil nil <span style="color: #2d9574;">"+1"</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+还可以计算指定日期的相对日期. 你可以为 <code>org-read-date</code> 指定基础日期也可以用另一个 <code>org-read-date</code> 来获取这个基础日期. 
+在下例中,我想知道2015-08-31之后的第一个星期一是什么时候(请注意,这里用了两个 <code>+</code> 号,而不是一个 <code>+</code> 号).
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-org">(org-read-date nil nil "++mon" nil (org-time-string-to-time "2015-08-31"))
+</pre>
+</div>
+
+<p>
+<code>org-time-string-to-time</code> 将一个表示日期或时间的字符串转换成时间的内部表示方式.
+之后你可以通过 <code>decode-time</code> 抽取出其中的各部分的内容(比如月份之类), 你也可以通过 <code>time-to-seconds</code> 将其转换成至纪元开始所经过的秒数.
+当然,你也可以直接用 <code>org-time-to-seconds</code> 来将Org时间字符串直接转换成秒数.
+</p>
+
+<p>
+如果你想计算天数, 可以用 <code>org-time-string-to-absolute</code> 来转换日期字符串. 例如, 你可以用下面的方式计算两个日期之间的天数(包含减的日期,而不包含被减的日期):
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-org">(let ((start-date (org-read-date))
+      (end-date (org-read-date)))
+  (- (org-time-string-to-absolute end-date)
+     (org-time-string-to-absolute start-date)))
+</pre>
+</div>
+
+<p>
+要获得日期中的年月日信息,可以联合使用 <code>org-time-string-to-time</code> 与 <code>decode-time</code>, 你也可以联合使用 <code>org-time-string-to-seconds</code> 与 <code>calendar-gregorian-from-absolute</code>.
+</p>
+
+<p>
+要将内部的时间表示结构体转换成Org格式的日期, 我比较推崇 <code>(format-time-string "%Y-%m-%d" ...)</code>. 而 <code>encode-time</code> 则能用来将其他东西转换成内部表示的时间格式.
+</p>
+
+<p>
+如果你要处理至纪元以来的绝对天数,你可以将之转换成Gregorian历,然后再格式化成字符串.
+</p>
+
+<p>
+那么, 要遍历两个日期之间的所有天,你可以用类似下面的代码来实现:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">let*</span> <span style="color: #bc6ec5;">(</span><span style="color: #2d9574;">(</span>start-date <span style="color: #67b11d;">(</span>org-read-date<span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span>
+       <span style="color: #2d9574;">(</span>end-date <span style="color: #67b11d;">(</span>org-read-date<span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span>
+       <span style="color: #2d9574;">(</span>current <span style="color: #67b11d;">(</span>org-time-string-to-absolute start-date<span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span>
+       <span style="color: #2d9574;">(</span>end <span style="color: #67b11d;">(</span>org-time-string-to-absolute end-date<span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span>
+       gregorian-date
+       formatted-date<span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">while</span> <span style="color: #2d9574;">(</span>&lt; current end<span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span><span style="color: #4f97d7; font-weight: bold;">setq</span> gregorian-date <span style="color: #67b11d;">(</span>calendar-gregorian-from-absolute current<span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span><span style="color: #4f97d7; font-weight: bold;">setq</span> formatted-date
+          <span style="color: #67b11d;">(</span>format <span style="color: #2d9574;">"%04d-%02d-%02d"</span>
+                  <span style="color: #b1951d;">(</span>elt gregorian-date <span style="color: #a45bad;">2</span><span style="color: #b1951d;">)</span> <span style="color: #2aa1ae; background-color: #292e34;">; </span><span style="color: #2aa1ae; background-color: #292e34;">month</span>
+                  <span style="color: #b1951d;">(</span>elt gregorian-date <span style="color: #a45bad;">0</span><span style="color: #b1951d;">)</span> <span style="color: #2aa1ae; background-color: #292e34;">; </span><span style="color: #2aa1ae; background-color: #292e34;">day</span>
+                  <span style="color: #b1951d;">(</span>elt gregorian-date <span style="color: #a45bad;">1</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span> <span style="color: #2aa1ae; background-color: #292e34;">; </span><span style="color: #2aa1ae; background-color: #292e34;">year</span>
+    <span style="color: #2aa1ae; background-color: #292e34;">;; </span><span style="color: #2aa1ae; background-color: #292e34;">Do something here; ex:</span>
+    <span style="color: #2d9574;">(</span>message <span style="color: #2d9574;">"%s"</span> formatted-date<span style="color: #2d9574;">)</span>
+    <span style="color: #2aa1ae; background-color: #292e34;">;; </span><span style="color: #2aa1ae; background-color: #292e34;">Move to the next date</span>
+    <span style="color: #2d9574;">(</span><span style="color: #4f97d7; font-weight: bold;">setq</span> current <span style="color: #67b11d;">(</span>1+ current<span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+此外, 你也可以用 <code>org-read-date</code> 来对日期进行运算,可以将上面代码简化成这样:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">let*</span> <span style="color: #bc6ec5;">(</span><span style="color: #2d9574;">(</span>start-date <span style="color: #67b11d;">(</span>org-read-date<span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span>
+       <span style="color: #2d9574;">(</span>end-date <span style="color: #67b11d;">(</span>org-read-date<span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span>
+       <span style="color: #2d9574;">(</span>current start-date<span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">while</span> <span style="color: #2d9574;">(</span>string&lt; current end-date<span style="color: #2d9574;">)</span>
+    <span style="color: #2aa1ae; background-color: #292e34;">;; </span><span style="color: #2aa1ae; background-color: #292e34;">Do something here; ex:</span>
+    <span style="color: #2d9574;">(</span>message <span style="color: #2d9574;">"%s"</span> current<span style="color: #2d9574;">)</span>
+    <span style="color: #2aa1ae; background-color: #292e34;">;; </span><span style="color: #2aa1ae; background-color: #292e34;">Move to the next date</span>
+    <span style="color: #2d9574;">(</span><span style="color: #4f97d7; font-weight: bold;">setq</span> current <span style="color: #67b11d;">(</span>org-read-date nil nil <span style="color: #2d9574;">"++1"</span> nil <span style="color: #b1951d;">(</span>org-time-string-to-time current<span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+当然可能还有更优雅的方式来重写此代码,如果你找到了,请与我们分享.
+</p>
+
+<p>
+总之, 希望文本能对你们有帮助!
+</p>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2016-10-16</span>
+            <span title="last modification date" class="post-info">2016-10-16</span>
+            <span title="tags" class="post-info">:N/A:</span>
+            <span title="author" class="post-info"><a href="mailto:lujun9972 &lt;at&gt; lujun9972-F41">lujun9972</a></span>
+        </div>
+    <script src="http://lujun9972.github.io/emacs-document/media/js/jquery-2.1.3.min.js"></script>
+        <section>
+            <h1>Comments</h1>
+            <div id="comment-wrap">
+                    <a class="disqus_label">使用 Disqus 评论</a>
+                    <a class="ds-label">使用多说评论</a>
+    </ul>
+        <div id="disqus_thread"></div>
+        <script type="text/javascript">
+         //var disqus_developer = 1;
+         var preempt_signal=false;
+         var disqus_identifier = "/blog/2016/10/16/org-mode中的日期计算方式/";
+         var disqus_url = "http://lujun9972.github.io/emacs-document/blog/2016/10/16/org-mode中的日期计算方式/";
+         var disqus_shortname = 'emacs-document';
+         /* * * DON'T EDIT BELOW THIS LINE * * */
+         (function() {
+             var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+             dsq.src = 'http://' + disqus_shortname + '.disqus.com/embed.js';
+             (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+             $('#disqus_thread').css('display','none');
+         })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+        <div class="ds-thread"></div>
+        <script type="text/javascript">
+         var duoshuoQuery = {short_name:'emacs-document'};
+         (function() {
+             var ds = document.createElement('script');
+             ds.type = 'text/javascript';ds.async = true;
+             ds.src = 'http://static.duoshuo.com/embed.js';
+             ds.charset = 'UTF-8';
+             (document.getElementsByTagName('head')[0]
+           || document.getElementsByTagName('body')[0]).appendChild(ds);
+             $('.ds-thread').css('display','block');
+         })();
+        </script>
+    <script>
+     /* comments */
+     var ego_disqus_thread=$('#disqus_thread');
+     var ego_ds_label=$('.ds-thread');
+     $('.disqus_label').click(function(){
+         ego_disqus_thread.show();
+         ego_ds_label.hide();
+     });
+     $('.ds-label').click(function(){
+         ego_disqus_thread.hide();
+         ego_ds_label.show();
+     });
+    </script>
+        </section>
+    <script src="http://lujun9972.github.io/emacs-document/media/js/main.js"></script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 25.x(<a href="http://orgmode.org">Org mode</a> 8.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:lujun9972 &lt;at&gt; lujun9972-F41">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div></body>
+</html>

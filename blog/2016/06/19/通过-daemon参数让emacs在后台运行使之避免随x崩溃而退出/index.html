@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>通过-daemon参数让Emacs在后台运行使之避免随X崩溃而退出 - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <style>
+   #ds-thread #ds-reset .ds-comment-body p {color: #ffffff;}
+   #ds-thread #ds-reset .ds-comment-body p a {color: #ff0;}
+   #ds-thread #ds-reset .ds-comment-body p a:hover {color: #0ff;}
+   #disqus_thread a {color: #00ffff;}
+  </style>
+  <link rel="stylesheet" href="http://lujun9972.github.io/emacs-document/media/css/main.css" type="text/css"/>
+  <link rel="stylesheet" href="http://lujun9972.github.io/emacs-document/media/css/comment.css" type="text/css"/>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="http://lujun9972.github.io/emacs-document/">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;集思广益</p>
+    <nav class="site-nav">
+      <div class="menu-icon">
+        <svg viewBox="0 0 18 15">
+          <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.031C17.335,0,18,0.665,18,1.484L18,1.484z" fill="#ffff00"/>
+          <path d="M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0c0-0.82,0.665-1.484,1.484-1.484 h15.031C17.335,6.031,18,6.696,18,7.516L18,7.516z" fill="#ffff00"/>
+          <path d="M18,13.516C18,14.335,17.335,15,16.516,15H1.484C0.665,15,0,14.335,0,13.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.031C17.335,12.031,18,12.696,18,13.516L18,13.516z" fill="#ffff00"/>
+        </svg>
+      </div>
+      <ul class="trigger">
+        <li><a href="http://lujun9972.github.io/emacs-document/years/">Years</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/authors/">Authors</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/tags/">Tags</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document">Github</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="http://www.google.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">通过-daemon参数让Emacs在后台运行使之避免随X崩溃而退出</h1>
+<p>
+我的X server有时会停止响应,这时我不得不将之杀掉再重启. 也许是我的配置有问题,每次X server启动时,一开始分辨率总是很低(since it starts off in low-graphics mode ). 直到我手工重启图形登录管理器之后(我用的是sddm)才恢复正常. 总之,由于很难调试和修复这个问题, 我决定将注意力放在重启X时真正对我造成困扰的事情上:即,X退出时,Emacs也会跟着退出. <code>M-x recover-session</code> 能够很好的恢复我修改过的文件,而且一般来说我也会记得一打开Emacs就调用该命令来恢复上次的修改,但有时我会忘了这样做,则结果是我丢失了之前做出的那些更改.
+</p>
+
+<p>
+考虑到我调用了 <code>(server-start)</code> 以便允许不同的Emacs客户端连接到同一进程. 因此每次我需要重启X时,我都会先切换到控制台,使用 <code>emacsclient -c</code> 连接上Emacs, 然后使用 <code>M-x save-buffers-kill-emacs</code> 来关闭Emacs. 但是我依然需要在重启X后重启Emacs.
+</p>
+
+<p>
+使用 <code>emacs --daemon</code> 可以将Emacs作为后台进程运行,然后使用 <code>emacsclient -c</code> 连接上它. 然而,当我这么操作时,emacsclient frame并未应用我设置的主题. 需要为 <code>after-make-frame-functions</code> 变量添加下面函数才能修复这个问题:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">defun</span> <span style="color: #bc6ec5; font-weight: bold;">my/setup-color-theme</span> <span style="color: #bc6ec5;">()</span>
+  <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">interactive</span><span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span>color-theme-solarized-dark<span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span>set-face-foreground 'secondary-selection <span style="color: #2d9574;">"darkblue"</span><span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span>set-face-background 'secondary-selection <span style="color: #2d9574;">"lightblue"</span><span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span>set-face-background 'font-lock-doc-face <span style="color: #2d9574;">"black"</span><span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span>set-face-foreground 'font-lock-doc-face <span style="color: #2d9574;">"wheat"</span><span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span>set-face-background 'font-lock-string-face <span style="color: #2d9574;">"black"</span><span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span>set-face-foreground 'org-todo <span style="color: #2d9574;">"green"</span><span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span>set-face-background 'org-todo <span style="color: #2d9574;">"black"</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+<span style="color: #4f97d7;">(</span>add-hook 'after-make-frame-functions
+          <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">lambda</span> <span style="color: #2d9574;">(</span>frame<span style="color: #2d9574;">)</span>
+            <span style="color: #2d9574;">(</span>select-frame frame<span style="color: #2d9574;">)</span>
+            <span style="color: #2d9574;">(</span>my/setup-color-theme<span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+我对 <code>emacs --daemon</code> 和 <code>emacsclient -c</code> 这种方式很满意,因此我决定更进一步,让它在我开启电脑时就自动运行. 我试过使用 <a href="https://www.emacswiki.org/emacs/EmacsAsDaemon">https://www.emacswiki.org/emacs/EmacsAsDaemon</a> 中的init脚本. 但是由于我的Linux版本使用的是systemd,因此启动该init脚本会导致一个"缺少service文件"的错误信息. 所以我删除了这个init脚本然后创建了自己的脚本作为代替 <code>~/.config/systemd/user/emacs.service</code> :
+</p>
+<div class="org-src-container">
+
+<pre class="src src-conf">[<span style="color: #ce537a; font-weight: bold;">Unit</span>]
+<span style="color: #7590db;">Description</span>=Emacs: the extensible, self-documenting text editor
+
+[<span style="color: #ce537a; font-weight: bold;">Service</span>]
+<span style="color: #7590db;">Type</span>=forking
+<span style="color: #7590db;">ExecStart</span>=/usr/local/bin/emacs --daemon
+<span style="color: #7590db;">ExecStop</span>=/usr/local/bin/emacsclient --eval <span style="color: #2d9574;">"(progn (setq kill-emacs-hook 'nil) (kill-emacs))"</span>
+<span style="color: #7590db;">Restart</span>=always
+<span style="color: #7590db;">TimeoutStartSec</span>=0
+
+[<span style="color: #ce537a; font-weight: bold;">Install</span>]
+<span style="color: #7590db;">WantedBy</span>=default.target
+</pre>
+</div>
+
+<p>
+接着我用自己的一般用户账号来运行下面这些命令:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">systemctl --user enable emacs
+systemctl --user start emacs
+</pre>
+</div>
+
+<p>
+再然后,我将 <code>~/.xsession</code> 中的 <code>emacs</code> 修改为 <code>emacsclient -c</code>, 这样新产生的X session会连接上已有的session而不是重新创建一个新session. 这样一来,每次我重启电脑时,Emacs都会以我用户的权限启动,当我启动X时,都会有一个emacsclient连接上这个Emacs.
+</p>
+
+<p>
+然而,我发现,重启X依然会倒使Emacs daemon崩溃掉. 这个bug在 <code>emacs --daemon</code> 中有相关警告,它可能跟GTK有关. 我使用 <code>./configure --with-x-toolkit=lucid; make; make install</code> 重新编译Emacs后,似乎就没什么问题了; 我可以随意重启X而不会影响Emacs了. 而且这样还带来一个好处: 由于Emacs是在我启动计算机时进行的初始化,而我所需要作的仅仅是连接上那个进程而已,因此当我登录用户后,给人的感觉Emacs启动真的很快.
+</p>
+
+<p>
+最后一点: 我注意到TRAMP无法找到我的SSH keyring,因此当我用Org Babel运行远程服务器上的代码(就像下面这段代码一样)时,TRAMP会卡住等待我输入passphrass:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-org"><span style="color: #827591; background-color: #373040;">#+begin_src sh :dir [email protected]:~</span>
+perl library-new.pl Business
+<span style="color: #827591; background-color: #373040;">#+end_src</span>
+</pre>
+</div>
+
+<p>
+由于我的SSH socket看起来就像 <code>/tmp/ssh-BLAHBLAHBLAH/agent.PROCESSID</code> 一样, EmacsWiki中所描述的SSH_AUTH_SOCK设置方法(Environment=SSH_AUTH_SOCK=%t/keyring/ssh)不适用于我. 好在 <a href="https://github.com/nhoffman/.emacs.d/blob/master/init.org">https://github.com/nhoffman/.emacs.d/blob/master/init.org</a> 中的脚本适用于我.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">defun</span> <span style="color: #bc6ec5; font-weight: bold;">my/ssh-refresh</span> <span style="color: #bc6ec5;">()</span>
+  <span style="color: #2aa1ae;">"Reset the environment variable SSH_AUTH_SOCK"</span>
+  <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">interactive</span><span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">let</span> <span style="color: #2d9574;">(</span>ssh-auth-sock-old <span style="color: #67b11d;">(</span>getenv <span style="color: #2d9574;">"SSH_AUTH_SOCK"</span><span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span>setenv <span style="color: #2d9574;">"SSH_AUTH_SOCK"</span>
+            <span style="color: #67b11d;">(</span>car <span style="color: #b1951d;">(</span>split-string
+                  <span style="color: #4f97d7;">(</span>shell-command-to-string
+                   <span style="color: #2d9574;">"ls -t $(find /tmp/ssh-* -user $USER -name 'agent.*' 2&gt; /dev/null)"</span><span style="color: #4f97d7;">)</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span>message
+     <span style="color: #67b11d;">(</span>format <span style="color: #2d9574;">"SSH_AUTH_SOCK %s --&gt; %s"</span>
+             ssh-auth-sock-old <span style="color: #b1951d;">(</span>getenv <span style="color: #2d9574;">"SSH_AUTH_SOCK"</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+<span style="color: #4f97d7;">(</span>my/ssh-refresh<span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+另外, <code>emacs --daemon</code> 并不会使用我在KDE中配置的默认浏览器. 当我打开Org mode中的URL链接时会打开一个新的Chromium进程,而不是使用Google Chrome浏览器. 我通过将 <code>browse-url-browser-function</code> 的值从 <code>browse-url-default-browser</code> 改为 <code>browse-url-generic</code> 从而解决这个问题:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">setq</span> browse-url-generic-program <span style="color: #2d9574;">"google-chrome"</span><span style="color: #4f97d7;">)</span>
+<span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">setq</span> browse-url-browser-function 'browse-url-generic<span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+让我们来看看这样设置后的效果如何吧!
+</p>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2016-06-19</span>
+            <span title="last modification date" class="post-info">2016-06-24</span>
+            <span title="tags" class="post-info">:N/A:</span>
+            <span title="author" class="post-info"><a href="mailto:lujun9972 &lt;at&gt; lujun9972-F41">lujun9972</a></span>
+        </div>
+    <script src="http://lujun9972.github.io/emacs-document/media/js/jquery-2.1.3.min.js"></script>
+        <section>
+            <h1>Comments</h1>
+            <div id="comment-wrap">
+                    <a class="disqus_label">使用 Disqus 评论</a>
+                    <a class="ds-label">使用多说评论</a>
+    </ul>
+        <div id="disqus_thread"></div>
+        <script type="text/javascript">
+         //var disqus_developer = 1;
+         var preempt_signal=false;
+         var disqus_identifier = "/blog/2016/06/19/通过-daemon参数让emacs在后台运行使之避免随x崩溃而退出/";
+         var disqus_url = "http://lujun9972.github.io/emacs-document/blog/2016/06/19/通过-daemon参数让emacs在后台运行使之避免随x崩溃而退出/";
+         var disqus_shortname = 'emacs-document';
+         /* * * DON'T EDIT BELOW THIS LINE * * */
+         (function() {
+             var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+             dsq.src = 'http://' + disqus_shortname + '.disqus.com/embed.js';
+             (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+             $('#disqus_thread').css('display','none');
+         })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+        <div class="ds-thread"></div>
+        <script type="text/javascript">
+         var duoshuoQuery = {short_name:'emacs-document'};
+         (function() {
+             var ds = document.createElement('script');
+             ds.type = 'text/javascript';ds.async = true;
+             ds.src = 'http://static.duoshuo.com/embed.js';
+             ds.charset = 'UTF-8';
+             (document.getElementsByTagName('head')[0]
+           || document.getElementsByTagName('body')[0]).appendChild(ds);
+             $('.ds-thread').css('display','block');
+         })();
+        </script>
+    <script>
+     /* comments */
+     var ego_disqus_thread=$('#disqus_thread');
+     var ego_ds_label=$('.ds-thread');
+     $('.disqus_label').click(function(){
+         ego_disqus_thread.show();
+         ego_ds_label.hide();
+     });
+     $('.ds-label').click(function(){
+         ego_disqus_thread.hide();
+         ego_ds_label.show();
+     });
+    </script>
+        </section>
+    <script src="http://lujun9972.github.io/emacs-document/media/js/main.js"></script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 25.x(<a href="http://orgmode.org">Org mode</a> 8.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:lujun9972 &lt;at&gt; lujun9972-F41">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div></body>
+</html>

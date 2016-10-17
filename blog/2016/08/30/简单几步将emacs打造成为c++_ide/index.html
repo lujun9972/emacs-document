@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>简单几步将Emacs打造成为C++_IDE - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <style>
+   #ds-thread #ds-reset .ds-comment-body p {color: #ffffff;}
+   #ds-thread #ds-reset .ds-comment-body p a {color: #ff0;}
+   #ds-thread #ds-reset .ds-comment-body p a:hover {color: #0ff;}
+   #disqus_thread a {color: #00ffff;}
+  </style>
+  <link rel="stylesheet" href="http://lujun9972.github.io/emacs-document/media/css/main.css" type="text/css"/>
+  <link rel="stylesheet" href="http://lujun9972.github.io/emacs-document/media/css/comment.css" type="text/css"/>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="http://lujun9972.github.io/emacs-document/">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;集思广益</p>
+    <nav class="site-nav">
+      <div class="menu-icon">
+        <svg viewBox="0 0 18 15">
+          <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.031C17.335,0,18,0.665,18,1.484L18,1.484z" fill="#ffff00"/>
+          <path d="M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0c0-0.82,0.665-1.484,1.484-1.484 h15.031C17.335,6.031,18,6.696,18,7.516L18,7.516z" fill="#ffff00"/>
+          <path d="M18,13.516C18,14.335,17.335,15,16.516,15H1.484C0.665,15,0,14.335,0,13.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.031C17.335,12.031,18,12.696,18,13.516L18,13.516z" fill="#ffff00"/>
+        </svg>
+      </div>
+      <ul class="trigger">
+        <li><a href="http://lujun9972.github.io/emacs-document/years/">Years</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/authors/">Authors</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/tags/">Tags</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document">Github</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="http://www.google.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">简单几步将Emacs打造成为C++_IDE</h1>
+<div id="table-of-contents">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#orgheadline1">1. 步骤1, 创建一个示例项目来作实验</a></li>
+<li><a href="#orgheadline2">2. 步骤2, 扫描C++代码并配置Emacs</a></li>
+<li><a href="#orgheadline3">3. 使用方法</a></li>
+<li><a href="#orgheadline4">4. 技术细节(选读)</a></li>
+</ul>
+</div>
+</div>
+<p>
+我发明了一种快速又友好的解决方案.
+</p>
+
+<p>
+该解决方案适用于Linux/OSX/Cygwin (应该也适用于Windows环境,但我不在Windows下作开发所以不确定).
+</p>
+
+<p>
+只有很少量的配置. 你只需要安装 <code>GNU Global</code> 以及另外两个Emacs插件:
+</p>
+
+<ul class="org-ul">
+<li><a href="https://github.com/company-mode/company-mode">company</a> ,用于代码补全</li>
+<li><a href="https://github.com/syohex/emacs-helm-gtags">emacs-helm-gtags</a> 或 <a href="https://github.com/syohex/emacs-counsel-gtags">emacs-counsel-gtags</a> 用于代码导航. 我个人用的是 <code>emacs-counsel-gtags</code>.</li>
+</ul>
+
+<p>
+下面是步骤说明.
+</p>
+
+<div id="outline-container-orgheadline1" class="outline-2">
+<h2 id="orgheadline1"><span class="section-number-2">1</span> 步骤1, 创建一个示例项目来作实验</h2>
+<div class="outline-text-2" id="text-1">
+<p>
+假设我有两个目录 <code>~/proj1</code> 以及 <code>~/proj2</code>. 两个项目都会用到第三方库的C++头文件,这些头文件放在只读目录 <code>/usr/include</code> 中.
+</p>
+
+<p>
+新建一个 <code>~/obj</code> 目录来存放第三方库的索引文件.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">mkdir -p ~/<span style="color: #4f97d7;">{</span>proj1,proj2,obj<span style="color: #4f97d7;">}</span>
+</pre>
+</div>
+
+<p>
+<code>~/proj2/lib.cpp</code> 的内容为:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-cpp"><span style="color: #ce537a; font-weight: bold;">void</span> <span style="color: #bc6ec5; font-weight: bold;">proj2_hello</span><span style="color: #4f97d7;">(</span><span style="color: #ce537a; font-weight: bold;">int</span> <span style="color: #7590db;">a2</span>, <span style="color: #ce537a; font-weight: bold;">char</span>* <span style="color: #7590db;">b2</span><span style="color: #4f97d7;">)</span> <span style="color: #4f97d7;">{</span>
+<span style="color: #4f97d7;">}</span>
+</pre>
+</div>
+
+<p>
+<code>~/proj1/main.cpp</code> 的内容为:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-cpp"><span style="color: #ce537a; font-weight: bold;">void</span> <span style="color: #bc6ec5; font-weight: bold;">proj1_hello</span><span style="color: #4f97d7;">(</span><span style="color: #ce537a; font-weight: bold;">int</span> <span style="color: #7590db;">a1</span>, <span style="color: #ce537a; font-weight: bold;">char</span>* <span style="color: #7590db;">b1</span><span style="color: #4f97d7;">)</span> <span style="color: #4f97d7;">{</span>
+<span style="color: #4f97d7;">}</span>
+
+<span style="color: #ce537a; font-weight: bold;">int</span> <span style="color: #bc6ec5; font-weight: bold;">main</span><span style="color: #4f97d7;">(</span><span style="color: #ce537a; font-weight: bold;">int</span> <span style="color: #7590db;">argc</span>, <span style="color: #ce537a; font-weight: bold;">char</span> *<span style="color: #7590db;">argv</span><span style="color: #bc6ec5;">[]</span><span style="color: #4f97d7;">)</span> <span style="color: #4f97d7;">{</span>
+  <span style="color: #4f97d7; font-weight: bold;">return</span> <span style="color: #a45bad;">0</span>;
+<span style="color: #4f97d7;">}</span>
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgheadline2" class="outline-2">
+<h2 id="orgheadline2"><span class="section-number-2">2</span> 步骤2, 扫描C++代码并配置Emacs</h2>
+<div class="outline-text-2" id="text-2">
+<p>
+在shell中运行下列代码来扫描代码Run below command in shell to scan code,
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #4f97d7;">cd</span> /usr/include &amp;&amp; <span style="color: #7590db;">MAKEOBJDIRPREFIX</span>=~/obj gtags -O &amp;&amp; <span style="color: #4f97d7;">cd</span> ~/proj1 &amp;&amp; gtags &amp;&amp; <span style="color: #4f97d7;">cd</span> ~/proj2 &amp;&amp; gtags
+</pre>
+</div>
+
+<p>
+设置好相应的Emacs插件后(最简单的方法只需要把这些插件安装好就行了), 将下列代码插入到 <code>~/.emacs</code> 中,
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #2aa1ae; background-color: #292e34;">;; </span><span style="color: #2aa1ae; background-color: #292e34;">Please note `</span><span style="color: #a45bad; background-color: #292e34;">file-truename</span><span style="color: #2aa1ae; background-color: #292e34;">' must be used!</span>
+<span style="color: #4f97d7;">(</span>setenv <span style="color: #2d9574;">"GTAGSLIBPATH"</span> <span style="color: #bc6ec5;">(</span>concat <span style="color: #2d9574;">"/usr/include"</span>
+                               <span style="color: #2d9574;">":"</span>
+                               <span style="color: #2d9574;">(</span>file-truename <span style="color: #2d9574;">"~/proj2"</span><span style="color: #2d9574;">)</span>
+                               <span style="color: #2d9574;">":"</span>
+                               <span style="color: #2d9574;">(</span>file-truename <span style="color: #2d9574;">"~/proj1"</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+<span style="color: #4f97d7;">(</span>setenv <span style="color: #2d9574;">"MAKEOBJDIRPREFIX"</span> <span style="color: #bc6ec5;">(</span>file-truename <span style="color: #2d9574;">"~/obj/"</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+<span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">setq</span> company-backends '<span style="color: #bc6ec5;">(</span><span style="color: #2d9574;">(</span>company-dabbrev-code company-gtags<span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgheadline3" class="outline-2">
+<h2 id="orgheadline3"><span class="section-number-2">3</span> 使用方法</h2>
+<div class="outline-text-2" id="text-3">
+<p>
+就像平常那样使用Emacs就行了.
+</p>
+
+<p>
+不过有一点要逐一,你需要安装8月25日之后编译的company,因为我昨天才<a href="https://github.com/company-mode/company-mode/issues/570">修复了一个company的issue</a>.
+</p>
+
+
+<div class="figure">
+<p><img src="http://blog.binchen.org/wp-content/cpp-gtags-demo-nq8.png" alt="cpp-gtags-demo-nq8.png" />
+</p>
+</div>
+</div>
+</div>
+
+
+<div id="outline-container-orgheadline4" class="outline-2">
+<h2 id="orgheadline4"><span class="section-number-2">4</span> 技术细节(选读)</h2>
+<div class="outline-text-2" id="text-4">
+<p>
+通过查阅 <a href="https://www.gnu.org/software/global/manual/global.html">GNU Global manual</a> 来搞清楚环境变量 <code>GTAGSLIBPATH</code> 和 <code>MAKEOBJDIRPREFIX</code> 的意思.
+</p>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2016-08-30</span>
+            <span title="last modification date" class="post-info">2016-08-30</span>
+            <span title="tags" class="post-info">:N/A:</span>
+            <span title="author" class="post-info"><a href="mailto:lujun9972 &lt;at&gt; lujun9972-F41">lujun9972</a></span>
+        </div>
+    <script src="http://lujun9972.github.io/emacs-document/media/js/jquery-2.1.3.min.js"></script>
+        <section>
+            <h1>Comments</h1>
+            <div id="comment-wrap">
+                    <a class="disqus_label">使用 Disqus 评论</a>
+                    <a class="ds-label">使用多说评论</a>
+    </ul>
+        <div id="disqus_thread"></div>
+        <script type="text/javascript">
+         //var disqus_developer = 1;
+         var preempt_signal=false;
+         var disqus_identifier = "/blog/2016/08/30/简单几步将emacs打造成为c++_ide/";
+         var disqus_url = "http://lujun9972.github.io/emacs-document/blog/2016/08/30/简单几步将emacs打造成为c++_ide/";
+         var disqus_shortname = 'emacs-document';
+         /* * * DON'T EDIT BELOW THIS LINE * * */
+         (function() {
+             var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+             dsq.src = 'http://' + disqus_shortname + '.disqus.com/embed.js';
+             (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+             $('#disqus_thread').css('display','none');
+         })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+        <div class="ds-thread"></div>
+        <script type="text/javascript">
+         var duoshuoQuery = {short_name:'emacs-document'};
+         (function() {
+             var ds = document.createElement('script');
+             ds.type = 'text/javascript';ds.async = true;
+             ds.src = 'http://static.duoshuo.com/embed.js';
+             ds.charset = 'UTF-8';
+             (document.getElementsByTagName('head')[0]
+           || document.getElementsByTagName('body')[0]).appendChild(ds);
+             $('.ds-thread').css('display','block');
+         })();
+        </script>
+    <script>
+     /* comments */
+     var ego_disqus_thread=$('#disqus_thread');
+     var ego_ds_label=$('.ds-thread');
+     $('.disqus_label').click(function(){
+         ego_disqus_thread.show();
+         ego_ds_label.hide();
+     });
+     $('.ds-label').click(function(){
+         ego_disqus_thread.hide();
+         ego_ds_label.show();
+     });
+    </script>
+        </section>
+    <script src="http://lujun9972.github.io/emacs-document/media/js/main.js"></script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 25.x(<a href="http://orgmode.org">Org mode</a> 8.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:lujun9972 &lt;at&gt; lujun9972-F41">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div></body>
+</html>

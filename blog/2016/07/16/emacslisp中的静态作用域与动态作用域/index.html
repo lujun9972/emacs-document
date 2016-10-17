@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>EmacsLisp中的静态作用域与动态作用域 - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <style>
+   #ds-thread #ds-reset .ds-comment-body p {color: #ffffff;}
+   #ds-thread #ds-reset .ds-comment-body p a {color: #ff0;}
+   #ds-thread #ds-reset .ds-comment-body p a:hover {color: #0ff;}
+   #disqus_thread a {color: #00ffff;}
+  </style>
+  <link rel="stylesheet" href="http://lujun9972.github.io/emacs-document/media/css/main.css" type="text/css"/>
+  <link rel="stylesheet" href="http://lujun9972.github.io/emacs-document/media/css/comment.css" type="text/css"/>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="http://lujun9972.github.io/emacs-document/">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;集思广益</p>
+    <nav class="site-nav">
+      <div class="menu-icon">
+        <svg viewBox="0 0 18 15">
+          <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.031C17.335,0,18,0.665,18,1.484L18,1.484z" fill="#ffff00"/>
+          <path d="M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0c0-0.82,0.665-1.484,1.484-1.484 h15.031C17.335,6.031,18,6.696,18,7.516L18,7.516z" fill="#ffff00"/>
+          <path d="M18,13.516C18,14.335,17.335,15,16.516,15H1.484C0.665,15,0,14.335,0,13.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.031C17.335,12.031,18,12.696,18,13.516L18,13.516z" fill="#ffff00"/>
+        </svg>
+      </div>
+      <ul class="trigger">
+        <li><a href="http://lujun9972.github.io/emacs-document/years/">Years</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/authors/">Authors</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/tags/">Tags</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document">Github</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="http://www.google.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">EmacsLisp中的静态作用域与动态作用域</h1>
+<p>
+在本文中,我会演示:
+</p>
+
+<ol class="org-ol">
+<li>Emacs Lisp中动态作用域与静态作用域之间的不同点</li>
+<li>实用动态作用域要当心什么</li>
+<li>静态作用域及静态闭包有什么用</li>
+<li>当混用静态作用域和动态作用域时,会发生什么情况</li>
+</ol>
+
+<p>
+Emacs Lisp 在Emacs23及以下版本中只支持动态作用域. 直到Emacs24才开始支持静态作用域的. 这很好,因为静态作用域在大多数时候都要比动态作用域更清晰易懂.本文随后会解释这一点.
+若你希望使用静态作用域,需要将 <code>-*- lexical-binding: t -*-</code> 放到el文件的第一行中. 这样当Emacs24加载该文件时,就会对里面的代码应用静态作用域了.
+举个例子,我现在Emacs初始化文件中的第一行是
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #2aa1ae; background-color: #292e34;">;; </span><span style="color: #2aa1ae; background-color: #292e34;">-*- coding: utf-8 -*-</span>
+</pre>
+</div>
+
+<p>
+当我把这一行改成
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #2aa1ae; background-color: #292e34;">;; </span><span style="color: #2aa1ae; background-color: #292e34;">-*- coding: utf-8; lexical-binding: t -*-</span>
+</pre>
+</div>
+
+<p>
+则Emacs初始化文件中的代码被Emacs24加载时使用的是静态作用域了. 参见 <a href="http://www.gnu.org/software/emacs/manual/html_node/emacs/File-Variables.html">file variables</a>.
+</p>
+
+<p>
+要实验一下静态作用域,第一步创建一个空的le文件(C-x C-f lexical-scratch.el RET), 然后添加下面这行内容:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #2aa1ae; background-color: #292e34;">;; </span><span style="color: #2aa1ae; background-color: #292e34;">-*- lexical-binding: t -*-</span>
+</pre>
+</div>
+
+<p>
+保存一下, 然后再revert一下这个buffer(M-x revert-buffer). 现在该buffer中的代码处于静态作用域下了,你可以在该buffer中做各种尝试了.
+</p>
+
+<p>
+那么,什么是动态作用域,什么又是静态作用域呢? 我们来看个简单的例子吧.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">setq</span> a <span style="color: #a45bad;">17</span><span style="color: #4f97d7;">)</span>
+<span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">defun</span> <span style="color: #bc6ec5; font-weight: bold;">my-print-a</span> <span style="color: #bc6ec5;">()</span>
+  <span style="color: #bc6ec5;">(</span>print a<span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+<span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">setq</span> a <span style="color: #a45bad;">1717</span><span style="color: #4f97d7;">)</span>
+<span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">let</span> <span style="color: #bc6ec5;">(</span><span style="color: #2d9574;">(</span>a <span style="color: #a45bad;">8</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span>my-print-a<span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+注意到在 <code>my-print-a</code> 中并未指定 <code>a</code> 变量的值,我们称呼其为“free variable”(自由变量) (也被称为 "nonlocal varibale"(非局部变量) 因为"<code>a</code> 不是在 <code>my-print-a</code> 函数内定义的"). 
+上面代码的运行结果会是什么呢?会输出1717呢还是8? 在动态作用域下,它输出8,但在静态作用域下,输出为1717. 
+在动态作用域下, <code>my-print-a</code> 中 <code>a</code> 所引用的值由 <code>my-print-a</code> 的调用环境所决定. 而在静态作用域下, <code>a</code> 的值由 <code>my-print-a</code> 的定义环境所决定.
+</p>
+
+<p>
+在动态作用域下,该代码输出8是因为,调用 <code>my-print-a</code> 的时机,是在一个let语句中,在let语句内, <code>a</code> 的值被绑定到8. 若你是在let语句外面调用 <code>my-print-a</code> 则会输出1717.
+</p>
+
+<p>
+在静态作用域下,代码输出1717是因为,首先, <code>my-print-a</code> 是在let语句外定义的,因此 <code>my-print-a</code> 中的 <code>a</code> 所引用的是 <code>a</code> 的全局绑定,而不是由let语句所创建的局部绑定(所谓绑定是指将名字 <code>a</code> 绑定到或分配给一块内存地址). 
+其次,当 <code>my-print-a</code> 调用时, <code>a</code> 的全局的值变成了1717,它是与8这个局部值是相隔离的. 若你将 <code>my-print-a</code> 的定义移到let语句中,则输出的值会是8,这是因为这时 <code>my-print-a</code> 中的 <code>a</code> 引用的是let语句所创建的局部绑定.
+</p>
+
+<p>
+如果你会JavaScript, 那么上面那段代码其实相当于下面这段JavaScript代码
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-javascript"><span style="color: #4f97d7; font-weight: bold;">var</span> <span style="color: #7590db;">a</span>;
+a = <span style="color: #a45bad;">17</span>;
+<span style="color: #4f97d7; font-weight: bold;">function</span> <span style="color: #bc6ec5; font-weight: bold;">myPrintA</span><span style="color: #4f97d7;">()</span> <span style="color: #4f97d7;">{</span>
+    console.log<span style="color: #bc6ec5;">(</span>a<span style="color: #bc6ec5;">)</span>;
+<span style="color: #4f97d7;">}</span>
+a = <span style="color: #a45bad;">1717</span>;
+<span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">function</span> <span style="color: #bc6ec5;">()</span> <span style="color: #bc6ec5;">{</span>
+    <span style="color: #4f97d7; font-weight: bold;">var</span> <span style="color: #7590db;">a</span> = <span style="color: #a45bad;">8</span>;
+    myPrintA<span style="color: #2d9574;">()</span>;
+<span style="color: #bc6ec5;">}()</span><span style="color: #4f97d7;">)</span>;
+</pre>
+</div>
+
+<p>
+这段JavaScript代码会输出 <code>1717</code>. 现在大多数的编程语言都是使用静态作用域的.
+</p>
+
+<p>
+若你使用的是Emacs24, 你可以在scratch buffer中运行以下代码,来看看在静态作用域下,我上面的例子是否真的输出1717.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span>eval
+ '<span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">progn</span>
+    <span style="color: #2d9574;">(</span><span style="color: #4f97d7; font-weight: bold;">setq</span> a <span style="color: #a45bad;">17</span><span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span><span style="color: #4f97d7; font-weight: bold;">defun</span> <span style="color: #bc6ec5; font-weight: bold;">my-print-a</span> <span style="color: #67b11d;">()</span>
+      <span style="color: #67b11d;">(</span>print a<span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span><span style="color: #4f97d7; font-weight: bold;">setq</span> a <span style="color: #a45bad;">1717</span><span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span><span style="color: #4f97d7; font-weight: bold;">let</span> <span style="color: #67b11d;">(</span><span style="color: #b1951d;">(</span>a <span style="color: #a45bad;">8</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span>
+      <span style="color: #67b11d;">(</span>my-print-a<span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span>
+ t<span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+Emacs24的 <code>eval</code> 函数可以接受第二个可选参数, 若该参数的值为t则表示在静态作用域下执行代码. 执行时,可别忘了 =(progn &#x2026;)前的'哦.
+</p>
+
+<p>
+支持静态作用域是创建静态闭包的基础. 那么什么是静态闭包呢? 让我们看看下面这段代码:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">setq</span> a <span style="color: #a45bad;">0</span><span style="color: #4f97d7;">)</span>
+<span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">let</span> <span style="color: #bc6ec5;">(</span><span style="color: #2d9574;">(</span>a <span style="color: #a45bad;">17</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">defun</span> <span style="color: #bc6ec5; font-weight: bold;">my-print-a</span> <span style="color: #2d9574;">()</span>
+    <span style="color: #2d9574;">(</span>print a<span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">setq</span> a <span style="color: #a45bad;">1717</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+<span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">let</span> <span style="color: #bc6ec5;">(</span><span style="color: #2d9574;">(</span>a <span style="color: #a45bad;">8</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span>my-print-a<span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+在静态作用域下,其输出为1717. 下面是Alice针对上面代码的解释:
+</p>
+
+<blockquote>
+<p>
+咋一看,得出这个结果并不奇怪,但是若你仔细观察,就会发现有点奇怪了. 一开始,我想"这是静态作用域下,因此 <code>my-print-a</code> 中的 <code>a</code> 引用的是第一个let语句中创建的额局部绑定. 所以输出1717是理所当然的事情了"
+但我再一看,发现 <code>my-print-a</code> 调用时,其中 <code>a</code> 所引用的由第一个let语句创建的局部绑定不是应该已经过期了吗? 你怎么可能还能使用过期的变量呢! 为什么会输出1717而不是提示"对不起,我已经不存在了"呢? 这里明明应该报错,为什么却没有呢?
+</p>
+</blockquote>
+
+<p>
+第一个局部绑定通过某种方式在第一个let语句退出后还依然存在,并且只允许 <code>my-print-a</code> 来访问它. 这意味着Emacs肯定在低层维护着这些变量,这才使得静态作用域工作的要比想像中的更好.
+</p>
+
+<p>
+那么,什么是静态闭包呢? 这与静态作用域的实现原理相关. <code>my-print-a</code> 的<a href="http://www.gnu.org/software/emacs/manual/html_node/elisp/Function-Cells.html">function cell</a> 中包含了一个指向 <code>a</code> 的那个本应过期的绑定, 你可以通过执行 <code>(symbol-function 'my-print-a)</code> 来看到这一点.
+这种结合函数定义以及指向函数创建时作用域的指针的组合物就叫做静态闭包. 你也可以称呼任何能访问已过期绑定的静态作用域函数为静态闭包. 静态闭包也简称闭包. 但并不是所有的静态作用域语言都支持闭包.
+</p>
+
+<p>
+在静态作用域下,当你想看看函数体中某个变量引用的是什么东西时,你只需要看看函数体是在代码的哪个地方定义的,然后找到相关绑定即可. 这也是为什么静态作用域写的代码更清晰的原因,我们所要做的仅仅是看一下变量是在哪个位置定义就行了,也无需担心相关的绑定会过期.
+</p>
+
+<p>
+总之,上面代码的用JavaScript表示就是:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-js"><span style="color: #4f97d7; font-weight: bold;">var</span> <span style="color: #7590db;">a</span>, <span style="color: #7590db;">myPrintA</span>;
+a = <span style="color: #a45bad;">0</span>;
+<span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">function</span> <span style="color: #bc6ec5;">()</span> <span style="color: #bc6ec5;">{</span>
+    <span style="color: #2aa1ae; background-color: #292e34;">// </span><span style="color: #2aa1ae; background-color: #292e34;">local variable a</span>
+    <span style="color: #4f97d7; font-weight: bold;">var</span> <span style="color: #7590db;">a</span> = <span style="color: #a45bad;">17</span>;
+    myPrintA = <span style="color: #4f97d7; font-weight: bold;">function</span> <span style="color: #2d9574;">()</span> <span style="color: #2d9574;">{</span>
+        console.log<span style="color: #67b11d;">(</span>a<span style="color: #67b11d;">)</span>;
+    <span style="color: #2d9574;">}</span>;
+    a = <span style="color: #a45bad;">1717</span>;
+<span style="color: #bc6ec5;">}()</span><span style="color: #4f97d7;">)</span>;
+<span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">function</span> <span style="color: #bc6ec5;">()</span> <span style="color: #bc6ec5;">{</span>
+    <span style="color: #2aa1ae; background-color: #292e34;">// </span><span style="color: #2aa1ae; background-color: #292e34;">local variable a</span>
+    <span style="color: #4f97d7; font-weight: bold;">var</span> <span style="color: #7590db;">a</span> = <span style="color: #a45bad;">8</span>;
+    myPrintA<span style="color: #2d9574;">()</span>;
+<span style="color: #bc6ec5;">}()</span><span style="color: #4f97d7;">)</span>;
+</pre>
+</div>
+
+<p>
+其输出结果为1717,因为JavaScript支持静态作用域.
+</p>
+
+<p>
+在Emacs 24内部, 静态作用域函数是由格式为 <code>(closure ENV ARGS BODY...)</code> 的form来表示的, 而动态作用域函数是由格式为 <code>(lambda ARGS BODY...)</code> 的form来表示的(其格式与你在Emacs Lisp中书写的匿名函数是一样的).
+下面这段代码在动态作用域下会输出 <code>(lambda (x y) (+ x y))</code> 两次,在静态作用域下会输出 <code>(closure (t) (x y) (+ x y))</code> 两次
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">defun</span> <span style="color: #bc6ec5; font-weight: bold;">my-sum</span> <span style="color: #bc6ec5;">(</span>x y<span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span>+ x y<span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+<span style="color: #2aa1ae; background-color: #292e34;">;; </span><span style="color: #2aa1ae; background-color: #292e34;">print the contents of function cell of my-sum</span>
+<span style="color: #4f97d7;">(</span>print <span style="color: #bc6ec5;">(</span>symbol-function 'my-sum<span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+<span style="color: #2aa1ae; background-color: #292e34;">;; </span><span style="color: #2aa1ae; background-color: #292e34;">print an anonymous function</span>
+<span style="color: #4f97d7;">(</span>print <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">lambda</span> <span style="color: #2d9574;">(</span>x y<span style="color: #2d9574;">)</span> <span style="color: #2d9574;">(</span>+ x y<span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+貌似 <code>(lambda ...)</code> 语句的执行结果在动态作用域下就是它自己,而在动态作用域下则是 <code>(closure ...)</code>.
+</p>
+
+<p>
+下面聊聊嵌套定义的情况. 在静态作用域下,若A函数定义了B函数(即是说B函数是在A函数的函数体中定义的),B函数又定义了C函数,那么当C函数输出 <code>a</code> 时,先会在函数C中查找 <code>a</code> 的引用,若没有找到,则会去函数B(函数C定义的位置)中查找 <code>a</code> 的引用,以此类推.
+</p>
+
+<p>
+在动态作用域下,假设我们有一个函数 <code>my-func1</code>,这个函数调用了函数 <code>my-func2</code>, <code>my-func2</code> 函数又调用了 <code>my-func3</code>,函数 <code>my-func3</code> 输出 <code>a</code> 的值. <code>my-func2</code> 在调用 <code>my-func3</code> 时在本地设置 <code>a</code> 为2. 
+那么在在动态作用域下调用 <code>my-func1</code> 会有什么结果呢? 它会输出 <code>2</code>. 那么,若我是在一个将 <code>a</code> 设为1的环境调用 <code>my-func1</code>,又会是什么结果呢? 它还是输出2而不是1. 可以使用以下代码进行测试: 
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">defun</span> <span style="color: #bc6ec5; font-weight: bold;">my-func1</span> <span style="color: #bc6ec5;">()</span>
+  <span style="color: #bc6ec5;">(</span>my-func2<span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+<span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">defun</span> <span style="color: #bc6ec5; font-weight: bold;">my-func2</span> <span style="color: #bc6ec5;">()</span>
+  <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">let</span> <span style="color: #2d9574;">(</span><span style="color: #67b11d;">(</span>a <span style="color: #a45bad;">2</span><span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span>my-func3<span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+<span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">defun</span> <span style="color: #bc6ec5; font-weight: bold;">my-func3</span> <span style="color: #bc6ec5;">()</span>
+  <span style="color: #bc6ec5;">(</span>print a<span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+<span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">let</span> <span style="color: #bc6ec5;">(</span><span style="color: #2d9574;">(</span>a <span style="color: #a45bad;">1</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span>my-func1<span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+其执行过程是这样的,在将 <code>a</code> 局部绑定为1的情况下调用 <code>my-func1</code> ,然后 <code>my-func1</code> 又调用 <code>my-func2</code>. 接下来, <code>my-func2</code> 为a又创建了一个局部绑定,从而屏蔽了之前那个将 <code>a</code> 绑定为1的局部绑定了.
+这个执行时点,就好像是 <code>(let ((a 1)) (let ((a 2)) X ))</code> 中的X一样,在这个时点调用 <code>my-func3</code> 当然会输出2了.
+</p>
+
+<p>
+动态作用域有一个弊端你应该知道的. 假设你你想调用一个以函数为参数的函数.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">defun</span> <span style="color: #bc6ec5; font-weight: bold;">my-call</span> <span style="color: #bc6ec5;">(</span>f n<span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span>funcall f n<span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+
+<span style="color: #4f97d7;">(</span>my-call #'1+ <span style="color: #a45bad;">5</span><span style="color: #4f97d7;">)</span> <span style="color: #2aa1ae; background-color: #292e34;">; </span><span style="color: #2aa1ae; background-color: #292e34;">=&gt; 6</span>
+<span style="color: #4f97d7;">(</span>my-call #'oddp <span style="color: #a45bad;">5</span><span style="color: #4f97d7;">)</span> <span style="color: #2aa1ae; background-color: #292e34;">; </span><span style="color: #2aa1ae; background-color: #292e34;">=&gt; t</span>
+
+<span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">dolist</span> <span style="color: #bc6ec5;">(</span>i <span style="color: #2d9574;">(</span>list <span style="color: #a45bad;">1</span> <span style="color: #a45bad;">2</span> <span style="color: #a45bad;">3</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span>print
+   <span style="color: #2d9574;">(</span>my-call <span style="color: #67b11d;">(</span><span style="color: #4f97d7; font-weight: bold;">lambda</span> <span style="color: #b1951d;">(</span>x<span style="color: #b1951d;">)</span> <span style="color: #b1951d;">(</span>* i x<span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span> <span style="color: #a45bad;">5</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span> <span style="color: #2aa1ae; background-color: #292e34;">; </span><span style="color: #2aa1ae; background-color: #292e34;">&#36755;&#20986; 5 10 15</span>
+</pre>
+</div>
+
+<p>
+目前看来没什么问题. 接下来我们试试
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">dolist</span> <span style="color: #bc6ec5;">(</span>n <span style="color: #2d9574;">(</span>list <span style="color: #a45bad;">1</span> <span style="color: #a45bad;">2</span> <span style="color: #a45bad;">3</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span>print
+   <span style="color: #2d9574;">(</span>my-call <span style="color: #67b11d;">(</span><span style="color: #4f97d7; font-weight: bold;">lambda</span> <span style="color: #b1951d;">(</span>x<span style="color: #b1951d;">)</span> <span style="color: #b1951d;">(</span>* n x<span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span> <span style="color: #a45bad;">5</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span> <span style="color: #2aa1ae; background-color: #292e34;">; </span><span style="color: #2aa1ae; background-color: #292e34;">&#21160;&#24577;&#20316;&#29992;&#22495;&#19979;&#20250;&#36755;&#20986; 25 25 25</span>
+</pre>
+</div>
+
+<p>
+怎么会这样? 问题的关键在于 <code>(lambda (x) (* n x))</code> 中的 <code>n</code> 与 <code>my-call</code> 中的参数同名了. 匿名函数 <code>(lambda (x) (* n x))</code> 是在 <code>my-call</code> 中被调用的,而 <code>my-call</code> 函数内,参数 <code>n</code> 被绑定成了5了. 
+在静态作用域中上面代码会如愿输出 <code>5 10 15</code>
+</p>
+
+<p>
+缺陷 1 – 将一个动态作用域下的函数作为参数传递給另一个函数可能会有问题!
+(Update: 所谓动态作用域下的函数是指在动态作用域文件中定义的函数. 所以与其从函数的角度来思考这个问题不如从动态作用域文件对比静态作用域文件的角度来思考这个问题. 
+或者更精确一点, 是动态作用域elisp buffer中的动态作用域代码 vs 静态作用域elisp buffer中的静态作用域代码
+请参见 <a href="http://stackoverflow.com/questions/7654848/what-are-the-new-rules-for-variable-scoping-in-emacs-24"><a href="http://stackoverflow.com/questions/7654848/what-are-the-new-rules-for-variable-scoping-in-emacs-24">http://stackoverflow.com/questions/7654848/what-are-the-new-rules-for-variable-scoping-in-emacs-24</a></a>
+)
+</p>
+
+<p>
+让我们来看另一个问题. 尝试定义一个函数,其接受两个函数f和g,并返回一个组合函数等价于先调用g函数然后再用结果调用f函数.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #2aa1ae; background-color: #292e34;">;; </span><span style="color: #2aa1ae; background-color: #292e34;">in dynamic scoping</span>
+<span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">defun</span> <span style="color: #bc6ec5; font-weight: bold;">my-compose</span> <span style="color: #bc6ec5;">(</span>f g<span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">lambda</span> <span style="color: #2d9574;">(</span>x<span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span>funcall f <span style="color: #67b11d;">(</span>funcall g x<span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+
+<span style="color: #4f97d7;">(</span>funcall
+ <span style="color: #bc6ec5;">(</span>my-compose <span style="color: #2d9574;">(</span><span style="color: #4f97d7; font-weight: bold;">lambda</span> <span style="color: #67b11d;">(</span>n<span style="color: #67b11d;">)</span> <span style="color: #67b11d;">(</span>+ n <span style="color: #a45bad;">3</span><span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span> <span style="color: #2d9574;">(</span><span style="color: #4f97d7; font-weight: bold;">lambda</span> <span style="color: #67b11d;">(</span>n<span style="color: #67b11d;">)</span> <span style="color: #67b11d;">(</span>+ n <span style="color: #a45bad;">20</span><span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span>
+ <span style="color: #a45bad;">100</span><span style="color: #4f97d7;">)</span> <span style="color: #2aa1ae; background-color: #292e34;">; </span><span style="color: #2aa1ae; background-color: #292e34;">&#32467;&#26524;&#25253;&#38169;, Lisp error: (void-variable f)</span>
+</pre>
+</div>
+
+<p>
+错误信息告诉我们 <code>f</code> 没有定义. 为什么会这样? 因为组合函数是在 <code>my-compose</code> 中创建的, 但是在另一个 <code>f</code> 和 <code>g</code> 都没有绑定的地方调用的.
+当然,如果是静态作用域,则上面代码运行结果与预期一样.
+</p>
+
+<p>
+缺陷 2 – 使用从动态作用域函数返回的函数可能会有问题!
+</p>
+
+<p>
+在Emacs 24中, <code>defvar</code> 创建的变量称为 <code>special variables</code>. <code>Special variables</code> 是动态作用域变量,即使它在静态作用域函数中创建的绑定也是动态绑定.
+<code>case-fold-search</code> 就是个special variable的例子. 函数 <code>search-forward</code> 是否大小写敏感依赖于 <code>case-fold-search</code> 的值. 当 <code>case-fold-search</code> 设为t时, <code>(search-forward "hello")</code> 能够匹配"HELLO", 当 <code>case-fold-search</code> 为 nil时则不匹配. 
+假设你在静态作用域下的el文件中定义自己的 <code>my-search-forward</code> 函数,且在 <code>my-search-forward</code> 中也使用 <code>case-fold-search</code> 来决定是否大小写敏感. 由于 <code>case-fold-search</code> 为special variable, 因此当你调用
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">let</span> <span style="color: #bc6ec5;">(</span><span style="color: #2d9574;">(</span>case-fold-search t<span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span>my-search-forward <span style="color: #2d9574;">"hello"</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+你可以确定该搜索是大小写不敏感的.
+</p>
+
+<p>
+你可以使用函数 <code>special-variable-p</code> 来判断一个变量是否special.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span>special-variable-p 'print-level<span style="color: #4f97d7;">)</span> <span style="color: #2aa1ae; background-color: #292e34;">; </span><span style="color: #2aa1ae; background-color: #292e34;">=&gt; t</span>
+<span style="color: #4f97d7;">(</span>special-variable-p 'print-length<span style="color: #4f97d7;">)</span> <span style="color: #2aa1ae; background-color: #292e34;">; </span><span style="color: #2aa1ae; background-color: #292e34;">=&gt; t</span>
+<span style="color: #4f97d7;">(</span>special-variable-p 'debug-on-error<span style="color: #4f97d7;">)</span> <span style="color: #2aa1ae; background-color: #292e34;">; </span><span style="color: #2aa1ae; background-color: #292e34;">=&gt; t</span>
+<span style="color: #4f97d7;">(</span>special-variable-p 'debug-on-quit<span style="color: #4f97d7;">)</span> <span style="color: #2aa1ae; background-color: #292e34;">; </span><span style="color: #2aa1ae; background-color: #292e34;">=&gt; t</span>
+</pre>
+</div>
+
+<p>
+Special variables某些情况下很有用. <a href="http://www.reddit.com/r/programming/comments/ggmc2/emacs_lisp_now_lexically_scoped_oh_very_funny_no/c1nfngv">gsg在reddit中曾经说过</a>:
+</p>
+
+<blockquote>
+<p>
+动态作用域允许你給参数化代码而无需明确地传递一个参数. 把这种方式作为默认的行为不太好,但是有些代码确实能因此而收益.
+</p>
+</blockquote>
+
+<p>
+<a href="http://www.reddit.com/r/programming/comments/ggmc2/emacs_lisp_now_lexically_scoped_oh_very_funny_no/c1nkdcu">kragensitaker也说过</a>:
+</p>
+
+<blockquote>
+<p>
+有些情况下需要使用动态作用域,例如Thread-local变量, 异常处理器, 当前语言环境, 当前选中的区域 以及图形转换等.
+</p>
+</blockquote>
+
+<p>
+接下来让我们看看静态作用域有什么用.
+</p>
+
+<p>
+在静态作用域下运行下面代码.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">let</span> <span style="color: #bc6ec5;">(</span>c<span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">defun</span> <span style="color: #bc6ec5; font-weight: bold;">my-get-c</span> <span style="color: #2d9574;">()</span>
+    c<span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">defun</span> <span style="color: #bc6ec5; font-weight: bold;">my-set-c</span> <span style="color: #2d9574;">(</span>new-c<span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span><span style="color: #4f97d7; font-weight: bold;">setq</span> c new-c<span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">defun</span> <span style="color: #bc6ec5; font-weight: bold;">my-add-to-c</span> <span style="color: #2d9574;">(</span>x<span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span><span style="color: #4f97d7; font-weight: bold;">setq</span> c <span style="color: #67b11d;">(</span>+ x c<span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+然后在下面的代码中使用这三个函数. 由于在动态作用域下调用的静态函数依然是静态函数(Update:也许这样解释比较好:函数调用仅仅只是调用函数而已,它仅仅执行函数体的代码,二不会改变函数体的代码. 函数体依然处于静态作用域环境下. 因此,函数体中的变量(special varialbe除外)依然是引用的静态绑定),因此不管你是否在静态作用域下运行,其结果都是一样的.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span>my-set-c <span style="color: #a45bad;">10</span><span style="color: #4f97d7;">)</span>
+<span style="color: #4f97d7;">(</span>my-add-to-c <span style="color: #a45bad;">5</span><span style="color: #4f97d7;">)</span>
+<span style="color: #4f97d7;">(</span>print <span style="color: #bc6ec5;">(</span>my-get-c<span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span> <span style="color: #2aa1ae; background-color: #292e34;">; </span><span style="color: #2aa1ae; background-color: #292e34;">prints 15.</span>
+<span style="color: #4f97d7;">(</span>my-add-to-c <span style="color: #a45bad;">1</span><span style="color: #4f97d7;">)</span>
+<span style="color: #4f97d7;">(</span>print <span style="color: #bc6ec5;">(</span>my-get-c<span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span> <span style="color: #2aa1ae; background-color: #292e34;">; </span><span style="color: #2aa1ae; background-color: #292e34;">prints 16</span>
+<span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">let</span> <span style="color: #bc6ec5;">(</span><span style="color: #2d9574;">(</span>c <span style="color: #a45bad;">0</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span>print c<span style="color: #bc6ec5;">)</span> <span style="color: #2aa1ae; background-color: #292e34;">; </span><span style="color: #2aa1ae; background-color: #292e34;">prints 0</span>
+  <span style="color: #bc6ec5;">(</span>print <span style="color: #2d9574;">(</span>my-get-c<span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span> <span style="color: #2aa1ae; background-color: #292e34;">; </span><span style="color: #2aa1ae; background-color: #292e34;">prints 16.</span>
+</pre>
+</div>
+
+<p>
+<code>my-get-c</code>, <code>my-set-c</code>, 和 <code>my-add-to-c</code> 共享同一个 <code>c</code> 绑定,这使得 <code>c</code> 就好像是一个私有变量一样, 并且与其他名为 <code>c</code> 的绑定(例如 <code>(let ((c 0)) ...)</code> 中的c)相独立.
+之所以会这样是因为创建这个c绑定的let语句包含了这三个 <code>defun</code> 语句,因此除了这三个函数能访问以外,对于其他的访问来说 <code>c</code> 以及过期了.
+</p>
+
+<p>
+Now let’s test using lexical closures to do what static variables in C do.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">require</span> '<span style="color: #a45bad;">cl</span><span style="color: #4f97d7;">)</span> <span style="color: #2aa1ae; background-color: #292e34;">; </span><span style="color: #2aa1ae; background-color: #292e34;">for incf</span>
+<span style="color: #4f97d7;">(</span>eval
+ '<span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">let</span> <span style="color: #2d9574;">(</span><span style="color: #67b11d;">(</span>i <span style="color: #a45bad;">0</span><span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span><span style="color: #4f97d7; font-weight: bold;">defun</span> <span style="color: #bc6ec5; font-weight: bold;">my-counter</span> <span style="color: #67b11d;">()</span>
+      <span style="color: #67b11d;">(</span><span style="color: #4f97d7; font-weight: bold;">prog1</span>
+          i
+        <span style="color: #b1951d;">(</span><span style="color: #4f97d7; font-weight: bold;">incf</span> i<span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span>
+ t<span style="color: #4f97d7;">)</span>
+<span style="color: #4f97d7;">(</span>my-counter<span style="color: #4f97d7;">)</span> <span style="color: #2aa1ae; background-color: #292e34;">; </span><span style="color: #2aa1ae; background-color: #292e34;">=&gt; 0</span>
+<span style="color: #4f97d7;">(</span>my-counter<span style="color: #4f97d7;">)</span> <span style="color: #2aa1ae; background-color: #292e34;">; </span><span style="color: #2aa1ae; background-color: #292e34;">=&gt; 1</span>
+<span style="color: #4f97d7;">(</span>my-counter<span style="color: #4f97d7;">)</span> <span style="color: #2aa1ae; background-color: #292e34;">; </span><span style="color: #2aa1ae; background-color: #292e34;">=&gt; 2</span>
+<span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">let</span> <span style="color: #bc6ec5;">(</span><span style="color: #2d9574;">(</span>i <span style="color: #a45bad;">10</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span>my-counter<span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span> <span style="color: #2aa1ae; background-color: #292e34;">; </span><span style="color: #2aa1ae; background-color: #292e34;">=&gt; 3</span>
+<span style="color: #4f97d7;">(</span>my-counter<span style="color: #4f97d7;">)</span> <span style="color: #2aa1ae; background-color: #292e34;">; </span><span style="color: #2aa1ae; background-color: #292e34;">=&gt; 4</span>
+</pre>
+</div>
+
+<p>
+若你觉得很奇怪,为什么上面代码的输出是这样的,请看下面的演示案例.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span>eval
+ '<span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">let</span> <span style="color: #2d9574;">(</span><span style="color: #67b11d;">(</span>i1 <span style="color: #a45bad;">0</span><span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span><span style="color: #4f97d7; font-weight: bold;">defun</span> <span style="color: #bc6ec5; font-weight: bold;">my-test</span> <span style="color: #67b11d;">()</span>
+      <span style="color: #67b11d;">(</span><span style="color: #4f97d7; font-weight: bold;">let</span> <span style="color: #b1951d;">(</span><span style="color: #4f97d7;">(</span>i2 <span style="color: #a45bad;">0</span><span style="color: #4f97d7;">)</span><span style="color: #b1951d;">)</span>
+        <span style="color: #b1951d;">(</span><span style="color: #4f97d7; font-weight: bold;">prog1</span>
+            <span style="color: #4f97d7;">(</span>list i1 i2<span style="color: #4f97d7;">)</span>
+          <span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">incf</span> i1<span style="color: #4f97d7;">)</span>
+          <span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">incf</span> i2<span style="color: #4f97d7;">)</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span>
+ t<span style="color: #4f97d7;">)</span>
+<span style="color: #4f97d7;">(</span>my-test<span style="color: #4f97d7;">)</span> <span style="color: #2aa1ae; background-color: #292e34;">; </span><span style="color: #2aa1ae; background-color: #292e34;">=&gt; (0 0)</span>
+<span style="color: #4f97d7;">(</span>my-test<span style="color: #4f97d7;">)</span> <span style="color: #2aa1ae; background-color: #292e34;">; </span><span style="color: #2aa1ae; background-color: #292e34;">=&gt; (1 0)</span>
+<span style="color: #4f97d7;">(</span>my-test<span style="color: #4f97d7;">)</span> <span style="color: #2aa1ae; background-color: #292e34;">; </span><span style="color: #2aa1ae; background-color: #292e34;">=&gt; (2 0)</span>
+</pre>
+</div>
+
+<p>
+我们定义了 <code>my-test</code> 函数,然后调用这个函数三次. <code>my-test</code> 中的let语句 <code>(let ((i2 0)) ..)</code> 也随之执行了三次. 另一方面,let语句 <code>(let ((i1 0)) ... )</code> 仅仅在定义 <code>my-test</code> 时执行了一边. 我希望这个例子能有助于你的理解.
+</p>
+
+<p>
+下面让我们测试一个返回闭包函数的函数.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span>eval
+ '<span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">defun</span> <span style="color: #bc6ec5; font-weight: bold;">my-get-counter</span> <span style="color: #2d9574;">(</span>start step<span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span><span style="color: #4f97d7; font-weight: bold;">let</span> <span style="color: #67b11d;">(</span><span style="color: #b1951d;">(</span>count start<span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span>
+      <span style="color: #67b11d;">(</span><span style="color: #4f97d7; font-weight: bold;">lambda</span> <span style="color: #b1951d;">()</span>
+        <span style="color: #b1951d;">(</span><span style="color: #4f97d7; font-weight: bold;">prog1</span>
+            count
+          <span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">setq</span> count <span style="color: #bc6ec5;">(</span>+ count step<span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span>
+    <span style="color: #bc6ec5;">)</span>
+ t<span style="color: #4f97d7;">)</span>
+
+<span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">setq</span> my-get-even-numbers <span style="color: #bc6ec5;">(</span>my-get-counter <span style="color: #a45bad;">0</span> <span style="color: #a45bad;">2</span><span style="color: #bc6ec5;">)</span>
+      my-get-odd-numbers <span style="color: #bc6ec5;">(</span>my-get-counter <span style="color: #a45bad;">1</span> <span style="color: #a45bad;">2</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+
+<span style="color: #4f97d7;">(</span>funcall my-get-even-numbers<span style="color: #4f97d7;">)</span> <span style="color: #2aa1ae; background-color: #292e34;">; </span><span style="color: #2aa1ae; background-color: #292e34;">=&gt; 0</span>
+<span style="color: #4f97d7;">(</span>funcall my-get-even-numbers<span style="color: #4f97d7;">)</span> <span style="color: #2aa1ae; background-color: #292e34;">; </span><span style="color: #2aa1ae; background-color: #292e34;">=&gt; 2</span>
+<span style="color: #4f97d7;">(</span>funcall my-get-even-numbers<span style="color: #4f97d7;">)</span> <span style="color: #2aa1ae; background-color: #292e34;">; </span><span style="color: #2aa1ae; background-color: #292e34;">=&gt; 4</span>
+
+<span style="color: #4f97d7;">(</span>funcall my-get-odd-numbers<span style="color: #4f97d7;">)</span> <span style="color: #2aa1ae; background-color: #292e34;">; </span><span style="color: #2aa1ae; background-color: #292e34;">=&gt; 1</span>
+<span style="color: #4f97d7;">(</span>funcall my-get-odd-numbers<span style="color: #4f97d7;">)</span> <span style="color: #2aa1ae; background-color: #292e34;">; </span><span style="color: #2aa1ae; background-color: #292e34;">=&gt; 3</span>
+<span style="color: #4f97d7;">(</span>funcall my-get-odd-numbers<span style="color: #4f97d7;">)</span> <span style="color: #2aa1ae; background-color: #292e34;">; </span><span style="color: #2aa1ae; background-color: #292e34;">=&gt; 5</span>
+
+<span style="color: #4f97d7;">(</span>funcall my-get-even-numbers<span style="color: #4f97d7;">)</span> <span style="color: #2aa1ae; background-color: #292e34;">; </span><span style="color: #2aa1ae; background-color: #292e34;">=&gt; 6</span>
+<span style="color: #4f97d7;">(</span>funcall my-get-even-numbers<span style="color: #4f97d7;">)</span> <span style="color: #2aa1ae; background-color: #292e34;">; </span><span style="color: #2aa1ae; background-color: #292e34;">=&gt; 8</span>
+
+<span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">setq</span> my-get-even-numbers-2 <span style="color: #bc6ec5;">(</span>my-get-counter <span style="color: #a45bad;">0</span> <span style="color: #a45bad;">2</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+<span style="color: #4f97d7;">(</span>funcall my-get-even-numbers-2<span style="color: #4f97d7;">)</span> <span style="color: #2aa1ae; background-color: #292e34;">; </span><span style="color: #2aa1ae; background-color: #292e34;">=&gt; 0</span>
+<span style="color: #4f97d7;">(</span>funcall my-get-even-numbers-2<span style="color: #4f97d7;">)</span> <span style="color: #2aa1ae; background-color: #292e34;">; </span><span style="color: #2aa1ae; background-color: #292e34;">=&gt; 2</span>
+<span style="color: #4f97d7;">(</span>funcall my-get-even-numbers-2<span style="color: #4f97d7;">)</span> <span style="color: #2aa1ae; background-color: #292e34;">; </span><span style="color: #2aa1ae; background-color: #292e34;">=&gt; 4</span>
+
+<span style="color: #4f97d7;">(</span>funcall my-get-even-numbers<span style="color: #4f97d7;">)</span> <span style="color: #2aa1ae; background-color: #292e34;">; </span><span style="color: #2aa1ae; background-color: #292e34;">=&gt; 10</span>
+<span style="color: #4f97d7;">(</span>funcall my-get-even-numbers<span style="color: #4f97d7;">)</span> <span style="color: #2aa1ae; background-color: #292e34;">; </span><span style="color: #2aa1ae; background-color: #292e34;">=&gt; 12</span>
+<span style="color: #4f97d7;">(</span>funcall my-get-even-numbers<span style="color: #4f97d7;">)</span> <span style="color: #2aa1ae; background-color: #292e34;">; </span><span style="color: #2aa1ae; background-color: #292e34;">=&gt; 14</span>
+</pre>
+</div>
+
+<p>
+你可能会觉得奇怪,为什么 <code>my-get-even-numbers</code>, <code>my-get-odd-numbers</code> 以及 <code>my-get-even-numbers-2</code> 看起来有自己独立的 <code>count</code> 变量一样,而不是共享同一个 <code>count</code> 变量呢?
+答案是,它们确实有自己独立的 <code>count</code> 变量. 若你感到困惑不解, 你可以试试在静态作用域下执行以下代码,看结果是什么.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">let</span> <span style="color: #bc6ec5;">(</span><span style="color: #2d9574;">(</span>count <span style="color: #a45bad;">0</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">setq</span> my-count
+        <span style="color: #2d9574;">(</span><span style="color: #4f97d7; font-weight: bold;">lambda</span> <span style="color: #67b11d;">()</span>
+          <span style="color: #67b11d;">(</span><span style="color: #4f97d7; font-weight: bold;">prog1</span>
+              count
+            <span style="color: #b1951d;">(</span><span style="color: #4f97d7; font-weight: bold;">setq</span> count <span style="color: #4f97d7;">(</span>1+ count<span style="color: #4f97d7;">)</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+<span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">let</span> <span style="color: #bc6ec5;">(</span><span style="color: #2d9574;">(</span>count <span style="color: #a45bad;">0</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">setq</span> my-count-2
+        <span style="color: #2d9574;">(</span><span style="color: #4f97d7; font-weight: bold;">lambda</span> <span style="color: #67b11d;">()</span>
+          <span style="color: #67b11d;">(</span><span style="color: #4f97d7; font-weight: bold;">prog1</span>
+              count
+            <span style="color: #b1951d;">(</span><span style="color: #4f97d7; font-weight: bold;">setq</span> count <span style="color: #4f97d7;">(</span>1+ count<span style="color: #4f97d7;">)</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+<code>my-count</code> 与 <code>my-count-2</code> 都有它们自己独立的 <code>count</code> 变量. 这两个let语句各自包含了各自的 <code>(setq .. (lambda ...))</code> 语句. 这与 <code>my-get-counter</code> 是一样的请看. 每次执行 <code>(my-get-counter ..)</code> 都会执行一次 <code>(let ((count ..)) (lambda ..))</code>, 每次都会为 <code>count</code> 创建一个新的独立的绑定給新返回的函数访问. 当你调用 <code>(my-get-counter ..)</code> 三次, <code>(let ((count ..)) (lambda ..))</code> 也被执行了三次, 创建了三个 <code>count</code> 绑定和三个返回的函数.
+</p>
+
+<p>
+Alice现在写的所有Emacs Lisp代码都使用静态作用域. 那么当混用静态作用域代码和动态作用域代码时,会有什么后果呢?
+</p>
+
+<p>
+让我们从一个简单的例子开始.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span>eval
+ '<span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">defun</span> <span style="color: #bc6ec5; font-weight: bold;">my-bah</span> <span style="color: #2d9574;">()</span><span style="color: #bc6ec5;">)</span>
+ t<span style="color: #4f97d7;">)</span>
+
+<span style="color: #4f97d7;">(</span>eval
+ '<span style="color: #bc6ec5;">(</span>fset 'my-bah-2 <span style="color: #2d9574;">(</span>symbol-function 'my-bah<span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span>
+ nil<span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+函数 <code>my-bah</code> 是定义在静态作用域环境的. 因此它肯定是静态作用域函数. 那么 <code>my-bah-2</code> 呢? Alice认为"函数 <code>my-bah-2</code> 是在动态作用域环境下定义的,因此它肯定是动态作用域函数". 但是另一方面,Bob认为"<code>my-bah-2</code> 中function-cell的内容就是拷贝的 <code>my-bah</code> 中function cell的内容. 及润 <code>my-bah</code> 中function-cell的内容是静态作用域函数,那么 <code>my-bah-2</code> 中function cell的内容也应该是静态作用域函数". Alice说"目前这些函数啥都不干,让我们修改一下它们,让它们通过返回值告诉我们它们是否处于静态作用域下"
+</p>
+
+<p>
+下面这段代码在静态作用域下会返回t,否则返回nil. <a href="https://yoo2080.wordpress.com/2011/12/30/how-to-check-dynamically-if-lexical-scoping-is-active-in-emacs-lisp/">Checking the value of lexical-binding instead here is a bad idea.</a> 
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">let</span> <span style="color: #bc6ec5;">(</span><span style="color: #2d9574;">(</span>x nil<span style="color: #2d9574;">)</span>
+      <span style="color: #2d9574;">(</span>f <span style="color: #67b11d;">(</span><span style="color: #4f97d7; font-weight: bold;">let</span> <span style="color: #b1951d;">(</span><span style="color: #4f97d7;">(</span>x t<span style="color: #4f97d7;">)</span><span style="color: #b1951d;">)</span> <span style="color: #b1951d;">(</span><span style="color: #4f97d7; font-weight: bold;">lambda</span> <span style="color: #4f97d7;">()</span> x<span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span>funcall f<span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+Alice 修改了一下 <code>my-bah</code> 以及 <code>my-bah-2</code> 的代码.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span>eval
+ '<span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">defun</span> <span style="color: #bc6ec5; font-weight: bold;">my-bah</span> <span style="color: #2d9574;">()</span>
+    <span style="color: #2d9574;">(</span><span style="color: #4f97d7; font-weight: bold;">let</span> <span style="color: #67b11d;">(</span><span style="color: #b1951d;">(</span>x nil<span style="color: #b1951d;">)</span>
+          <span style="color: #b1951d;">(</span>f <span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">let</span> <span style="color: #bc6ec5;">(</span><span style="color: #2d9574;">(</span>x t<span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span> <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">lambda</span> <span style="color: #2d9574;">()</span> x<span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span>
+      <span style="color: #67b11d;">(</span>funcall f<span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span>
+ t<span style="color: #4f97d7;">)</span>
+
+<span style="color: #4f97d7;">(</span>eval
+ '<span style="color: #bc6ec5;">(</span>fset 'my-bah-2 <span style="color: #2d9574;">(</span>symbol-function 'my-bah<span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span>
+ nil<span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+让我们看看 <code>my-bah-2</code> 是否是静态作用域函数.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span>my-bah<span style="color: #4f97d7;">)</span> <span style="color: #2aa1ae; background-color: #292e34;">; </span><span style="color: #2aa1ae; background-color: #292e34;">=&gt; t</span>
+<span style="color: #4f97d7;">(</span>my-bah-2<span style="color: #4f97d7;">)</span> <span style="color: #2aa1ae; background-color: #292e34;">; </span><span style="color: #2aa1ae; background-color: #292e34;">=&gt; t</span>
+</pre>
+</div>
+
+<p>
+看起来Bob是对的. 让我们不用 <code>defun</code> 再试一次.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span>eval
+ '<span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">setq</span> my-nah
+        <span style="color: #2d9574;">(</span><span style="color: #4f97d7; font-weight: bold;">lambda</span> <span style="color: #67b11d;">()</span>
+          <span style="color: #67b11d;">(</span><span style="color: #4f97d7; font-weight: bold;">let</span> <span style="color: #b1951d;">(</span><span style="color: #4f97d7;">(</span>x nil<span style="color: #4f97d7;">)</span>
+                <span style="color: #4f97d7;">(</span>f <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">let</span> <span style="color: #2d9574;">(</span><span style="color: #9cb6ad;">(</span>x t<span style="color: #9cb6ad;">)</span><span style="color: #2d9574;">)</span> <span style="color: #2d9574;">(</span><span style="color: #4f97d7; font-weight: bold;">lambda</span> <span style="color: #9cb6ad;">()</span> x<span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span><span style="color: #b1951d;">)</span>
+            <span style="color: #b1951d;">(</span>funcall f<span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span>
+ t<span style="color: #4f97d7;">)</span>
+
+<span style="color: #4f97d7;">(</span>eval
+ '<span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">setq</span> my-nah-2 my-nah<span style="color: #bc6ec5;">)</span>
+ nil<span style="color: #4f97d7;">)</span>
+
+<span style="color: #4f97d7;">(</span>funcall my-nah<span style="color: #4f97d7;">)</span> <span style="color: #2aa1ae; background-color: #292e34;">; </span><span style="color: #2aa1ae; background-color: #292e34;">=&gt; t</span>
+<span style="color: #4f97d7;">(</span>funcall my-nah-2<span style="color: #4f97d7;">)</span> <span style="color: #2aa1ae; background-color: #292e34;">; </span><span style="color: #2aa1ae; background-color: #292e34;">=&gt; t</span>
+</pre>
+</div>
+
+<p>
+当你运行 <code>(setq abc (+ 1 1))</code> 时,会先计算 <code>(+ 1 1)</code> 表达式得到2,然后将计算结果,数字2,赋给变量 <code>abc</code>. 类似的,当你运行 <code>(setq my-nah (lambda ...))</code>, 会先执行 <code>(lambda ...)</code>,其结果是一个匿名函数.
+在静态作用域下,执行结构是一个类似 <code>(closure ....)</code> 的静态作用域函数. 然后这个静态作用域表达式被赋予变量 <code>my-nah</code>.
+</p>
+
+<p>
+先运行 <code>(setq abc (+ 1 1))</code> 随后再运行 <code>(setq abc-2 abc)</code> 的执行过程中, 表达式 <code>(+ 1 1)</code> 只会执行一次. 语句 <code>(setq abc-2 abc)</code> 并不会再一次执行 <code>(+ 1 1)</code> , 它仅仅是将以及计算出的结果2保存到 <code>abc-2</code> 中. 真正执行的其实是符号 <code>abc</code> 自己,而符号 <code>abc</code> 的执行结果就是2. 
+类似的,在上面 <code>my-nah</code> 及 <code>my-nah-2</code> 的例子中, <code>(lambda ...)</code> 只会执行一次, 其结果是 <code>(closure ...)</code> .在你运行 <code>(setq my-nah-2 my-nah)</code> 时并不会再次执行代码重新生成一个结果, 而仅仅是以及计算出的结果保存到 <code>my-nah-2</code> 中. 
+虽然说 <code>(setq my-nah-2 my-nah)</code> 是在动态作用域环境下运行的,然而由于匿名函数表达式是在静态作用域环境中运行的, 变量 <code>my-nah-2</code> 最终持有的是静态作用域函数.
+</p>
+
+<p>
+一个静态作用域函数创建出来后,即使是在动态作用域环境中被赋值給其他变量,其依然还是静态作用域函数.
+</p>
+
+<p>
+上面 <code>defun my-bah</code> 的例子也类似. 符号 <code>my-bah</code> 的function cell中持有的是一个静态作用域函数,然后这个静态作用域函数被赋值给了别人. 你可以试试下面代码的结果. 
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span>print my-nah-2<span style="color: #4f97d7;">)</span>
+<span style="color: #4f97d7;">(</span>print <span style="color: #bc6ec5;">(</span>symbol-function 'my-bah-2<span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+因此,当你在静态作用域文件中用 <code>defun</code> 定义了函数. 要想知道该函数中的自由变量引用的是什么,只需要在源文件中查找就行了,无需担心该函数会在静态作用域文件中收同名变量的影响.
+</p>
+
+<p>
+理解了 <code>my-nah-2 &amp; my-bah-2</code> 的那个例子后,让我们再来看看 <code>my-get-counter</code>. 既然 <code>(defun my-get-counter ...)</code> 是在静态作用域源文件中,那么 <code>my-get-counter are</code> 返回的函数也应该静态作用域的. 让我们来看下面这段代码.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span>eval
+ '<span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">progn</span>
+    <span style="color: #2d9574;">(</span><span style="color: #4f97d7; font-weight: bold;">setq</span> my-get-even-numbers <span style="color: #67b11d;">(</span>my-get-counter <span style="color: #a45bad;">0</span> <span style="color: #a45bad;">2</span><span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span>print <span style="color: #67b11d;">(</span>funcall my-get-even-numbers<span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span>print <span style="color: #67b11d;">(</span>funcall my-get-even-numbers<span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span>print <span style="color: #67b11d;">(</span>funcall my-get-even-numbers<span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span>
+ nil<span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+其结果输出 <code>0 2 4</code>. Alice的观点是这样的:"函数 <code>my-get-even-numbers</code> 是在动态作用域环境中定义的. 但是为什么它运行起来就好像是静态作用域函数一样呢?". 其实,与 <code>my-nah-2</code> 一样, <code>my-get-even-numbers</code> 变量持有的也是静态作用域函数. 为防你感到迷惑,让我们先来看看 <code>my-get-sum</code> 函数.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">defun</span> <span style="color: #bc6ec5; font-weight: bold;">my-get-sum</span> <span style="color: #bc6ec5;">(</span>x y<span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span>+ x y<span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+<code>my-get-sum</code> 中的 <code>(+ x y)</code> 是一个加法表达式.而 <code>my-get-sum</code> 返回的是计算 <code>(+ x y)</code> 的结果,而不是 <code>(+ x y)</code> 本身. 当你运行 <code>(my-get-sum 1 2)</code> 时,其返回的并不是字面表达式 <code>(+ x y)</code>,而是 <code>my-get-sum</code> 内 <code>(+ x y)</code> 的计算结果 <code>3</code>.
+</p>
+
+<p>
+回到 <code>my-get-counter</code>. <code>my-get-counter</code> 中的 <code>(lambda ...)</code> 是一个匿名函数表达式. 该表达式在 <code>my-get-counter</code> 内执行一次,其结果(类似 <code>(closure ...)</code> 的东西)被立即返回并存储在变量 <code>my-get-even-numbers</code> 中. <code>(lambda ...)</code> 仅仅被执行一次,且执行环境是静态作用域函数 <code>my-get-counter</code> 的内部. 在静态作用域函数内执行lambda语句,其结果总是 <code>(closure ...)</code>. 这就是为什么 <code>my-get-even-numbers</code> 最终持有的是静态作用域函数的缘故了.
+</p>
+
+<p>
+另外,静态作用域函数也能创建并返回一个动态作用域函数, 只要以某种方式绕过执行lambda语句就行.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span>eval
+ '<span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">defun</span> <span style="color: #bc6ec5; font-weight: bold;">my-return-dynamically-scoped-function</span> <span style="color: #2d9574;">()</span>
+    <span style="color: #2d9574;">(</span>list 'lambda '<span style="color: #67b11d;">()</span> 'a<span style="color: #2d9574;">)</span>
+    <span style="color: #bc6ec5;">)</span>
+ t<span style="color: #4f97d7;">)</span>
+
+<span style="color: #4f97d7;">(</span>eval
+ '<span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">defun</span> <span style="color: #bc6ec5; font-weight: bold;">my-return-dynamically-scoped-function</span> <span style="color: #2d9574;">()</span>
+    '<span style="color: #2d9574;">(</span>lambda <span style="color: #67b11d;">()</span> a<span style="color: #2d9574;">)</span> <span style="color: #2aa1ae; background-color: #292e34;">; </span><span style="color: #2aa1ae; background-color: #292e34;">quoted lambda</span>
+    <span style="color: #bc6ec5;">)</span>
+ t<span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+我不知道这么做的理由,但是确实可以这么做.
+</p>
+
+<p>
+现在让我们再来看看 <code>my-call</code> 的例子.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span>eval
+ '<span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">defun</span> <span style="color: #bc6ec5; font-weight: bold;">my-call</span> <span style="color: #2d9574;">(</span>f n<span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span>funcall f n<span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span>
+ nil<span style="color: #4f97d7;">)</span>
+
+<span style="color: #4f97d7;">(</span>eval
+ '<span style="color: #bc6ec5;">(</span>dolist <span style="color: #2d9574;">(</span>n <span style="color: #67b11d;">(</span>list <span style="color: #a45bad;">1</span> <span style="color: #a45bad;">2</span> <span style="color: #a45bad;">3</span><span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span>print
+     <span style="color: #67b11d;">(</span>my-call <span style="color: #b1951d;">(</span><span style="color: #4f97d7; font-weight: bold;">lambda</span> <span style="color: #4f97d7;">(</span>x<span style="color: #4f97d7;">)</span> <span style="color: #4f97d7;">(</span>* n x<span style="color: #4f97d7;">)</span><span style="color: #b1951d;">)</span> <span style="color: #a45bad;">5</span><span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span>
+ t<span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+其输出为 <code>5 10 15</code>. Alice可能又要说了:"函数 <code>f</code> 是在动态作用域环境中定义的,为什么它运行起来就好像静态作用域函数一样?" 
+传递給 <code>my-call</code> 的匿名函数是在静态作用域环境中定义的, 因此它被传递給 <code>my-call</code> 后依然是静态作用域函数.
+若你还不明白,你可以这么想, <code>(lambda ...)</code> 的执行结果被传递给了 <code>my-call</code>. <code>my-call</code> 经该执行结果存储在了它的局部变量 <code>f</code> 中. 因此,最终 <code>f</code> 引用的是静态作用域函数. 
+</p>
+
+<p>
+函数 <code>mapcar*</code> 与 <code>my-call</code> 类似,都接受一个函数作为参数,而且目前来看,其本身也是定义在动态作用域源文件中的(译者注:现在已经修复了这个问题). 下面这个动态作用域陷阱来源于 <a href="http://stackoverflow.com/a/3791877/37664">StackOverflow </a>.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">let</span> <span style="color: #bc6ec5;">(</span><span style="color: #2d9574;">(</span>cl-x <span style="color: #a45bad;">10</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span>mapcar* <span style="color: #2d9574;">(</span><span style="color: #4f97d7; font-weight: bold;">lambda</span> <span style="color: #67b11d;">(</span>elt<span style="color: #67b11d;">)</span> <span style="color: #67b11d;">(</span>* cl-x elt<span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span> '<span style="color: #2d9574;">(</span><span style="color: #a45bad;">1</span> <span style="color: #a45bad;">2</span> <span style="color: #a45bad;">3</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+<code>mapcar*</code> 的定义中也使用了 <code>cl-x</code> 作为参数名称. 因此在动态作用域中执行上面代码会有奇怪的结果(缺陷1). 但若你在静态作用域中运行该代码则没有问题,这是因为静态作用域匿名函数传递到 <code>mapcar*</code> 中依然是静态作用域函数.
+</p>
+
+<p>
+就上面这些例子来看,似乎静态作用域要更好一些. 是时候拥抱静态作用域了.
+</p>
+
+<p>
+(更新: 还可以看看<a href="https://yoo2080.wordpress.com/2013/08/14/invasion-of-special-variables-in-emacs-lisp/">Invasion of special variables</a> 它展示了其他一些陷阱以及如何避免的方法)
+</p>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2016-07-16</span>
+            <span title="last modification date" class="post-info">2016-07-16</span>
+            <span title="tags" class="post-info">:N/A:</span>
+            <span title="author" class="post-info"><a href="mailto:lujun9972 &lt;at&gt; lujun9972-F41">lujun9972</a></span>
+        </div>
+    <script src="http://lujun9972.github.io/emacs-document/media/js/jquery-2.1.3.min.js"></script>
+        <section>
+            <h1>Comments</h1>
+            <div id="comment-wrap">
+                    <a class="disqus_label">使用 Disqus 评论</a>
+                    <a class="ds-label">使用多说评论</a>
+    </ul>
+        <div id="disqus_thread"></div>
+        <script type="text/javascript">
+         //var disqus_developer = 1;
+         var preempt_signal=false;
+         var disqus_identifier = "/blog/2016/07/16/emacslisp中的静态作用域与动态作用域/";
+         var disqus_url = "http://lujun9972.github.io/emacs-document/blog/2016/07/16/emacslisp中的静态作用域与动态作用域/";
+         var disqus_shortname = 'emacs-document';
+         /* * * DON'T EDIT BELOW THIS LINE * * */
+         (function() {
+             var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+             dsq.src = 'http://' + disqus_shortname + '.disqus.com/embed.js';
+             (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+             $('#disqus_thread').css('display','none');
+         })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+        <div class="ds-thread"></div>
+        <script type="text/javascript">
+         var duoshuoQuery = {short_name:'emacs-document'};
+         (function() {
+             var ds = document.createElement('script');
+             ds.type = 'text/javascript';ds.async = true;
+             ds.src = 'http://static.duoshuo.com/embed.js';
+             ds.charset = 'UTF-8';
+             (document.getElementsByTagName('head')[0]
+           || document.getElementsByTagName('body')[0]).appendChild(ds);
+             $('.ds-thread').css('display','block');
+         })();
+        </script>
+    <script>
+     /* comments */
+     var ego_disqus_thread=$('#disqus_thread');
+     var ego_ds_label=$('.ds-thread');
+     $('.disqus_label').click(function(){
+         ego_disqus_thread.show();
+         ego_ds_label.hide();
+     });
+     $('.ds-label').click(function(){
+         ego_disqus_thread.hide();
+         ego_ds_label.show();
+     });
+    </script>
+        </section>
+    <script src="http://lujun9972.github.io/emacs-document/media/js/main.js"></script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 25.x(<a href="http://orgmode.org">Org mode</a> 8.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:lujun9972 &lt;at&gt; lujun9972-F41">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div></body>
+</html>

@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Literate-database-work - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <style>
+   #ds-thread #ds-reset .ds-comment-body p {color: #ffffff;}
+   #ds-thread #ds-reset .ds-comment-body p a {color: #ff0;}
+   #ds-thread #ds-reset .ds-comment-body p a:hover {color: #0ff;}
+   #disqus_thread a {color: #00ffff;}
+  </style>
+  <link rel="stylesheet" href="http://lujun9972.github.io/emacs-document/media/css/main.css" type="text/css"/>
+  <link rel="stylesheet" href="http://lujun9972.github.io/emacs-document/media/css/comment.css" type="text/css"/>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="http://lujun9972.github.io/emacs-document/">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;集思广益</p>
+    <nav class="site-nav">
+      <div class="menu-icon">
+        <svg viewBox="0 0 18 15">
+          <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.031C17.335,0,18,0.665,18,1.484L18,1.484z" fill="#ffff00"/>
+          <path d="M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0c0-0.82,0.665-1.484,1.484-1.484 h15.031C17.335,6.031,18,6.696,18,7.516L18,7.516z" fill="#ffff00"/>
+          <path d="M18,13.516C18,14.335,17.335,15,16.516,15H1.484C0.665,15,0,14.335,0,13.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.031C17.335,12.031,18,12.696,18,13.516L18,13.516z" fill="#ffff00"/>
+        </svg>
+      </div>
+      <ul class="trigger">
+        <li><a href="http://lujun9972.github.io/emacs-document/years/">Years</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/authors/">Authors</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/tags/">Tags</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document">Github</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="http://www.google.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">Literate-database-work</h1>
+<div id="table-of-contents">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#orgheadline1">1. Header Properties</a></li>
+<li><a href="#orgheadline2">2. Using SQL Code Blocks</a></li>
+<li><a href="#orgheadline3">3. More Interesting Queries</a></li>
+<li><a href="#orgheadline4">4. 总结</a></li>
+<li><a href="#orgheadline5">5. Footnotes:</a></li>
+</ul>
+</div>
+</div>
+<p>
+我曾被要求搞清楚OpenStack的Keystone服务(它的授权与认证组件)是如何使用MySQL的. OpenStack的文档一向零散,因此我决定直接研究它的数据库,而不是阅读源代码.
+</p>
+
+<p>
+我当然不是DBA,但我觉得我可以看一下某个开发系统的数据并能够很好的解决所遇到的BUG. 我探索数据库的方法与他人有点不一样,我使用的是自创的 <a href="http://howardism.org/Technical/Emacs/literate-devops.html">Literate Devops</a> 方法. 
+我在前一段时间已经介绍过这种方法了,现在我再以另一个案例为例,分享这种方法.
+</p>
+
+<div id="outline-container-orgheadline1" class="outline-2">
+<h2 id="orgheadline1"><span class="section-number-2">1</span> Header Properties</h2>
+<div class="outline-text-2" id="text-1">
+<p>
+我通过SSH登陆到控制节点并创建一个隧道与我本地系统的3306端口连接:^<a href="http://howardism.org/Technical/Emacs/literate-database.html#fn.1">1</a>
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">ssh -L <span style="color: #a45bad;">3306:controller:3306</span> controller
+</pre>
+</div>
+
+<p>
+然后我打开最新的笔记(org-mode格式)并创建一个新标题. 标题后时一个可折叠的属性drawer. 其中包含了数据库连接的信息(这些信息是我从远程系统的配置文件中找到的).
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-org"><span style="color: #292b2e;">*</span><span style="color: #2d9574; font-size: 120%; font-weight: bold;">* MySQL Analysis</span>
+<span style="color: #bc6ec5;">  :PROPERTIES:</span>
+  <span style="color: #bc6ec5;">:engine:</span>   mysql
+  <span style="color: #bc6ec5;">:dbhost:</span>   localhost
+  <span style="color: #bc6ec5;">:database:</span> keystone
+  <span style="color: #bc6ec5;">:dbuser:</span>   keystone
+  <span style="color: #bc6ec5;">:dbpassword:</span> d97d880017c8b965
+  <span style="color: #bc6ec5;">:cmdline:</span>  --protocol=tcp
+  <span style="color: #bc6ec5;">:exports:</span>  both
+<span style="color: #bc6ec5;">  :END:</span>
+</pre>
+</div>
+
+<p>
+注意 <code>cmdline</code> 属性的值. 若mysql主机为 <code>localhost</code> 的话,则MySQL连接器会尝试通过local file socket来建立与数据库的连接. 由于这其实是个转发端口,因此我需要明确指定使用TCP协议创建连接.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgheadline2" class="outline-2">
+<h2 id="orgheadline2"><span class="section-number-2">2</span> Using SQL Code Blocks</h2>
+<div class="outline-text-2" id="text-2">
+<p>
+现在我可以开始我的以文字为导向的探索. 由于我假定我的结果会被发送给同事阅读, my prose was for them as much as me…
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-org">Not knowing anything about the token properties in the Keystone
+database structure, I jumped into the database to expose a bit of the
+schema. What follows is a summary of my exploration as well as some
+recommendations we can use to ascertain its health.
+
+First, here are the tables associated with the <span style="color: #4f97d7;">=keystone=</span> database:
+</pre>
+</div>
+
+<p>
+文档中每个端口后面都跟着一个SQL代码块.^<a href="http://howardism.org/Technical/Emacs/literate-database.html#fn.2">2</a> 例如:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-org"><span style="color: #827591; background-color: #373040;">#+BEGIN_SRC sql</span>
+  SHOW tables;
+<span style="color: #827591; background-color: #373040;">#+END_SRC</span>
+</pre>
+</div>
+
+<p>
+这种方式的美妙之处在于,我可以通过按下 <code>C-c C-c</code> 来执行改代码块中的代码,并将查询数据库的结果以org-mode中表格的形式插入到文档中:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-org"><span style="color: #9f8766;">#+RESULTS:</span>
+<span style="color: #b2b2b2; background-color: #293239;">| Tables_in_keystone     |</span>
+<span style="color: #b2b2b2; background-color: #293239;">|------------------------|</span>
+<span style="color: #b2b2b2; background-color: #293239;">| credential             |</span>
+<span style="color: #b2b2b2; background-color: #293239;">| domain                 |</span>
+<span style="color: #b2b2b2; background-color: #293239;">| endpoint               |</span>
+<span style="color: #b2b2b2; background-color: #293239;">| group                  |</span>
+<span style="color: #b2b2b2; background-color: #293239;">| group_domain_metadata  |</span>
+<span style="color: #b2b2b2; background-color: #293239;">| group_project_metadata |</span>
+<span style="color: #b2b2b2; background-color: #293239;">| migrate_version        |</span>
+<span style="color: #b2b2b2; background-color: #293239;">| policy                 |</span>
+<span style="color: #b2b2b2; background-color: #293239;">| project                |</span>
+<span style="color: #b2b2b2; background-color: #293239;">| role                   |</span>
+<span style="color: #b2b2b2; background-color: #293239;">| service                |</span>
+<span style="color: #b2b2b2; background-color: #293239;">| token                  |</span>
+<span style="color: #b2b2b2; background-color: #293239;">| trust                  |</span>
+<span style="color: #b2b2b2; background-color: #293239;">| trust_role             |</span>
+<span style="color: #b2b2b2; background-color: #293239;">| user                   |</span>
+<span style="color: #b2b2b2; background-color: #293239;">| user_domain_metadata   |</span>
+<span style="color: #b2b2b2; background-color: #293239;">| user_group_membership  |</span>
+<span style="color: #b2b2b2; background-color: #293239;">| user_project_metadata  |</span>
+</pre>
+</div>
+
+<p>
+基于这个结果,我继续往下探索. 名为user的表格看起来蛮有意思的:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-org">The <span style="color: #4f97d7;">=user=</span> table has the following schema:
+
+<span style="color: #827591; background-color: #373040;">#+BEGIN_SRC sql</span>
+  SHOW columns <span style="color: #4f97d7; font-weight: bold;">FROM</span> <span style="color: #4f97d7;">user</span>;
+<span style="color: #827591; background-color: #373040;">#+END_SRC</span>
+</pre>
+</div>
+
+<p>
+其结果给了我很多查询的灵感:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-org"><span style="color: #9f8766;">#+RESULTS:</span>
+<span style="color: #b2b2b2; background-color: #293239;">| Field              | Type         | Null | Key | Default | Extra |</span>
+<span style="color: #b2b2b2; background-color: #293239;">|--------------------+--------------+------+-----+---------+-------|</span>
+<span style="color: #b2b2b2; background-color: #293239;">| id                 | varchar(64)  | NO   | PRI | NULL    |       |</span>
+<span style="color: #b2b2b2; background-color: #293239;">| name               | varchar(255) | NO   |     | NULL    |       |</span>
+<span style="color: #b2b2b2; background-color: #293239;">| extra              | text         | YES  |     | NULL    |       |</span>
+<span style="color: #b2b2b2; background-color: #293239;">| password           | varchar(128) | YES  |     | NULL    |       |</span>
+<span style="color: #b2b2b2; background-color: #293239;">| enabled            | tinyint(1)   | YES  |     | NULL    |       |</span>
+<span style="color: #b2b2b2; background-color: #293239;">| domain_id          | varchar(64)  | NO   | MUL | NULL    |       |</span>
+<span style="color: #b2b2b2; background-color: #293239;">| default_project_id | varchar(64)  | YES  |     | NULL    |       |</span>
+</pre>
+</div>
+
+<p>
+并且当我导出我的org-mode文件时,这些表格都被渲染的很不错:
+</p>
+
+
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+</colgroup>
+<thead>
+<tr>
+<th scope="col" class="org-left">Field</th>
+<th scope="col" class="org-left">Type</th>
+<th scope="col" class="org-left">Null</th>
+<th scope="col" class="org-left">Key</th>
+<th scope="col" class="org-left">Default</th>
+<th scope="col" class="org-left">Extra</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="org-left">id</td>
+<td class="org-left">varchar(64)</td>
+<td class="org-left">NO</td>
+<td class="org-left">PRI</td>
+<td class="org-left">NULL</td>
+<td class="org-left">&#xa0;</td>
+</tr>
+
+<tr>
+<td class="org-left">name</td>
+<td class="org-left">varchar(255)</td>
+<td class="org-left">NO</td>
+<td class="org-left">&#xa0;</td>
+<td class="org-left">NULL</td>
+<td class="org-left">&#xa0;</td>
+</tr>
+
+<tr>
+<td class="org-left">extra</td>
+<td class="org-left">text</td>
+<td class="org-left">YES</td>
+<td class="org-left">&#xa0;</td>
+<td class="org-left">NULL</td>
+<td class="org-left">&#xa0;</td>
+</tr>
+
+<tr>
+<td class="org-left">password</td>
+<td class="org-left">varchar(128)</td>
+<td class="org-left">YES</td>
+<td class="org-left">&#xa0;</td>
+<td class="org-left">NULL</td>
+<td class="org-left">&#xa0;</td>
+</tr>
+
+<tr>
+<td class="org-left">enabled</td>
+<td class="org-left">tinyint(1)</td>
+<td class="org-left">YES</td>
+<td class="org-left">&#xa0;</td>
+<td class="org-left">NULL</td>
+<td class="org-left">&#xa0;</td>
+</tr>
+
+<tr>
+<td class="org-left">domain_id</td>
+<td class="org-left">varchar(64)</td>
+<td class="org-left">NO</td>
+<td class="org-left">MUL</td>
+<td class="org-left">NULL</td>
+<td class="org-left">&#xa0;</td>
+</tr>
+
+<tr>
+<td class="org-left">default_project_id</td>
+<td class="org-left">varchar(64)</td>
+<td class="org-left">YES</td>
+<td class="org-left">&#xa0;</td>
+<td class="org-left">NULL</td>
+<td class="org-left">&#xa0;</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+
+
+
+<div id="outline-container-orgheadline3" class="outline-2">
+<h2 id="orgheadline3"><span class="section-number-2">3</span> More Interesting Queries</h2>
+<div class="outline-text-2" id="text-3">
+<p>
+我无意于向你展示我探索的细节(因为这只是一个例子而已,用于想你展示这种基于org-mode的literate devops概念的威力). 但是,由于我输入的SQL语句时直接发送到数据库的,因此我还可以使用MySQL特有的语法:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-org"> Clearly we are seeing a lot of expired tokens. How old is the oldest
+ expire token?
+
+<span style="color: #827591; background-color: #373040;"> #+BEGIN_SRC sql</span>
+   <span style="color: #4f97d7; font-weight: bold;">SELECT</span> expires,
+    <span style="color: #4f97d7;">(</span>UNIX_TIMESTAMP<span style="color: #bc6ec5;">(</span>expires<span style="color: #bc6ec5;">)</span> - UNIX_TIMESTAMP<span style="color: #bc6ec5;">(</span>NOW<span style="color: #2d9574;">()</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>/<span style="color: #a45bad;">60</span> <span style="color: #4f97d7; font-weight: bold;">AS</span> minutes_ago,
+    <span style="color: #4f97d7;">(</span>UNIX_TIMESTAMP<span style="color: #bc6ec5;">(</span>expires<span style="color: #bc6ec5;">)</span> - UNIX_TIMESTAMP<span style="color: #bc6ec5;">(</span>NOW<span style="color: #2d9574;">()</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>/<span style="color: #a45bad;">60</span>/<span style="color: #a45bad;">60</span> <span style="color: #4f97d7; font-weight: bold;">AS</span> hours_ago
+   <span style="color: #4f97d7; font-weight: bold;">FROM</span> token
+   <span style="color: #4f97d7; font-weight: bold;">ORDER</span> <span style="color: #4f97d7; font-weight: bold;">BY</span> expires <span style="color: #4f97d7; font-weight: bold;">DESC</span>
+   <span style="color: #4f97d7; font-weight: bold;">LIMIT</span> <span style="color: #a45bad;">1</span>
+<span style="color: #827591; background-color: #373040;"> #+END_SRC</span>
+
+<span style="color: #9f8766;"> #+RESULTS:</span>
+ <span style="color: #b2b2b2; background-color: #293239;">| expires             | minutes_ago |   hours_ago |</span>
+ <span style="color: #b2b2b2; background-color: #293239;">|---------------------+-------------+-------------|</span>
+ <span style="color: #b2b2b2; background-color: #293239;">| 2015-04-08 18:49:42 |   1438.2500 | 23.97083333 |</span>
+
+Huh. <span style="color: #4f97d7;">=1439=</span> is <span style="font-style: italic;">/almost/</span> 24 hours ago. Is that our policy? Actually, it
+is indeed a configurable policy. Set to 24 hours in case long running
+stories cache that token.
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgheadline4" class="outline-2">
+<h2 id="orgheadline4"><span class="section-number-2">4</span> 总结</h2>
+<div class="outline-text-2" id="text-4">
+<p>
+最终结果很有趣,我将其导出成HTML格式作为邮件内容,并由此展开最初的讨论, 然后最终会记入我们的Wiki系统.
+</p>
+
+<p>
+导出的文档<a href="http://howardism.org/Technical/Emacs/literate-database-example.html">可以在这里看到</a> (为防你好奇,我修改掉了原始数据). 你也<a href="http://howardism.org/Technical/Emacs/literate-database-example.org.txt">可以在这看到原始的org文档</a>.
+</p>
+
+<p>
+这种方法的另一个副作用时当我通过skype与远程的同事讨论数据库时,我可以与他共享Emacs屏幕,然后重新运行这些查询语句病获得输出结构. 然后将他的想法记录下来以备以后讨论.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgheadline5" class="outline-2">
+<h2 id="orgheadline5"><span class="section-number-2">5</span> Footnotes:</h2>
+<div class="outline-text-2" id="text-5">
+<p>
+^<a href="http://howardism.org/Technical/Emacs/literate-database.html#fnr.1">1</a>
+</p>
+
+<p>
+你需要配置MySQL使之允许远程连接上数据库.
+</p>
+
+<p>
+方法是,编辑 <code>/etc/mysql/my.cnf</code> 文件, 将 <code>bind-address</code> 改为 <code>0.0.0.0</code>. 若能将本机地址添加到数据库服务器上的 <code>/etc/hosts</code> 中,使之能进行反向查找,那也是有助远程连接数据库的.
+</p>
+
+<p>
+若不知道如何创建一个可以从任何主机连接上系统的数据库用户账户,请参照下面代码:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sql"><span style="color: #4f97d7; font-weight: bold;">CREATE</span> <span style="color: #4f97d7;">USER</span> <span style="color: #2d9574;">'howard'</span>@<span style="color: #2d9574;">'%'</span> IDENTIFIED <span style="color: #4f97d7; font-weight: bold;">BY</span> <span style="color: #2d9574;">'byebye'</span>;
+<span style="color: #4f97d7; font-weight: bold;">GRANT</span> <span style="color: #4f97d7; font-weight: bold;">ALL</span> <span style="color: #4f97d7; font-weight: bold;">PRIVILEGES</span> <span style="color: #4f97d7; font-weight: bold;">ON</span> *.* <span style="color: #4f97d7; font-weight: bold;">TO</span> <span style="color: #2d9574;">'howard'</span>@<span style="color: #2d9574;">'%'</span> <span style="color: #4f97d7; font-weight: bold;">WITH</span> <span style="color: #4f97d7; font-weight: bold;">GRANT</span> <span style="color: #4f97d7; font-weight: bold;">OPTION</span>;
+FLUSH <span style="color: #4f97d7; font-weight: bold;">PRIVILEGES</span>;
+</pre>
+</div>
+
+<p>
+之后,你可以试着使用CLI客户端进行连接了:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">mysql -h localhost -P <span style="color: #a45bad;">3306</span> -u howard -p=byebye --protocol=tcp -e <span style="color: #2d9574;">"show tables;"</span>
+</pre>
+</div>
+
+<p>
+若出现下面的错误:
+</p>
+
+<pre class="example">
+Warning: Using a password on the command line interface can be insecure.
+ERROR 1045 (28000): Access denied for user 'howard'@'HABRAMS-02' (using password: YES)
+</pre>
+
+<p>
+请执行下面的查询语句来检查数据库用户账户:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sql"><span style="color: #4f97d7; font-weight: bold;">SELECT</span> <span style="color: #4f97d7;">user</span>, <span style="color: #4f97d7; font-weight: bold;">host</span> <span style="color: #4f97d7; font-weight: bold;">FROM</span> mysql.<span style="color: #4f97d7;">user</span>;
+</pre>
+</div>
+
+<p>
+返回的结果可能类似这样的:
+</p>
+
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-left" />
+
+<col  class="org-left" />
+</colgroup>
+<tbody>
+<tr>
+<td class="org-left">user</td>
+<td class="org-left">host</td>
+</tr>
+
+<tr>
+<td class="org-left">howard</td>
+<td class="org-left">%</td>
+</tr>
+
+<tr>
+<td class="org-left">root</td>
+<td class="org-left">10.0.2.2</td>
+</tr>
+
+<tr>
+<td class="org-left">root</td>
+<td class="org-left">127.0.0.1</td>
+</tr>
+
+<tr>
+<td class="org-left">root</td>
+<td class="org-left">::1</td>
+</tr>
+</tbody>
+</table>
+
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-left" />
+
+<col  class="org-left" />
+</colgroup>
+<tbody>
+<tr>
+<td class="org-left">root</td>
+<td class="org-left">localhost</td>
+</tr>
+</tbody>
+</table>
+
+<p>
+Still having troubles, re-run the CREATE USER SQL statement with the following hosts:
+</p>
+
+<ul class="org-ul">
+<li>% … should allow all.</li>
+<li>localhost … isn’t really what you want</li>
+<li>The hostname of your local system</li>
+</ul>
+
+<p>
+Be careful with adding entries that you don’t need, for it appears that for MySQL, order matters, and
+some combination will be chosen for you.
+</p>
+
+<p>
+^<a href="http://howardism.org/Technical/Emacs/literate-database.html#fnr.2">2</a>
+</p>
+
+<p>
+In order to use sql as a Babel formatting language, you have to specify it in the
+org-babel-load-languages list. In my case, I don’t use sql enough, so M-x load-library and then
+entering ob-sql is sufficient.
+</p>
+
+<p>
+Or:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">require</span> '<span style="color: #a45bad;">sql</span><span style="color: #4f97d7;">)</span>
+<span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">require</span> '<span style="color: #a45bad;">ob-sql</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2016-07-03</span>
+            <span title="last modification date" class="post-info">2016-07-03</span>
+            <span title="tags" class="post-info">:N/A:</span>
+            <span title="author" class="post-info"><a href="mailto:lujun9972 &lt;at&gt; lujun9972-F41">lujun9972</a></span>
+        </div>
+    <script src="http://lujun9972.github.io/emacs-document/media/js/jquery-2.1.3.min.js"></script>
+        <section>
+            <h1>Comments</h1>
+            <div id="comment-wrap">
+                    <a class="disqus_label">使用 Disqus 评论</a>
+                    <a class="ds-label">使用多说评论</a>
+    </ul>
+        <div id="disqus_thread"></div>
+        <script type="text/javascript">
+         //var disqus_developer = 1;
+         var preempt_signal=false;
+         var disqus_identifier = "/blog/2016/07/03/literate-database-work/";
+         var disqus_url = "http://lujun9972.github.io/emacs-document/blog/2016/07/03/literate-database-work/";
+         var disqus_shortname = 'emacs-document';
+         /* * * DON'T EDIT BELOW THIS LINE * * */
+         (function() {
+             var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+             dsq.src = 'http://' + disqus_shortname + '.disqus.com/embed.js';
+             (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+             $('#disqus_thread').css('display','none');
+         })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+        <div class="ds-thread"></div>
+        <script type="text/javascript">
+         var duoshuoQuery = {short_name:'emacs-document'};
+         (function() {
+             var ds = document.createElement('script');
+             ds.type = 'text/javascript';ds.async = true;
+             ds.src = 'http://static.duoshuo.com/embed.js';
+             ds.charset = 'UTF-8';
+             (document.getElementsByTagName('head')[0]
+           || document.getElementsByTagName('body')[0]).appendChild(ds);
+             $('.ds-thread').css('display','block');
+         })();
+        </script>
+    <script>
+     /* comments */
+     var ego_disqus_thread=$('#disqus_thread');
+     var ego_ds_label=$('.ds-thread');
+     $('.disqus_label').click(function(){
+         ego_disqus_thread.show();
+         ego_ds_label.hide();
+     });
+     $('.ds-label').click(function(){
+         ego_disqus_thread.hide();
+         ego_ds_label.show();
+     });
+    </script>
+        </section>
+    <script src="http://lujun9972.github.io/emacs-document/media/js/main.js"></script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 25.x(<a href="http://orgmode.org">Org mode</a> 8.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:lujun9972 &lt;at&gt; lujun9972-F41">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div></body>
+</html>

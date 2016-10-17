@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>在Emacs中借助GnuPG与Auth-Source保管你的秘密 - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <style>
+   #ds-thread #ds-reset .ds-comment-body p {color: #ffffff;}
+   #ds-thread #ds-reset .ds-comment-body p a {color: #ff0;}
+   #ds-thread #ds-reset .ds-comment-body p a:hover {color: #0ff;}
+   #disqus_thread a {color: #00ffff;}
+  </style>
+  <link rel="stylesheet" href="http://lujun9972.github.io/emacs-document/media/css/main.css" type="text/css"/>
+  <link rel="stylesheet" href="http://lujun9972.github.io/emacs-document/media/css/comment.css" type="text/css"/>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="http://lujun9972.github.io/emacs-document/">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;集思广益</p>
+    <nav class="site-nav">
+      <div class="menu-icon">
+        <svg viewBox="0 0 18 15">
+          <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.031C17.335,0,18,0.665,18,1.484L18,1.484z" fill="#ffff00"/>
+          <path d="M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0c0-0.82,0.665-1.484,1.484-1.484 h15.031C17.335,6.031,18,6.696,18,7.516L18,7.516z" fill="#ffff00"/>
+          <path d="M18,13.516C18,14.335,17.335,15,16.516,15H1.484C0.665,15,0,14.335,0,13.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.031C17.335,12.031,18,12.696,18,13.516L18,13.516z" fill="#ffff00"/>
+        </svg>
+      </div>
+      <ul class="trigger">
+        <li><a href="http://lujun9972.github.io/emacs-document/years/">Years</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/authors/">Authors</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/tags/">Tags</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document">Github</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="http://www.google.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">在Emacs中借助GnuPG与Auth-Source保管你的秘密</h1>
+<div id="table-of-contents">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#orgheadline1">1. Keeping Secrets in Emacs with GnuPG &amp; EasyPG</a></li>
+<li><a href="#orgheadline2">2. GPG v1 versus GPG v2</a></li>
+<li><a href="#orgheadline3">3. Transparent File Cryptography with EasyPG</a></li>
+<li><a href="#orgheadline4">4. Interactive Commands</a></li>
+<li><a href="#orgheadline5">5. Dired</a></li>
+<li><a href="#orgheadline6">6. Disabling External Pin Entry</a></li>
+<li><a href="#orgheadline7">7. Using Keys to Store Secrets</a></li>
+<li><a href="#orgheadline8">8. Creating a key</a></li>
+<li><a href="#orgheadline9">9. Exporting and Re-Importing a Key</a></li>
+<li><a href="#orgheadline10">10. Encrypting Data with a Key</a></li>
+<li><a href="#orgheadline11">11. Storing Credentials with the Auth Source Package</a></li>
+<li><a href="#orgheadline12">12. Debugging Authentication Issues</a></li>
+<li><a href="#orgheadline13">13. Automatic Jabber Login</a></li>
+<li><a href="#orgheadline14">14. Conclusion</a></li>
+</ul>
+</div>
+</div>
+<p>
+用明文存储机密信息可不好. 如果你非常在意你的机密(若你已经被监控起来了,那么你怎么在意都不过分),那么这篇文章中的建议恐怕还远远不能满足你的需求;
+但是对于大多数人来说,用加密的文件来保存机密信息已经足够安全了.
+</p>
+
+<p>
+自然,Emacs有多种方式为你加密.
+</p>
+
+<p>
+Emacs原生支持GnuPG加密.借助一个名为EasyPG的package(或者缩写为epa)可以对文件进行加签/验证,加密/解密等操作.
+我还会告诉你如何使用auth-source这个package(它为不同的加密后端提供了一个统一的接口)来自动登录到各种外部服务上去(需要设置公私密钥).
+</p>
+
+<div id="outline-container-orgheadline1" class="outline-2">
+<h2 id="orgheadline1"><span class="section-number-2">1</span> Keeping Secrets in Emacs with GnuPG &amp; EasyPG</h2>
+<div class="outline-text-2" id="text-1">
+<p>
+GNU Privacy Guard (<a href="https://www.gnupg.org/">GnuPG</a>)是OpenPGP标准的一个实现. 它十分的强大,同时支持对称加密与非对称加密. 你可以用它对对二进制文件或归档文件进行签名,用非对称密钥对文件进行加解密,也可以用对称加密的方法对文件进行加密.
+GPG,你值得拥有.
+</p>
+
+<p>
+而且GnuPG也与Emacs整合的很好,Emacs内建了一个名为EasyPG的package,可以提供基本的GnuPG功能.
+</p>
+
+<p>
+你即能用EasyPG来对文件加签,也能用它来验签,即能用对文件加密也能用来解密,而且同时支持对称和非对称加解密. 
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgheadline2" class="outline-2">
+<h2 id="orgheadline2"><span class="section-number-2">2</span> GPG v1 versus GPG v2</h2>
+<div class="outline-text-2" id="text-2">
+<p>
+若你使用EasyPG时发生错误,告诉你找不到gpg程序,那通常是因为你安装的是第二版的GPG,它的文件名是gpg2. 你可以设置一下 <code>epg-gpg-program</code> 的值:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">setq</span> epg-gpg-program <span style="color: #2d9574;">"gpg2"</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgheadline3" class="outline-2">
+<h2 id="orgheadline3"><span class="section-number-2">3</span> Transparent File Cryptography with EasyPG</h2>
+<div class="outline-text-2" id="text-3">
+<p>
+EasyPG最好用的一个功能是它会在你打开文件时自动解密,然后在保存是自动加密,整个过程对你来说是透明的.
+</p>
+
+<p>
+EasyPG package会添加几个hook到Emacs,它会自动地探测一个文件是否为GnuPG加密过的文件. 变量 <code>auto-mode-alist</code> 决定了Emacs打开某个文件时会进入哪个major mode. 在我这,以 <code>.gpg</code> 结尾的文件被认为是经过GnuPG加密过的文件.
+</p>
+
+<p>
+你可以测试一下,打开一个文件(例如 <code>/tmp/foobar.gpg</code>),写入一些内容,在按下 <code>C-x C-s</code> 保存它. 会发现Emacs提示你选择一个密钥来加密,如果你没有选择任何密钥,则会提示你输入用于对称加密的密码.
+</p>
+
+<p>
+然后你再重新打开这个文件,会发现Emacs提示你输入上次加密时的密码,然后Emacs会对文件进行解密并打开它.
+</p>
+
+<p>
+不仅如此,它还支持嵌套的文件扩展名: 例如打开一个名为 <code>.py.gpg</code> 的文件,Emacs会先对它进行解密然后用普通的python-mode打开它. 对加密过的压缩归档文件也是一样,打开后缀为 <code>.tar.gz.gpg</code> 的文件,Emacs会先解密然后用auto-compression-mode打开它.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgheadline4" class="outline-2">
+<h2 id="orgheadline4"><span class="section-number-2">4</span> Interactive Commands</h2>
+<div class="outline-text-2" id="text-4">
+<p>
+EasyPG有一些方便的快捷键:
+</p>
+
+<p>
+Command                       Description                                     
+M-x epa-list-keys             列出所有私钥/公钥
+M-x epa-list-secret-keysList 
+M-x epa-verify-&lt;region|file&gt;  校验当前region/文件
+M-x epa-sign-&lt;region|file&gt;    对当前region/文件加签
+M-x epa-insert-keys           在buffer中插入一个或多个密钥
+M-x epa-decrypt-&lt;region|file&gt; 解密当前region/文件
+M-x epa-encrypt-&lt;region|file&gt; 加密当前region/文件
+</p>
+
+<p>
+大多数的命令命名方式都遵照一定模式,并且他们的功能也很直观. <code>M-x epa-list-keys</code> 和 <code>M-x epa-list-secret-keys</code> 都会列出你系统中密钥链中的密钥. 
+你也可以用Emacs Secrets package (下面会说到)或系统自带的工具(例如Ubuntu的seahorse)来查看这些密钥.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgheadline5" class="outline-2">
+<h2 id="orgheadline5"><span class="section-number-2">5</span> Dired</h2>
+<div class="outline-text-2" id="text-5">
+<p>
+借助Emacs巧妙的auto-mode-alist体系,你可以在Dired中直接打开.gpg文件,跟你在其他地方打开.gpg文件没什么两样. 不过Dired还为EasyPG提供了一些好用的快捷键:
+</p>
+
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-left" />
+
+<col  class="org-left" />
+</colgroup>
+<thead>
+<tr>
+<th scope="col" class="org-left">Key Binding</th>
+<th scope="col" class="org-left">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="org-left">: d</td>
+<td class="org-left">Decrypt marked or selected</td>
+</tr>
+
+<tr>
+<td class="org-left">: e</td>
+<td class="org-left">Encrypt marked or selected</td>
+</tr>
+
+<tr>
+<td class="org-left">: s</td>
+<td class="org-left">Sign marked or selected</td>
+</tr>
+
+<tr>
+<td class="org-left">: v</td>
+<td class="org-left">Signs the current buffer</td>
+</tr>
+</tbody>
+</table>
+
+<p>
+如果你mark了多个文件,则Dired会应用命令到这些文件上,否则会应用命令到光标所在的文件上.
+</p>
+
+<p>
+要注意:如果你想将多个文件加密成一个.gpg文件,你需要先把这些文件压缩成一个文件:
+mark好要被压缩的文件,再按下 <code>c</code>,然后输入要压缩成的目标文件名. Emacs就会根据目标文件的文件扩展名(.tar.gz, .zip等等)自动选择合适的压缩命令去压缩这些文件,然后你就可以对产生的压缩文件进行加密了.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgheadline6" class="outline-2">
+<h2 id="orgheadline6"><span class="section-number-2">6</span> Disabling External Pin Entry</h2>
+<div class="outline-text-2" id="text-6">
+<p>
+你可以强制让GPG不要用外部工具来读取PIN码. 这在你不希望启用默认的GPG Agent pin entry工具,而希望Emacs来为你管理pin entry时尤其有用.
+</p>
+
+<p>
+有很多中方法都能做到这一步(具体的方法跟你的操作系统发行版与窗口管理器有关),不过最简单的在Emacs中禁用agent info的方法是执行下面代码:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span>setenv <span style="color: #2d9574;">"GPG_AGENT_INFO"</span> nil<span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+这会强制让Emacs用它自己的内部密码提示功能而不会调用外部的pin entry程序来读取PIN码.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgheadline7" class="outline-2">
+<h2 id="orgheadline7"><span class="section-number-2">7</span> Using Keys to Store Secrets</h2>
+<div class="outline-text-2" id="text-7">
+<p>
+NOTE: 请注意,这只是一篇关于Emacs的博文,而不是专业讲安全的文章. 我们只会列出一些如何在Emacs中使用GPG功能的指导意见.
+</p>
+
+<p>
+我之前提到过的,通过对称密码可以透明地加解密文件,操作起来很简单. 但是跟使用非对称加密的方式比较起来还是显得麻烦了一些. 使用非对称密钥加密的好处在于你可以将密钥保存在内存中让Emacs自动加解密文件而无需再次提示你输入密码了.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgheadline8" class="outline-2">
+<h2 id="orgheadline8"><span class="section-number-2">8</span> Creating a key</h2>
+<div class="outline-text-2" id="text-8">
+<p>
+第一步,你需要使用gpg产生一个密钥对:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">gpg --gen-key
+</pre>
+</div>
+
+<p>
+照者提示一步步下去就能产生密钥了. 我强烈推荐你输入一个密码来保护你的密钥!
+</p>
+
+<p>
+你可以通过在Emacs中运行 <code>M-x epa-list-secret-keys</code> 来检查密钥是否加载了.
+</p>
+
+<p>
+你也可以在命令行中运行 <code>gpg --list-secret-keys</code> 来检查密钥是否加载了, 这时你可能会得到类似下面的结果:
+</p>
+
+<pre class="example">
+$ gpg --list-secret-keys
+
+sec   2048R/5DB69AC1 2016-06-13
+uid                  Cosmo Kramer (Kramerica Industries) &lt;kramer@example.com&gt;
+ssb   2048R/02A89A28 2016-06-13
+</pre>
+
+<p>
+当然你也可以使用类似seahorse这类带界面的程序来检查.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgheadline9" class="outline-2">
+<h2 id="orgheadline9"><span class="section-number-2">9</span> Exporting and Re-Importing a Key</h2>
+<div class="outline-text-2" id="text-9">
+<p>
+第二步,将密钥导出到文件中,需要指定密钥持有人的名称,email地址或密钥的ID:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">gpg --armor --export-secret-keys Cosmo Kramer &gt; mykey.asc
+</pre>
+</div>
+
+<p>
+现在你可以在别的机器上重新导入这个key了, but you will also have to trust it again. 你可以传递你的全称(放在引号内)或email地址給gpg,它会帮你选择正确的那个key.
+下面的例子中我在修改该key传递了密钥持有人的全称进去,gpg会自动帮你找出要修改的是哪个密钥:
+</p>
+
+<pre class="example">
+$ gpg --import mykey.asc
+$ gpg --edit-key "Cosmo Kramer"
+gpg&gt; trust
+Your decision? 5
+Do you really want to set this key to ultimate trust? (y/N) y
+gpg&gt; quit
+</pre>
+
+<p>
+现在你已经知道怎么创建一个密钥,也知道如何在不同电脑之间导出/导入密钥了. 但是要注意,若你丢失密钥,则你也就丢失了这些加过密的数据了!
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgheadline10" class="outline-2">
+<h2 id="orgheadline10"><span class="section-number-2">10</span> Encrypting Data with a Key</h2>
+<div class="outline-text-2" id="text-10">
+<p>
+你可以告诉EasyPG自动用哪个密钥来加解密. 只需要设置一下文件局部变量 <code>epa-file-encrypt-to that</code> 就行了.
+</p>
+
+<p>
+下面是一个简单的例子. 创建一个名为you-secrets.el的elips文件,输入下面内容:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"># -*- epa-file-encrypt-to: <span style="color: #4f97d7;">(</span><span style="color: #2d9574;">"kramer@example.com"</span><span style="color: #4f97d7;">)</span> -*-
+
+<span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">setq</span> jabber-account-list ...<span style="color: #4f97d7;">)</span>
+<span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">setq</span> my-secret-password <span style="color: #2d9574;">"rosebud"</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+这里 <code>kramer@example.com</code> 就是我们上面例子中船舰的密钥的email. 这里之所有使用email而不是key ID是因为email更易读一些.
+</p>
+
+<p>
+然后执行 <code>M-x epa-encrypt-file</code> 来加密这个文件,并选择上面那个密钥来加密. 下一次你再保存这个文件时,Emacs会自动选择正确的那个密钥并对它进行加密处理.
+</p>
+
+<p>
+现在你可以在你的 <code>init.el</code> 中加载这个文件了:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span>load-library <span style="color: #2d9574;">"/path/to/your-secrets.el.gpg"</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+Emacs会提示你输入该密钥的保护密码,然后像普通文件那样加载这个elisp文件.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgheadline11" class="outline-2">
+<h2 id="orgheadline11"><span class="section-number-2">11</span> Storing Credentials with the Auth Source Package</h2>
+<div class="outline-text-2" id="text-11">
+<p>
+这部分内容是基于 <code>Using Keys to Store Secrets</code> 之上的.
+</p>
+
+<p>
+<code>Auth Source</code> 为各种常见的后端(例如操作系统的Keychain,本地的~/.authinfo和~/.netrc文件)提供了一个统一的接口.
+</p>
+
+<p>
+很多Emacs package 都用到了 <code>Auth Source</code>, 因为它提供了一个很简单易用的API. 这些Package包括 jabber.el, GNUS, TRAMP, 各种内置的网络相关的函数, LDAP (使得Emacs内置了一个LDAP客户端), 以及 ERC.
+</p>
+
+<p>
+<code>Auth Source</code> 解决了保存某台主机上用户名与密码的问题,并且它还支持多种后端,允许你将证书存放在多个地方.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgheadline12" class="outline-2">
+<h2 id="orgheadline12"><span class="section-number-2">12</span> Debugging Authentication Issues</h2>
+<div class="outline-text-2" id="text-12">
+<p>
+首先我要提一下有关调试的变量. 在没有添加一个中间层的条件下调试认证问题是很困难的一件事情. 要开启调试信息,需要设置变量 <code>auth-source-debug</code>, <code>t</code> 表示启用调试信息, <code>nil</code> 表示禁用调试信息:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">setq</span> auth-source-debug t<span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+这样就会在 <code>*Messages*</code> buffer中显示很多附加的有用的信息. 请一定记得在调试完后把这个值再设置成nil.
+</p>
+
+<p>
+调试时另一个常用的命令是 <code>M-x auth-source-forget-all-cached</code>. Auth source可能会把你在Emacs中的认证关系搞混乱了,执行这个命令会清空所有的缓存认证信息.
+in Emacs; use this command to forget all the cached details.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgheadline13" class="outline-2">
+<h2 id="orgheadline13"><span class="section-number-2">13</span> Automatic Jabber Login</h2>
+<div class="outline-text-2" id="text-13">
+<p>
+下面有一个很常见的工作流: 用jabber.el登录Google Hangouts/Chat.el.
+</p>
+
+<p>
+假设有这么一个jabber账户:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">setq</span> jabber-account-list
+      '<span style="color: #bc6ec5;">(</span><span style="color: #2d9574;">(</span><span style="color: #2d9574;">"&lt;your-gmail-email&gt;"</span>
+         <span style="color: #67b11d;">(</span><span style="color: #4f97d7;">:network-server</span> . <span style="color: #2d9574;">"talk.google.com"</span><span style="color: #67b11d;">)</span>
+         <span style="color: #67b11d;">(</span><span style="color: #4f97d7;">:port</span> . <span style="color: #a45bad;">443</span><span style="color: #67b11d;">)</span>
+         <span style="color: #67b11d;">(</span><span style="color: #4f97d7;">:connection-type</span> . ssl<span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+当你执行 <code>M-x jabber-connect</code> 后,如果顺利话,Emacs要求你输入密码. 如果你不想每次都输入密码,你可以以加密的方式存储密码并且让Emacs自动为你输入密码.
+</p>
+
+<p>
+为了做到这一点,我们需要一个 <code>.authinfo</code> 文件,还要通过某种途径告诉Emacs授权文件的位置. 默认情况下Emacs会尝试 <code>~/.authinfo</code> 等几个地方,不过我比较推荐对授权文件进行加密并将之纳入源代码管理中. 
+你可以通过设置变量 <code>auth-sources</code> 的值来告诉auth-source去哪些地方查找授权文件:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">setq</span> auth-sources
+      '<span style="color: #bc6ec5;">(</span><span style="color: #2d9574;">(</span><span style="color: #4f97d7;">:source</span> <span style="color: #2d9574;">"~/.emacs.d/secrets/.authinfo.gpg"</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+你需要根据实际情况修改上面的路径. 下一步,创建这个授权文件然后添加下面一行内容:
+</p>
+
+<pre class="example">
+machine gmail.com login &lt;your account name&gt; port xmpp password &lt;your secret password&gt;
+</pre>
+
+<p>
+将 <code>&lt;your account name&gt;</code> 替换为你的用户名(只需要用户名,例如是填johndoe而不是johndoe@gmail.com). 将 <code>&lt;your secret password&gt;</code> 替换为你自己的密码,然后保存该文件并选择之前创建的密钥进行加密.
+</p>
+
+<p>
+确定已经设置了 <code>auth-sources</code> 变量的值后,再运行一次 <code>M-x jabber-connect</code>. 如果你的设置无误的话,Emacs会解密你的 <code>.authinfo.gpg</code> 文件(若Emacs没有存储密钥到内存中的话,还会提示你输入你的保护密码),然后根据主机名与用户名从 <code>.authinfo.gpg</code> 文件中找出对应的密码,发送給Jabber.
+</p>
+
+<p>
+如果出错了,请参见上面 <code>Debugging Authentication Issues</code> 部分的内容.
+</p>
+
+<p>
+同样的,你还可以将这种方法应用于你的email,应用于TRAMP(若没有使用SSH密钥的话)以及其他类似的场景中. Emacs会将密钥存储在内存中并且自动用它来进行加解密,而不会一边又一边的要求你输入保护密码.
+</p>
+
+<p>
+另外, <code>auth-sources</code> 变量支持多中校验来源. 你甚至可以可以使用你操作系统中的keychain/agent作为密钥的来源.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgheadline14" class="outline-2">
+<h2 id="orgheadline14"><span class="section-number-2">14</span> Conclusion</h2>
+<div class="outline-text-2" id="text-14">
+<p>
+你的Vogon poetry是安全的,这真是一个好消息. 如你所见,借助GPG以及Emacs的认证机制,可以使得大多数的认证过程变得自动化.
+EasyPG 与 Auth Sources是两个值得学习的强力工具. 事实上,我这里不过是提到了一点皮毛.
+每个人都可能有自己独特的相关配置,所以如果你有什么有趣的,能够节省时间的流程,请告诉我.
+</p>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2016-08-16</span>
+            <span title="last modification date" class="post-info">2016-08-18</span>
+            <span title="tags" class="post-info">:N/A:</span>
+            <span title="author" class="post-info"><a href="mailto:lujun9972 &lt;at&gt; lujun9972-F41">lujun9972</a></span>
+        </div>
+    <script src="http://lujun9972.github.io/emacs-document/media/js/jquery-2.1.3.min.js"></script>
+        <section>
+            <h1>Comments</h1>
+            <div id="comment-wrap">
+                    <a class="disqus_label">使用 Disqus 评论</a>
+                    <a class="ds-label">使用多说评论</a>
+    </ul>
+        <div id="disqus_thread"></div>
+        <script type="text/javascript">
+         //var disqus_developer = 1;
+         var preempt_signal=false;
+         var disqus_identifier = "/blog/2016/08/16/在emacs中借助gnupg与auth-source保管你的秘密/";
+         var disqus_url = "http://lujun9972.github.io/emacs-document/blog/2016/08/16/在emacs中借助gnupg与auth-source保管你的秘密/";
+         var disqus_shortname = 'emacs-document';
+         /* * * DON'T EDIT BELOW THIS LINE * * */
+         (function() {
+             var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+             dsq.src = 'http://' + disqus_shortname + '.disqus.com/embed.js';
+             (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+             $('#disqus_thread').css('display','none');
+         })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+        <div class="ds-thread"></div>
+        <script type="text/javascript">
+         var duoshuoQuery = {short_name:'emacs-document'};
+         (function() {
+             var ds = document.createElement('script');
+             ds.type = 'text/javascript';ds.async = true;
+             ds.src = 'http://static.duoshuo.com/embed.js';
+             ds.charset = 'UTF-8';
+             (document.getElementsByTagName('head')[0]
+           || document.getElementsByTagName('body')[0]).appendChild(ds);
+             $('.ds-thread').css('display','block');
+         })();
+        </script>
+    <script>
+     /* comments */
+     var ego_disqus_thread=$('#disqus_thread');
+     var ego_ds_label=$('.ds-thread');
+     $('.disqus_label').click(function(){
+         ego_disqus_thread.show();
+         ego_ds_label.hide();
+     });
+     $('.ds-label').click(function(){
+         ego_disqus_thread.hide();
+         ego_ds_label.show();
+     });
+    </script>
+        </section>
+    <script src="http://lujun9972.github.io/emacs-document/media/js/main.js"></script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 25.x(<a href="http://orgmode.org">Org mode</a> 8.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:lujun9972 &lt;at&gt; lujun9972-F41">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div></body>
+</html>

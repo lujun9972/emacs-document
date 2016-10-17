@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>EmacSQL简介 - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <style>
+   #ds-thread #ds-reset .ds-comment-body p {color: #ffffff;}
+   #ds-thread #ds-reset .ds-comment-body p a {color: #ff0;}
+   #ds-thread #ds-reset .ds-comment-body p a:hover {color: #0ff;}
+   #disqus_thread a {color: #00ffff;}
+  </style>
+  <link rel="stylesheet" href="http://lujun9972.github.io/emacs-document/media/css/main.css" type="text/css"/>
+  <link rel="stylesheet" href="http://lujun9972.github.io/emacs-document/media/css/comment.css" type="text/css"/>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="http://lujun9972.github.io/emacs-document/">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;集思广益</p>
+    <nav class="site-nav">
+      <div class="menu-icon">
+        <svg viewBox="0 0 18 15">
+          <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.031C17.335,0,18,0.665,18,1.484L18,1.484z" fill="#ffff00"/>
+          <path d="M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0c0-0.82,0.665-1.484,1.484-1.484 h15.031C17.335,6.031,18,6.696,18,7.516L18,7.516z" fill="#ffff00"/>
+          <path d="M18,13.516C18,14.335,17.335,15,16.516,15H1.484C0.665,15,0,14.335,0,13.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.031C17.335,12.031,18,12.696,18,13.516L18,13.516z" fill="#ffff00"/>
+        </svg>
+      </div>
+      <ul class="trigger">
+        <li><a href="http://lujun9972.github.io/emacs-document/years/">Years</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/authors/">Authors</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/tags/">Tags</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document">Github</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="http://www.google.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">EmacSQL简介</h1>
+<div id="table-of-contents">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#orgheadline1">1. High-level SQL Compiler</a></li>
+<li><a href="#orgheadline2">2. Parameters</a></li>
+<li><a href="#orgheadline3">3. Schemas</a></li>
+<li><a href="#orgheadline4">4. Back-ends</a></li>
+<li><a href="#orgheadline5">5. SQLite Implementation Difficulties</a></li>
+<li><a href="#orgheadline6">6. Pseudo-terminals</a></li>
+<li><a href="#orgheadline7">7. A Custom SQLite Binary</a></li>
+<li><a href="#orgheadline8">8. Other Back-ends</a></li>
+<li><a href="#orgheadline9">9. EmacSQL’s Future</a></li>
+</ul>
+</div>
+</div>
+<p>
+昨天我release了第一版的 <a href="https://github.com/skeeto/emacsql">EmacSQL</a>. 我为这个Emacs package已经花费了几周的时间了. EmacSQL 是一个Emacs上的高层SQL数据库抽象接口. 它主要使用SQLite作为后端,目前也支持PostgreSQL和MySQL.
+</p>
+
+<p>
+该package可以<a href="http://melpa.milkbox.net/#/emacsql">通过MELPA安装</a> ,并且安装好后立即就能用了. 它依赖于我上周才添加的<a href="http://nullprogram.com/blog/2014/01/27/">finalizers package</a> .
+</p>
+
+<p>
+虽然这个package依赖于一个非Elisp的组件,SQLite,但对于使用者来说,并不需要关心这个. 当编译该package的Elisp的时候,若系统已经安装了C编译器,则package会自动编译出SQLite执行程序共EmacSQL使用. 否则,会自动下载我预编译好的SQLite执行程序. 理想情况下,EmacSQL的这部分非Elisp组件可以对使用者完全透明,使用者完全可以认为Emacs已经内建了关系型数据库.
+</p>
+
+<p>
+EmacSQL不会去用SQLite的官方命令行程序(即使已经有了也不会取用),原因我会随后解释.
+</p>
+
+<p>
+就好像<a href="http://nullprogram.com/blog/2012/10/31/">Skewer</a> 使我接触到web开发一样, EmacSQL 让我快速学到了很多SQL与关系型数据库的知识. 在开始这个项目前,我对这个领域知之甚少, 但在开发这个项目的过程中,我学到了许多这方面的知识. 创建一个Emacs扩展真是进入一门新领域的快速途径.
+</p>
+
+<p>
+如果你跟我一样完全是个新手,而你又想自学SQLite的SQL,我强烈推荐<a href="http://www.amazon.com/gp/product/0596521189/ref=as_li_qf_sp_asin_tl?ie=UTF8&amp;camp=1789&amp;creative=9325&amp;creativeASIN=0596521189&amp;linkCode=as2&amp;tag=nullprogram-20">Using SQLite</a>这篇文章. 这真是一篇入门精品.
+</p>
+
+<div id="outline-container-orgheadline1" class="outline-2">
+<h2 id="orgheadline1"><span class="section-number-2">1</span> High-level SQL Compiler</h2>
+<div class="outline-text-2" id="text-1">
+<p>
+所谓“high-level”意味着它会帮你拼接SQL语句. EmacSQL是根据一些简单的转换规则来将S表达式转化为SQL语句的. 也就是说,如果你已经懂得SQL了,你应该就能知道EmacSQL的低层运行机理. 下面是一些例子,
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">require</span> '<span style="color: #a45bad;">emacsql</span><span style="color: #4f97d7;">)</span>
+
+<span style="color: #2aa1ae; background-color: #292e34;">;; </span><span style="color: #2aa1ae; background-color: #292e34;">Connect to the database, SQLite in this case:</span>
+<span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">defvar</span> <span style="color: #7590db;">db</span> <span style="color: #bc6ec5;">(</span>emacsql-connect <span style="color: #2d9574;">"~/office.db"</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+
+<span style="color: #2aa1ae; background-color: #292e34;">;; </span><span style="color: #2aa1ae; background-color: #292e34;">Create a table with 3 columns:</span>
+<span style="color: #4f97d7;">(</span>emacsql db <span style="color: #bc6ec5;">[</span><span style="color: #4f97d7;">:create-table</span> patients
+                           <span style="color: #2d9574;">(</span><span style="color: #67b11d;">[</span>name <span style="color: #b1951d;">(</span>id integer <span style="color: #4f97d7;">:primary-key</span><span style="color: #b1951d;">)</span> <span style="color: #b1951d;">(</span>weight float<span style="color: #b1951d;">)</span><span style="color: #67b11d;">]</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">]</span><span style="color: #4f97d7;">)</span>
+
+<span style="color: #2aa1ae; background-color: #292e34;">;; </span><span style="color: #2aa1ae; background-color: #292e34;">Insert a few rows:</span>
+<span style="color: #4f97d7;">(</span>emacsql db <span style="color: #bc6ec5;">[</span><span style="color: #4f97d7;">:insert</span> <span style="color: #4f97d7;">:into</span> patients
+                     <span style="color: #4f97d7;">:values</span> <span style="color: #2d9574;">(</span><span style="color: #67b11d;">[</span><span style="color: #2d9574;">"Jeff"</span> <span style="color: #a45bad;">1000</span> <span style="color: #a45bad;">184.2</span><span style="color: #67b11d;">]</span> <span style="color: #67b11d;">[</span><span style="color: #2d9574;">"Susan"</span> <span style="color: #a45bad;">1001</span> <span style="color: #a45bad;">118.9</span><span style="color: #67b11d;">]</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">]</span><span style="color: #4f97d7;">)</span>
+
+<span style="color: #2aa1ae; background-color: #292e34;">;; </span><span style="color: #2aa1ae; background-color: #292e34;">Query the database:</span>
+<span style="color: #4f97d7;">(</span>emacsql db <span style="color: #bc6ec5;">[</span><span style="color: #4f97d7;">:select</span> <span style="color: #2d9574;">[</span>name id<span style="color: #2d9574;">]</span>
+                     <span style="color: #4f97d7;">:from</span> patients
+                     <span style="color: #4f97d7;">:where</span> <span style="color: #2d9574;">(</span>&lt; weight <span style="color: #a45bad;">150.0</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">]</span><span style="color: #4f97d7;">)</span>
+<span style="color: #2aa1ae; background-color: #292e34;">;; </span><span style="color: #2aa1ae; background-color: #292e34;">=&gt; (("Susan" 1001))</span>
+
+<span style="color: #2aa1ae; background-color: #292e34;">;; </span><span style="color: #2aa1ae; background-color: #292e34;">Queries can be templates, using $s1, $i2, etc. as parameters:</span>
+<span style="color: #4f97d7;">(</span>emacsql db <span style="color: #bc6ec5;">[</span><span style="color: #4f97d7;">:select</span> <span style="color: #2d9574;">[</span>name id<span style="color: #2d9574;">]</span>
+                     <span style="color: #4f97d7;">:from</span> patients
+                     <span style="color: #4f97d7;">:where</span> <span style="color: #2d9574;">(</span>&gt; weight $s1<span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">]</span>
+         <span style="color: #a45bad;">100</span><span style="color: #4f97d7;">)</span>
+<span style="color: #2aa1ae; background-color: #292e34;">;; </span><span style="color: #2aa1ae; background-color: #292e34;">=&gt; (("Jeff" 1000) ("Susan" 1001))</span>
+</pre>
+</div>
+
+<p>
+一个查询就是一个由关键字,标识符,参数和数据组成的数组. 这里参数的作用在于使得使用者无需在运行期动态地组建S表达式.
+</p>
+
+<p>
+将S表达式编译成SQL语句的规则已经列在EmacSQL的文档中了,我这里就不再重复了. 简单来说,lisp关键字会转换成SQL关键字, 要查询的记录信息(row-oriented information)使用数组来表示, 表达式使用list来表示, symbol没有被引用的话则会转换成标识符.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">[</span><span style="color: #4f97d7;">:select</span> <span style="color: #bc6ec5;">[</span>name weight<span style="color: #bc6ec5;">]</span> <span style="color: #4f97d7;">:from</span> patients <span style="color: #4f97d7;">:where</span> <span style="color: #bc6ec5;">(</span>&lt; weight <span style="color: #a45bad;">150.0</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">]</span>
+</pre>
+</div>
+
+<p>
+会被编译成:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sql"><span style="color: #4f97d7; font-weight: bold;">SELECT</span> <span style="color: #4f97d7; font-weight: bold;">name</span>, weight <span style="color: #4f97d7; font-weight: bold;">FROM</span> patients <span style="color: #4f97d7; font-weight: bold;">WHERE</span> weight &lt; <span style="color: #a45bad;">150</span>.<span style="color: #a45bad;">0</span>;
+</pre>
+</div>
+
+<p>
+另外, 任何<a href="http://nullprogram.com/blog/2013/12/30/#almost_everything_prints_readably">可读的lisp值</a> 都能存储到数据库的属性中. 整数被映射出INTEGER型,小数被映射成REAL型, nil被映射为NULL,其他类型的值都以字面量的格式存储为TEXT类型. 当然这种映射关系根据后端的不同而改变.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgheadline2" class="outline-2">
+<h2 id="orgheadline2"><span class="section-number-2">2</span> Parameters</h2>
+<div class="outline-text-2" id="text-2">
+<p>
+以$开头的symbol被看成是参数. 紧跟$的是参数的类型 — identifier (i), scalar (s), vector (v), schema (S) — 最后是参数的位置.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">[</span><span style="color: #4f97d7;">:select</span> <span style="color: #bc6ec5;">[</span>$i1<span style="color: #bc6ec5;">]</span> <span style="color: #4f97d7;">:from</span> $i2 <span style="color: #4f97d7;">:where</span> <span style="color: #bc6ec5;">(</span>&lt; $i3 $s4<span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">]</span>
+</pre>
+</div>
+
+<p>
+若接受三个symbol以及1个整数作为参数: <code>name people age 21</code>, 则会编译成:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sql"><span style="color: #4f97d7; font-weight: bold;">SELECT</span> <span style="color: #4f97d7; font-weight: bold;">name</span> <span style="color: #4f97d7; font-weight: bold;">FROM</span> people <span style="color: #4f97d7; font-weight: bold;">WHERE</span> age &lt; <span style="color: #a45bad;">21</span>;
+</pre>
+</div>
+
+<p>
+数组类型的参数引用的是带插入的行或者IN表达式中的集合.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">[</span><span style="color: #4f97d7;">:insert-into</span> people <span style="color: #bc6ec5;">[</span>name age<span style="color: #bc6ec5;">]</span> <span style="color: #4f97d7;">:values</span> $v1<span style="color: #4f97d7;">]</span>
+</pre>
+</div>
+
+<p>
+若接受了一个由两行组成的list作为参数: <code>(["Jim" 45] ["Jeff" 34])</code>,则会编译成
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sql"><span style="color: #4f97d7; font-weight: bold;">INSERT</span> <span style="color: #4f97d7; font-weight: bold;">INTO</span> people <span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">name</span>, age<span style="color: #4f97d7;">)</span> <span style="color: #4f97d7; font-weight: bold;">VALUES</span> <span style="color: #4f97d7;">(</span><span style="color: #2d9574;">'"Jim"'</span>, <span style="color: #a45bad;">45</span><span style="color: #4f97d7;">)</span>, <span style="color: #4f97d7;">(</span><span style="color: #2d9574;">'"Jeff"'</span>, <span style="color: #a45bad;">34</span><span style="color: #4f97d7;">)</span>;
+</pre>
+</div>
+
+<p>
+还有这个例子:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">[</span><span style="color: #4f97d7;">:select</span> * <span style="color: #4f97d7;">:from</span> tags <span style="color: #4f97d7;">:where</span> <span style="color: #bc6ec5;">(</span>in tag $v1<span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">]</span>
+</pre>
+</div>
+
+<p>
+若接受的参数为 <code>[hiking camping biking]</code>,则会编译成
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sql"><span style="color: #4f97d7; font-weight: bold;">SELECT</span> * <span style="color: #4f97d7; font-weight: bold;">FROM</span> tags <span style="color: #4f97d7; font-weight: bold;">WHERE</span> tag <span style="color: #4f97d7; font-weight: bold;">IN</span> <span style="color: #4f97d7;">(</span><span style="color: #2d9574;">'hiking'</span>, <span style="color: #2d9574;">'camping'</span>, <span style="color: #2d9574;">'biking'</span><span style="color: #4f97d7;">)</span>;
+</pre>
+</div>
+
+<p>
+当写这些S表达式时,记住可以使用命令 <code>emacsql-show-last-sql</code> 来在minibuffer中显示当前S表达式转换成的SQL语句是什么.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgheadline3" class="outline-2">
+<h2 id="orgheadline3"><span class="section-number-2">3</span> Schemas</h2>
+<div class="outline-text-2" id="text-3">
+<p>
+表结构是用列表来表示的,该列表的第一个元素是由列名组成的数组(也就是说,记录信息(row-oriented information)是以数组的形式来表示的). list中剩下的元素表示表格的约束条件. 下面是摘自文档中的一些例子:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #2aa1ae; background-color: #292e34;">;; </span><span style="color: #2aa1ae; background-color: #292e34;">No constraints schema with four columns:</span>
+<span style="color: #4f97d7;">(</span><span style="color: #bc6ec5;">[</span>name id building room<span style="color: #bc6ec5;">]</span><span style="color: #4f97d7;">)</span>
+
+<span style="color: #2aa1ae; background-color: #292e34;">;; </span><span style="color: #2aa1ae; background-color: #292e34;">Add some column constraints:</span>
+<span style="color: #4f97d7;">(</span><span style="color: #bc6ec5;">[</span><span style="color: #2d9574;">(</span>name <span style="color: #4f97d7;">:unique</span><span style="color: #2d9574;">)</span> <span style="color: #2d9574;">(</span>id integer <span style="color: #4f97d7;">:primary-key</span><span style="color: #2d9574;">)</span> building room<span style="color: #bc6ec5;">]</span><span style="color: #4f97d7;">)</span>
+
+<span style="color: #2aa1ae; background-color: #292e34;">;; </span><span style="color: #2aa1ae; background-color: #292e34;">Add some table constraints:</span>
+<span style="color: #4f97d7;">(</span><span style="color: #bc6ec5;">[</span><span style="color: #2d9574;">(</span>name <span style="color: #4f97d7;">:unique</span><span style="color: #2d9574;">)</span> <span style="color: #2d9574;">(</span>id integer <span style="color: #4f97d7;">:primary-key</span><span style="color: #2d9574;">)</span> building room<span style="color: #bc6ec5;">]</span>
+ <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7;">:unique</span> <span style="color: #2d9574;">[</span>building room<span style="color: #2d9574;">]</span><span style="color: #bc6ec5;">)</span>
+ <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7;">:check</span> <span style="color: #2d9574;">(</span>&gt; id <span style="color: #a45bad;">0</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+我尝试过很多种语法来创建EmacSQL数据库,在这些语法中,表示表结构的方式一直没有改变过. 表结构类似于程序中的类型定义,而行则是这些类型的是一个实例, 因此使用类似 <code>defstrcut</code> 这样的结构来表示表结构是可行的.
+</p>
+
+<p>
+这种结构表达式可以被 <code>$S</code> 类的参数所替代("S"表示Schema).
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">defconst</span> <span style="color: #7590db;">foo-schema-people</span>
+  '<span style="color: #bc6ec5;">(</span><span style="color: #2d9574;">[</span><span style="color: #67b11d;">(</span>person-id integer <span style="color: #4f97d7;">:primary-key</span><span style="color: #67b11d;">)</span> name age<span style="color: #2d9574;">]</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+
+<span style="color: #2aa1ae; background-color: #292e34;">;; </span><span style="color: #2aa1ae; background-color: #292e34;">...</span>
+
+<span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">defun</span> <span style="color: #bc6ec5; font-weight: bold;">foo-init</span> <span style="color: #bc6ec5;">(</span>db<span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span>emacsql db <span style="color: #2d9574;">[</span><span style="color: #4f97d7;">:create-table</span> $i1 $S2<span style="color: #2d9574;">]</span> 'people foo-schema-people<span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgheadline4" class="outline-2">
+<h2 id="orgheadline4"><span class="section-number-2">4</span> Back-ends</h2>
+<div class="outline-text-2" id="text-4">
+<p>
+目前为止我们所讨论的任何东西都只与SQL声明编译器有关. SQL声明编译器与后端实现无关,这些后端被用于处理SQL声明编译产生的字符串.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgheadline5" class="outline-2">
+<h2 id="orgheadline5"><a id="j5q7j1903ah0"></a><span class="section-number-2">5</span> SQLite Implementation Difficulties</h2>
+<div class="outline-text-2" id="text-5">
+<p>
+一年多前,我用Elisp写过<a href="http://nullprogram.com/blog/2012/12/29/">一个pastebin webapp</a>. 我本想用SQLite作为后端来存储粘贴的内容,但是发现SQLite的命令行程序(sqlite3)很难与Emacs进行整合. 难点在于,除了"tcl"之外,所有的输出模式都很模糊. 输出可能是以"csv"格式输出的. TEXT属性值中可能包含换行符,这使得一条记录可能被分成了许多行. 输出中可能包含类似sqlite3的提示符这样的内容,这样就无法搞清楚sqlite3是否已经将结果完全输出了. 最终我认为sqlite3根本不适合与Emacs进行整合.
+</p>
+
+<p>
+最近alexbenjm和Andres Ramirez<a href="http://nullprogram.com/blog/2013/09/09/">开始讨论 </a>在Elfeed中使用SQLie来作为后端. 这个讨论给我以灵感,让我用另一种方式来处理SQLite输出的这种模糊性: 只使用TEXT来存储Elisp值的输出字面量! 只要将 <code>print-escape-newlines</code> 设置为非nil, 则TEXT值就不会被分隔为多行了,并且我还能使用 <code>read</code> 来从sqlite3的输出中还原原数据. 所有的sqlite3的输出模式一下子清晰起来了.
+</p>
+
+<p>
+然而,在解决了这个重大问题之后,我发现了一个更大的难题: GNU Readline. Linux package仓库中的sqlite3程序几乎都在编译时开启了Readline支持了.开启Readline支持使得该工具更易于人使用,但对于Emacs来说却是个大难题.
+</p>
+
+<p>
+First, sqlite3 the command shell is not up to the same standards as SQLite the database. 在我使用SQLite的那么点时间里,我就发现了该程序的多个BUG. 其中一个是因为sqlite3这个程序并未很好地与GNU Readline整合在一起. sqlite3中有一个 <code>.echo</code> 元命令可以设置是否回显输入的命令(该功能可能在某些情况下很有用,但对我来说无用). 该BUG产生的原因是该回显命令与GNU Readline的eaho是分开的,在激活Readline的情况下,若开启 <code>.echo</code> 则实际上会回显两次. 若关闭 <code>.echo</code> 则回显一次.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgheadline6" class="outline-2">
+<h2 id="orgheadline6"><span class="section-number-2">6</span> Pseudo-terminals</h2>
+<div class="outline-text-2" id="text-6">
+<p>
+在某些条件下,比如当通过管道而不是PTY进行通讯时,Readline无法被激活. 这个问题本应该被解决的, 当Readline被禁用的后果是sqlite3大量的缓存输出内容. 这使得无法与sqlite3进行正常的交互. 更糟糕的是,在Windows平台上<a href="http://sqlite.1065341.n5.nabble.com/Command-line-shell-not-flushing-stderr-when-interactive-td73340.html">错误信息也可能被缓存</a>, 这样一来sqlite3的出错信息都可能长时间不显示(这是sqlite3的又一个bug).
+</p>
+
+<p>
+除了Readline无法正常输出的问题之外,还有一个问题是Readline无法接收到控制字符. ASCII表中头32个字符被认为是控制字符. 不处于raw模式下的伪终端(PTY)会立即对输入的控制字符做出反应. There’s no escaping them.
+</p>
+
+<p>
+Emacs默认通过PTY与其子进程进行通讯(这可能是早期设计上的一个错误), 这就限制住了可以被发送的数据范围. 你可以自己试一下. 执行 <code>M-x sql-sqlite</code> (该命令是Emacs内置的) 然后试着发送任意包含 <code>0x1C</code> 字符的字符串. 你可以通过按下 <code>C-q C-\</code> 来输入这个特殊字符,但发送这个字符会使得子进程挂掉.
+</p>
+
+<p>
+有两种方法解决这个特殊字符的问题. 一种方法是使用管道进行通讯(方法是设置 <code>process-connection-type</code> 为t),因为管道并不会响应控制字符. 然而由于上面提到的缓存问题,因此这种方法不适用于sqlite3.
+</p>
+
+<p>
+另一种解决方法是将PTY置于raw模式下. 不幸的是,Emacs中并没有函数来实现这个功能,你不得不通过调用 <code>stty</code> 程序来完成这个动作. 当然, 由于需要在同一个PTY上运行 <code>stty</code> ,因此我们需要用到 <code>start-process-shell-command</code> 命令.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span>start-process-shell-command name buffer <span style="color: #2d9574;">"stty raw &amp;&amp; &lt;your command&gt;"</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+Windows平台既没有 <code>stty</code> 命令,也没有PTY(或任何类似PTY的东西),因此在运行进程前你需要先检查一下所处的操作系统. 然而即使是这种方法也不适用于sqlite3,因为Readline本身就会响应这些控制字符,而且没有办法禁止掉.
+</p>
+
+<p>
+有一个叫做<a href="https://github.com/mhayashi1120/Emacs-esqlite">esqlite</a> 的package,也是SQLite的前端. 它就是基于sqlite3命令的,因此深受这些问题的侵扰.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgheadline7" class="outline-2">
+<h2 id="orgheadline7"><span class="section-number-2">7</span> A Custom SQLite Binary</h2>
+<div class="outline-text-2" id="text-7">
+<p>
+由于sqlite3如此不可靠，我设计了自己的协议并开发了相关的外置程序. 该程序只是一小段C代码，它接受一个SQL字符串然后将查询结果转换为S表达式的格式返回. 借助这段C程序,我不再需要强制存储lisp值的字面量了,但我依然保留了这一范式. 因为这样做可以简化这段C程序的实现, 更重要的是,我可以完全依赖Emacs的 <code>reader</code> 来解析查询结果. 这使得Emacs能够与子进程尽可能快地进行通讯. 毕竟 <code>reader</code> 要比任何Elisp程序更快.
+</p>
+
+<p>
+我之前提到过的,当具备条件的情况下,安装程序会直接编译这段C程序,否则会从我的服务器上直接下载预编译好的程序(当然,只支持常见的那几个平台). 也就是说,不管你用的什么平台,EmacSQL至少都有一种可用的后端.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgheadline8" class="outline-2">
+<h2 id="orgheadline8"><span class="section-number-2">8</span> Other Back-ends</h2>
+<div class="outline-text-2" id="text-8">
+<p>
+EmacSQL同时支持PostgreSQL 与 MySQL,当然,前提是已经安装了响应的客户端程序(psql/mysql). 两者处理起来都比sqlite3要好的多,通过调用 <code>stty</code> 设置PTY为raw mode,无需任何其他的帮助就能很好的解析两者的输出. 两种后端都通过了所有的单元测试,所以,技术上来说,它们都能正常的工具.
+</p>
+
+<p>
+要用它们来实现本文一开始的那些例子, 需要先require <code>emacsql-psql</code> 或 <code>emacsql-mysql</code>,然后替换 <code>emacsql-connect</code> 为 <code>emacsql-psql</code> 或 <code>emacsql-mysql</code> 的构造函数(参数也需要作响应改变). 所有这三个构造函数都返回一个emacsql-connection对象,并且共用同一个API.
+</p>
+
+<p>
+EmacSQL目前只为这几个数据库提供了统一的接口. 所有操作数据库连接的函数都是泛型函数(EIEIO),这样,改变后端只会影响到程序的SQL声明而已. 例如, if you use  SQLite-ism (dynamic typing) it won’t translate to either of the other databases should they be swapped in.
+</p>
+
+<p>
+以后我会再写写关于数据库连接的API及其实现方式. 除了处理PTY这部分内容外,其实还蛮简单的. 比如MySQL的实现只有区区80行代码而已.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgheadline9" class="outline-2">
+<h2 id="orgheadline9"><span class="section-number-2">9</span> EmacSQL’s Future</h2>
+<div class="outline-text-2" id="text-9">
+<p>
+我希望EmacSQL能成为可供其他package依赖的可信任的数据库解决方案. 截止到目前未知,已经有两个package使用了EmacSQL: pastebin demo 和 Elfeed, 我希望有更多人使用这个package而不是自己去hacker数据库.
+</p>
+
+<p>
+我已经重新创建了一个分支用于使用EmacSQL是重新实现其数据库操作. 总有一天,我会使用它作为Elfeed与数据库交互的主要方式. EmacSQL所使用的SQLite开启了 full-text search engine, 这使得Elfeed的搜索API可以即强大又快速. 目前来看,主要的问题是Elfeed的数据库API与ACID数据库事务不那么兼容 — 这是我的短视所造成的(shortsightedness on my part)!
+</p>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2016-07-06</span>
+            <span title="last modification date" class="post-info">2016-07-06</span>
+            <span title="tags" class="post-info">:N/A:</span>
+            <span title="author" class="post-info"><a href="mailto:lujun9972 &lt;at&gt; lujun9972-F41">lujun9972</a></span>
+        </div>
+    <script src="http://lujun9972.github.io/emacs-document/media/js/jquery-2.1.3.min.js"></script>
+        <section>
+            <h1>Comments</h1>
+            <div id="comment-wrap">
+                    <a class="disqus_label">使用 Disqus 评论</a>
+                    <a class="ds-label">使用多说评论</a>
+    </ul>
+        <div id="disqus_thread"></div>
+        <script type="text/javascript">
+         //var disqus_developer = 1;
+         var preempt_signal=false;
+         var disqus_identifier = "/blog/2016/07/06/emacsql简介/";
+         var disqus_url = "http://lujun9972.github.io/emacs-document/blog/2016/07/06/emacsql简介/";
+         var disqus_shortname = 'emacs-document';
+         /* * * DON'T EDIT BELOW THIS LINE * * */
+         (function() {
+             var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+             dsq.src = 'http://' + disqus_shortname + '.disqus.com/embed.js';
+             (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+             $('#disqus_thread').css('display','none');
+         })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+        <div class="ds-thread"></div>
+        <script type="text/javascript">
+         var duoshuoQuery = {short_name:'emacs-document'};
+         (function() {
+             var ds = document.createElement('script');
+             ds.type = 'text/javascript';ds.async = true;
+             ds.src = 'http://static.duoshuo.com/embed.js';
+             ds.charset = 'UTF-8';
+             (document.getElementsByTagName('head')[0]
+           || document.getElementsByTagName('body')[0]).appendChild(ds);
+             $('.ds-thread').css('display','block');
+         })();
+        </script>
+    <script>
+     /* comments */
+     var ego_disqus_thread=$('#disqus_thread');
+     var ego_ds_label=$('.ds-thread');
+     $('.disqus_label').click(function(){
+         ego_disqus_thread.show();
+         ego_ds_label.hide();
+     });
+     $('.ds-label').click(function(){
+         ego_disqus_thread.hide();
+         ego_ds_label.show();
+     });
+    </script>
+        </section>
+    <script src="http://lujun9972.github.io/emacs-document/media/js/main.js"></script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 25.x(<a href="http://orgmode.org">Org mode</a> 8.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:lujun9972 &lt;at&gt; lujun9972-F41">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div></body>
+</html>

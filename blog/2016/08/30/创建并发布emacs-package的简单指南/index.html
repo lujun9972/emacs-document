@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>创建并发布Emacs package的简单指南 - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <style>
+   #ds-thread #ds-reset .ds-comment-body p {color: #ffffff;}
+   #ds-thread #ds-reset .ds-comment-body p a {color: #ff0;}
+   #ds-thread #ds-reset .ds-comment-body p a:hover {color: #0ff;}
+   #disqus_thread a {color: #00ffff;}
+  </style>
+  <link rel="stylesheet" href="http://lujun9972.github.io/emacs-document/media/css/main.css" type="text/css"/>
+  <link rel="stylesheet" href="http://lujun9972.github.io/emacs-document/media/css/comment.css" type="text/css"/>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="http://lujun9972.github.io/emacs-document/">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;集思广益</p>
+    <nav class="site-nav">
+      <div class="menu-icon">
+        <svg viewBox="0 0 18 15">
+          <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.031C17.335,0,18,0.665,18,1.484L18,1.484z" fill="#ffff00"/>
+          <path d="M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0c0-0.82,0.665-1.484,1.484-1.484 h15.031C17.335,6.031,18,6.696,18,7.516L18,7.516z" fill="#ffff00"/>
+          <path d="M18,13.516C18,14.335,17.335,15,16.516,15H1.484C0.665,15,0,14.335,0,13.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.031C17.335,12.031,18,12.696,18,13.516L18,13.516z" fill="#ffff00"/>
+        </svg>
+      </div>
+      <ul class="trigger">
+        <li><a href="http://lujun9972.github.io/emacs-document/years/">Years</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/authors/">Authors</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/tags/">Tags</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document">Github</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="http://www.google.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">创建并发布Emacs package的简单指南</h1>
+<div id="table-of-contents">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#orgheadline2">1. Emacs as an Emacs Lisp IDE</a>
+<ul>
+<li><a href="#orgheadline1">1.1. A few recommendations</a></li>
+</ul>
+</li>
+<li><a href="#orgheadline5">2. Making a Custom Compilation Mode</a>
+<ul>
+<li><a href="#orgheadline3">2.1. Compilation buffer</a></li>
+<li><a href="#orgheadline4">2.2. Custom compilation mode</a></li>
+</ul>
+</li>
+<li><a href="#orgheadline8">3. Running Test Commands</a>
+<ul>
+<li><a href="#orgheadline6">3.1. Find project root</a></li>
+<li><a href="#orgheadline7">3.2. Customize configuration</a></li>
+</ul>
+</li>
+<li><a href="#orgheadline14">4. Generating and Running Compile Command</a>
+<ul>
+<li><a href="#orgheadline9">4.1. Check for unsaved buffers</a></li>
+<li><a href="#orgheadline10">4.2. Clean up test buffer</a></li>
+<li><a href="#orgheadline11">4.3. Bind values</a></li>
+<li><a href="#orgheadline12">4.4. Run test command</a></li>
+<li><a href="#orgheadline13">4.5. Expose interface to users</a></li>
+</ul>
+</li>
+<li><a href="#orgheadline17">5. Distributing on MELPA</a>
+<ul>
+<li><a href="#orgheadline15">5.1. Format the package file</a></li>
+<li><a href="#orgheadline16">5.2. Add your recipe</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+<p>
+我<a href="https://spin.atomicobject.com/2016/01/26/webstorm-nodejs-development/">最近写了篇帖子</a> 是关于用<a href="https://www.gnu.org/software/emacs">Emacs</a> 作为JavaScript开发环境的. 其中一个着重要解决的问题是如何在Emacs中方便的运行JavaScript测试. 我经常使用TDD的开发方式,因此需要经常跳出编辑器去运行测试案例,这让我觉得很麻烦.
+</p>
+
+<p>
+我知道Emacs是完全可以做到这一点的,因为已经有了类似的运行测试的mode了,比如<a href="https://github.com/pezra/rspec-mode">RSpec-mode</a>. 基于此,我决定去学习一下<a href="https://www.gnu.org/software/emacs/manual/html_node/elisp">Emacs Lisp</a> 然后自己写一个<a href="https://mochajs.org/">Mocha</a> 测试器. 
+在这个过程中,我学到了许多关于开发Emacs package的知识,并且最终开发出了一个有用的工具. 我想我有必要分享一下我学到的东西了.
+</p>
+
+<p>
+关于这部分的内容有很多,我们这主要关注三个方面知识: 将Emacs作为Lisp IDE,编写简答的package,以及发布该package給他人使用.
+</p>
+
+<div id="outline-container-orgheadline2" class="outline-2">
+<h2 id="orgheadline2"><span class="section-number-2">1</span> Emacs as an Emacs Lisp IDE</h2>
+<div class="outline-text-2" id="text-1">
+<p>
+毋庸置疑, Emacs本身就很适合作为Emacs Lisp代码的开发环境. 它可以很轻易的配置成像IDE那样包括自动补全,文档提示,整合调试以及REPL等功能.
+</p>
+</div>
+
+<div id="outline-container-orgheadline1" class="outline-3">
+<h3 id="orgheadline1"><span class="section-number-3">1.1</span> A few recommendations</h3>
+<div class="outline-text-3" id="text-1-1">
+<p>
+虽说Emacs本身就内置了这些IDE的特性,但我还是强烈推荐安装一些第三方的package,比如 <a href="http://company-mode.github.io/">company-mode</a> (提供自动补全功能) and <a href="http://www.flycheck.org/en/latest/">Flycheck</a> (提供实时语法监测功能).
+</p>
+
+<p>
+我也推荐开启内置的eldoc-mode, 它在你编写代码时为各种函数与symbol提供文档与签名的提示信息.
+</p>
+
+<p>
+最后,你应该熟悉那些内置的Emacs Lisp调试与执行相关的函数. 要测试一段代码,你可以开启内置的 <code>Lisp-interaction-mode</code>, <code>*scratch*</code> buffer在默认情况下会开启该mode. 在该mode下,你可以粘贴一段Emacs Lisp代码然后按下 <code>C-x C-e</code> 来运行这段代码并看到运行的结果.
+</p>
+
+<p>
+Emacs还内置了一个<a href="https://www.gnu.org/software/emacs/manual/html_node/elisp/Edebug.html">Edebug</a> 工具, 它可以单步调试Emacs Lisp代码. 它有很多的功能,但是我最常用的是它的 <code>edebug-defun</code> 函数. 它会在函数开始的地方设置一个断点,并在运行到这个函数时触发该断点.
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgheadline5" class="outline-2">
+<h2 id="orgheadline5"><span class="section-number-2">2</span> Making a Custom Compilation Mode</h2>
+<div class="outline-text-2" id="text-2">
+<p>
+Mocha是一个命令行工具, Emacs内置有很多函数来运行外部的命令行程序.
+</p>
+</div>
+
+<div id="outline-container-orgheadline3" class="outline-3">
+<h3 id="orgheadline3"><span class="section-number-3">2.1</span> Compilation buffer</h3>
+<div class="outline-text-3" id="text-2-1">
+<p>
+在Emacs中最贴近测试运行器的东西应该就是 <code>compilation buffer</code> 了. 它会运行一个外部的命令行进程然后将输出结果显示在buffer中. 这就很适合于运行像编译程序或测试运行器这一类的程序了. 它甚至还有高亮错误与跳转到出错位置的能力.
+</p>
+
+<p>
+只需要像下面这样运行 <code>M-x compile</code> 就好了:
+</p>
+
+
+<div class="figure">
+<p><img src="http://g.recordit.co/wWAwkTuVH2.gif" alt="wWAwkTuVH2.gif" />
+</p>
+</div>
+
+<p>
+这种用法比较适用于执行那些固定不变的静态编译命令(默认为make -k). 但是它不是那些适合于作为测试启动器,因为测试启动器有如下要求:
+</p>
+
+<ol class="org-ol">
+<li>它需要在一个固定的目录下运行一个测试脚本(M-x compile会使用当前文件所在的目录作为运行脚本的工作目录).</li>
+<li>测试时需要能传递一个动态配置项(例如要测试的文件)給测试脚本</li>
+</ol>
+</div>
+</div>
+
+<div id="outline-container-orgheadline4" class="outline-3">
+<h3 id="orgheadline4"><span class="section-number-3">2.2</span> Custom compilation mode</h3>
+<div class="outline-text-3" id="text-2-2">
+<p>
+最终的解决方案是自己创建一个可以接受参数并运行交互式函数的compilation mode. 这个实现起来其实蛮容易的. 只需要几行代码就行了:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">require</span> '<span style="color: #a45bad;">compile</span><span style="color: #4f97d7;">)</span>
+
+...
+
+<span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">defvar</span> <span style="color: #7590db;">node-error-regexp-alist</span>
+  `<span style="color: #bc6ec5;">(</span><span style="color: #2d9574;">(</span>,node-error-regexp <span style="color: #a45bad;">1</span> <span style="color: #a45bad;">2</span> <span style="color: #a45bad;">3</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+
+<span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">defun</span> <span style="color: #bc6ec5; font-weight: bold;">mocha-compilation-filter</span> <span style="color: #bc6ec5;">()</span>
+  <span style="color: #2aa1ae;">"Filter function for compilation output."</span>
+  <span style="color: #bc6ec5;">(</span>ansi-color-apply-on-region compilation-filter-start <span style="color: #2d9574;">(</span>point-max<span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+
+<span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">define-compilation-mode</span> mocha-compilation-mode <span style="color: #2d9574;">"Mocha"</span>
+  <span style="color: #2aa1ae;">"Mocha compilation mode."</span>
+  <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">progn</span>
+    <span style="color: #2d9574;">(</span>set <span style="color: #67b11d;">(</span>make-local-variable 'compilation-error-regexp-alist<span style="color: #67b11d;">)</span> node-error-regexp-alist<span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span>add-hook 'compilation-filter-hook 'mocha-compilation-filter nil t<span style="color: #2d9574;">)</span>
+    <span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+这些代码可能有些难懂(托Lisp的福!), 其实它做的事情很简单. 我们使用内置的 <code>define-compilation-mode</code> 宏来定义一个名为 <code>mocha-compilation-mode</code> 的compilation-mode, 并且做了以下两件事情:
+</p>
+
+<ol class="org-ol">
+<li>给它传递了一个正则表达式来将<a href="https://nodejs.org/en">Node.js</a> 产生的错误输出映射成文件,行号和列号.</li>
+<li>增加了一个hook来正确解析ANSI escape code.</li>
+</ol>
+
+<p>
+第一件事让我们可以快速跳转到测试失败的地方. 第二件事可以让输出好看一些.
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgheadline8" class="outline-2">
+<h2 id="orgheadline8"><span class="section-number-2">3</span> Running Test Commands</h2>
+<div class="outline-text-2" id="text-3">
+<p>
+现在我们自定义出了一个能正确显示命令输出的compilation mode了, 下一步我们需要定义一个测试命令,并让它能够在我们自定义的compilation mode下被调用. 要做到这一步需要经过以下几步.
+</p>
+</div>
+
+<div id="outline-container-orgheadline6" class="outline-3">
+<h3 id="orgheadline6"><span class="section-number-3">3.1</span> Find project root</h3>
+<div class="outline-text-3" id="text-3-1">
+<p>
+许多命令行工具都要求是在项目的根目录下运行的. 好在项目的根目录一般都会有一些特定的文件或目录存在(比如版本控制目录).
+由于通过寻找特定文件/目录来确定项目根目录位置的需求太常见了,因此Emacs内建了一个名为 <code>locate-dominating-file</code> 的函数来递归地沿着目录树向上搜索特定的文件名称.
+该函数的文档很好的说明了如何使用该函数:
+</p>
+
+<blockquote>
+<p>
+(locate-dominating-file FILE NAME)
+Look up the directory hierarchy from FILE for a directory containing NAME. Stop at the first parent
+directory containing a file NAME, and return the directory. Return nil if not found. Instead of a string,
+NAME can also be a predicate taking one argument (a directory) and returning a non-nil value if that
+directory is the one for which we’re looking.
+</p>
+</blockquote>
+</div>
+</div>
+
+<div id="outline-container-orgheadline7" class="outline-3">
+<h3 id="orgheadline7"><span class="section-number-3">3.2</span> Customize configuration</h3>
+<div class="outline-text-3" id="text-3-2">
+<p>
+测试与编译毕竟是不一样的,编译每次的编译命令都是一样的,然而测试时需要动态的生成测试命令. 好在Emacs内置的 <code>Customize</code> 为package提供了一套很棒的配置界面.
+<code>Customize</code> 预定义了很多宏,这些宏可以用来为package定义配置参数,并提供了一套图形界面来配置这些参数.
+</p>
+
+<p>
+例如,下面定义了一些Mocha的配置项:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">defgroup</span> <span style="color: #ce537a; font-weight: bold;">mocha</span> nil
+  <span style="color: #2aa1ae;">"Tools for running mocha tests."</span>
+  <span style="color: #4f97d7;">:group</span> 'tools<span style="color: #4f97d7;">)</span>
+
+<span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">defcustom</span> <span style="color: #7590db;">mocha-which-node</span> <span style="color: #2d9574;">"node"</span>
+  <span style="color: #2aa1ae;">"The path to the node executable to run."</span>
+  <span style="color: #4f97d7;">:type</span> 'string
+  <span style="color: #4f97d7;">:group</span> 'mocha<span style="color: #4f97d7;">)</span>
+
+<span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">defcustom</span> <span style="color: #7590db;">mocha-command</span> <span style="color: #2d9574;">"mocha"</span>
+  <span style="color: #2aa1ae;">"The path to the mocha command to run."</span>
+  <span style="color: #4f97d7;">:type</span> 'string
+  <span style="color: #4f97d7;">:group</span> 'mocha<span style="color: #4f97d7;">)</span>
+
+<span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">defcustom</span> <span style="color: #7590db;">mocha-environment-variables</span> nil
+  <span style="color: #2aa1ae;">"Environment variables to run mocha with."</span>
+  <span style="color: #4f97d7;">:type</span> 'string
+  <span style="color: #4f97d7;">:group</span> 'mocha<span style="color: #4f97d7;">)</span>
+
+<span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">defcustom</span> <span style="color: #7590db;">mocha-options</span> <span style="color: #2d9574;">"--recursive --reporter dot"</span>
+  <span style="color: #2aa1ae;">"Command line options to pass to mocha."</span>
+  <span style="color: #4f97d7;">:type</span> 'string
+  <span style="color: #4f97d7;">:group</span> 'mocha<span style="color: #4f97d7;">)</span>
+
+<span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">defcustom</span> <span style="color: #7590db;">mocha-debug-port</span> <span style="color: #2d9574;">"5858"</span>
+  <span style="color: #2aa1ae;">"The port number to debug mocha tests at."</span>
+  <span style="color: #4f97d7;">:type</span> 'string
+  <span style="color: #4f97d7;">:group</span> 'mocha<span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+这些配置项的配置界面如下所示:
+</p>
+
+<p>
+<a href="https://spin.atomicobject.com/wp-content/uploads/20160514211809/Screen-Shot-2016-05-14-at-7.04.02-PM-1024x393.png">GUI interface for configuring our package</a>
+</p>
+
+<p>
+由于许多的配置项是用来配置项目信息而不是全局信息的,因此Emacs还支持通过一个名为 <code>.dir-locals.el</code> 的文件来为每个目录设置自己的配置信息.
+<code>.dir-locals.el</code> 文件的内容大致如下所示:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #bc6ec5;">(</span>nil . <span style="color: #2d9574;">(</span>
+         <span style="color: #67b11d;">(</span>mocha-which-node . <span style="color: #2d9574;">"/Users/ajs/.nvm/versions/node/v4.2.2/bin/node"</span><span style="color: #67b11d;">)</span>
+         <span style="color: #67b11d;">(</span>mocha-command . <span style="color: #2d9574;">"node_modules/.bin/mocha"</span><span style="color: #67b11d;">)</span>
+         <span style="color: #67b11d;">(</span>mocha-environment-variables . <span style="color: #2d9574;">"NODE_ENV=test"</span><span style="color: #67b11d;">)</span>
+         <span style="color: #67b11d;">(</span>mocha-options . <span style="color: #2d9574;">"--recursive --reporter dot -t 5000"</span><span style="color: #67b11d;">)</span>
+         <span style="color: #67b11d;">(</span>mocha-project-test-directory . <span style="color: #2d9574;">"test"</span><span style="color: #67b11d;">)</span>
+         <span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+上面这段代码可能有点难懂. 这样设置的效果是,如果你的Emacs工作目录处于该 <code>.dir-locals.el</code> 文件的同级目录或子目录下时,Emacs会使用 <code>.dir-locals.el</code> 中配置的信息而不是全局的配置信息.
+</p>
+
+<p>
+我们定义好了这些配置项后,很容易就能写出个函数来拼装这些配置信息成一个测试命令了!
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">defun</span> <span style="color: #bc6ec5; font-weight: bold;">mocha-generate-command</span> <span style="color: #bc6ec5;">(</span>debug <span style="color: #ce537a; font-weight: bold;">&amp;optional</span> mocha-file test<span style="color: #bc6ec5;">)</span>
+  <span style="color: #2aa1ae;">"The test command to run.</span>
+<span style="color: #2aa1ae;">If DEBUG is true, then make this a debug command.</span>
+<span style="color: #2aa1ae;">If MOCHA-FILE is specified run just that file otherwise run</span>
+<span style="color: #2aa1ae;">MOCHA-PROJECT-TEST-DIRECTORY.</span>
+<span style="color: #2aa1ae;">IF TEST is specified run mocha with a grep for just that test."</span>
+  <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">let</span> <span style="color: #2d9574;">(</span><span style="color: #67b11d;">(</span>path <span style="color: #b1951d;">(</span><span style="color: #4f97d7; font-weight: bold;">or</span> mocha-file mocha-project-test-directory<span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span>
+        <span style="color: #67b11d;">(</span>target <span style="color: #b1951d;">(</span><span style="color: #4f97d7; font-weight: bold;">if</span> test <span style="color: #4f97d7;">(</span>concat <span style="color: #2d9574;">"--grep \""</span> test <span style="color: #2d9574;">"\" "</span><span style="color: #4f97d7;">)</span> <span style="color: #2d9574;">""</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span>
+        <span style="color: #67b11d;">(</span>node-command <span style="color: #b1951d;">(</span>concat mocha-which-node <span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">if</span> debug <span style="color: #bc6ec5;">(</span>concat <span style="color: #2d9574;">" --debug="</span> mocha-debug-port<span style="color: #bc6ec5;">)</span> <span style="color: #2d9574;">""</span><span style="color: #4f97d7;">)</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span>
+        <span style="color: #67b11d;">(</span>options <span style="color: #b1951d;">(</span>concat mocha-options <span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">if</span> debug <span style="color: #2d9574;">" -t 21600000"</span><span style="color: #4f97d7;">)</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span>concat mocha-environment-variables <span style="color: #2d9574;">" "</span>
+            node-command <span style="color: #2d9574;">" "</span>
+            mocha-command <span style="color: #2d9574;">" "</span>
+            options <span style="color: #2d9574;">" "</span>
+            target
+            path<span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgheadline14" class="outline-2">
+<h2 id="orgheadline14"><span class="section-number-2">4</span> Generating and Running Compile Command</h2>
+<div class="outline-text-2" id="text-4">
+<p>
+现在我们可以配置测试命令并且还能找出项目的根目录了, 下一步就是在之前自定义的compilation mode中运行测试命令了.
+下面我会向你展示实现该功能的最关键的那些代码,我将这些代码分成几个部分并逐一进行讲解.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">defun</span> <span style="color: #bc6ec5; font-weight: bold;">mocha-run</span> <span style="color: #bc6ec5;">(</span><span style="color: #ce537a; font-weight: bold;">&amp;optional</span> mocha-file test<span style="color: #bc6ec5;">)</span>
+  <span style="color: #2aa1ae;">"Run mocha in a compilation buffer.</span>
+<span style="color: #2aa1ae;">If MOCHA-FILE is specified run just that file otherwise run</span>
+<span style="color: #2aa1ae;">MOCHA-PROJECT-TEST-DIRECTORY.</span>
+<span style="color: #2aa1ae;">IF TEST is specified run mocha with a grep for just that test."</span>
+  <span style="color: #bc6ec5;">(</span>save-some-buffers <span style="color: #2d9574;">(</span>not compilation-ask-about-save<span style="color: #2d9574;">)</span>
+                     <span style="color: #2d9574;">(</span><span style="color: #4f97d7; font-weight: bold;">when</span> <span style="color: #67b11d;">(</span>boundp 'compilation-save-buffers-predicate<span style="color: #67b11d;">)</span>
+                       compilation-save-buffers-predicate<span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span>
+
+  <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">when</span> <span style="color: #2d9574;">(</span>get-buffer <span style="color: #2d9574;">"*mocha tests*"</span><span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span>kill-buffer <span style="color: #2d9574;">"*mocha tests*"</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">let</span> <span style="color: #2d9574;">(</span><span style="color: #67b11d;">(</span>test-command-to-run <span style="color: #b1951d;">(</span>mocha-generate-command nil mocha-file test<span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span> <span style="color: #67b11d;">(</span>root-dir <span style="color: #b1951d;">(</span>mocha-find-project-root<span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span><span style="color: #4f97d7; font-weight: bold;">with-current-buffer</span> <span style="color: #67b11d;">(</span>get-buffer-create <span style="color: #2d9574;">"*mocha tests*"</span><span style="color: #67b11d;">)</span>
+      <span style="color: #67b11d;">(</span><span style="color: #4f97d7; font-weight: bold;">setq</span> default-directory root-dir<span style="color: #67b11d;">)</span>
+      <span style="color: #67b11d;">(</span>compilation-start test-command-to-run 'mocha-compilation-mode <span style="color: #b1951d;">(</span><span style="color: #4f97d7; font-weight: bold;">lambda</span> <span style="color: #4f97d7;">(</span>m<span style="color: #4f97d7;">)</span> <span style="color: #4f97d7;">(</span>buffer-name<span style="color: #4f97d7;">)</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+哇塞! 这份代码看起来挺难懂的,让我们一点一点来分析.
+</p>
+</div>
+
+<div id="outline-container-orgheadline9" class="outline-3">
+<h3 id="orgheadline9"><span class="section-number-3">4.1</span> Check for unsaved buffers</h3>
+<div class="outline-text-3" id="text-4-1">
+<p>
+该函数作的第一件事就是检查是否还有未保存的buffer存在,如果存在则提示用于先保存. 
+这项工作看起来挺复杂的,不过对于这种常用的操作,Emacs只需要寥寥数行就能搞定.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span>save-some-buffers <span style="color: #bc6ec5;">(</span>not compilation-ask-about-save<span style="color: #bc6ec5;">)</span>
+                   <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">when</span> <span style="color: #2d9574;">(</span>boundp 'compilation-save-buffers-predicate<span style="color: #2d9574;">)</span>
+                     compilation-save-buffers-predicate<span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgheadline10" class="outline-3">
+<h3 id="orgheadline10"><span class="section-number-3">4.2</span> Clean up test buffer</h3>
+<div class="outline-text-3" id="text-4-2">
+<p>
+下一步我们通过搜索运行测试的那个buffer,来看它是否还在运行上一个测试. 若还在运行上一个测试,则我们直接杀掉它另起一个新测试.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">when</span> <span style="color: #bc6ec5;">(</span>get-buffer <span style="color: #2d9574;">"*mocha tests*"</span><span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span>kill-buffer <span style="color: #2d9574;">"*mocha tests*"</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgheadline11" class="outline-3">
+<h3 id="orgheadline11"><span class="section-number-3">4.3</span> Bind values</h3>
+<div class="outline-text-3" id="text-4-3">
+<p>
+之后,正戏开始了. 我们一开始先设置了两个值:一个时我们要调用的测试命令,另一个是项目的根目录地址. 这两个值都通过上面定义的代码计算出来的.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">let</span> <span style="color: #bc6ec5;">(</span><span style="color: #2d9574;">(</span>test-command-to-run <span style="color: #67b11d;">(</span>mocha-generate-command nil mocha-file test<span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span> <span style="color: #2d9574;">(</span>root-dir <span style="color: #67b11d;">(</span>mocha-find-project-root<span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span>
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgheadline12" class="outline-3">
+<h3 id="orgheadline12"><span class="section-number-3">4.4</span> Run test command</h3>
+<div class="outline-text-3" id="text-4-4">
+<p>
+然后,我们真正运行测试命令. 分三步走:
+</p>
+
+<ol class="org-ol">
+<li>创建并切换到一个buffer中,该buffer就是我们测试的运行环境.</li>
+<li>更改工作目录到项目根路径.</li>
+<li>在自定义的compilation mode中运行测试命令.</li>
+</ol>
+
+<p>
+这三步就对应着代码中的最后三行:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">with-current-buffer</span> <span style="color: #bc6ec5;">(</span>get-buffer-create <span style="color: #2d9574;">"*mocha tests*"</span><span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">setq</span> default-directory root-dir<span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span>compilation-start test-command-to-run 'mocha-compilation-mode <span style="color: #2d9574;">(</span><span style="color: #4f97d7; font-weight: bold;">lambda</span> <span style="color: #67b11d;">(</span>m<span style="color: #67b11d;">)</span> <span style="color: #67b11d;">(</span>buffer-name<span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span><span style="color: #e0211d; text-decoration: overline;">))</span>
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgheadline13" class="outline-3">
+<h3 id="orgheadline13"><span class="section-number-3">4.5</span> Expose interface to users</h3>
+<div class="outline-text-3" id="text-4-5">
+<p>
+现在我们有了运行测试命令的代码了,我们还需要将之暴露給用户使用. Emacs使用interactive functions来实现这一点, interactive function可以被用户通过 "M-x 函数名"或热键的方式调用.
+</p>
+
+<p>
+要让一个函数变得可交互, 你只需要将 <code>(interactive)</code> 这句话放在函数体的最开头就行了,像这样:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #2aa1ae; background-color: #292e34;">;;;</span><span style="color: #2aa1ae; background-color: #292e34;">###</span><span style="color: #dc752f; background-color: #292b2e;">autoload</span>
+<span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">defun</span> <span style="color: #bc6ec5; font-weight: bold;">mocha-test-file</span> <span style="color: #bc6ec5;">()</span>
+  <span style="color: #2aa1ae;">"Test the current file."</span>
+  <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">interactive</span><span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span>mocha-run <span style="color: #2d9574;">(</span>buffer-file-name<span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+习惯上我们常常会将 <code>;;;###autoload</code> 这个特殊的注释放在函数前面,这个注释会帮助其他引用你package的Emacs文件找到函数定义的位置,这样就可以直接使用该函数(例如你可以为它绑定一个热键)而不用先加载package了.
+</p>
+
+<p>
+一旦某个函数被定义为可交互的,它就可以通过 <code>M-x 函数名</code> 的方式被用户所调用.
+</p>
+
+<p>
+<a href="https://raw.githubusercontent.com/scottaj/mocha.el/master/mocha.png">Interact</a>
+</p>
+
+<p>
+自此所有工作就完成了. 仅仅几个函数,我们就为我们的开发环境创造出了一个高度可定制化的测试器.
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgheadline17" class="outline-2">
+<h2 id="orgheadline17"><span class="section-number-2">5</span> Distributing on MELPA</h2>
+<div class="outline-text-2" id="text-5">
+<p>
+创建了自己的package后,你想不想把它分享给大家使用呢? Emacs内建了一个package管理器使得你可以很容易向大家分享你的package. 
+该package管理器支持多种不同的仓库,因此要想发布你的package,只需要将你的package放到其中一个仓库中就行了.
+</p>
+
+<p>
+比较常见的三个package仓库有<a href="http://elpa.gnu.org/">ELPA</a>, <a href="https://marmalade-repo.org/">Marmalade</a>, 和<a href="http://melpa.org/">MELPA</a>. ELPA是GNU官方的仓库,Emacs天生支持该仓库. 相比之下Marmalade 和 MELPA 都是第三方的仓库. 
+各个仓库之间都有一些不同之处,最大的不同在于它们对版权的处理方式.
+</p>
+
+<p>
+ELPA 和 Marmalade 都要求所有的package都遵守GPL 或 GPL-兼容的 协议. 而且, ELPA还要求你签署一份 <a href="http://www.gnu.org/licenses/why-assign.en.html">FSF 版权申明</a>. MELPA则对你的版权没有要求,不过它会对所有新增的package都进行代码审核以保障质量.
+</p>
+
+<p>
+你可以自由选择把自己的pacakge放到哪个仓库上去,我自己选择的MELPA仓库,因此我这里就说说把package放到这个仓库的流程吧.
+</p>
+
+<p>
+把package放到MELPA中有两个基本步骤.
+</p>
+</div>
+
+<div id="outline-container-orgheadline15" class="outline-3">
+<h3 id="orgheadline15"><span class="section-number-3">5.1</span> Format the package file</h3>
+<div class="outline-text-3" id="text-5-1">
+<p>
+首先,你需要安装一定的Emacs Lisp惯例来组织你的package文件, 需要增加一个描述package的头以及其他一些内容.
+在编写package文件时很推荐开启 <a href="http://www.flycheck.org/en/latest/">Flycheck</a>, 它会将所有缺失的必须内容标记成错误然后引导你逐一添加这些内容. 
+添加这些内容是很有必要的,因此Emacs package管理器会将这些内容作为元数据来解析.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgheadline16" class="outline-3">
+<h3 id="orgheadline16"><span class="section-number-3">5.2</span> Add your recipe</h3>
+<div class="outline-text-3" id="text-5-2">
+<p>
+组织好你的代码之后,你需要在Github上forke <a href="https://github.com/melpa/melpa">MELPA project</a>  然后为你的package添加一份recipe. 
+MELPA有文档告诉你如何配置复杂的package,但是对于简单的单文件package, 编写recipe很简单.
+</p>
+
+<p>
+Mocha runner的receipt看起来如下所示:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span>mocha
+ <span style="color: #4f97d7;">:repo</span> <span style="color: #2d9574;">"scottaj/mocha.el"</span>
+ <span style="color: #4f97d7;">:fetcher</span> github<span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+就这么简单,仅仅是一个指向Github仓库的路径而已. 添加完了recipe之后,你就可以给MELLPA提交pull request了. 自然有人会审查你的package,也许还会提出一些改动的建议.
+所有这些完成之后,你的pull request就会合并到MELPA上去了,MELPA会定期build然后发布你的package. 
+而且MELPA会直接从你的源代码仓库中拉取代码的,因此你更新package后也无需对MELPA作任何操作. 它会自动拉取最新版本的代码.
+</p>
+
+<p>
+至此,这篇创建并发布Emacs package的简单指南就完结了. 你可以在 <a href="https://github.com/scottaj/mocha.el">here</a> 找到上例中的 Mocha.el package,也可以在 <a href="https://github.com/scottaj/new-emacs-config">这里</a> 看到我的Emacs配置信息. 
+如果你有疑问,欢迎留言!
+</p>
+</div>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2016-08-30</span>
+            <span title="last modification date" class="post-info">2016-08-30</span>
+            <span title="tags" class="post-info">:N/A:</span>
+            <span title="author" class="post-info"><a href="mailto:lujun9972 &lt;at&gt; lujun9972-F41">lujun9972</a></span>
+        </div>
+    <script src="http://lujun9972.github.io/emacs-document/media/js/jquery-2.1.3.min.js"></script>
+        <section>
+            <h1>Comments</h1>
+            <div id="comment-wrap">
+                    <a class="disqus_label">使用 Disqus 评论</a>
+                    <a class="ds-label">使用多说评论</a>
+    </ul>
+        <div id="disqus_thread"></div>
+        <script type="text/javascript">
+         //var disqus_developer = 1;
+         var preempt_signal=false;
+         var disqus_identifier = "/blog/2016/08/30/创建并发布emacs-package的简单指南/";
+         var disqus_url = "http://lujun9972.github.io/emacs-document/blog/2016/08/30/创建并发布emacs-package的简单指南/";
+         var disqus_shortname = 'emacs-document';
+         /* * * DON'T EDIT BELOW THIS LINE * * */
+         (function() {
+             var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+             dsq.src = 'http://' + disqus_shortname + '.disqus.com/embed.js';
+             (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+             $('#disqus_thread').css('display','none');
+         })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+        <div class="ds-thread"></div>
+        <script type="text/javascript">
+         var duoshuoQuery = {short_name:'emacs-document'};
+         (function() {
+             var ds = document.createElement('script');
+             ds.type = 'text/javascript';ds.async = true;
+             ds.src = 'http://static.duoshuo.com/embed.js';
+             ds.charset = 'UTF-8';
+             (document.getElementsByTagName('head')[0]
+           || document.getElementsByTagName('body')[0]).appendChild(ds);
+             $('.ds-thread').css('display','block');
+         })();
+        </script>
+    <script>
+     /* comments */
+     var ego_disqus_thread=$('#disqus_thread');
+     var ego_ds_label=$('.ds-thread');
+     $('.disqus_label').click(function(){
+         ego_disqus_thread.show();
+         ego_ds_label.hide();
+     });
+     $('.ds-label').click(function(){
+         ego_disqus_thread.hide();
+         ego_ds_label.show();
+     });
+    </script>
+        </section>
+    <script src="http://lujun9972.github.io/emacs-document/media/js/main.js"></script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 25.x(<a href="http://orgmode.org">Org mode</a> 8.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:lujun9972 &lt;at&gt; lujun9972-F41">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div></body>
+</html>

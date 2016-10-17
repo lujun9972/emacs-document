@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>为Emacs增加新语言支持 - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <style>
+   #ds-thread #ds-reset .ds-comment-body p {color: #ffffff;}
+   #ds-thread #ds-reset .ds-comment-body p a {color: #ff0;}
+   #ds-thread #ds-reset .ds-comment-body p a:hover {color: #0ff;}
+   #disqus_thread a {color: #00ffff;}
+  </style>
+  <link rel="stylesheet" href="http://lujun9972.github.io/emacs-document/media/css/main.css" type="text/css"/>
+  <link rel="stylesheet" href="http://lujun9972.github.io/emacs-document/media/css/comment.css" type="text/css"/>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="http://lujun9972.github.io/emacs-document/">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;集思广益</p>
+    <nav class="site-nav">
+      <div class="menu-icon">
+        <svg viewBox="0 0 18 15">
+          <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.031C17.335,0,18,0.665,18,1.484L18,1.484z" fill="#ffff00"/>
+          <path d="M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0c0-0.82,0.665-1.484,1.484-1.484 h15.031C17.335,6.031,18,6.696,18,7.516L18,7.516z" fill="#ffff00"/>
+          <path d="M18,13.516C18,14.335,17.335,15,16.516,15H1.484C0.665,15,0,14.335,0,13.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.031C17.335,12.031,18,12.696,18,13.516L18,13.516z" fill="#ffff00"/>
+        </svg>
+      </div>
+      <ul class="trigger">
+        <li><a href="http://lujun9972.github.io/emacs-document/years/">Years</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/authors/">Authors</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/tags/">Tags</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document">Github</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="http://www.google.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">为Emacs增加新语言支持</h1>
+<div id="table-of-contents">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#orgheadline1">1. 入门</a></li>
+<li><a href="#orgheadline2">2. 完全的语法高亮</a></li>
+<li><a href="#orgheadline3">3. 缩进</a></li>
+<li><a href="#orgheadline4">4. 实时检查</a></li>
+<li><a href="#orgheadline5">5. 补全</a></li>
+<li><a href="#orgheadline6">6. Eldoc</a></li>
+<li><a href="#orgheadline7">7. 整合REPL</a></li>
+<li><a href="#orgheadline8">8. Polish</a></li>
+</ul>
+</div>
+</div>
+<p>
+能否编写一个major mode是是否能称为elisp hacker的分水岭. 你早晚都会遇到一种编程语言或者一种配置格式是Emacs尚不支持的. 原因可能是它们是才出现不久,也可能是因为它们太小众了.
+</p>
+
+<p>
+最终,你会决定卷起袖子开始填坑. 那么你该如何编写一个major mode呢? 怎样才算是一个好的major mode呢?
+</p>
+
+<div id="outline-container-orgheadline1" class="outline-2">
+<h2 id="orgheadline1"><span class="section-number-2">1</span> 入门</h2>
+<div class="outline-text-2" id="text-1">
+<p>
+创建一个最少功能的major mode,你只需要设置syntax table即可. 只要你的mode能高亮出注释和字符串,那就是有用的
+</p>
+
+<p>
+下面是一个最简化的JS mode:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">defconst</span> <span style="color: #7590db;">my-js-mode-syntax-table</span>
+  <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">let</span> <span style="color: #2d9574;">(</span><span style="color: #67b11d;">(</span>table <span style="color: #b1951d;">(</span>make-syntax-table<span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span>
+    <span style="color: #2aa1ae; background-color: #292e34;">;; </span><span style="color: #2aa1ae; background-color: #292e34;">' is a string delimiter</span>
+    <span style="color: #2d9574;">(</span>modify-syntax-entry ?' <span style="color: #2d9574;">"\""</span> table<span style="color: #2d9574;">)</span>
+    <span style="color: #2aa1ae; background-color: #292e34;">;; </span><span style="color: #2aa1ae; background-color: #292e34;">" is a string delimiter too</span>
+    <span style="color: #2d9574;">(</span>modify-syntax-entry ?\" <span style="color: #2d9574;">"\""</span> table<span style="color: #2d9574;">)</span>
+
+    <span style="color: #2aa1ae; background-color: #292e34;">;; </span><span style="color: #2aa1ae; background-color: #292e34;">/ is punctuation, but // is a comment starter</span>
+    <span style="color: #2d9574;">(</span>modify-syntax-entry ?/ <span style="color: #2d9574;">". 12"</span> table<span style="color: #2d9574;">)</span>
+    <span style="color: #2aa1ae; background-color: #292e34;">;; </span><span style="color: #2aa1ae; background-color: #292e34;">\n is a comment ender</span>
+    <span style="color: #2d9574;">(</span>modify-syntax-entry ?\n <span style="color: #2d9574;">"&gt;"</span> table<span style="color: #2d9574;">)</span>
+    table<span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+
+<span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">define-derived-mode</span> <span style="color: #bc6ec5; font-weight: bold;">my-js-mode</span> prog-mode <span style="color: #2d9574;">"Simple JS Mode"</span>
+  <span style="color: #4f97d7;">:syntax-table</span> my-js-mode-syntax-table
+  <span style="color: #bc6ec5;">(</span>font-lock-fontify-buffer<span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+Here’s the result:
+<img src="http://www.wilfred.me.uk/assets/simple_js_mode.png" alt="simple_js_mode.png" />
+</p>
+
+<p>
+看起来并没有作什么工作,但对于配置文件来说,一般够用了.
+</p>
+
+<p>
+恭喜你, 你现在已经是一名elisp hacker了! 将你的major mode发布到MELPA上吧,这样大家可以使用并贡献給你的新mode.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgheadline2" class="outline-2">
+<h2 id="orgheadline2"><span class="section-number-2">2</span> 完全的语法高亮</h2>
+<div class="outline-text-2" id="text-2">
+<p>
+从这里开始,存在一个很大的扩展空间了. 你需要看一下 <a href="http://www.wilfred.me.uk/blog/2014/09/27/the-definitive-guide-to-syntax-highlighting/">sophisticated syntax highlighting</a> ,这篇文章囊括了一门语言的所有语法说明.
+</p>
+
+<p>
+随着你的major mode变得越来越复杂, 你应该开始考虑如何对它进行测试了. 虽说许多major mode确实都没有测试,但是像你这么一位自重的hacker是很乐意看到bug被修复的(but a self-respecting hacker like you likes bugs to stay fixed).
+</p>
+
+<p>
+第一步是创建一个包含各种特殊语法情况的案例文件然后打开它. 这种方式很繁杂,最终你会想用程序来进行测试. <a href="https://github.com/lunaryorn/puppet-mode/blob/1813c7bc46f178aeab5d78d5268dda0dd756c305/test/puppet-mode-test.el#L107">puppet-mode就是一个很好的例子</a>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgheadline3" class="outline-2">
+<h2 id="orgheadline3"><span class="section-number-2">3</span> 缩进</h2>
+<div class="outline-text-2" id="text-3">
+<p>
+下一步该处理缩进的问题了. 用于希望Emacs在任何状态下都能正确地缩进代码. 你需要检查光标附近的语法然后计算出当前的嵌套层级.
+</p>
+
+<p>
+为了计算当前的嵌套层级,你往往需要从光标当前位置向后搜索整个buffer,并计算出现 <code>{</code> (或其他等价的作用域分隔符)的次数. 然后再根据嵌套层级调整当前行的缩进位置(一般是将嵌套层级乘于 <code>my-mode-tab-width</code>). 若你仔细的处理了字符串和注释中的 <code>{</code> ,这种方式往往能行.
+</p>
+
+<p>
+还有一种方法, Emacs提供了<a href="https://www.gnu.org/software/emacs/manual/html_node/elisp/SMIE.html">Simple Minded Indentation Engine (SMIE).</a> 你只需要写好BNF语法,然后你就能生成基础的缩进与移动命令了.
+</p>
+<blockquote>
+<p>
+You could be a total lunatic, and Emacs has to make you happy.
+</p>
+
+<p>
+– Steve Yegge on indentation
+</p>
+</blockquote>
+
+<p>
+在实际中,对什么才是正确的缩进是有争议的,因此为了适应不同的缩进风格,你可以需要提供一些配置项供用户自己调整. 若一切正常的话,你应该能做: 到从一个现存的项目中打开一个大文件,然后运行 <code>(indent-region (point-min) (point-max))</code>, 结果缩进并不会有什么改变.
+</p>
+
+<p>
+缩进的逻辑测试起来很简单,你可以参见<a href="https://github.com/JuliaLang/julia/blob/76df7f48b3956de7d2eb07a15c995c9304d5361f/contrib/julia-mode.el#L441">julia-mode</a> 中的例子. 你还需要测试在大文件中缩进是否足够快速,因为一不小心就可能应用了缓慢的算法.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgheadline4" class="outline-2">
+<h2 id="orgheadline4"><span class="section-number-2">4</span> 实时检查</h2>
+<div class="outline-text-2" id="text-4">
+<p>
+若能为 <code>flycheck</code> 添加一个linter那必是极好的. 然而即使尚没有成熟的lint工具,能够实时高亮语法错误也不错.
+</p>
+
+<p>
+<a href="https://github.com/Wilfred/flycheck-pyflakes">flycheck-pyflakes</a> 标示出未用的变量
+<img src="http://www.wilfred.me.uk/assets/flycheck_python.png" alt="flycheck_python.png" />
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgheadline5" class="outline-2">
+<h2 id="orgheadline5"><span class="section-number-2">5</span> 补全</h2>
+<div class="outline-text-2" id="text-5">
+<p>
+一个好的major mode能够提供自动补全的功能. 你可以通过编写 <a href="http://company-mode.github.io/">company</a> 后端来为major mode提供补全的能力. 下面这些例子也许能给你一些灵感:
+</p>
+
+<p>
+<code>company-clang</code> (<code>company</code> 的一部分)使用 <code>Clang</code> 来发现结构体成员:
+<img src="http://www.wilfred.me.uk/assets/c_member_completion.png" alt="c_member_completion.png" />
+</p>
+
+<p>
+<a href="https://github.com/randomphrase/company-c-headers">company-c-headers</a> 搜索本地文件系统来提供补全C头文件的建议
+<img src="http://www.wilfred.me.uk/assets/c_header_completion.png" alt="c_header_completion.png" />
+</p>
+
+<p>
+<a href="https://github.com/Wilfred/pip-requirements.el">pip-requirements</a> 在internet上搜索可用的package列表
+<img src="http://www.wilfred.me.uk/assets/pip_library_completion.png" alt="pip_library_completion.png" />
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgheadline6" class="outline-2">
+<h2 id="orgheadline6"><span class="section-number-2">6</span> Eldoc</h2>
+<div class="outline-text-2" id="text-6">
+<p>
+<a href="http://www.gnu.org/software/emacs/manual/html_node/emacs/Lisp-Doc.html">Eldoc</a> 是一个在minibuffer显示光标所在内容相关信息的minor mode,一般被用于提示函数前面或变量类型,但你可以用它来提示任何一样东西.
+</p>
+
+<p>
+假设你你的major mode能进行一些静态分析, 使用eldoc来显示上下文相关信息是一种很好的方式.
+</p>
+
+<p>
+用eldoc显示elisp中的docstrings:
+<img src="http://www.wilfred.me.uk/assets/elisp_eldoc.png" alt="elisp_eldoc.png" />
+</p>
+
+<p>
+用<a href="https://github.com/nflath/c-eldoc">c-eldoc</a> 显示光标所在函数的函数原型:
+<img src="http://www.wilfred.me.uk/assets/c_eldoc.png" alt="c_eldoc.png" />
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgheadline7" class="outline-2">
+<h2 id="orgheadline7"><span class="section-number-2">7</span> 整合REPL</h2>
+<div class="outline-text-2" id="text-7">
+<p>
+最后,最完美的major mode会允许你直接在Emacs中以交互的方式运行代码.
+</p>
+
+<p>
+Emacs提供了一个 <code>comint-mode</code>,该mode允许你自定义解析器,并在Emacs中运行该解析器. 许多major modes,尤其那些Emacs自带的major mode,都是继承自comint-mode的.
+</p>
+
+<p>
+像<a href="https://github.com/clojure-emacs/cider">cider</a> 和 <a href="https://github.com/capitaomorte/sly">sly</a> 这样的项目整合REPL的程序甚至比comint-mode还要高. 这些包允许你通过解释器进程查询文档字符串,进行自动补全,宏扩展等等其他很多内容.
+</p>
+
+<p>
+cider将Emacs和Clojure REPL完美的整合在一起了: 
+<img src="http://www.wilfred.me.uk/assets/cider.png" alt="cider.png" />
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgheadline8" class="outline-2">
+<h2 id="orgheadline8"><span class="section-number-2">8</span> Polish</h2>
+<div class="outline-text-2" id="text-8">
+<p>
+Emacs一开始就内建支持C语言编程,而且 <a href="https://github.com/emacs-mirror/emacs/commits/master/lisp/progmodes/cc-mode.el">这种支持直到2015年还在不断的改进</a>! 尽早发布,经常发布,你会创造精品.
+</p>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2016-06-28</span>
+            <span title="last modification date" class="post-info">2016-06-28</span>
+            <span title="tags" class="post-info">:N/A:</span>
+            <span title="author" class="post-info"><a href="mailto:lujun9972 &lt;at&gt; lujun9972-F41">lujun9972</a></span>
+        </div>
+    <script src="http://lujun9972.github.io/emacs-document/media/js/jquery-2.1.3.min.js"></script>
+        <section>
+            <h1>Comments</h1>
+            <div id="comment-wrap">
+                    <a class="disqus_label">使用 Disqus 评论</a>
+                    <a class="ds-label">使用多说评论</a>
+    </ul>
+        <div id="disqus_thread"></div>
+        <script type="text/javascript">
+         //var disqus_developer = 1;
+         var preempt_signal=false;
+         var disqus_identifier = "/blog/2016/06/28/为emacs增加新语言支持/";
+         var disqus_url = "http://lujun9972.github.io/emacs-document/blog/2016/06/28/为emacs增加新语言支持/";
+         var disqus_shortname = 'emacs-document';
+         /* * * DON'T EDIT BELOW THIS LINE * * */
+         (function() {
+             var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+             dsq.src = 'http://' + disqus_shortname + '.disqus.com/embed.js';
+             (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+             $('#disqus_thread').css('display','none');
+         })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+        <div class="ds-thread"></div>
+        <script type="text/javascript">
+         var duoshuoQuery = {short_name:'emacs-document'};
+         (function() {
+             var ds = document.createElement('script');
+             ds.type = 'text/javascript';ds.async = true;
+             ds.src = 'http://static.duoshuo.com/embed.js';
+             ds.charset = 'UTF-8';
+             (document.getElementsByTagName('head')[0]
+           || document.getElementsByTagName('body')[0]).appendChild(ds);
+             $('.ds-thread').css('display','block');
+         })();
+        </script>
+    <script>
+     /* comments */
+     var ego_disqus_thread=$('#disqus_thread');
+     var ego_ds_label=$('.ds-thread');
+     $('.disqus_label').click(function(){
+         ego_disqus_thread.show();
+         ego_ds_label.hide();
+     });
+     $('.ds-label').click(function(){
+         ego_disqus_thread.hide();
+         ego_ds_label.show();
+     });
+    </script>
+        </section>
+    <script src="http://lujun9972.github.io/emacs-document/media/js/main.js"></script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 25.x(<a href="http://orgmode.org">Org mode</a> 8.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:lujun9972 &lt;at&gt; lujun9972-F41">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div></body>
+</html>

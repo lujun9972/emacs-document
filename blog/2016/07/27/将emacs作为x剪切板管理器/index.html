@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>将Emacs作为X剪切板管理器 - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <style>
+   #ds-thread #ds-reset .ds-comment-body p {color: #ffffff;}
+   #ds-thread #ds-reset .ds-comment-body p a {color: #ff0;}
+   #ds-thread #ds-reset .ds-comment-body p a:hover {color: #0ff;}
+   #disqus_thread a {color: #00ffff;}
+  </style>
+  <link rel="stylesheet" href="http://lujun9972.github.io/emacs-document/media/css/main.css" type="text/css"/>
+  <link rel="stylesheet" href="http://lujun9972.github.io/emacs-document/media/css/comment.css" type="text/css"/>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="http://lujun9972.github.io/emacs-document/">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;集思广益</p>
+    <nav class="site-nav">
+      <div class="menu-icon">
+        <svg viewBox="0 0 18 15">
+          <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.031C17.335,0,18,0.665,18,1.484L18,1.484z" fill="#ffff00"/>
+          <path d="M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0c0-0.82,0.665-1.484,1.484-1.484 h15.031C17.335,6.031,18,6.696,18,7.516L18,7.516z" fill="#ffff00"/>
+          <path d="M18,13.516C18,14.335,17.335,15,16.516,15H1.484C0.665,15,0,14.335,0,13.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.031C17.335,12.031,18,12.696,18,13.516L18,13.516z" fill="#ffff00"/>
+        </svg>
+      </div>
+      <ul class="trigger">
+        <li><a href="http://lujun9972.github.io/emacs-document/years/">Years</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/authors/">Authors</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/tags/">Tags</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document">Github</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="http://www.google.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">将Emacs作为X剪切板管理器</h1>
+<p>
+一直以来,我都是使用clipit(parcellite的克隆版本)作为X环境下的剪切板管理器(X clipboard manager). 但是我发现当有一个剪切板管理器运行时,Emacs会出现一个<a href="https://github.com/emacs-helm/helm/issues/1157">bug</a>, 这逼着我去寻找clipit的替代品.
+我如愿以偿地找到了一个名为<a href="https://github.com/bburns/clipmon">clipmon</a>的package, 它工作的相对还不错,但是美中不足的是,它也有一个 <a href="https://debbugs.gnu.org/cgi/bugreport.cgi?bug=22214">bug</a>.
+而且,看起来在Emacs中监测X剪切板的唯一方式似乎只能由Emacs主动去检查X剪切板中的内容. 我不是很喜欢这种每隔一两秒就由Emacs检查一次X剪切板的方案. 我的替代方案是将检查剪切板的动作移出Emacs,由shell脚本来完成.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #2aa1ae; background-color: #292e34;">#</span><span style="color: #2aa1ae; background-color: #292e34;">!/bin/</span><span style="color: #4f97d7; font-weight: bold;">sh</span>
+
+<span style="color: #7590db;">occ</span>=$<span style="color: #4f97d7;">(</span><span style="color: #fa8072;">xclip</span> -sel clip -o | sed <span style="color: #2d9574;">'s/[\"]/\\&amp;/g'</span><span style="color: #4f97d7;">)</span>
+
+<span style="color: #4f97d7; font-weight: bold;">while</span> sleep <span style="color: #a45bad;">2</span>; <span style="color: #4f97d7; font-weight: bold;">do</span>
+    <span style="color: #7590db;">ncc</span>=$<span style="color: #4f97d7;">(</span><span style="color: #fa8072;">xclip</span> -sel clip -o | sed <span style="color: #2d9574;">'s/[\"]/\\&amp;/g'</span><span style="color: #4f97d7;">)</span>
+    <span style="color: #4f97d7; font-weight: bold;">if</span> <span style="color: #4f97d7;">[</span> <span style="color: #2d9574;">"${occ}"</span> != <span style="color: #2d9574;">"${ncc}"</span> <span style="color: #4f97d7;">]</span>; <span style="color: #4f97d7; font-weight: bold;">then</span>
+        emacsclient -e <span style="color: #2d9574;">"(kill-new \"${ncc}\")"</span>
+        <span style="color: #7590db;">occ</span>=$<span style="color: #4f97d7;">{</span><span style="color: #7590db;">ncc</span><span style="color: #4f97d7;">}</span>
+    <span style="color: #4f97d7; font-weight: bold;">fi</span>
+<span style="color: #4f97d7; font-weight: bold;">done</span>
+</pre>
+</div>
+
+<p>
+这是一个简单而有效的解决方案,但是它依然要不断的探测剪切板的内容. 若能有一个事件驱动的解决方案就好了. 我的Emacs经历让我有股冲动去为X试着写一个on-clipboard-change hook, 但这个工作量就太大了.
+</p>
+
+<p>
+一般来讲, 除了Emacs之外,我只用另外两个应用(一个web浏览器,一个终端模拟器),而且这两款应用都是可定制的.
+这使得每次我从这些应用中拷贝东西到X剪切板时都可以同时再将剪切板中的内容拷贝到Emacs的kill ring中去.
+我用的浏览器是Conkeror,我将下面这段配置添加到它的初始化文件中去了.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-js"><span style="color: #4f97d7; font-weight: bold;">function</span> <span style="color: #bc6ec5; font-weight: bold;">ekr</span> <span style="color: #4f97d7;">(</span><span style="color: #7590db;">cc</span><span style="color: #4f97d7;">)</span> <span style="color: #4f97d7;">{</span>
+    <span style="color: #4f97d7; font-weight: bold;">if</span> <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">typeof</span> cc === <span style="color: #2d9574;">'undefined'</span><span style="color: #bc6ec5;">)</span> <span style="color: #bc6ec5;">{</span> cc = read_from_clipboard<span style="color: #2d9574;">()</span>; <span style="color: #bc6ec5;">}</span>
+    cc = cc.replace<span style="color: #bc6ec5;">(</span><span style="color: #2d9574;">/([^\\]*)\\([^\\]*)/</span>g, <span style="color: #2d9574;">"$1\\\\$2"</span><span style="color: #bc6ec5;">)</span>;
+    cc = cc.replace<span style="color: #bc6ec5;">(</span><span style="color: #2d9574;">'"'</span>, <span style="color: #2d9574;">'\\"'</span>, <span style="color: #2d9574;">"g"</span><span style="color: #bc6ec5;">)</span>;
+    cc = cc.replace<span style="color: #bc6ec5;">(</span><span style="color: #2d9574;">"'"</span>, <span style="color: #2d9574;">"'\\''"</span>, <span style="color: #2d9574;">"g"</span><span style="color: #bc6ec5;">)</span>;
+    <span style="color: #4f97d7; font-weight: bold;">var</span> <span style="color: #7590db;">ecc</span> = <span style="color: #2d9574;">"emacsclient -e '(kill-new \""</span> + cc + <span style="color: #2d9574;">"\")' &gt; /dev/null"</span>;
+    shell_command_blind<span style="color: #bc6ec5;">(</span>ecc<span style="color: #bc6ec5;">)</span>;
+<span style="color: #4f97d7;">}</span>
+
+interactive<span style="color: #4f97d7;">(</span>
+    <span style="color: #2d9574;">"ekr_cmd_copy"</span>,
+    <span style="color: #2d9574;">"Copy the selection to the clipboard and the Emacs kill ring"</span>,
+    <span style="color: #4f97d7; font-weight: bold;">function</span> <span style="color: #bc6ec5;">(</span><span style="color: #7590db;">I</span><span style="color: #bc6ec5;">)</span> <span style="color: #bc6ec5;">{</span>
+        call_builtin_command<span style="color: #2d9574;">(</span>I.window, <span style="color: #2d9574;">"cmd_copy"</span>, <span style="color: #a45bad;">true</span><span style="color: #2d9574;">)</span>;
+        ekr<span style="color: #2d9574;">()</span>;
+    <span style="color: #bc6ec5;">}</span>
+<span style="color: #4f97d7;">)</span>;
+
+undefine_key<span style="color: #4f97d7;">(</span>caret_keymap,<span style="color: #2d9574;">"M-w"</span><span style="color: #4f97d7;">)</span>;
+define_key<span style="color: #4f97d7;">(</span>caret_keymap,<span style="color: #2d9574;">"M-w"</span>, <span style="color: #2d9574;">"ekr_cmd_copy"</span><span style="color: #4f97d7;">)</span>;
+undefine_key<span style="color: #4f97d7;">(</span>content_buffer_normal_keymap,<span style="color: #2d9574;">"M-w"</span><span style="color: #4f97d7;">)</span>;
+define_key<span style="color: #4f97d7;">(</span>content_buffer_normal_keymap,<span style="color: #2d9574;">"M-w"</span>, <span style="color: #2d9574;">"ekr_cmd_copy"</span><span style="color: #4f97d7;">)</span>;
+undefine_key<span style="color: #4f97d7;">(</span>special_buffer_keymap,<span style="color: #2d9574;">"M-w"</span><span style="color: #4f97d7;">)</span>;
+define_key<span style="color: #4f97d7;">(</span>special_buffer_keymap,<span style="color: #2d9574;">"M-w"</span>, <span style="color: #2d9574;">"ekr_cmd_copy"</span><span style="color: #4f97d7;">)</span>;
+undefine_key<span style="color: #4f97d7;">(</span>text_keymap,<span style="color: #2d9574;">"M-w"</span><span style="color: #4f97d7;">)</span>;
+define_key<span style="color: #4f97d7;">(</span>text_keymap,<span style="color: #2d9574;">"M-w"</span>, <span style="color: #2d9574;">"ekr_cmd_copy"</span><span style="color: #4f97d7;">)</span>;
+</pre>
+</div>
+
+<p>
+我还在 <code>modules/commands.js</code> 中的 <code>kill-region</code> 和 <code>kill-ring-save</code> 的命令以及 <code>modules/content-buffer-input.js</code> 中的 <code>cut-to-end-of-line</code> 命令后添加了对 <code>ekr()</code> 的调用. 
+在 <code>modules/elements.js</code> 中的 <code>copy_text</code> 函数最后添加了对 <code>ekr(text)</code> 的调用.
+</p>
+
+<p>
+第二个常用的非Emacs应用是urxvt/tmux. 为了完成跟上面一样的效果,我将下面这行配置加入到 <code>~/.tmux.conf</code> 中.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-conf">bind-key -temacs-copy M-w copy-pipe <span style="color: #2d9574;">'c2e -r'</span>
+</pre>
+</div>
+
+<p>
+下面是c2e脚本的源代码.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #2aa1ae; background-color: #292e34;">#</span><span style="color: #2aa1ae; background-color: #292e34;">!/bin/</span><span style="color: #4f97d7; font-weight: bold;">sh</span>
+
+<span style="color: #2aa1ae; background-color: #292e34;"># </span><span style="color: #2aa1ae; background-color: #292e34;">c2e: Copy text to the Emacs kill ring.</span>
+<span style="color: #2aa1ae; background-color: #292e34;">#</span>
+<span style="color: #2aa1ae; background-color: #292e34;"># </span><span style="color: #2aa1ae; background-color: #292e34;">With no arguments, send the contents of the X clipboard to the Emacs kill ring.</span>
+<span style="color: #2aa1ae; background-color: #292e34;"># </span><span style="color: #2aa1ae; background-color: #292e34;">With -r, first set the clipboard to the contents read from standard input.</span>
+<span style="color: #2aa1ae; background-color: #292e34;"># </span><span style="color: #2aa1ae; background-color: #292e34;">With -s, instead send X primary selection to the Emacs kill ring.</span>
+
+<span style="color: #4f97d7; font-weight: bold;">if</span> <span style="color: #4f97d7;">[</span> <span style="color: #2d9574;">"${1}"</span> = <span style="color: #2d9574;">'-r'</span> <span style="color: #4f97d7;">]</span>; <span style="color: #4f97d7; font-weight: bold;">then</span>
+    <span style="color: #4f97d7; font-weight: bold;">exec</span> xclip -sel clip -i -f | <span style="color: #2d9574;">\</span>
+        emacsclient -e <span style="color: #2d9574;">"(kill-new \"$(</span><span style="color: #fa8072;">sed</span><span style="color: #2d9574;"> 's/[\"]/\\&amp;/g')\")"</span>
+<span style="color: #4f97d7; font-weight: bold;">elif</span> <span style="color: #4f97d7;">[</span> <span style="color: #2d9574;">"${1}"</span> = <span style="color: #2d9574;">'-s'</span> <span style="color: #4f97d7;">]</span>; <span style="color: #4f97d7; font-weight: bold;">then</span>
+    <span style="color: #4f97d7; font-weight: bold;">exec</span> xclip -o | <span style="color: #2d9574;">\</span>
+        emacsclient -e <span style="color: #2d9574;">"(kill-new \"$(</span><span style="color: #fa8072;">sed</span><span style="color: #2d9574;"> 's/[\"]/\\&amp;/g')\")"</span>
+<span style="color: #4f97d7; font-weight: bold;">else</span>
+    <span style="color: #4f97d7; font-weight: bold;">exec</span> xclip -sel clip -o | <span style="color: #2d9574;">\</span>
+        emacsclient -e <span style="color: #2d9574;">"(kill-new \"$(</span><span style="color: #fa8072;">sed</span><span style="color: #2d9574;"> 's/[\"]/\\&amp;/g')\")"</span>
+<span style="color: #4f97d7; font-weight: bold;">fi</span>
+</pre>
+</div>
+
+<p>
+为了使这个新剪切板管理器(即Emacs的 kill ring)更容易使用,我为StumpWM添加了一个新的命令和相应的快捷键.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-lisp"><span style="color: #4f97d7;">(</span>defcommand eaacm <span style="color: #bc6ec5;">()</span> <span style="color: #bc6ec5;">()</span>
+  <span style="color: #2d9574;">"Emacs as a clipboard manager."</span>
+  <span style="color: #bc6ec5;">(</span>run-or-raise <span style="color: #2d9574;">"emacsclient -nc"</span> '<span style="color: #2d9574;">(</span><span style="color: #4f97d7;">:class</span> <span style="color: #2d9574;">"Emacs"</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span>run-shell-command <span style="color: #2d9574;">"emacsclient -n -e '(let ((helm-full-frame t)) \</span>
+<span style="color: #2d9574;">      (save-window-excursion (delete-other-windows) (helm-show-kill-ring)))'"</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+
+<span style="color: #4f97d7;">(</span>define-key *root-map* <span style="color: #bc6ec5;">(</span>kbd <span style="color: #2d9574;">"c"</span><span style="color: #bc6ec5;">)</span> <span style="color: #2d9574;">"eaacm"</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+现在不管我正在使用哪个应用,只需要按下 <code>C-t c</code> 就会有一个helm界面让我选择kill ring中的内容. 在Helm中甚至有一项功能可以将当前entry移动到kill ring的顶端同时将该entry的内容拷贝到X剪切板中. 该功能的默认快捷键是 <code>C-c C-k</code>.
+</p>
+
+<p>
+偶尔我也会需要在其他应用中拷贝内容到剪切板中,因此我还创建了两个简单的StumpWM命令来调用c2e脚本,并分别分配了快捷键.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-lisp"><span style="color: #4f97d7;">(</span>defcommand c2e <span style="color: #bc6ec5;">()</span> <span style="color: #bc6ec5;">()</span>
+  <span style="color: #2d9574;">"Copy the X clipboard contents to the Emacs kill ring."</span>
+  <span style="color: #bc6ec5;">(</span>run-shell-command <span style="color: #2d9574;">"c2e"</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+
+<span style="color: #4f97d7;">(</span>defcommand s2e <span style="color: #bc6ec5;">()</span> <span style="color: #bc6ec5;">()</span>
+  <span style="color: #2d9574;">"Copy the X selection contents to the Emacs kill ring."</span>
+  <span style="color: #bc6ec5;">(</span>run-shell-command <span style="color: #2d9574;">"c2e -s"</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+
+<span style="color: #4f97d7;">(</span>define-key *root-map* <span style="color: #bc6ec5;">(</span>kbd <span style="color: #2d9574;">"C"</span><span style="color: #bc6ec5;">)</span>        <span style="color: #2d9574;">"c2e"</span><span style="color: #4f97d7;">)</span>
+<span style="color: #4f97d7;">(</span>define-key *root-map* <span style="color: #bc6ec5;">(</span>kbd <span style="color: #2d9574;">"s"</span><span style="color: #bc6ec5;">)</span>        <span style="color: #2d9574;">"s2e"</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+仅仅过了几天而已,Emacs就变成了一个很不错的X剪切板管理器了.
+</p>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2016-07-27</span>
+            <span title="last modification date" class="post-info">2016-07-27</span>
+            <span title="tags" class="post-info">:N/A:</span>
+            <span title="author" class="post-info"><a href="mailto:lujun9972 &lt;at&gt; lujun9972-F41">lujun9972</a></span>
+        </div>
+    <script src="http://lujun9972.github.io/emacs-document/media/js/jquery-2.1.3.min.js"></script>
+        <section>
+            <h1>Comments</h1>
+            <div id="comment-wrap">
+                    <a class="disqus_label">使用 Disqus 评论</a>
+                    <a class="ds-label">使用多说评论</a>
+    </ul>
+        <div id="disqus_thread"></div>
+        <script type="text/javascript">
+         //var disqus_developer = 1;
+         var preempt_signal=false;
+         var disqus_identifier = "/blog/2016/07/27/将emacs作为x剪切板管理器/";
+         var disqus_url = "http://lujun9972.github.io/emacs-document/blog/2016/07/27/将emacs作为x剪切板管理器/";
+         var disqus_shortname = 'emacs-document';
+         /* * * DON'T EDIT BELOW THIS LINE * * */
+         (function() {
+             var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+             dsq.src = 'http://' + disqus_shortname + '.disqus.com/embed.js';
+             (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+             $('#disqus_thread').css('display','none');
+         })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+        <div class="ds-thread"></div>
+        <script type="text/javascript">
+         var duoshuoQuery = {short_name:'emacs-document'};
+         (function() {
+             var ds = document.createElement('script');
+             ds.type = 'text/javascript';ds.async = true;
+             ds.src = 'http://static.duoshuo.com/embed.js';
+             ds.charset = 'UTF-8';
+             (document.getElementsByTagName('head')[0]
+           || document.getElementsByTagName('body')[0]).appendChild(ds);
+             $('.ds-thread').css('display','block');
+         })();
+        </script>
+    <script>
+     /* comments */
+     var ego_disqus_thread=$('#disqus_thread');
+     var ego_ds_label=$('.ds-thread');
+     $('.disqus_label').click(function(){
+         ego_disqus_thread.show();
+         ego_ds_label.hide();
+     });
+     $('.ds-label').click(function(){
+         ego_disqus_thread.hide();
+         ego_ds_label.show();
+     });
+    </script>
+        </section>
+    <script src="http://lujun9972.github.io/emacs-document/media/js/main.js"></script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 25.x(<a href="http://orgmode.org">Org mode</a> 8.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:lujun9972 &lt;at&gt; lujun9972-F41">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div></body>
+</html>

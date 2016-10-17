@@ -1,0 +1,1005 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>用Emacs Shell替代zsh - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <style>
+   #ds-thread #ds-reset .ds-comment-body p {color: #ffffff;}
+   #ds-thread #ds-reset .ds-comment-body p a {color: #ff0;}
+   #ds-thread #ds-reset .ds-comment-body p a:hover {color: #0ff;}
+   #disqus_thread a {color: #00ffff;}
+  </style>
+  <link rel="stylesheet" href="http://lujun9972.github.io/emacs-document/media/css/main.css" type="text/css"/>
+  <link rel="stylesheet" href="http://lujun9972.github.io/emacs-document/media/css/comment.css" type="text/css"/>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="http://lujun9972.github.io/emacs-document/">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;集思广益</p>
+    <nav class="site-nav">
+      <div class="menu-icon">
+        <svg viewBox="0 0 18 15">
+          <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.031C17.335,0,18,0.665,18,1.484L18,1.484z" fill="#ffff00"/>
+          <path d="M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0c0-0.82,0.665-1.484,1.484-1.484 h15.031C17.335,6.031,18,6.696,18,7.516L18,7.516z" fill="#ffff00"/>
+          <path d="M18,13.516C18,14.335,17.335,15,16.516,15H1.484C0.665,15,0,14.335,0,13.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.031C17.335,12.031,18,12.696,18,13.516L18,13.516z" fill="#ffff00"/>
+        </svg>
+      </div>
+      <ul class="trigger">
+        <li><a href="http://lujun9972.github.io/emacs-document/years/">Years</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/authors/">Authors</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/tags/">Tags</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document">Github</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="http://www.google.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">用Emacs Shell替代zsh</h1>
+<div id="table-of-contents">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#orgheadline1">1. Why?</a></li>
+<li><a href="#orgheadline2">2. Starting the Shell</a></li>
+<li><a href="#orgheadline3">3. Lisp REPL? Almost</a></li>
+<li><a href="#orgheadline4">4. Variables</a></li>
+<li><a href="#orgheadline5">5. Loops</a></li>
+<li><a href="#orgheadline9">6. File Selection</a>
+<ul>
+<li><a href="#orgheadline6">6.1. File Filter Predicates</a></li>
+<li><a href="#orgheadline7">6.2. Modifiers</a></li>
+<li><a href="#orgheadline8">6.3. Custom Filter Predicates</a></li>
+</ul>
+</li>
+<li><a href="#orgheadline10">7. Summary</a></li>
+<li><a href="#orgheadline11">8. Footnotes:</a></li>
+</ul>
+</div>
+</div>
+<p>
+我做到了. 我已经不再需要Zshell , Fish , Bash 等等这些东西了…至少大部分时候都不再需要了. 
+它们都是很不错的工具,只不过我的工作流是以编辑器来驱动的. 我启动Emacs,然后仅仅在需要管理文件之类的操作时才进入shell,而不是先进入shell四处游荡,然后再开始编辑文件.
+</p>
+
+<p>
+大多数Emacs用户都会拆分Emacs window然后在Emacs中启动一个shell,并在需要时进入该shell window中进行操作,不需要时则切换到其他window.
+不过我发现Emacs的Eshell似乎更适合于我,我越用就越发的爱上它了.
+</p>
+
+<p>
+不过eshell有一个问题就是缺少文档&#x2026;而且还有点难以理解. 因此我才撰写了本文. 不过在我开始之前,我要给Mickey Petersen的新书《<a href="https://www.masteringemacs.org">Mastering Emacs</a>》做个广告,它里面有一篇"<a href="https://www.masteringemacs.org/article/complete-guide-mastering-eshell">mastering the eshell</a>" 写得特别好(而且免费就能阅读).
+</p>
+
+<div id="outline-container-orgheadline1" class="outline-2">
+<h2 id="orgheadline1"><span class="section-number-2">1</span> Why?</h2>
+<div class="outline-text-2" id="text-1">
+<p>
+shell其实就是一个由命令驱动的REPL. 你输入命令然后查看结果,然后输入另一个命令…如此往复. 如果输出结果只有几行,你会让它直接输出,如果输出结果有几百行,你会通过管道将结果传递给less命令.
+</p>
+
+<p>
+不过在eshell中,你根本无需将结果传递给另一个pager,如果你发现输出结果太多内容了,只需要按下 <code>C-c C-p</code> 就会帮你跳到最后输入命令的头部,and then C-v your way down. 甚至于,你可以直接搜索你想要的那部分内容.
+在eshell中执行命令意味着,这些命令的输出都会经过Emacs pager的处理.
+</p>
+
+<p>
+更酷的是,你可以像<a href="http://www.masteringemacs.org/articles/2010/12/13/complete-guide-mastering-eshell/">Plan 9</a> 那样启用Eshell的智能显示功能, 这时,执行命令后,如果命令输出过长,你的光标会自动留在输入命令的位置,直到你输入了一个非光标移动的键,光标才会跳到输入下一条命令的地方.
+</p>
+
+<p>
+Eshell拥有如下几个优点:
+</p>
+
+<ul class="org-ul">
+<li>它是由Emacs Lisp写成的, 因此它是跨平台的.</li>
+<li>你不仅仅可以使用脚本和程序,你还可以使用Emacs函数… 想用Lisp写你的shell脚本?没问题!</li>
+<li>它的使用体验也比一般的shell要好.</li>
+</ul>
+
+<p>
+但是当一个程序想要直接操作终端时,就不适于Eshell了.^<a href="http://www.howardism.org/Technical/Emacs/eshell-fun.html#fn.1">1</a>
+</p>
+
+<p>
+你可能也尝试过Eshell, 我想你一定为它的独特性所吸引. 现在让我们更近一步的了解它…
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgheadline2" class="outline-2">
+<h2 id="orgheadline2"><span class="section-number-2">2</span> Starting the Shell</h2>
+<div class="outline-text-2" id="text-2">
+<p>
+我的工作流是以Emacs所驱动的,偶尔才会用到shell. 我常常会在shell中输入一些命令后,然后回到原来的工作中. 当我想弹出一个shell时,我使用下列函数来创建一个指定buffer的window(该window位于原始window的下方,占三分之一的高度),并开启eshell(它会自动进入当前buffer的目录中).
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">defun</span> <span style="color: #bc6ec5; font-weight: bold;">eshell-here</span> <span style="color: #bc6ec5;">()</span>
+  <span style="color: #2aa1ae;">"Opens up a new shell in the directory associated with the</span>
+<span style="color: #2aa1ae;">current buffer's file. The eshell is renamed to match that</span>
+<span style="color: #2aa1ae;">directory to make multiple eshell windows easier."</span>
+  <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">interactive</span><span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">let*</span> <span style="color: #2d9574;">(</span><span style="color: #67b11d;">(</span>parent <span style="color: #b1951d;">(</span><span style="color: #4f97d7; font-weight: bold;">if</span> <span style="color: #4f97d7;">(</span>buffer-file-name<span style="color: #4f97d7;">)</span>
+                     <span style="color: #4f97d7;">(</span>file-name-directory <span style="color: #bc6ec5;">(</span>buffer-file-name<span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+                   default-directory<span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span>
+         <span style="color: #67b11d;">(</span>height <span style="color: #b1951d;">(</span>/ <span style="color: #4f97d7;">(</span>window-total-height<span style="color: #4f97d7;">)</span> <span style="color: #a45bad;">3</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span>
+         <span style="color: #67b11d;">(</span>name   <span style="color: #b1951d;">(</span>car <span style="color: #4f97d7;">(</span>last <span style="color: #bc6ec5;">(</span>split-string parent <span style="color: #2d9574;">"/"</span> t<span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span>split-window-vertically <span style="color: #67b11d;">(</span>- height<span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span>other-window <span style="color: #a45bad;">1</span><span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span>eshell <span style="color: #2d9574;">"new"</span><span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span>rename-buffer <span style="color: #67b11d;">(</span>concat <span style="color: #2d9574;">"*eshell: "</span> name <span style="color: #2d9574;">"*"</span><span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span>
+
+    <span style="color: #2d9574;">(</span>insert <span style="color: #67b11d;">(</span>concat <span style="color: #2d9574;">"ls"</span><span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span>eshell-send-input<span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+
+<span style="color: #4f97d7;">(</span>global-set-key <span style="color: #bc6ec5;">(</span>kbd <span style="color: #2d9574;">"C-!"</span><span style="color: #bc6ec5;">)</span> 'eshell-here<span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+下面是我自定义的函数 <code>x</code>, 它会退出shell并关闭该window.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">defun</span> <span style="color: #bc6ec5; font-weight: bold;">eshell/x</span> <span style="color: #bc6ec5;">()</span>
+  <span style="color: #bc6ec5;">(</span>insert <span style="color: #2d9574;">"exit"</span><span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span>eshell-send-input<span style="color: #bc6ec5;">)</span>
+  <span style="color: #bc6ec5;">(</span>delete-window<span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgheadline3" class="outline-2">
+<h2 id="orgheadline3"><span class="section-number-2">3</span> Lisp REPL? Almost</h2>
+<div class="outline-text-2" id="text-3">
+<p>
+EShell 同时也是一个 Lisp REPL. 下面是一些例子:
+</p>
+
+<pre class="example">
+$ (message "hello world")
+"hello world"
+</pre>
+
+<p>
+不过,在shell中,相比语法的清晰度我们更在意输入的简洁性与速度, 因此,在这种情况下,我们可以省略掉两边的括号:
+</p>
+
+<pre class="example">
+$ message "hello world"
+"hello world"
+</pre>
+
+<p>
+以 <code>eshell/</code> 为前缀的函数在Eshell中执行时可以省略掉这个前缀, 也就是说你可以直接输入echo而实际调用的是 <code>eshell/echo</code> 函数:
+</p>
+
+<pre class="example">
+$ echo "hello world"
+"hello world"
+</pre>
+
+<p>
+不过如果你把函数调用放入括号内,则你需要输入函数的全称:
+</p>
+
+<pre class="example">
+$ (eshell/echo "hello world")
+"hello world"
+</pre>
+
+<p>
+那么传递的参数类型是什么呢? 在普通shell中,所有的参数都是字符串类型的,不过在Eshell中就不一定了:
+</p>
+
+<pre class="example">
+$ echo hello world
+("hello" "world")
+</pre>
+
+<p>
+结果是一个由两个字符串组成的list. 然而,你并不能把echo的结果传递给car… 至少不能直接传递过去:
+</p>
+
+<pre class="example">
+$ car echo hello world
+</pre>
+
+<p>
+会返回一个错误, 下面这样也会报错:
+</p>
+
+<pre class="example">
+$ car (list hello world)
+</pre>
+
+<p>
+你会发现,一点你把代码纳入括号内,你就必须严格遵守elisp的相关语法规定了,所以你应该这么做:
+</p>
+
+<pre class="example">
+$ car (list "hello" "world")
+</pre>
+
+<p>
+EShell定义了一个名为 <code>listify</code> 的命令(译者注:这里严格来说是eshell/listify函数,但在eshell中不严格区分命令还是函数,所以按照shell的说法说成是命令了,下面在不区分函数或命令时也一样),能将传递给它的参数转换为字符串列表:
+</p>
+
+<pre class="example">
+$ listify hello world
+("hello" "world")
+</pre>
+
+<p>
+不过如果你想把这个命令的结果传递给别的命令,比如car,你需要将之用大括号括起来,它的意思是说,以shell的方式执行命令,但是将返回的结果作为lisp对象来对待:
+</p>
+
+<pre class="example">
+$ car { listify hello world }
+hello
+</pre>
+
+<p>
+目前我还没搞清楚 <code>list</code> 和 <code>listify</code> 之间的区别, 它们看起来作用是一样的:
+</p>
+
+<pre class="example">
+$ listify hello world
+("hello" "world")
+
+$ list hello world
+("hello" "world")
+
+$ listify 1 2 3
+(1 2 3)
+
+$ list 1 2 3
+(1 2 3)
+
+$ list "hello world"
+(#("hello world" 0 11
+   (escaped t)))
+
+$ listify "hello world"
+(#("hello world" 0 11
+   (escaped t)))
+</pre>
+
+<p>
+说了这么多,其实我的意思就是说,你既可以把Eshell当成是一个shell,也可以把它当成是一个Lisp REPL,你也可以既把它当成是shell也把它当成是Lisp REPL,只要你不要被搞糊涂了就成.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgheadline4" class="outline-2">
+<h2 id="orgheadline4"><span class="section-number-2">4</span> Variables</h2>
+<div class="outline-text-2" id="text-4">
+<p>
+在Eshell的文档中有这么一段话
+</p>
+
+<blockquote>
+<p>
+由于Eshell是基于Emacs的REPL(1), 它并没有自己的作用域, 因此它存储变量的方式跟你在Elisp程序中是一样的.
+</p>
+</blockquote>
+
+<p>
+运行 <code>printenv</code> 会显示出那些环境变量,使用 <code>setenv</code> 来设置环境变量:
+</p>
+
+<pre class="example">
+$ setenv A "hello world"
+$ getenv A
+"hello world"
+</pre>
+
+<p>
+使用 <code>setq</code> 来未普通的Emacs变量来赋值:
+</p>
+
+<pre class="example">
+$ setq B hello world
+$ echo $B
+hello
+$ setq B "hello world"
+$ echo $B
+hello world
+</pre>
+
+<p>
+通过在变量名前加 <code>$</code>, 你可以查看所有Emacs变量的值:
+</p>
+
+<pre class="example">
+$ echo $recentf-max-menu-items
+25
+</pre>
+
+<p>
+需要注意的是,同名的环境变量的值会覆盖Emacs普通变量的值:
+</p>
+
+<pre class="example">
+$ setenv C hello
+$ setq C goodbye
+$ echo $C
+hello
+</pre>
+
+<p>
+左后,你可以从文件中读取Eshell变量的设置:
+</p>
+
+<pre class="example">
+$ cat blah.eshell
+setq FOO 42
+setq BLING "bongy"
+
+$ . blah.eshell
+42
+bongy
+
+$ echo $FOO
+42
+
+$ echo $BLING
+bongy
+</pre>
+</div>
+</div>
+
+<div id="outline-container-orgheadline5" class="outline-2">
+<h2 id="orgheadline5"><span class="section-number-2">5</span> Loops</h2>
+<div class="outline-text-2" id="text-5">
+<p>
+在shell中经常需要逐个地处理多个文件. 在Eshell中,你既可以使用lisp中的dolist来实现,也可以使用类似shell的语法来实现:
+</p>
+
+<pre class="example">
+$ for file in *.org {
+  echo "Upcasing: $file"
+  mv $file $file(:U)
+}
+</pre>
+
+<p>
+上例中的 (:U)是一个转换器,会将它之前的内容转换为大写形式. 我会在下一部分内容对它中进行讲解(这也是Eshell最出色的特性之一).
+</p>
+
+<p>
+你可能会发现,上例中的 <code>*.org</code> 传递给 <code>for</code> 循环语句的是一个用来迭代的list. 另外,如果有多于1个的参数传递给 <code>for</code> 时,也会创建一个list,例如:
+</p>
+
+<pre class="example">
+$ for i in 1 2 3 4 { echo $i }
+</pre>
+
+<p>
+若传递给 <code>for</code> 的是多个list,则这些list会合并(flatten)成一个list, 因此你可以像下面这样操作:
+</p>
+
+<pre class="example">
+$ for file in emacs* zsh* { ... }
+</pre>
+</div>
+</div>
+
+<div id="outline-container-orgheadline9" class="outline-2">
+<h2 id="orgheadline9"><span class="section-number-2">6</span> File Selection</h2>
+<div class="outline-text-2" id="text-6">
+<p>
+若你要做的仅仅是重命名一个文件,或修改某个目录下所有文件的访问权限,那你根本无需用到shell,用dired甚至是Finder就足够了. shell只有在你想操作一部分匹配某模式的文件时才能比较方便.
+Eshell由于其特有的的filter(偷师于<a href="http://zsh.sourceforge.net/Doc/Release/Expansion.html">Zshell的modifiers</a>)功能而尤为表现出众:
+</p>
+
+<pre class="example">
+$ ls -al *.mp3(U)   # Show songs I own
+</pre>
+
+<p>
+上例中的 <code>*.mp3</code> 这部分就是我们所熟知的globbing pattern,而后面的(U)部分则进一步对结果进行了过滤. 在本例中,仅仅会输出宿主为你自己的那些文件.
+</p>
+
+<p>
+你可以用下面两个命令来获取相关帮助信息:
+</p>
+
+<pre class="example">
+$ eshell-display-predicate-help
+$ eshell-display-modifier-help
+</pre>
+
+<p>
+你可能之前有接触过predicates(因为它们跟ZShell中的意义很接近), 不过更酷的是,你可以通过编写Elisp代码来新增自己的predicates 和 modifiers.
+</p>
+</div>
+
+<div id="outline-container-orgheadline6" class="outline-3">
+<h3 id="orgheadline6"><span class="section-number-3">6.1</span> File Filter Predicates</h3>
+<div class="outline-text-3" id="text-6-1">
+<p>
+下面是filter predicates的一份列表. 可以叠加多个filter predicate,也就是说输入 <code>ls **/*(IW)</code> 会列出当前目录及其子目录中那些同组用户及其他用户可读的文件.
+</p>
+
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-left" />
+
+<col  class="org-left" />
+</colgroup>
+<tbody>
+<tr>
+<td class="org-left">.</td>
+<td class="org-left">Regular files</td>
+</tr>
+
+<tr>
+<td class="org-left">*</td>
+<td class="org-left">Executable files</td>
+</tr>
+
+<tr>
+<td class="org-left">@</td>
+<td class="org-left">Symlinks</td>
+</tr>
+
+<tr>
+<td class="org-left">p</td>
+<td class="org-left">named pipes</td>
+</tr>
+
+<tr>
+<td class="org-left">s</td>
+<td class="org-left">sockets</td>
+</tr>
+
+<tr>
+<td class="org-left">U</td>
+<td class="org-left">Owned by current UID</td>
+</tr>
+
+<tr>
+<td class="org-left">u</td>
+<td class="org-left">Owned by the given user account or UID, e.g. (u'howard')</td>
+</tr>
+
+<tr>
+<td class="org-left">g</td>
+<td class="org-left">Owned by the given group account or GID, e.g. (g100)</td>
+</tr>
+
+<tr>
+<td class="org-left">r</td>
+<td class="org-left">Readable by owner (A is readable by group)</td>
+</tr>
+
+<tr>
+<td class="org-left">R</td>
+<td class="org-left">Readable by World</td>
+</tr>
+
+<tr>
+<td class="org-left">w</td>
+<td class="org-left">Writable by owner (I is writable by group)</td>
+</tr>
+
+<tr>
+<td class="org-left">W</td>
+<td class="org-left">Writable by World</td>
+</tr>
+
+<tr>
+<td class="org-left">x</td>
+<td class="org-left">Executable by owner (E is executable by group)</td>
+</tr>
+
+<tr>
+<td class="org-left">X</td>
+<td class="org-left">Executable by world</td>
+</tr>
+
+<tr>
+<td class="org-left">s</td>
+<td class="org-left">setuid (for user)</td>
+</tr>
+
+<tr>
+<td class="org-left">S</td>
+<td class="org-left">setgid (for group)</td>
+</tr>
+
+<tr>
+<td class="org-left">t</td>
+<td class="org-left">Sticky bit</td>
+</tr>
+
+<tr>
+<td class="org-left">%</td>
+<td class="org-left">Other file types.</td>
+</tr>
+</tbody>
+</table>
+
+<p>
+"filter predicates" 的用法很直观. 比如要列出所有的目录只需要:
+</p>
+
+<pre class="example">
+ls -ld *(/)
+</pre>
+
+<p>
+有些"filter predicates"可以接受其他选项参数,例如要列出所有属于howard的文件,可以这样做:
+</p>
+
+<pre class="example">
+ls -ld *(u'howard')
+</pre>
+
+<p>
+<code>%</code> 需要第二个参数来指定文件的类型. 这里文件类型的说明与 <code>ls</code> 命令的输出一致,例如 <code>%c</code> 表示字符设备. 下面是一份来自 <code>ls</code> man page的列表:
+</p>
+
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-left" />
+
+<col  class="org-left" />
+</colgroup>
+<tbody>
+<tr>
+<td class="org-left">b</td>
+<td class="org-left">Block special file</td>
+</tr>
+
+<tr>
+<td class="org-left">c</td>
+<td class="org-left">Character special file</td>
+</tr>
+
+<tr>
+<td class="org-left">d</td>
+<td class="org-left">Directory</td>
+</tr>
+
+<tr>
+<td class="org-left">l</td>
+<td class="org-left">Symbolic link</td>
+</tr>
+
+<tr>
+<td class="org-left">s</td>
+<td class="org-left">Socket link</td>
+</tr>
+
+<tr>
+<td class="org-left">p</td>
+<td class="org-left">FIFO</td>
+</tr>
+</tbody>
+</table>
+
+<p>
+可以整合多个"filter predicates". 比如要列出所有你拥有的符号链接,可以这样:
+</p>
+
+<pre class="example">
+ls -l *(@U)
+</pre>
+
+<p>
+你也可以列出不属于你的所有符号链接,方法是加一个前缀^:
+</p>
+
+<pre class="example">
+ls -l *(@^U)
+</pre>
+
+<p>
+时间与大小相关的filter需要额外的参数. 下面内容摘自 <code>eshell-display-predicate-help</code> 的输出内容:
+</p>
+
+<blockquote>
+<p>
+a[Mwhms][+-](N|'FILE')
+    access time +/-/= N months/weeks/hours/mins/secs (days if unspecified) if FILE specified, use as
+    comparison basis; so a+’file.c’ shows files accessed before file.c was last accessed.
+m[Mwhms][+-](N|'FILE')
+    modification time…
+c[Mwhms][+-](N|'FILE')
+    change time…
+L[kmp][+-]N
+    file size +/-/= N Kb/Mb/blocks
+</p>
+</blockquote>
+
+<p>
+下面展示了一些案例:
+</p>
+
+<p>
+要列出目录中昨天之后才修改过的所有org－mode文件，需要输入:
+</p>
+
+<pre class="example">
+ls *.org(m-1)
+</pre>
+
+<p>
+这里的 <code>m</code> 表示修改时间, <code>-</code> 表示减法， <code>1</code> 是要减去的天数，我们这里没有指定时间单位，默认就是天.
+要列出最近8小时内修改过的文件,我们需要输入:
+</p>
+
+<pre class="example">
+ls *.org(mh-8)
+</pre>
+
+<p>
+压缩最近30天都没有访问过的所有文件:
+</p>
+
+<pre class="example">
+bzip2 -9v **/*(a+30)
+</pre>
+
+<p>
+这里 <code>**</code> 表示递归引用的各层子目录.
+</p>
+
+<p>
+列出大于等于50k(用了符号+)的Shell脚本(以.sh结尾的可执行的文件):
+</p>
+
+<pre class="example">
+ls ***/*.sh(*Kl+50)
+</pre>
+
+<p>
+要表示大于等于50K,我们先写单位为K,然后用+表示大于或等于,最后接一个大小. 三个星 <code>***</code> 表示递归搜索各个子目录,但并不包括符号链接.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgheadline7" class="outline-3">
+<h3 id="orgheadline7"><span class="section-number-3">6.2</span> Modifiers</h3>
+<div class="outline-text-3" id="text-6-2">
+<p>
+Modifiers与上面提到的filters很类似, 只不过它是以冒号开始的, 而且它的作用是用来修改字符串,文件名或由字符串/文件名组成的列表的.
+例如, <code>:U</code> 会将字符串或文件名转换为大写形式:
+</p>
+
+<pre class="example">
+for f in *(:U) { echo $f }
+</pre>
+
+<p>
+输出为:
+</p>
+
+<pre class="example">
+AB-TESTING-EXPERIMENTS.ORG
+AB-TESTING-PRESENTATION.ORG
+ACTIONSCRIPT-NOTES.ORG
+ADIUM-PLUGINS-AND-EXTENSIONS.ORG
+ALFRED.ORG
+ANGULARJS-BOILERPLATE.ORG
+ANGULARJS-MODULES.ORG
+ANGULARJS-TESTING.ORG
+APPLESCRIPT-RECIPES.ORG
+APPLESCRIPT-SKYPE.ORG
+...
+</pre>
+
+<p>
+modifiers也可以作用域变量. 下例的输出结果与上例中的输出一样:
+</p>
+
+<pre class="example">
+for f in * { echo $f(:U) }
+</pre>
+
+<p>
+下面是完整的用于修改字符串或文件名的modifiers列表:
+</p>
+
+<pre class="example">
+:L      lowercase                                
+:U      uppercase                                
+:C      capitalize                               
+:h      dirname                                  
+:t      basename                                 
+:e      file extension                           
+:r      strip file extension                     
+:q      escape special characters                
+:S      split string at any whitespace character 
+:S/PAT/ split string at each occurrence of /PAT/ 
+:E      evaluate again
+</pre>
+
+<p>
+下面是用于修改list的modifiers的列表:
+</p>
+
+<pre class="example">
+:o            sort alphabetically                           
+:O            reverse sort alphabetically                   
+:u            unique list (typically used after :o or :O)   
+:R            reverse the list                              
+:j            join list members, separated by a space       
+:j/PAT/       join list members, separated by PAT           
+:i/PAT/       exclude all members not matching PAT          
+:x/PAT/       exclude all members matching PAT              
+:s/pat/match/ substitute PAT with MATCH                     
+:g/pat/match/ substitute PAT with MATCH for all occurrences
+</pre>
+
+<p>
+要将所有你拥有的文件的扩展名前添加字符串 <code>-foobar</code>,你可以这样:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #4f97d7; font-weight: bold;">for</span> F<span style="color: #4f97d7; font-weight: bold;"> in</span> *<span style="color: #4f97d7;">(</span>U<span style="color: #4f97d7;">)</span> <span style="color: #4f97d7;">{</span> mv $<span style="color: #7590db;">F</span> $<span style="color: #7590db;">F</span><span style="color: #bc6ec5;">(</span>:r<span style="color: #bc6ec5;">)</span>-foobar.$<span style="color: #7590db;">F</span><span style="color: #bc6ec5;">(</span>:e<span style="color: #bc6ec5;">)</span> <span style="color: #4f97d7;">}</span>
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgheadline8" class="outline-3">
+<h3 id="orgheadline8"><span class="section-number-3">6.3</span> Custom Filter Predicates</h3>
+<div class="outline-text-3" id="text-6-3">
+<p>
+你知道的,Emacs最棒的地方在于它能够自定义任何东西,当然也包括你的shell体验拉.
+</p>
+
+<p>
+<a href="https://www.masteringemacs.org/article/complete-guide-mastering-eshell#adding-new-modifiers-and-predicates">如Mickey Petersen所言</a>, 我们还可以通过创建自己的判断函数来过滤文件. 我们要是能有一个filter来根据org-mode文件内部的 <code>#+TAGS</code> 部分来过滤文件那该多好啊. 这样的话,如果我有个文件是以如下内容开头的:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-org"><span style="color: #9f8766;">#+TITLE:</span>  <span style="color: #bc6ec5; font-size: 140%; font-weight: bold; text-decoration: underline;">Alfred</span>
+<span style="color: #9f8766;">#+AUTHOR:</span> <span style="color: #afeeee;">Howard Abrams</span>
+<span style="color: #9f8766;">#+DATE:</span>   <span style="color: #afeeee;">[2013-05-15 Wed]</span>
+<span style="color: #9f8766;">#+TAGS:   mac technical</span>
+</pre>
+</div>
+
+<p>
+那么,我只要输入下面那样的语句就能找出所有包含mac标签的org文件了.
+like:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">ls *.org<span style="color: #4f97d7;">(</span>T<span style="color: #2d9574;">'mac'</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+如果创建的filter可以不接任何参数,即它可以只用一个符号来代替,那么我们可以为 <code>eshell-predicate-alist</code> 添加一个元组来指定filter符号与相应的判断函数(返回值要么是true要么是nil). 像下面那样:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span>add-to-list 'eshell-predicate-alist '<span style="color: #bc6ec5;">(</span>?P . eshell-primary-file<span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+不过在本例中, 符号T还需要接受一个tag作为参数. 这种情况下,我们需要分两步走:
+</p>
+
+<ol class="org-ol">
+<li>需要先定义一个解析Eshell buffer的函数,该函数用于寻找传递给filter的参数(并且需要在解析出参数后,将光标移动到参数后)</li>
+<li>还需要一个接受文件作参数的判断函数</li>
+</ol>
+
+<p>
+这第一步,我们的解析函数会被调用来解析当前的文本内容,然后根据解析出来的内容返回用于过滤文件的判断函数:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span>add-to-list 'eshell-predicate-alist '<span style="color: #bc6ec5;">(</span>?T . <span style="color: #2d9574;">(</span>eshell-org-file-tags<span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+我这里将两个步骤整合到一个函数中, 该函数完成第一个步骤的工作后,会返回一个lambda表达式用于完成第二个步骤.
+</p>
+
+<p>
+第一步是通过解析光标后面的文本来获取tag的内容(被单引号括起来了), 然后将光标移动到tag参数后为后面的过滤函数的执行作准备(用goto-char跳转到匹配的结尾处).
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">defun</span> <span style="color: #bc6ec5; font-weight: bold;">eshell-org-file-tags</span> <span style="color: #bc6ec5;">()</span>
+  <span style="color: #2aa1ae;">"Helps the eshell parse the text the point is currently on,</span>
+<span style="color: #2aa1ae;">looking for parameters surrounded in single quotes. Returns a</span>
+<span style="color: #2aa1ae;">function that takes a FILE and returns nil if the file given to</span>
+<span style="color: #2aa1ae;">it doesn't contain the org-mode #+TAGS: entry specified."</span>
+
+  <span style="color: #2aa1ae; background-color: #292e34;">;; </span><span style="color: #2aa1ae; background-color: #292e34;">Step 1. Parse the eshell buffer for our tag between quotes</span>
+  <span style="color: #2aa1ae; background-color: #292e34;">;;         </span><span style="color: #2aa1ae; background-color: #292e34;">Make sure to move point to the end of the match:</span>
+  <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">if</span> <span style="color: #2d9574;">(</span>looking-at <span style="color: #2d9574;">"'</span><span style="color: #2d9574; font-weight: bold;">\\</span><span style="color: #2d9574; font-weight: bold;">(</span><span style="color: #2d9574;">[</span><span style="color: #a45bad;">^</span><span style="color: #2d9574;">)']+</span><span style="color: #2d9574; font-weight: bold;">\\</span><span style="color: #2d9574; font-weight: bold;">)</span><span style="color: #2d9574;">'"</span><span style="color: #2d9574;">)</span>
+      <span style="color: #2d9574;">(</span><span style="color: #4f97d7; font-weight: bold;">let*</span> <span style="color: #67b11d;">(</span><span style="color: #b1951d;">(</span>tag <span style="color: #4f97d7;">(</span>match-string <span style="color: #a45bad;">1</span><span style="color: #4f97d7;">)</span><span style="color: #b1951d;">)</span>
+             <span style="color: #b1951d;">(</span>reg <span style="color: #4f97d7;">(</span>concat <span style="color: #2d9574;">"^#\\+TAGS:.* "</span> tag <span style="color: #2d9574;">"\\b"</span><span style="color: #4f97d7;">)</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span>
+        <span style="color: #67b11d;">(</span>goto-char <span style="color: #b1951d;">(</span>match-end <span style="color: #a45bad;">0</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span>
+
+        <span style="color: #2aa1ae; background-color: #292e34;">;; </span><span style="color: #2aa1ae; background-color: #292e34;">Step 2. Return the predicate function:</span>
+        <span style="color: #2aa1ae; background-color: #292e34;">;;         </span><span style="color: #2aa1ae; background-color: #292e34;">Careful when accessing the `</span><span style="color: #a45bad; background-color: #292e34;">reg</span><span style="color: #2aa1ae; background-color: #292e34;">' variable.</span>
+        `<span style="color: #67b11d;">(</span><span style="color: #4f97d7; font-weight: bold;">lambda</span> <span style="color: #b1951d;">(</span>file<span style="color: #b1951d;">)</span>
+           <span style="color: #b1951d;">(</span><span style="color: #4f97d7; font-weight: bold;">with-temp-buffer</span>
+             <span style="color: #4f97d7;">(</span>insert-file-contents file<span style="color: #4f97d7;">)</span>
+             <span style="color: #4f97d7;">(</span>re-search-forward ,reg nil t <span style="color: #a45bad;">1</span><span style="color: #4f97d7;">)</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span>
+    <span style="color: #2d9574;">(</span><span style="color: #dc752f; background-color: #292b2e;">error</span> <span style="color: #2d9574;">"The `T' predicate takes an org-mode tag value in single quotes."</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+第二步是返回一个函数,该函数会将指定文件的内容加载到一个临时buffer中,然后通过正则表达式搜索内容是否匹配包含指定的标签. 如果没有搜索到匹配内容返回nil(即为假),其他任何返回值都认为是真.
+</p>
+
+<p>
+现在我可以只搜索Homebrew命令的内容而不会误找出与啤酒相关的内容了.
+</p>
+
+<pre class="example">
+$ grep brew *.org(T'mac')
+</pre>
+
+<p>
+由于这里的grep调用的是Emacs的grep函数,因此它会将匹配的结果显示在一个buffer中,而且我只需要点击一下就会自动加载好文件准备给我编辑了.
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgheadline10" class="outline-2">
+<h2 id="orgheadline10"><span class="section-number-2">7</span> Summary</h2>
+<div class="outline-text-2" id="text-7">
+<p>
+当然,EShell的精髓在于能与Emacs进行整合, 例如可以通过配置 <code>highlight-regexp</code> 来高亮输出中的关键字,还能将输出结果重定向到Emacs buffer中:
+</p>
+
+<pre class="example">
+$ ls -al &gt; #&lt;buffer some-notes.org&gt;
+</pre>
+
+<p>
+然后可以在结果中按下 <code>C-c |</code> 将输出结果转换成一个org-mode下的表格进行下一步的操作.
+</p>
+
+<p>
+虽然Eshell内建于Emacs中,无需任何定制就能用,我还是<a href="https://github.com/howardabrams/dot-files/blob/master/emacs-eshell.org">做了一些改进以期能帮助到他人</a>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgheadline11" class="outline-2">
+<h2 id="orgheadline11"><span class="section-number-2">8</span> Footnotes:</h2>
+<div class="outline-text-2" id="text-8">
+<p>
+^<a href="http://www.howardism.org/Technical/Emacs/eshell-fun.html#fnr.1">1</a>
+</p>
+
+<p>
+像 <code>top</code> 这样的程序在Eshell中不能很好的工作,因为这种程序会尝试用原始的VT100控制代码来修改终端显示,然而Eshell假设所运行的程序输出的都是标准文本输出.
+</p>
+
+<p>
+好在,在你输入 <code>top</code> 后, eshell会发现 <code>top</code> 被列在它的黑名单中了(准确地说,这种黑名单叫做eshell-visual-commands), 然后就会让它在一个特殊的comit buffer中显示.
+</p>
+
+<p>
+在实践中,我根本没有注意到这个局限,因为大多数我使用的程序都实际上是被重写的Emacs函数. 不过如果你发现有个程序在Eshell中工作的不好,不妨试试把这个程序纳入到 <code>eshell-visual-commands</code> 这个列表中.
+</p>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2016-08-30</span>
+            <span title="last modification date" class="post-info">2016-10-16</span>
+            <span title="tags" class="post-info">:N/A:</span>
+            <span title="author" class="post-info"><a href="mailto:lujun9972 &lt;at&gt; lujun9972-F41">lujun9972</a></span>
+        </div>
+    <script src="http://lujun9972.github.io/emacs-document/media/js/jquery-2.1.3.min.js"></script>
+        <section>
+            <h1>Comments</h1>
+            <div id="comment-wrap">
+                    <a class="disqus_label">使用 Disqus 评论</a>
+                    <a class="ds-label">使用多说评论</a>
+    </ul>
+        <div id="disqus_thread"></div>
+        <script type="text/javascript">
+         //var disqus_developer = 1;
+         var preempt_signal=false;
+         var disqus_identifier = "/blog/2016/08/30/用emacs-shell替代zsh/";
+         var disqus_url = "http://lujun9972.github.io/emacs-document/blog/2016/08/30/用emacs-shell替代zsh/";
+         var disqus_shortname = 'emacs-document';
+         /* * * DON'T EDIT BELOW THIS LINE * * */
+         (function() {
+             var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+             dsq.src = 'http://' + disqus_shortname + '.disqus.com/embed.js';
+             (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+             $('#disqus_thread').css('display','none');
+         })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+        <div class="ds-thread"></div>
+        <script type="text/javascript">
+         var duoshuoQuery = {short_name:'emacs-document'};
+         (function() {
+             var ds = document.createElement('script');
+             ds.type = 'text/javascript';ds.async = true;
+             ds.src = 'http://static.duoshuo.com/embed.js';
+             ds.charset = 'UTF-8';
+             (document.getElementsByTagName('head')[0]
+           || document.getElementsByTagName('body')[0]).appendChild(ds);
+             $('.ds-thread').css('display','block');
+         })();
+        </script>
+    <script>
+     /* comments */
+     var ego_disqus_thread=$('#disqus_thread');
+     var ego_ds_label=$('.ds-thread');
+     $('.disqus_label').click(function(){
+         ego_disqus_thread.show();
+         ego_ds_label.hide();
+     });
+     $('.ds-label').click(function(){
+         ego_disqus_thread.hide();
+         ego_ds_label.show();
+     });
+    </script>
+        </section>
+    <script src="http://lujun9972.github.io/emacs-document/media/js/main.js"></script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 25.x(<a href="http://orgmode.org">Org mode</a> 8.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:lujun9972 &lt;at&gt; lujun9972-F41">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div></body>
+</html>

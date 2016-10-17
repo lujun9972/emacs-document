@@ -1,0 +1,4798 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Emacs-Lisp-coding-thoughts - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <style>
+   #ds-thread #ds-reset .ds-comment-body p {color: #ffffff;}
+   #ds-thread #ds-reset .ds-comment-body p a {color: #ff0;}
+   #ds-thread #ds-reset .ds-comment-body p a:hover {color: #0ff;}
+   #disqus_thread a {color: #00ffff;}
+  </style>
+  <link rel="stylesheet" href="http://lujun9972.github.io/emacs-document/media/css/main.css" type="text/css"/>
+  <link rel="stylesheet" href="http://lujun9972.github.io/emacs-document/media/css/comment.css" type="text/css"/>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="http://lujun9972.github.io/emacs-document/">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;集思广益</p>
+    <nav class="site-nav">
+      <div class="menu-icon">
+        <svg viewBox="0 0 18 15">
+          <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.031C17.335,0,18,0.665,18,1.484L18,1.484z" fill="#ffff00"/>
+          <path d="M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0c0-0.82,0.665-1.484,1.484-1.484 h15.031C17.335,6.031,18,6.696,18,7.516L18,7.516z" fill="#ffff00"/>
+          <path d="M18,13.516C18,14.335,17.335,15,16.516,15H1.484C0.665,15,0,14.335,0,13.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.031C17.335,12.031,18,12.696,18,13.516L18,13.516z" fill="#ffff00"/>
+        </svg>
+      </div>
+      <ul class="trigger">
+        <li><a href="http://lujun9972.github.io/emacs-document/years/">Years</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/authors/">Authors</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/tags/">Tags</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document">Github</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="http://www.google.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">Emacs-Lisp-coding-thoughts</h1>
+<hr  />
+
+<p>
+1.0 Document id
+</p>
+
+<p>
+Copyright © 1995-2007 Jari Aalto
+</p>
+
+<p>
+License: This material may be distributed only subject to the terms and conditions set forth in GNU General
+Public License v2 or later; or, at your option, distributed under the terms of GNU Free Documentation License
+version 1.2 or later (GNU FDL).
+</p>
+
+<p>
+This document contains Unix Emacs Lisp programming information. It addresses the coding style of Emacs lisp
+and also presents notes about Emacs lisp byte compiler. Emacs Lisp code profiling is also examined and some
+profiling result presented.
+</p>
+
+<p>
+1.1 What this document is not
+</p>
+
+<p>
+This document won't introduce you to lisp, you must have basic knowledge about lisp programming beforehand:
+functions, local, global variables and various forms used in lisp. Mainly, this contains no ready solutions,
+functions, that you could use. There may be case studies though.
+</p>
+
+<p>
+1.2 What is this document?
+</p>
+
+<p>
+This document contains some guidelines that were found handy. There have also appeared also very good articles
+in the Usenet Emacs newsgroups and many good articles may have passed by, but hope you find those included
+interesting. It is recommended that you first read some elementary lisp reference before reading this paper.
+</p>
+
+<p>
+Read this document as recommendations, not as strict rules. Adapt ideas that seem reasonable to you, and
+discard the others you feel, don't serve your needs.
+</p>
+
+<p>
+The Elp (lisp profiling tool) results in the page are mainly for curious reader, when he needs some reference
+how to write tight loops, time critical functions. But normally there is not much need for optimization in
+Emacs: you run into performance problems very rarely. Be very skeptical when reading the results and do not
+put your blind trust on them.
+</p>
+
+<p>
+Used Abbreviations
+</p>
+
+<p>
+[jari] Jari Aalto
+[kai] Kai Grossjohann
+[vladimir] Vladimir Alexiev
+</p>
+<hr  />
+
+<p>
+2.0 The basic coding suggestions
+</p>
+
+<p>
+2.1 Major rule1 – comment as much as possible
+</p>
+
+<p>
+Someone else reading your code will appreciate any extra explanation that you may have written. Someday the
+code may also be maintained by someone else than you, so bear in mind that the would-be-maintainer can take
+over your code, when you no longer are around.
+</p>
+
+<p>
+2.2 Major rule2 – maintenance comes first
+</p>
+
+<p>
+Maintenance and readability comes first, never write tight code. Functions are easier to read if they are
+"airy" instead. Your code doesn't run any faster, no matter how much you shrink it. Some people like to delete
+all white spaces from their functions so that the code lines are stuck together; but that is not necessarily
+the best practice.
+</p>
+
+<p>
+Organize parts that belong together, into groups and add dashes or anything to make it visible that something
+important is happening (function or condition)
+</p>
+
+<p>
+2.3 Major rule3 – don't spare variables
+</p>
+
+<p>
+Don't be afraid of using many variables. Especially in functions, that need local variables. A variable can
+"self document" the code if named properly. Use XEmacs byte compiler to check is you have defined variables
+that you haven't actually used, so that the byte compilation results are clean. (Note: The XEmacs byte
+compiler can better catch programming errors than Emacs byte compiler.)
+</p>
+
+<p>
+In most cases the possible minor performance penalty of using many variables doesn't matter. See the profiling
+results later in this document.
+</p>
+
+<p>
+2.4 Major rule4 – document your functions and variables well
+</p>
+
+<p>
+Document your variables and functions well. If functions sets globals, say it in the docs (use "References:"
+tag). Every function and variable should have DOC-STRING, because when you do describe-symbols, it'll print
+out the SYMBOL and DOC-STRING. And one can even search through the doc strings with super-apropos Don't forget
+that the first line of the doc string should be a complete sentence.
+</p>
+
+<p>
+Don't you feel frustrated too if staring at this?
+</p>
+
+<p>
+(defconst foo-list-storage nil)    
+</p>
+
+<p>
+Now you have to skim the code to understand how and where the variable is used. The original Emacs
+recommendation has been that you do need to document package private variables, like the one above. However
+this recommendation is old and dates back to 18.xx days where the doc-strings memory space was a limited
+resource. In new Emacs releases there is dynamic byte compilation option which reduces the docstring memory
+consumption. There is no need to "hand optimise" the doc-strings away.
+</p>
+
+<p>
+2.5 Major rule5 – don't use tricks
+</p>
+
+<p>
+Think about new comers when you program, who know nothing about lisp. Try to code clearly. Avoid tricks, which
+is not very frienly for readers of your code. At least document well why the code at that point looks so
+complex.
+</p>
+
+<p>
+2.6 Major rule6 – use byte compiler to check leaks
+</p>
+
+<p>
+Check your code for variable leaks in fresh emacs "emacs -q" by running M-x byte-compile-file XXX.el. If
+possible use XEmacs's for checking because it reports warnings better.
+</p>
+
+<p>
+2.7 Use the error function.
+</p>
+
+<p>
+Use error command if you cannot continue, or if you think that some other program may depend on your code, it
+is best that the other program cannot continue. Don't try unnecerrarily handle erorr conditions - it won't
+work in general with Emacs Lisp, like if you have got used to Java's or C++'s throw staements.
+</p>
+
+<p>
+2.8 Make function as general as possible
+</p>
+
+<p>
+But not so general that it can eat apples and cars. It's "good", when the function doesn't get excessive long:
+still long cond statements are ok. Sometimes you just can't split the task into smaller parts or it makes no
+sense to split the function, oh well&#x2026;use your best judgement.
+</p>
+
+<p>
+Still, a long function raises always thoughts about bad coding. Usually there may be reusable parts, which can
+be separated, but then, perhaps no. Just make sure you are convinced you need that long function, and that's
+it.
+</p>
+<hr  />
+
+<p>
+3.0 Coding style issues
+</p>
+
+<p>
+3.1 Function's variable definitions
+</p>
+
+<p>
+Unclear code:
+</p>
+
+<p>
+(defun xx (arg1 arg2 &amp;optional arg3 )      
+  (let ((foo 1) (bar "xx") baz-flag point))
+   &#x2026;                                     
+</p>
+
+<p>
+Maybe better written as:
+</p>
+
+<p>
+(defun xx (arg1 arg2 &amp;optional arg3 )                     
+  (let* ((foo         1)                ;temporary counter
+         (bar         "xx")             ;displayed value  
+         baz-flag                                         
+         point)                                           
+  &#x2026;                                                     
+</p>
+
+<p>
+Tip: To "line up" variables nicely in the let statement use some package that can do it, like tinytab.el,
+which is tab minor mode.
+</p>
+
+<ul class="org-ul">
+<li>Put initialisations first, then variables that do not need initialisations. Here foo and bar are defined
+before baz-flag and point</li>
+<li>Put each one in separate lines and comment their usages when needed.</li>
+<li>Try to choose descriptive names for variables. Help reader and choose "buffer" instead of "b" or "buf".</li>
+<li>Long names are almost always better.</li>
+</ul>
+
+<p>
+3.2 Let with initialised empty values
+</p>
+
+<p>
+Let's start with example code:
+</p>
+
+<p>
+(let* ((foo '())    ;; A list                 
+       (bar nil)    ;; A truth value          
+       test)        ;; A scratch variable.    
+</p>
+
+<p>
+This effectively causes foo, bar, test to be nil. Don't give the extra stuff fool you. The programmers
+intention was to clarify, that the foo is a list and by initialising it with () would signify a list
+context&#x2026; and so on..
+</p>
+
+<p>
+But it can be done it more cleanly. The more symbols there are in the view, the less easily can human eye
+focus to important things. Let's try this instead:
+</p>
+
+<p>
+(let* (foo-list     ;; A list                 
+       bar-flag     ;; A truth value          
+       test)        ;; A scratch variable.    
+</p>
+
+<p>
+In this case, the variable names itself tell where they are used, and the missing symbols greatly improve the
+layout. You know, that variable is nil by default, so there is no point of assigning an empty list. Less is
+more, in most cases. In addition, when you use these variables inside function body, it's clear all the time
+what that stand for because the names tell them.
+</p>
+
+<p>
+3.3 There are alternatives to `progn'
+</p>
+
+<p>
+progn indents code right very fast and that makes writer to code in a tight space. All code examples below
+give exactly the same results.
+</p>
+
+<p>
+(if variable                    ;test here   
+    (progn                                   
+       &#x2026;it was non-nil , do something))    
+</p>
+
+<p>
+Sometimes 'cond' statement can be used similarly. It has an implicit progn form:
+</p>
+
+<p>
+(cond                                     
+ (variable                      ;test here
+  &#x2026;code..                               
+  &#x2026;code..))                             
+</p>
+
+<p>
+And there is also and command, but it requires that all the statements you want to execute return non-nil.
+This may not be exactly usable every time.
+</p>
+
+<p>
+(and variable     
+     ..code..     
+     ..code..)    
+</p>
+
+<p>
+Common lisp library, cl.el offers doing the same more cleanly. This is even more nicer. Prefer this one:
+</p>
+
+<p>
+(eval-when-compile (require 'cl))
+</p>
+
+<p>
+(when variable                   
+  &#x2026;code..                      
+  &#x2026;code..)                     
+</p>
+
+<p>
+[vladimir] &#x2026;There are other even worse cases. The worst I can think of is mapcar with an inlined function:
+</p>
+
+<p>
+(mapcar (function (lambda (e)   
+                    (do stuff)))
+      '(1 2 3))                 
+</p>
+
+<p>
+This leaves too few columns for (do stuff). Especially if it contains another mapcar. This is much better:
+</p>
+
+<p>
+(mapcar         
+ (function      
+  (lambda (e)   
+    (do stuff)))
+ '(1 2 3))      
+</p>
+
+<hr  />
+
+<p>
+4.0 Using global variables
+</p>
+
+<p>
+4.1 Thoughts on globals
+</p>
+
+<p>
+Because you will be using globals a lot in Emacs lisp packages, couple of words may be in place You probably
+are shocked by the fact that lisp programs use globals (actually prefixed or namespace globals) all the time,
+when you have learned that using globals is totally wrong and should be avoided at any costs.
+</p>
+
+<p>
+The class variables behave quite alike to global variables especially if the class derivation chain is long.
+Hm, to be strict, the scope of the variable just gets larger.
+</p>
+
+<p>
+            derived classes                   
+BASE        &#x2013;&gt;C1 &#x2013;&gt;C2 &#x2013;&gt;C3                 
+public var1               sees BASE's var1    
+</p>
+
+<p>
+var1 is not real global, because it ceases to exist if the class is deleted. But, When you see code like this,
+where variable is "seen" outside of function, the instincts say that we should treat var1 like global. It's
+temptating to think that local is something that is inside function or function block, and variables outside
+of a function, while they may be actually packaged within class, are all "globals". Admittedly this is not
+very accurate distinction, but a practical point of view. In Emacs lisp, the variable scope is whole package
+and the variables are true globals because any other packages can see them too.
+</p>
+
+<p>
+In Emacs Lisp you can also abstract the use of globals with the degree you want:
+</p>
+
+<ul class="org-ul">
+<li>You can use globals directly</li>
+<li>Indirectly in functions: using the aliasing method described in a short moment.</li>
+<li>Using control functions; that hide the globals from functions (quite strong abstraction)</li>
+</ul>
+
+<p>
+4.2 Globals and emacs lisp packages
+</p>
+
+<p>
+They are traditionally used in Emacs packages for
+</p>
+
+<ul class="org-ul">
+<li><p>
+User options: nil/non-nil/some value.
+</p>
+
+<p>
+(defvar my-global-var t                   
+  "Some docs come here how to use it")    
+</p></li>
+
+<li><p>
+Customisable user functions or hooks. Here user has a choice to select his preference function to do the
+job. Advancer lisp programmers traditionally don't even use the default functions but program their own
+and then set these variables to point to their implementations.
+</p>
+
+<p>
+(defvar my-collect-function 'my-default-collect-function-1
+  "*There are two default choices:                        
+   'my-default-collect-function-1                         
+   'my-default-collect-function-2")                       
+</p></li>
+
+<li><p>
+Private, place for package storage. Here the package maintainer updates and reads the my-:hash-table
+during the lifetime of the program.
+</p>
+
+<p>
+(defvar my-hash-table nil              
+  "Private. List of hash elements")    
+</p></li>
+</ul>
+
+<p>
+4.3 Aliasing to globals – summary
+</p>
+
+<p>
+To clarify: the term aliasing used in next sections doesn't mean real aliasing. The variable is not actually
+referred through an alias. When you work with a alias variable, you can pretend that you actually work with
+the global variable. The alias term is used merely for purposes where you read the global when you use it in
+function. You do not write to a variable aliased like this. We're actually using a copy of variable.
+</p>
+
+<p>
+The next sections will describe these benefits better, but the advantages of copying the global variables are
+listed here for quick reference:
+</p>
+
+<ul class="org-ul">
+<li>When globals are only in let, you can see at one glance what globals are used in the function. If your
+function has 10-20 lines, you can't find the used globals that easily</li>
+<li>You can add extra comment for each global while it is being aliased in let.</li>
+<li>Function maintenance is simpler: you can lift the global from let to the argument list of a function
+without touching the function body. You do this if you decide that the argument should be passed to
+function and not read from global.</li>
+</ul>
+
+<p>
+4.4 Aliasing to globals – counter arguments
+</p>
+
+<p>
+[vladimir] &#x2026;If alias is used, the reader has to remember that `foo-mode-switch` and `switch` are the same
+thing. Furthermore, when you read the body of the function, foo-mode-switch is clearly a global var (perhaps a
+user option), while you have to look back at the 'let' in order to see that 'switch' is one. Introducing a
+second name to the same entity doesn't necessarily make anything more clear. There are only a few valid
+reasons to
+</p>
+
+<p>
+(let ((local foo-global)))  
+    (setq local (car local))
+;; end                      
+</p>
+
+<p>
+full name seems too long. Of course, dabbrev or PC-lisp-complete-symbol will help you to write the long names,
+but what will help the reader to read them? of different name.
+</p>
+
+<p>
+(let ((case-fold-search nil))                  
+   (re-search-forward foo bar)   ; respect case
+;; end                                         
+</p>
+
+<p>
+4.5 Referring to global variable
+</p>
+
+<p>
+If any global variables is used in a function, don't use them directly, instead put them into function body
+let* where any anyone can see at a glance what variables are used. It also make maintaining process much
+simpler, since the changes have to be done into let* only. Prefer putting globals first in let.
+</p>
+
+<p>
+The other benefit for the maintainer is that if he ever decides to move that global to function call parameter
+, the task is easy: you just lift the value from let-form to the parameter list, and you never have to touch
+the function body, because it uses the local variables.
+</p>
+
+<p>
+(defun my-func ()                ; #1 
+  (let* ((list  my-mode-alist)   ;copy
+         ..other variables..)         
+    ..BODY..))                        
+</p>
+
+<p>
+You may later find out that it's actually better to call the function with list argument, so that function
+becomes more general. Following is the lifted global version of the previous function. Notice that the
+function body doesn't change in any way.
+</p>
+
+<p>
+(defun my-mode-func (list)          ; #2 , global is now an argument
+  (let* (                                                           
+         ..other variables..)                                       
+    ..BODY..))                                                      
+</p>
+
+<p>
+[Vladimir] also suggested that you really don't need this kind of abstraction, because converting function
+from #1a into #2a with function that use globals directly is as easy.
+</p>
+
+<p>
+(defun my-mode-func ()                      ; #1a      
+    ..BODY..                                           
+    (if (memq match my-mode-alist)                     
+        &#x2026;)))                                         
+</p>
+
+<p>
+;;  Now uses paramer, not global variable my-mode-alist
+(defun my-mode-func (my-mode-alist)         ; #2a      
+    ..BODY..                                           
+    (if (memq match my-mode-alist)                     
+        &#x2026;)))                                         
+</p>
+
+<p>
+Hm. What do you think? I'd say that this is equal to mine what comes to lisp. But by using the same name in
+function argument list as for global variable, may makes things confusing, because my-mode-alist is originally
+meant to be global variable and used in other functions directly. The key point here was that we intended to
+make function more general, implying that we are probably moving it away from this my-mode package and
+including it into some general lisp library. If we move this function in #2a format, we wouldn't want to keep
+symbol names(variables), which refer to specific package my-mode.
+</p>
+
+<p>
+Detecting reusable functions from any package is easier if the globals are presented in the first let
+statement.
+</p>
+
+<p>
+4.6 Maintenance and deferring to global
+</p>
+
+<p>
+Someone may now think in his mind:
+</p>
+
+<p>
+Doesn't that make program more slower, I can avoid those private variables and let* altogether if I use
+globals directly.
+</p>
+
+<p>
+Hm, yes and no; program won't slow down remarkably by the extra let* statement. More important is the ease of
+maintenance and ability to add comments beside the let statement, since all variables may not be self
+explanatory. If function is very small, use could those global variables directly to gain some more speed.
+</p>
+
+<p>
+But if there is anything more than 10 line long function, for clarity's sake, use the alias method to hide the
+global from the actual body of function.
+</p>
+
+<p>
+The only case where you may try to bother to optimise let* out is, when function gets called many times. Do
+you know that the function is dangerous to my program's performance? Probably not, that's why you sometimes
+use some lisp profiler (elp.el) to bog down speed problems.
+</p>
+
+<p>
+4.7 Deferring to global, caution
+</p>
+
+<p>
+The only exception when alias cannot be made in let is presented here. We may have to introduce a control
+function to read global. Suppose we have following situation.
+</p>
+
+<p>
+(defun my-foo ()                                        
+  (let* ((table my-:passwd-entries-table) ;; copy global
+         point)                                         
+..code..                                                
+..code..                                                
+(my-change-passwd-table)                    ;; OOPPS!   
+   (while table                             ;; error!   
+     ..do, read content..                               
+     ..code..)))                                        
+</p>
+
+<p>
+Obviously it is not possible to read the global beforehand, if it will be changed by another function call
+during the execution of current function.
+</p>
+
+<p>
+For small amount of globals, 5-10, there is no point to make separate control function for reading global,
+like in this following example.
+</p>
+
+<p>
+(defun my-foo ()                                              
+  (let* (table                      ;; no global copy         
+         point)                                               
+..code..                                                      
+..code..                                                      
+(my-change-passwd-table)            ;; Watch out!             
+   (setq table (my-read-passwd))    ;; a macro to read global.
+</p>
+
+<p>
+(while table                     ;; okay now..             
+  ..do, read content..                                     
+  ..code..)))                                              
+</p>
+
+<p>
+The my-read-passwd, is implemented as
+</p>
+
+<p>
+(defmacro my-read-passwd ()                     
+  "Returns contents of my-:passwd-entries-table"
+    (` my-passwd-entries-table))                
+</p>
+
+<p>
+Using this single macro is overkill, but it may turn into more complex function later, if you decide to use
+many globals. See next:
+</p>
+
+<p>
+(defsubst my-read-variable (variable)          
+  "Returns contents of global variables"       
+  (cond                                        
+   ((eq variable 'passwd)                      
+    my:passwd-entries-table)                   
+   ((eq variable 'user)                        
+    my-user)                                   
+   (t                                          
+    (error "No such variable '%s'" variable))))
+</p>
+
+<p>
+(my-read-variable 'passwd)                     
+</p>
+
+<p>
+The function is called with symbol describing the variable. This implementation totally hides the global
+variables from lisp calls and from other outside functions. You must decide how strong abstraction of data you
+want: For small programs, you probably don't need this kind of strong abstraction, but if the program gets
+bigger and you start having 20-50 globals, you may consider using similar global control functions.
+</p>
+<hr  />
+
+<p>
+5.0 The 'let' forms in function
+</p>
+
+<p>
+5.1 Using only one let form inside function
+</p>
+
+<p>
+Nowadays many books and many programmers teach that you should define variables inside block where you need
+them. This is perfectly good suggestion and you should follow it in natively compiled languages. The advise
+for Emacs Lisp is: "use when appropriate".
+</p>
+
+<p>
+Note: There is slight difference in memory usage if you define a) all variables at the beginning of function
+</p>
+<ol class="org-ol">
+<li>along the execution of your program, where they are created and destroyed. While the A may take couple of</li>
+</ol>
+<p>
+bytes overall more memory, the important point is the content of the variables. If you put 100 cons cells
+immediately into the variable, that's hogging memory, not the variable definition itself.
+</p>
+
+<p>
+In practice don't worry about this minor memory increase, because creating and destroying a variable increases
+overhead for functions too (multiple let statements), so how do you choose: a small memory increase at the
+beginning of file where you define all my variables or do you take chance on adding a slight overhead by
+defining variables while the function executes? In big, complex function this could be very important issue,
+but in short functions the choice is insignificant.
+</p>
+
+<p>
+Most of the time you can use only one let* because it helps keeping function layout clearer, while admittedly
+that there are very good reasons when you could consider using multiple let* statements. you can arrange the
+inner body of function to self standing blocks by using many let statements and introduce new let statements
+where logically appropriate and many lisp programmers recommend that you do so.
+</p>
+
+<p>
+In C++ using block local variables is pretty nice looking.
+</p>
+
+<p>
+..FUNCTION START                                          
+if (var == 1)                                             
+{                                                         
+    int temp = 0                    // local to block if  
+    if ( condition )                                      
+    {                                                     
+        int tmp = 0                 // this is again local
+        ..do something..                                  
+    }                                                     
+}                                                         
+</p>
+
+<p>
+But If we do the same in Emacs lisp, the count of added parentheses may be disturbing:
+</p>
+
+<p>
+..FUNCTION START                      
+(if (= var 1)                         
+    (let ((temp 0))                   
+       (setq tmp (1+ tmp))            
+       (if condition                  
+           (let ((tmp 0))             
+              (setq tmp (1+ tmp))     
+              ..do something..))))    
+</p>
+
+<p>
+If we were to write real lisp (not Emacs Lisp), the inner let variables could have been be optimized to
+registers and you should definitely use the multiple let statements. In Emacs lisp, this kind of optimizatrion
+does not happen because the code is not compiled to native machine code. That's why do not worry so much if
+all the variables are defined at the top-level let and not inside later let statements. You won't see any
+noticeable performance drop if you define couple of more variables at the beginning of function. That's why
+you see most of the time this format.
+</p>
+
+<p>
+..FUNCTION START                                
+(let ((tmp1 0)      ;; Define all used variables
+      (tmp2 0))                                 
+(if (= var 1)                                   
+    (setq tmp1 (1+ tmp1))                       
+    (if condition                               
+        (setq tmp2 (1+ tmp2))                   
+        ..do something..))))                    
+</p>
+
+<p>
+The idea for using only one let is that functions look like simple. In one let you can see what variables are
+used in a function and decide is some private variable is a candidate for global.
+</p>
+
+<p>
+FUNCTION   
+  VARIABLES
+  BODY     
+</p>
+
+<p>
+While they could look like this:
+</p>
+
+<p>
+FUNCTION    
+  VARIABLES 
+  BODY      
+    VARIABLE
+    BODY    
+  VARIABLES 
+  BODY      
+    VARIABLE
+    BODY    
+</p>
+
+<p>
+5.2 Let form and initialising variables
+</p>
+
+<p>
+But while the variables can be defined without performance penalty, postpone initialisation if it takes lot of
+time. They are initialised only just before they are actually used.
+</p>
+
+<p>
+(defun my-func (var)                                         
+  (let* ((re1  (get-re-1))     ; scans whole file.txt, 100Meg
+         (re2  (get-re-2))     ;                             
+         tmp)                                                
+    (cond                                                    
+     ((eq 'this var)                                         
+      ;; okay we're in business                              
+      (re-search-forward re1 nil t)                          
+      &#x2026;                                                    
+</p>
+
+<p>
+Instead write code like this, which initialises variable only when condition goes into the branch.
+</p>
+
+<p>
+(defun my-func (var)                                  
+  (let* (re1                ; NOTE - No initialisation
+         re2                ; NOTE - No initialisation
+         tmp)                                         
+    (cond                                             
+     ((eq 'this var)                                  
+      ;; okay we're in business                       
+      (setq re1 (get-re-1))                           
+      (setq re2 (get-re-2)))                          
+      &#x2026;                                             
+</p>
+
+<hr  />
+
+<p>
+6.0 Function call arguments and return values
+</p>
+
+<p>
+6.1 Using separate return value 'ret'
+</p>
+
+<p>
+Before going further, remember that all lisp forms return the last value which the form executed prior its
+ending. This is fundament of lisp language and whole lisp programming is based on it. The key here is that you
+can make the function's return value more visible: the point where the return value is set is obvious. If we
+use extra variable, say ret, over the implicit return value, the function is a) easier to debug: you can print
+the ret variable anywhere b) easier to follow: setting the return value is obvious 3) and one exit point is
+better than "hidden".
+</p>
+
+<p>
+Of course if the function is very small or extremely simple, you don't have use 'ret': return value is already
+obvious. Use your common sense to determine when the extra return variable ret could clarify the function and
+when you decide to leave it out and use lisp form's side effects of returning value of last executed
+statement.
+</p>
+
+<p>
+(defun my-func ()                                            
+   (let* (..                                                 
+          ..)                                                
+     &#x2026; many lines of code                                  
+     (if test                                                
+        (cond                                                
+          ((= 1 var)                                         
+           ;; IMPLICIT RETURN ))     &lt;&#x2014;  I wouldn't do this
+          (..other-test                                      
+           ;; IMPLICIT RETURN ))     &lt;&#x2014;  I wouldn't do this
+       &#x2026; many lines of code                                
+       &#x2026;)) ;; let-defun end                                
+</p>
+
+<p>
+Alternative choice
+</p>
+
+<p>
+(defun my-func ()                                         
+   (let* (ret                                             
+          ..)                                             
+      &#x2026; many lines of code                              
+      (if test                                            
+        (cond                                             
+          ((= 1 var)                                      
+           (setq ret (point)))                            
+          ((= 2 var)                                      
+           (setq ret ..)))                                
+        &#x2026; many lines of code                            
+        &#x2026;)                                              
+   ret))  ;; You can put your debugger breakpoint here    
+</p>
+
+<p>
+And here are some extremely simple functions, compared to above function that would have had many lines of
+code. In here, the return values are clear.
+</p>
+
+<p>
+(defun a (b)                                   
+  (if b                                        
+      3))    ; 'else' case returns nil.        
+</p>
+
+<p>
+(defun a (b)                                   
+  (cond                                        
+   ((&#x2026;)                                      
+</p>
+<ol class="org-ol">
+<li>;return value</li>
+</ol>
+<p>
+((&#x2026;)                                      
+</p>
+<ol class="org-ol">
+<li></li>
+</ol>
+<p>
+(t                                          
+ 3)))                                       
+</p>
+
+<p>
+Another advantage of using ret is, that it jumps into existence with default value nil. In function body, you
+just set it to another value if some condition is satisfied, otherwise called receives value nil by default.
+</p>
+
+<p>
+6.2 Calling functions: passing non-nil
+</p>
+
+<p>
+[Andrew Fitzgibbon <a href="mailto:andrewfg@oculus.aifh.ed.ac.uk">andrewfg@oculus.aifh.ed.ac.uk</a>] It's common to use a descriptive symbol instead of t when
+passing arguments to functions. E.g.
+</p>
+
+<p>
+(directory-files "~" 'absolute "^[^.#%]")    
+</p>
+
+<p>
+It's a pain then that there's only one nil when you want to default an argument, meaning that you can't easily
+document it. It's just occurred to me however that you can write:
+</p>
+
+<p>
+(directory-files "~" (not 'absolute) "^[^.#%]")    
+</p>
+
+<hr  />
+
+<p>
+7.0 Interactive functions and message display control
+</p>
+
+<p>
+How should message displaying be controlled in good manner? If you print any messages, you can add variable 
+verb to the optional parameter list. This variable should be the last element there; unless you have the &amp;rest
+list of course. Now, why such an recommendation? Suppose your function is quite time consuming; eg. if it does
+some file handling and it may be a good idea to print some messages to the user about the progress stages.
+</p>
+
+<p>
+7.1 Take one, lack of verbosity control
+</p>
+
+<p>
+(defun my-do-files ()                        
+  (let* (&#x2026;)                                
+     (while                                  
+      (message "reading files&#x2026;"))          
+       &#x2026; do it for 10 secs)                
+      (message "reading files&#x2026;done"))))    
+</p>
+
+<p>
+This was the traditional way to code it, because the message is always printed, no matter how the function is
+called: interactively or by some top level function.
+</p>
+
+<p>
+7.2 Take two, some verbosity control
+</p>
+
+<p>
+(defun my-do-files ()                           
+  (let* (&#x2026;)                                   
+     (while                                     
+       (if (interactive-p)                      
+           (message "reading files&#x2026;"))        
+       &#x2026; do it for 10 secs)                   
+     (if (interactive-p)                        
+         (message "reading files&#x2026;done"))))    
+</p>
+
+<p>
+Thi may be better implementation. Messages are printed only if the user has called fucntion interactively. Do
+you see anything to make better here? If not, let's examine one more example.
+</p>
+
+<p>
+7.3 Take three, full control of verbositiness
+</p>
+
+<p>
+(defun my-do-files (&amp;optional verb)             
+  (let* (&#x2026;)                                   
+     (setq verb (or verb (interactive-p)))      
+     (while                                     
+       (if verb                                 
+           (message "reading files&#x2026;"))        
+       &#x2026; do it for 10 secs)                   
+     (if verb                                   
+         (message "reading files&#x2026;done"))))    
+</p>
+
+<p>
+There are couple of interesting points in this solution. First, it provides verbosity to the user. Second it
+provides verbosity to the caller too. The idea is, that by default the function is verbose when user calls it,
+but it also gives the verbose messages whenever someone else calls it..
+</p>
+
+<p>
+The function can now be called like this and it keeps the used nicely aware of progress:
+</p>
+
+<p>
+M-x my-do-files         &#x2013;&gt; verbose    
+</p>
+
+<p>
+But the functions is recalled with the command with C-x ESC ESC followed by re-run with RET, the verbose
+messages are nnot printed.
+</p>
+
+<p>
+This actualy makes user function easier to call, because you don't have to call them via M-x (or key binding)
+to get the verbose messages (like returning status, state of mode on/off). Developers can now turn on
+particular verbosity of some function if they think would be good to display messages to the user while
+function is executing.
+</p>
+
+<p>
+7.4 Using call-interactively isn't always the solution.
+</p>
+
+<p>
+Aha, now I hear someone claiming that the example 3 drains into this simple lisp call if verbosity is required
+by lisp call
+</p>
+
+<p>
+(call-interactively 'my-do-files)    
+</p>
+
+<p>
+Yes, it turns on the (interactive-p) test in function, but by using this it also activates interactive part of
+the function. If function had the interactive part like this, it would be executed:
+</p>
+
+<p>
+(defun my-do-files (&amp;optional verb)
+  (interactive "sWhat's up doc? ") 
+  ..code..                         
+  (if (interactive-p)              
+      (message "this"))            
+</p>
+
+<p>
+Then the "What's up doc?" prompt would have been popped onto screen. The variable 'verb' is needed if the
+decision of printing message is given to the calling function.
+</p>
+<hr  />
+
+<p>
+8.0 Overriding functions
+</p>
+
+<p>
+8.1 What is that?
+</p>
+
+<p>
+Overriding means that the function exists already, but it doesn't do exactly what you want &#x2013;&gt; you want to
+write your own implementation which replaces the function. Sometimes there is Here are instructions how you
+override functions properly. If you just want to have some minor modification, then you should look at the 
+advice.el (std emacs distribution), but to complete replace a function, you can fllow steps above.
+</p>
+
+<p>
+First, make separate file, where you gather overridden functions. You use this file in next sections.
+</p>
+
+<p>
+~/elisp/my/emacs-rc-override.el    
+</p>
+
+<p>
+The body of the file looks something like this
+</p>
+
+<p>
+;;; emacs-rc-override.el &#x2014; My implementations              
+;; Override settings of functions for xxxx                   
+</p>
+
+<p>
+;; &#x2026;&#x2026;&#x2026;&#x2026;&#x2026;&#x2026;&#x2026;&#x2026;&#x2026;&#x2026;&#x2026;&#x2026;&#x2026;&#x2026;&#x2026;&#x2026; forms &#x2026;
+</p>
+
+<p>
+&lt;code here&gt;                                                  
+</p>
+
+<p>
+;; &#x2026;&#x2026;&#x2026;&#x2026;&#x2026;&#x2026;&#x2026;&#x2026;&#x2026;&#x2026;&#x2026;&#x2026;&#x2026;&#x2026;&#x2026;&#x2026; funcs &#x2026;
+</p>
+
+<p>
+&lt;code here&gt;                                                  
+</p>
+
+<p>
+(provide 'emacs-rc-override)                                 
+</p>
+
+<p>
+;;; End of file emacs-rc-override.el                         
+</p>
+
+<p>
+8.2 Using the eval-after-load hook trick
+</p>
+
+<p>
+Let]s start by defining our own mail-signature function which is defined in sendmail.el. First the Emacs
+startup file must be modified by adding this code to it:
+</p>
+
+<p>
+(eval-after-load "sendmail" '(load "~/elisp/my/emacs-rc-override"))    
+</p>
+
+<ul class="org-ul">
+<li>This says that "every time file sendmail is loaded, Emacs should execute lisp command (load &#x2026;)".</li>
+<li>If the sendmail is already loaded into emacs, the form executes immediately.</li>
+<li>If sendmail is already dumped into emacs, you don't need the statement at all, but you can load
+emacs-rc-override.el right away.</li>
+</ul>
+
+<p>
+Next, a function is added to replace the original. Add this code to emacs-rc-override.el after the "funcs"
+section:
+</p>
+
+<p>
+(defun mail-signature (atpoint)  
+  "My. Sign letter with contents"
+   ^^^                           
+  &#x2026;code)                       
+</p>
+
+<p>
+or
+</p>
+
+<p>
+(defun mail-signature (atpoint)          
+  "Overridden. Sign letter with contents"
+  ^^^^^^^^^^^^                           
+ &#x2026;code)                                
+</p>
+
+<p>
+Make sure you add some word like "My" or "Overridden" in front of the documentation string, so that when you
+look up the function description with M-x describe-function &lt;func&gt; or C-h f &lt;func&gt;, you don't mistakenly
+believe that is is standard emacs function If you overridden 1-2 functions, you may remember which ones you
+have rewritten, but when you start modifying emacs for your taste (I have 20-30 overridden functions), you
+can't remember which ones are "true" emacs functions.
+</p>
+
+<p>
+Besides, if you post the solution to emacs newsgroups, people will appreciate the comment so that they get the
+describe-function information too. Inexperienced user's typically just copy the function from the post and if
+the word my is not there they may never know later that the function whether it was emacs's default or not
+that they're using&#x2026;
+</p>
+
+<p>
+Now you have the file ready and only thing left is to put one statement into your .emacs init file:
+</p>
+
+<p>
+(load "~/elisp/my/emacs-rc-override")    
+</p>
+
+<p>
+This loads the file and hooks everything for you. If you later want to override some other function, you just
+open the ~/.emacs.o again and (say we override some Gnus functions) add this to the forms section and write
+the function to the funcs section in emacs-rc-override.el
+</p>
+
+<p>
+(eval-after-load "gnus" '(load "~/elisp/my/emacs-rc-override"))
+                  ^^^^^                                        
+</p>
+
+<p>
+8.3 Using advice.el to replace functions
+</p>
+
+<p>
+Note: When you use advice, make sure that the original behaviour of function is preserved. You don't want to
+break any existing packages that may use the advised function.
+</p>
+
+<p>
+This is much better way than previously presented eval-after-load method. This time you need advice.el from
+standard emacs distribution. Why is this better? Because advice doesn't wipe out functions permanently, you
+can turn them on and off when needed.
+</p>
+
+<p>
+The advice has flag around that lets you do things around then function: before and after calling it. But if
+you don't call ad-do-it inside advice, then you have effectively replaced the function. This is what you need
+</p>
+
+<p>
+(defadvice mail-signature (around my act)
+  "Replaces function."                   
+  &#x2026;code                                
+  (setq ad-return-value something))      
+</p>
+
+<p>
+The important point here is that you say around and do not include advice macro ad-do-it in the body of
+function (which would call the original function). The advice is put into category my to refer to your
+definitions and finally it's put into immediate use: act means activate now.
+</p>
+<hr  />
+
+<p>
+9.0 Using macros
+</p>
+
+<p>
+9.1 Macros introduction
+</p>
+
+<p>
+Dewey M. Sasser <a href="mailto:dewey@newvision.com">dewey@newvision.com</a>
+</p>
+
+<p>
+Macros are (probably) the most difficult thing in LISP to understand, especially coming from a background in C
+or assembly. The big key in lisp is that a macro is just a function invoked by the evaluator to find out what
+it should really evaluate. This has two big implications:
+</p>
+
+<ul class="org-ul">
+<li>Arguments to a macro are not evaluated.</li>
+<li>Macros can call functions</li>
+</ul>
+
+<p>
+It is not necessary (and because of feature #1, somewhat brain twisting) to call a macro from another macro.
+</p>
+
+<p>
+When you write a macro, don't think of it as writing a macro, but as a function that will be called to
+translate the arguments (as you've specified) from the way they are to some other form. Your return value is
+the form to be executed instead.
+</p>
+
+<p>
+For example:
+</p>
+
+<p>
+(defmacro my-setq (var value)            
+  (list 'setq var value))                
+</p>
+
+<p>
+(macroexpand '(my-setq x y))             
+==&gt;(setq x y)                            
+</p>
+
+<p>
+(defmacro msf (symbol)                   
+  `(symbol-function (quote ,symbol)))    
+</p>
+
+<p>
+But is a bit less obvious.
+</p>
+
+<p>
+If you really want to hurt your brain, think about situation where you might want to do ',',form (which is
+valid code and I've seen it used, but never had to use it myself). You do this kind of thing when you write
+macros which produce other macros.
+</p>
+
+<p>
+9.2 A note on lisp and "forward declarations"
+</p>
+
+<p>
+Dewey M. Sasser <a href="mailto:dewey@newvision.com">dewey@newvision.com</a>
+</p>
+
+<p>
+Lisp does not have "forward declarations", as in some other languages. In using Lisp, you should make sure
+that the definition has been seen before it is used.
+</p>
+
+<p>
+If you define function A using function B, but before function B has been defined, it will work, but the byte
+compiler may not be able to check your call to function B. Also, if B is really a macro rather than a
+function, it's definition must have been seen before it is used. Remember that macros are expanded by the
+byte-compiler and do not actually get compiled into your code. Only the results are compiled in.
+</p>
+
+<p>
+Anyone who programs in Lisp a lot (and you definitely do) should have a copy of CommonLisp:_the_Language_, 2nd
+Edition, by Guy L. Steel. Emacs Lisp is not strictly compatible with the language it defines, but Steel's book
+(commonly referred to as CLtL2) is a very good reference and description of how and while. It's not a
+tutorial, but an annotated standard.
+</p>
+
+<p>
+Whenever possible, have your macros expand to normal lisp code, the way you'd write it if you weren't using
+macros. Since you wouldn't write a normal function like:
+</p>
+
+<p>
+(setf (symbol-function 'my-func)                     
+        (function (lambda (x) (do-something x))))    
+</p>
+
+<p>
+don't make your macro expand to that unless there's some very good reason. If you go look at my modefn.el,
+where modefn::define-mode-specific-function does the real work behind a "defmodemethod" call, you'll see that
+what it's doing is just building the proper defun!
+</p>
+
+<p>
+This has the advantage of avoiding all of the nasty byte compiler tricks necessary to have something compiled
+as a function (like quoting with function, for example) or other things. Also, there's really no simple
+work-around for defvar. You pretty much have to use a defvar form. (OK, you could work around it, but it's a
+lot more work.)
+</p>
+
+<p>
+I think that if you forget about the code you've written so far (I know, that's difficult to do), and rewrite
+it using what you now know, you'll save yourself a lot of work and get better results.
+</p>
+
+<p>
+9.3 Macros and autoloading
+</p>
+
+<p>
+One important thing that you must remember when using macros is, that you must tell in autoload statement
+explicitly, that that defined symbol is a macro. Suppose following.
+</p>
+
+<p>
+library X: has 100 functions and macros
+library Y: has 100 functions only      
+</p>
+
+<p>
+Now user builds his package using code from library Y and X. Sophisticated user doesn't want to slurp whole
+library, immediately, but he wants to instruct emacs to load functions on demand by adding autoload statements
+into the code.
+</p>
+
+<p>
+Here is simple way to load packages
+</p>
+
+<p>
+(require 'X)    
+(require 'Y)    
+</p>
+
+<p>
+Slightly different way is presented below. The function y-function-this is loaded from package Y only when is
+is needed somewhere in the code.
+</p>
+
+<p>
+(require 'X)                       
+(autoload 'y-function-this "Y")    
+</p>
+
+<p>
+And the bogus way would be
+</p>
+
+<p>
+(autoload 'x-macro-this    "X")   ;; Wrong
+(autoload 'y-function-this "Y")           
+</p>
+
+<p>
+The last example fails, not during the byte compilation phase – it passes with flying colours, but in the
+middle of run time function it breaks. That's because the user forgot to mention that the the x-macro-this is
+a macro. What actually happened, was that in byte compiled file there is function call
+</p>
+
+<p>
+(x-macro-this)    
+</p>
+
+<p>
+But the macro should have been open coded and expanded! The right way to use the autoloads is:
+</p>
+
+<p>
+(autoload 'x-macro-this    "X" 'macro)   ;; okay now
+(autoload 'y-function-this "Y")                     
+</p>
+
+<p>
+Tip: See tinylisp.el and command '$ A' in tinylisp-mode which creates right autoload statements from any lisp
+package file.
+</p>
+
+<p>
+9.4 Coding defmacros and name space problem
+</p>
+
+<p>
+This topic is throughly explained in the '(XEmacs lispref) Surprising Local Variables' and It is adviced that
+you read that section for better reference. If you have been using macros, you probably know about the dynamic
+scoping problem that may be occurring.
+</p>
+
+<p>
+(defmacro my-macro (&amp;rest body)
+  (let* ((counter 0))          
+     (while (&lt; counter 9)      
+       (inc counter)           
+       ;; BODY sees <span class="underline">counter</span>  
+       (,@ body))))            
+</p>
+
+<p>
+In the code above, macro's counter is visible to body and if there is also user defined "counter", then there
+is a serious name conflict.
+</p>
+
+<p>
+One possible way to avoid this clashing is to use mangled variable names in local macros. Because the lisp is
+case sensitive, you can mix upper and lowercase letters to make unique variable name; the chance that body
+would have similar name is astronomically small. A non-clashing name could have been made from mixing the
+first and last characters:
+</p>
+
+<p>
+CounteR    
+</p>
+
+<p>
+Another way to use unique names I learned from a post by <a href="mailto:wbrodie@panix.com">wbrodie@panix.com</a> (Bill Brodie), gnu.emacs.help, 23
+Aug 1996. He quoted my post where I wondered where I could use make-symbol command.
+</p>
+
+<p>
+&gt; In fact I don't know any use of the command
+&gt; make-symbol&#x2026;
+</p>
+
+<p>
+Probably its most common use is in writing macros, to make sure that a temporary variable introduced into the
+macro's expansion doesn't conflict with any user variables. For example:
+</p>
+
+<p>
+(defmacro m (x)                   
+  (let ((x-var (make-symbol "x")))
+    (` (let (((, x-var) (, x)))   
+         &#x2026;))))                  
+</p>
+
+<p>
+9.5 Macro or defun
+</p>
+
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-left" />
+</colgroup>
+<tbody>
+<tr>
+<td class="org-left">looking thru the advice.el code I notice this definition:</td>
+</tr>
+<tbody>
+<tr>
+</tr>
+</tbody>
+
+<tr>
+<td class="org-left">(defmacro ad-xemacs-p ()</td>
+</tr>
+
+<tr>
+<td class="org-left">;;  Expands into Non-nil constant if we run XEmacs.</td>
+</tr>
+
+<tr>
+<td class="org-left">;;  Unselected conditional code will be optimized</td>
+</tr>
+
+<tr>
+<td class="org-left">;;  away during compilation.</td>
+</tr>
+
+<tr>
+<td class="org-left">(string-match "XEmacs" emacs-version))</td>
+</tr>
+<tbody>
+<tr>
+</tr>
+</tbody>
+
+<tr>
+<td class="org-left">and was wondering what the difference is between using `defmacro'</td>
+</tr>
+
+<tr>
+<td class="org-left">instead of `defun' when no args are used.</td>
+</tr>
+</tbody>
+</table>
+
+<p>
+[Vladimir]
+</p>
+
+<p>
+The above is equivalent to nil on non-xemacs and 6 (or whatever) on emacs. The bytecompiler will compile (if
+nil (foo)) to nothing. If you used a function instead (or a variable), the bytecompiler would generate code to
+call it (fetch its value) and accordingly it will include both the emacs and xemacs variants of the code. This
+is slower and produces more code, however there's one significant shortcoming of the macro variant: code
+compiled with emacs won't work on xemacs and vice versa This makes it impossible to share .elc's one a site
+that has both emacsen installed.
+</p>
+
+<p>
+9.6 Expanding macros
+</p>
+
+<p>
+It sometimes usefull to expand the macro to really see what happend in there. Evaluate these and be amazed
+</p>
+
+<p>
+(macroexpand      '(dolist (i '(1 2)) i))
+(cl-prettyexpand  '(dolist (i '(1 2)) i))
+</p>
+
+<p>
+;;  XEmacs 19.15 only                    
+(prettyexpand-sexp '(block nil))         
+</p>
+
+<p>
+9.7 Macro demonstration – tutorial
+</p>
+
+<p>
+Dewey M. Sasser <a href="mailto:dewey@newvision.com">dewey@newvision.com</a>
+</p>
+
+<p>
+As an example, here's my start at the "minor-mode" wizard (you know, ever since Microsoft started using that
+term, I've hated it.) This code defines a macro "make-minor-mode", which can be invoked like this:
+</p>
+
+<p>
+(make-minor-mode dewey        
+   "\C-cd" 'insert-dewey      
+   "\C-cs" 'insert-sasser)    
+</p>
+
+<p>
+The above call expands to this:
+</p>
+
+<p>
+(progn                                                              
+  (defvar dewey-minor-mode nil                                      
+    "Variable which controls if dewey-minor-mode is active.")       
+</p>
+
+<p>
+(defun dewey-minor-mode (&amp;optional arg)                           
+  "Function which toggles the dewey-minor-mode"                   
+  (setq dewey-minor-mode                                          
+      (if (null arg)                                              
+          (not dewey-minor-mode)                                  
+        (&gt; (prefix-nume ric-value arg) 0))))                      
+</p>
+
+<p>
+(setq minor-mode-alist                                            
+      (cons (cons (quote dewey-minor-mode) name)                  
+      minor-mode-alist))                                          
+</p>
+
+<p>
+(defvar dewey-minor-mode-keymap nil                               
+  "The keymap for dewey-minor-mode")                              
+</p>
+
+<p>
+(if keymap-symbol nil                                             
+  (setq dewey-minor-mode-keymap (make-sparse-keymap))             
+  (define-key dewey-minor-mode-keymap "^Cd" 'insert-dewey)        
+  (define-key dewey-minor-mode-keymap "^Cs" 'insert-sasser')))    
+</p>
+
+<p>
+9.8 Macro demonstration – code
+</p>
+
+<p>
+Dewey M. Sasser <a href="mailto:dewey@newvision.com">dewey@newvision.com</a>
+</p>
+
+<p>
+Here is the complete macros that are used. Study them carefully.
+</p>
+
+<p>
+(defun minor-mode-variable-symbol (mode)                       
+  "Return the symbol of the minor mode controlling variable.   
+Arguement MODE is a symbol"                                    
+  (intern (concat (symbol-name mode) "-minor-mode")))          
+</p>
+
+<p>
+(defun minor-mode-make-keymap-symbol (mode)                    
+  "Return the symbol of the minor mode controlling variable.   
+Arguement MODE is a symbol"                                    
+  (intern (concat (symbol-name mode) "-minor-mode-keymap")))   
+</p>
+
+<p>
+(defun minor-mode-function-name (mode)                         
+  "Return the symbol naming the minor mode function.           
+PREFIX can be used to determine which function"                
+  (intern (concat                                              
+           (symbol-name mode)                                  
+           "-minor-mode")))                                    
+</p>
+
+<p>
+(defun make-minor-mode-keymap (mode bindings)                  
+  "Define the appropriate keymap"                              
+  (let ((name (symbol-name mode))                              
+        (keymap-symbol (minor-mode-make-keymap-symbol mode)))  
+  (list                                                        
+   `(defvar ,keymap-symbol nil                                 
+      (concat "The keymap for " name "-minor-mode"))           
+   `(if keymap-symbol nil                                      
+      @(let (results key binding)                              
+          (if (oddp (length bindings))                         
+              (error "Odd number of keys and bindings"))       
+          (push `(setq ,keymap-symbol (make-sparse-keymap))    
+                results)                                       
+          (while bindings                                      
+            (setq key (pop bindings))                          
+            (setq binding (pop bindings))                      
+            (push                                              
+             `(define-key ,keymap-symbol ,key ,binding)        
+             results))                                         
+          (nreverse results))))))                              
+</p>
+
+<p>
+(defun make-minor-mode-add-to-alist (mode)                     
+  "Add appropriate thing to minor-mode-alist"                  
+  (let ((name (symbol-name mode))                              
+        (variable-symbol (minor-mode-variable-symbol mode)))   
+    `(setq minor-mode-alist                                    
+           (cons                                               
+            (cons ',variable-symbol name)                      
+            minor-mode-alist))))                               
+</p>
+
+<p>
+(defun make-minor-mode-variable (mode)                         
+  (let* ((variable-symbol (minor-mode-variable-symbol mode)))  
+    `(defvar ,variable-symbol nil                              
+       (concat "Variable which controls if " (symbol-name mode)
+                "-minor-mode is active."))))                   
+</p>
+
+<p>
+(defun make-minor-toggle-mode-function (mode)                  
+  "Return the defun form to define the minor mode"             
+  (let* ((mode-name (symbol-name mode))                        
+         (variable-symbol (minor-mode-variable-symbol mode))   
+         (function-name (minor-mode-function-name mode)))      
+    `(defun ,function-name (&amp;optional arg)                     
+       (concat "Function which toggles the "                   
+                mode-name "-minor-mode")                       
+          (setq ,variable-symbol                               
+                (if (null arg) (not ,variable-symbol)          
+                  (&gt; (prefix-numeric-value arg) 0))))))        
+</p>
+
+<p>
+(defmacro make-minor-mode (mode &amp;rest bindings)                
+  "Define the minor mode functions, etc"                       
+  `(progn                                                      
+     (make-minor-mode-variable mode)                           
+     (make-minor-toggle-mode-function mode)                    
+     (make-minor-mode-add-to-alist mode)                       
+     @(make-minor-mode-keymap mode bindings)))                 
+</p>
+
+<p>
+9.9 Nesting macros
+</p>
+
+<p>
+Below is a very simple demonstaration how you use toplevel to call other macros that need symbols as
+arguments. The toplevel expects that the variables are know by name before hand.
+</p>
+
+<p>
+;;  some predefined variables                                   
+</p>
+
+<p>
+(defvar my-variable1)                                           
+(defvar my-variable2)                                           
+</p>
+
+<p>
+(defmacro my-internal (sym)                                     
+  ;;  Example macro that needs symbol as input argument         
+  ;;                                                            
+  (` (symbol-value (, sym))))                                   
+</p>
+
+<p>
+(defmacro my-toplevel (variable-prefix)                         
+  ;;  toplevel uses my-internal macro; Create symbols for calls 
+  ;;                                                            
+  (let ((sym1 (intern                                           
+                (concat (` (, variable-prefix)) "-variable1"))) 
+        (sym2 (intern                                           
+                (concat (` (, variable-prefix)) "-variable2"))))
+    (`                                                          
+     (,@                                                        
+      (let* (ret)                                               
+        ;;  Really, nothing magic here. Since the return value  
+        ;;  of macro must be a list, we build up list with      
+        ;;  push command. To return the list in proper order    
+        ;;  we finally use nreverse.                            
+        ;;                                                      
+        (push 'progn ret)                                       
+        (push (` (my-internal (, sym1))) ret)                   
+        (push (` (my-internal (, sym2))) ret)                   
+</p>
+
+<p>
+(nreverse ret))))))                                     
+</p>
+
+<p>
+;;  To check what happens when the macro is expanded            
+</p>
+
+<p>
+(macroexpand ' (my-toplevel "my"))                              
+</p>
+
+<p>
+;;  And this is the result:                                     
+;; &#x2013;&gt; (progn                                                   
+;;       (my-internal my-variable1)                             
+;;       (my-internal my-variable2))                            
+</p>
+
+<p>
+9.10 Code: nesting macros, complex example
+</p>
+
+<p>
+[vladimir] Here's a macro to define toggle commands.
+</p>
+
+<p>
+(defmacro v/deftoggle                                         
+  (sym &amp;optional get set comment before after message)        
+  "Define a function v/toggle-SYM to toggle SYM on and off.   
+GET and SET are either nil in which case SYM and (setq SYM)   
+are used, functions (eg default-value and set-default)        
+called with SYM and SYM VAL,                                  
+or (macro lambda (SYM) &#x2026;) and                               
+(macro lambda (SYM VAL) &#x2026;) respectively.                    
+COMMENT is additional comment for v/toggle-SYM,               
+BEFORE and AFTER are lists of additional                      
+forms around the toggle code,                                 
+MESSAGE is a (macro lambda (SYM VAL) &#x2026;) replacing the normal
+\"SYM is VAL.\""                                              
+  (cond ((null get) (setq get sym))                           
+        ((symbolp get) (setq get `(,get (quote ,sym))))       
+        ((setq get (macroexpand (list get sym)))))            
+  (let ((val `(if arg (&gt; (prefix-numeric-value arg) 0)        
+                      (not ,get))))                           
+    (cond ((null set) (setq set `(setq ,sym ,val)))           
+          ((symbolp set) (setq set `(,set (quote ,sym) ,val)))
+          ((setq set (macroexpand (list set sym val)))))      
+    `(defun ,(intern (concat "v/toggle-" (symbol-name sym)))  
+            (&amp;optional arg)                                   
+       (concat "Toggle " (symbol-name sym)                    
+        ". Return the new value. With positive ARG set it,    
+        with nonpositive ARG reset it."                       
+                (if comment (concat "\n" comment)))           
+       (interactive "P")                                      
+       @before                                                
+       set                                                    
+       @after                                                 
+       (if message (macroexpand (list message sym get))       
+          `(message "%s is %s" (quote ,sym) ,get))            
+       get)))                                                 
+</p>
+
+<p>
+A simple command to toggle a var is defined like this:        
+</p>
+
+<p>
+(v/deftoggle bibtex-maintain-sorted-entries)                  
+</p>
+
+<p>
+This executes some code after toggling the var:
+</p>
+
+<p>
+(v/deftoggle debug-on-error nil nil              
+  "Require 'fdb (filter out trivial errors)." nil
+  ((if debug-on-error (require 'fdb))))          
+</p>
+
+<p>
+This uses default-value and set-default as the get and set functions because url-be-asynchronous is
+buffer-local, and we need to manipulate its global value.
+</p>
+
+<p>
+(v/deftoggle url-be-asynchronous default-value set-default)    
+</p>
+
+<p>
+This goes wild: it uses special get/set functions and a special message
+</p>
+
+<p>
+(v/deftoggle indented-text-mode                                   
+  (macro lambda (sym)                                             
+         '(eq major-mode 'indented-text-mode))                    
+  (macro lambda (sym val)                                         
+         `(if ,val                                                
+              (progn                                              
+                (make-variable-buffer-local                       
+                 'before-indented-text-mode)                      
+                (put 'before-indented-text-mode                   
+                     'permanent-local t)                          
+                ;; so that kill-all-local-variables won't touch it
+                ;;                                                
+                (setq before-indented-text-mode major-mode)       
+                (indented-text-mode))                             
+            (if (boundp 'before-indented-text-mode)               
+                (funcall before-indented-text-mode)               
+              (normal-mode)                                       
+              (if (eq major-mode 'indented-text-mode)             
+                  (text-mode)))))                                 
+  "Toggle the major mode between indented-text-mode               
+   and the normal-mode."                                          
+  nil nil                                                         
+  (macro lambda (sym val) `(message "%s" major-mode)))            
+</p>
+
+<p>
+9.11 Using macros to create functions
+</p>
+
+<p>
+;; example presented by [kai]                     
+</p>
+
+<p>
+(defun make-multiplier (n) `(lambda (x) (* ,n x)))
+(fset 'double (make-multiplier 2))                
+</p>
+
+<p>
+[Bill Dubuque <a href="mailto:wgd@martigny.ai.mit.edu">wgd@martigny.ai.mit.edu</a>] The above technique does not work to create a closure. The point of a
+closure is that it 'closes' over (captures) some lexically apparent bindings. The exact same binding may be
+shared by many different closures created in the same lexical context. If one of the closures alters the value
+of a closed variable, all the other closures will see the change.
+</p>
+
+<p>
+E.g. one can use closures to implement data abstractions where the closed bindings essentially are state that
+is hidden by the abstraction. Here is a toy example that implements a counter with READ and INCREMENT methods:
+</p>
+
+<p>
+(defun make-counter (value)                                 
+  (values                                                   
+    #'(lambda ()                ; READ method               
+        value)                                              
+    #'(lambda (increment)       ; INCREMENT method          
+        (setq value (+ value increment)))))                 
+</p>
+
+<p>
+(multiple-value-bind (counter-read counter-incf)            
+                     (make-counter 1)   ; value &lt;- 1        
+  (funcall counter-incf 2)              ; value &lt;- value + 2
+  (funcall counter-read))               ; read value        
+</p>
+
+<p>
+=&gt; 3                                                        
+</p>
+
+<p>
+Note how the same lexical binding of 'value' was captured in both the READ and INCREMENT closures returned by
+make-counter.
+</p>
+
+<p>
+Dewey M. Sasser <a href="mailto:dewey@newvision.com">dewey@newvision.com</a> comments:
+</p>
+
+<p>
+Actually, I found when experimenting that the fset line is byte compiled. I suppose what that means is that
+byte-compiler is smart enough to treat the argument to "fset" as a function.
+</p>
+
+<p>
+(defmacro make-multiplier (n)         
+   (` (lambda (x) (* (, n) x))))      
+</p>
+
+<p>
+(macroexpand ' (make-multiplier 2))   
+;; &#x2013;&gt; (function (lambda (x) (* 2 x)))
+</p>
+
+<p>
+(fset 'double (make-multiplier 2))    
+</p>
+
+<p>
+However, if you do a
+</p>
+
+<p>
+(setq some-var (make-multiplier 2))
+(fset 'double some-var)            
+</p>
+
+<p>
+I don't think it will be compiled; maybe you have to write
+</p>
+
+<p>
+(setq some-var (make-multiplier 2))            
+(fset 'double (byte-compile-sexp some-var))    
+</p>
+
+<p>
+Here is another possibility
+</p>
+
+<p>
+(defun make-multiplier (func-sym n)             
+   (let ((name (intern (symbol-name func-sym))))
+     (` (defun (, name) (x) (* (, n) x)))))     
+</p>
+
+<p>
+;;;###autoload                                 
+(` (,@ (make-multiplier 'double 2)))           
+;; &#x2013;&gt; (defun double (x) (* 2 x))              
+</p>
+
+<p>
+[*Dewey* comments more]
+</p>
+
+<p>
+However, while the real function is installed there, the autoload won't notice it. Autoload is a magic text
+thing. When the ;;;###autoload token is read, the autoload library uses (read) to read the next form. Read
+does not expand macros (well, only reader macros like #', and evidently ` is a reader macro that expands to
+the old-style (` (,a)) syntax). It the above example you get nothing (autoload should really be rewritten to
+be extensible).
+</p>
+
+<p>
+If you know the form will expand into "blah-func", which is a function, you can use:
+</p>
+
+<p>
+;;;###autoload (autoload 'blah-func "this-file" "docs")    
+</p>
+
+<p>
+or whatever the actual call to autoload that you want.
+</p>
+
+<p>
+9.12 How to read the macros
+</p>
+
+<p>
+When you see some exiting new styled macro, you can convert it back to old format with trick presented by 
+[dewey]
+</p>
+
+<p>
+(setq  foo (read (current-buffer)))         
+(print foo (current-buffer)) C-u C-x C-e    
+</p>
+
+<hr  />
+
+<p>
+10.0 Using lambda notation – some thoughts
+</p>
+
+<p>
+10.1 Clarification
+</p>
+
+<p>
+lambda is same as function, it is just "anonymous" function. So everything you can do with real function, you
+can do with lambda.
+</p>
+
+<p>
+Lisp programmers use lambda functions very often, but many times it would be better to see real functions
+instead. The lambdas have their places in lisp, eg. for mapcar and inside macros they are often used. But
+overall, lambdas are not that good.
+</p>
+
+<p>
+[Vladimir] also comments: There are several important things about using anon functions:
+</p>
+
+<ul class="org-ul">
+<li>They can be constructed at run-time, returned from functions, stored in structures, etc. Not having to
+have a name for a function can sometimes be a boon, because you don't have to divine one for it!</li>
+<li>They can use the environment of the form they're embedded in. Eg they can use the local 'let' variables of
+the containing function without having to pass them as args, use dynamically scoped variables, or make
+them globals.</li>
+</ul>
+
+<p>
+10.2 Motivation to not to use lambdas all the time
+</p>
+
+<ul class="org-ul">
+<li>Real function is cleaner, easy to hand to someone, more easily removed from hooks, more&#x2026; than a lambda
+form.</li>
+<li>You can test functions, because you can call them. You can't easily test lambdas, because they have no
+name to call at.</li>
+<li>You can put functions in separate file; it can be collection of useful functions found from the net. For
+speed reasons you can byte compile this separate file. Many lambdas in your .emacs just make it look
+messy, separate function file is more convenient way.</li>
+</ul>
+
+<p>
+Let's see an example. Suppose we want to add some more regexps to error identification regexp list when the 
+compile.el gets loaded.
+</p>
+
+<p>
+Bad choice:
+</p>
+
+<p>
+(eval-after-load                                     
+  "compile"                                          
+  '(progn                                            
+     ;; SGI's cc warning message                     
+     (setq compilation-error-regexp-alist            
+           (cons                                     
+            ;; IAR C Compiler: "can.c":390  G        
+            '("\n\"\\(.*\\)\":\\([0-9]+\\) +.*$" 1 2)
+             compilation-error-regexp-alist))))      
+</p>
+
+<p>
+While looking perfectly valid, it has some problems. How do you post this answer to someone else? Maybe he
+already has used some other way and he doesn't like this approach. How do you change this setup afterwards,
+especially when your're experimenting with right regexps. Gosh! How do I remove the entry from the variable
+eval-after-load ?
+</p>
+
+<p>
+In here things are simple. Easily modifiable. And easily handed to anyone else.
+</p>
+
+<p>
+Possibly better choice:
+</p>
+
+<p>
+(defvar my-compile-eval-after-form                               
+  '(progn (my-compile-setup))                                    
+ "*Form executed when file is loaded.")                          
+</p>
+
+<p>
+;;  Install it                                                   
+</p>
+
+<p>
+(eval-after-load "compile" my-compile-eval-after-form)           
+</p>
+
+<p>
+;;  Define my function to handle this                            
+</p>
+
+<p>
+(defun my-compile-setup ()                                       
+ "Installs new regexps to compilation-error-regexp-alist"        
+</p>
+
+<p>
+;;  first save the original, defvar executes only once         
+</p>
+
+<p>
+(defvar my-compilation-error-regexp-alist                      
+         compilation-error-regexp-alist                        
+   "Copy.")                                                    
+</p>
+
+<p>
+;;  Reset to default, we modify this later                     
+</p>
+
+<p>
+(setq compilation-error-regexp-alist                           
+      my-compilation-error-regexp-alist)                       
+</p>
+
+<p>
+;;  now we can experiment as much as we like by changing       
+;;  contents of these statements                               
+</p>
+
+<p>
+(setq compilation-error-regexp-alist ; SGI's cc warning message
+      (cons                                                    
+       ;; IAR C Compiler: "can.c":390  G                       
+       '("\n\"\\(.*\\)\":\\([0-9]+\\) +.*$" 1 2)               
+       compilation-error-regexp-alist)))                       
+</p>
+
+<p>
+Now, there is much more code involved here, but it is more portable. Remember the rule: space is cheap, ease
+of use comes first. Now you can also delete the entry easily from the eval-after-form.
+</p>
+
+<p>
+(defun my-delete-eval-after-form (file form)                        
+  "Deletes FORM for FILE form `eval-after-load-alist'"              
+  (delete form (assoc file after-load-alist)))                      
+</p>
+
+<p>
+;; Remove my installation                                           
+</p>
+
+<p>
+(my-delete-eval-after-form "compile" my-compile-eval-after-form)    
+</p>
+
+<p>
+10.3 Putting lambdas into hooks
+</p>
+
+<p>
+The same lambda talk applies to global-set-key and add-hook cases It's much cleaner to have function than the
+lambda. If you post the solution, people will appreciate function more than lambda solution. Let's try it this
+way first:
+</p>
+
+<p>
+(add-hook 'write-file-hooks                  
+             '(lambda ()                     
+               "My checkings"                
+               (save-excursion               
+                 (goto-char (point-min))     
+                 (if (re-search-forward &#x2026;.)
+                     .. do something fancy   
+                    .. else))))              
+</p>
+
+<p>
+Two obvious notes raise immediately: a) the indentation is disturbing, and limits more complex programming b)
+how do you use remove-hook for this ? Not very nice job&#x2026; Turn this into a function and you're back to clear
+waters.
+</p>
+
+<p>
+(add-hook 'write-file-hooks 'my-write-file-hooks)
+</p>
+
+<p>
+(defun my-write-file-hooks ()                    
+  .. whatever)                                   
+</p>
+
+<p>
+Advantages: no more lambda, no more indentation problems, you can use remove-hook easily, and you can print
+the hook contents nicely with the following. If there were lambdas, the output wouldn't be so nice.
+</p>
+
+<p>
+(Be in scratch buffer, make sure lisp-mode is on, write the variable and Hit the C-u .. keys behind a
+variable)
+</p>
+
+<p>
+write-file-hooks C-u C-x C-e    
+</p>
+
+<p>
+[Vladimir] For short functions to put in hooks/define-keys, I prefer to put the function like below. Then I
+can remove-hook it if I need, or re-eval the above to redefine the function, and whatnot.
+</p>
+
+<p>
+;; Defun returns the symbol just defined: the function name
+;;                                                         
+(add-hook 'write-file-hooks                                
+    (defun my-write-file-hooks ()                          
+     .. whatever))                                         
+;; End                                                     
+</p>
+
+<hr  />
+
+<p>
+11.0 Keeping your code organised
+</p>
+
+<p>
+11.1 Use function separation dash lines
+</p>
+
+<p>
+If you have loaded lisp packages from the net, you probably see many functions that are there "as is". Instead
+of just coding them there, you can ease the visibility of the functions by adding separator line before every
+function.
+</p>
+
+<p>
+Traditional:
+</p>
+
+<p>
+(defun my-func1 () 
+  (let* (&#x2026;)      
+    (save-excursion
+     ..)))         
+</p>
+
+<p>
+(defun my-func2 () 
+  (let* (&#x2026;)      
+    (save-excursion
+     ..)))         
+</p>
+
+<p>
+More visible choice:
+</p>
+
+<p>
+;;; &#x2014;&#x2014;&#x2014;&#x2014;&#x2014;&#x2014;&#x2014;&#x2014;&#x2014;&#x2014;&#x2014;&#x2014;&#x2014;&#x2014;&#x2014;&#x2014;&#x2014;&#x2014;&#x2014;
+;;;                                                          
+(defun my-func1 ()                                           
+  (let* (&#x2026;)                                                
+    (save-excursion                                          
+     ..)))                                                   
+</p>
+
+<p>
+;;; &#x2014;&#x2014;&#x2014;&#x2014;&#x2014;&#x2014;&#x2014;&#x2014;&#x2014;&#x2014;&#x2014;&#x2014;&#x2014;&#x2014;&#x2014;&#x2014;&#x2014;&#x2014;&#x2014;
+;;;                                                          
+(defun my-func2 ()                                           
+  (let* (&#x2026;)                                                
+    (save-excursion                                          
+     ..)))                                                   
+</p>
+
+<p>
+The comments use ";;;", although ";;" would suffice when the comment is outside of function body. According to
+lisp commenting rules the ";;" would have parked to the left hand too. The reason is that, when every comment
+outside of function has ";;;", I can grep my files for "outside" comments. The ";;" style I leave to function
+bodies.
+</p>
+
+<p>
+Few packages which might interest you, they all keep your code better organised.
+</p>
+
+<p>
+folding.el
+Included in latest XEmacs
+uses folders {{{ }}}
+</p>
+
+<p>
+tinybookmark.el
+(b)ook(m)ark package "straight lines with names"
+provides also X-popup for bookmarks
+</p>
+
+<p>
+imenu.el
+finding specific funtion, more detailed control.
+Included in Emacs and XEmacs
+</p>
+
+<p>
+11.2 Add autoload statements
+</p>
+
+<p>
+When you're making a package, don't forget to include those important autoload directives to key functions. If
+your package is expected to be put through the emacs build process when update-file-autoloads will add your
+autoloads to loaddefs.el, and subsequent dumping of that file with emacs will make them a permanent part of
+the emacs executable. (Usually loaddefs.el is dumped, so simply updating it and bytecompiling it won't cause
+it to be loaded at startup time.) Some sysadm may decide to keep your packages permanently in his emacs
+installation and he can rip the autoloads from your file with M-x generate-file-autoloads (function is defined
+in autoload.el).
+</p>
+
+<p>
+;;;###autoload       
+(defun my-func ()    
+</p>
+
+<hr  />
+
+<p>
+12.0 About lisp symbol naming
+</p>
+
+<p>
+Common idiom in lisp programs has been that the names contain only [-a-zA-Z] characters and so case chosen
+isn't generally mixed: My-Var is bad variable name. Also the traditional package definition convention has
+been:
+</p>
+
+<p>
+(defun  csh-mode-yyy &#x2026;    
+(defvar csh-mode-xxx &#x2026;    
+</p>
+
+<p>
+Here the first 'words' always specifies the package that is using the name space bucket, here csh-mode.
+Remember that symbol names are put to global name space, so each function and each variable must be unique.
+</p>
+
+<p>
+12.1 Don't use your initials
+</p>
+
+<p>
+In comp.lang.emacs, comp.emacs.xemacs and gnu.emacs.help where people are likely to post their own solution to
+other peoples, it seems that only few are aware of how they should name their symbols properly. The problem is
+that if you post code that has function name:
+</p>
+
+<p>
+fill-matched    
+</p>
+
+<p>
+How do you know afterwards (when you just grab the code and save it somewhere in your .emacs or personal
+"snippet" lib) when you start writing code using that function, that it wasn't a Emacs distributed function or
+variable?
+</p>
+
+<p>
+The problem arises too, if you name the functions so, that they start with your initials:
+</p>
+
+<p>
+joe-fill-matched    
+</p>
+
+<p>
+Now, what's wrong with that? Well, if you're going to post such code that have lot's of functions and
+variables starting with prefix joe- , people get upset when they save the functions and notice that there is
+someone other's initials involved. They just wanted to have some general function to solve current task.
+</p>
+
+<p>
+Now, when they ask help again, someone else posts his own functions and they end up gathering functions:
+</p>
+
+<p>
+joe-funcs ..     
+mike-funcs ..    
+bill-funcs ..    
+</p>
+
+<p>
+Putting those into .emacs doesn't look pretty.
+</p>
+
+<p>
+12.2 Use prefix my for private symbols
+</p>
+
+<p>
+It becomes obvious that it would be nice if everybody would use common naming convention, so that the code can
+be handed to anybody without changes. The best way to achieve this is that people use prefix:
+</p>
+
+<p>
+my-    
+</p>
+
+<p>
+To denote everything that they own: own variables own functions, maps.. Now it's very simple to post that code
+to someone else, and believe me everybody is happy when they receive good and clean code without someone
+else's initial involved. They feel that it's "my" code too, to solve "my" problems.
+</p>
+
+<p>
+To extend this naming more, people should also use convention:
+</p>
+
+<p>
+my-csh-mode-do-this&#x2026;    
+</p>
+
+<p>
+If it has anything to do with the csh-mode.el, so in general add the word my- + possible LIB-ID if you write
+some special functions for elisp packages. This way you can easily find all functions related to "csh-"
+package with describe-symbol function (available in tinyliby.el ), including your own.
+</p>
+
+<p>
+12.3 Naming variables differently?
+</p>
+
+<p>
+There is still a matter of style with the variable naming. While it is possible to program like the "lisp"
+way, that may not be the best bet. In Emacs Lisp, variable and function names do not need to differ in any
+way, so it's perfectly legal to have same name for a variable and for a function and for a keymap and .. you
+name it.
+</p>
+
+<p>
+(defun  csh-mode ()          
+  &#x2026;)                       
+</p>
+
+<p>
+(defvar csh-mode nil         
+  "Mode on/off variable")    
+</p>
+
+<p>
+This is both a good and a bad idea. The good part of it is, that when you're working with MODES or KEYMAPS,
+it's very desirable to have same name, so that you know what's going on in the code.
+</p>
+
+<p>
+But in the other hand, if you're not using modes, the naming convention is .. hmpf, confusing. In practical
+terms it's lot more easier to look at the code if the symbol itself denotes the CLASS where it belongs. If
+everything looks the same, as lisp does due to its nature, it would be welcomed if there were something that
+separate variables from function elements.
+</p>
+
+<p>
+12.4 Separate naming of variables
+</p>
+
+<p>
+In Tiny Tools you have seen another convention. Some has said that it "looks ugly", "I don't like it", and
+admittedly it can give that impression to the reader of the code.
+</p>
+
+<p>
+But managing lisp code gets complicated and hard to maintain if you don't develop some aids. A different
+symbol naming according to their CLASSES does help to read my code better and help maintainer to see where the
+variables are and where the functions are. Here is one possibility:
+</p>
+
+<p>
+(defun my-function () ..     
+(defvar my-:variable 100)    
+</p>
+
+<p>
+There is another benefit from this: it is now possible to grep all symbols referring to variables, and there
+is no false hits, It is also posisble to run a program to do the name replacement and it succeeds 100%.
+Variables fromcan be searched from the buffer by give my-: prefix to search engine. All in all, navigating in
+lisp code is much more easier.
+</p>
+
+<p>
+Have you ever tried to complete the lisp symbols? It's lot nicer when you car write my-: prefix and hit
+lisp-complete-symbol command to give you listing of all variables. No false hits concerning functions.
+</p>
+
+<p>
+Why ":" ? Well, that is familiar to a C++ and Perl programmer and The ':' character seems neutral and visible
+enough to be used in the code.
+</p>
+
+<p>
+There are also alternative choices, like using "&#x2013;", double dash to denote variables:
+</p>
+
+<p>
+(defconst my&#x2013;var1 "some" "*tmp var")    
+(defconst my&#x2013;var2 "some" "*tmp var")    
+(defconst my&#x2013;var3 "some" "*tmp var")    
+</p>
+
+<p>
+Note: The colon character is by default in the same syntax class as the dash, so your lisp commands like
+backward-sexp work as usual. You can verify this with commands
+</p>
+
+<p>
+(char-to-string (char-syntax ?:)) and              
+(char-to-string (char-syntax ?-)) in lisp-mode.    
+</p>
+
+<hr  />
+
+<p>
+13.0 Lisp code notes
+</p>
+
+<p>
+13.1 Call-interactively
+</p>
+
+<p>
+&gt; If I define a kbd macro, and then name it `say-hi', and I   
+&gt; make the kbd                                                
+&gt; macro map to the letters "HI", then that macro is a command.
+&gt;                                                             
+&gt; (defalias 'say-hi (read-kbd-macro "HI"))                    
+&gt;                                                             
+&gt; should end up being interactive. In fact, the expression:   
+&gt; (commandp 'say-hi)                                          
+&gt;                                                             
+&gt; evals to TRUE.                                              
+</p>
+
+<p>
+Hrvoje Niksic <a href="mailto:hniksic@srce.hr">hniksic@srce.hr</a>, comp.emacs.xemacs, 13 Apr 1997
+</p>
+
+<p>
+It is, but for a different reason. commandp returns t for interactive compiled functions, interactive lambda
+expressions, autoloads with fourth argument non-nil and <b>string and vectors</b>.
+</p>
+
+<p>
+(commandp [some vector])    
+</p>
+
+<p>
+yields t not because [some vector] is a valid command, but because it can be callable through
+execute-kbd-macro or such. Documentation for commandp never guarantees that you'll be able to
+call-interactively the objects it blesses with t.
+</p>
+
+<p>
+&gt; The error is when I do this:                
+&gt; (call-interactively 'say-hi)                
+&gt; I get :                                     
+&gt; wrong type of argument: commandp, say-hi    
+</p>
+
+<p>
+That is only a lousy-stated error message. You can call macros with execute-kbd-macro.
+</p>
+
+<p>
+(defun maybe-macro-call-interactively (def &amp;rest junk) 
+  "If DEF is a keyboard macro, execute it, else execute
+   it as a command."                                   
+  (if (and (symbolp def)                               
+           (or (vectorp (symbol-function def))         
+               (stringp (symbol-function def))))       
+      ;; looks like a macro                            
+      (execute-kbd-macro def)                          
+    ;; else just proceed to call-interactively         
+    (call-interactively def)))                         
+;; End                                                 
+</p>
+
+<p>
+13.2 Condition-case vs. unwind-protect ?
+</p>
+
+<p>
+Steven L Baur <a href="mailto:steve@miranova.com">steve@miranova.com</a>
+</p>
+
+<p>
+unwind-protect executes the clean up forms whenever the stack is unwound by either a throw (non-local exit),
+or by a signal (error condition). Condition-case handles only the error condition and can be bypassed by a
+non-local exit.
+</p>
+
+<p>
+Here's some sample code that illustrates the differences: (tested on Emacs 19.34 and XEmacs 19.15)
+</p>
+
+<p>
+(defun test-func (foo)                                      
+  "Test Function."                                          
+  (cond (foo (throw 'some-random-condition "Return Result"))
+        (t (signal 'error "some-data"))))                   
+;; end                                                      
+</p>
+
+<p>
+(defun wrapper-1 (foo)                                      
+  "Wrapper for test function."                              
+  (catch 'some-random-condition                             
+      (condition-case err                                   
+          (test-func foo)                                   
+        (error (message "Caught Error Condition")))))       
+;; End                                                      
+</p>
+
+<p>
+(defun wrapper-2 (foo)                                      
+  "Wrapper for test function."                              
+  (catch 'some-random-condition                             
+      (unwind-protect                                       
+          (test-func foo)                                   
+        (message "Caught Error Condition"))))               
+;; End                                                      
+</p>
+
+<p>
+If you call (wrapper-1 t), the "Caught Error&#x2026;" message is never executed, but if you call (wrapper-2 t) it
+will be.
+</p>
+
+<p>
+In the error signaling case, (wrapper-1 nil) will cause the error to be caught and never signalled up.
+Unwind-protect (wrapper-2 nil), the error condition does get propagated up. Since this appears to be what you
+want anyway, use unwind-protect.
+</p>
+
+<p>
+I hope that makes it a little clearer.
+</p>
+
+<p>
+13.3 Dolist
+</p>
+
+<p>
+The dolist command loops through a list and it is defined int the cl package; you can stop the loop with
+return command. Below you see example and the expansion with cl-prettyexpand.
+</p>
+
+<p>
+(dolist (elt '(1 2))                                             
+  (if (eq elt 1)                                                 
+      (return)))        ;Stop the list loop now                  
+</p>
+
+<p>
+(block nil                                                       
+  (let ((&#x2013;dolist-temp&#x2013;1090818 '(1 2))                          
+        elt)                                                     
+    (while &#x2013;dolist-temp&#x2013;1090818                                
+      (setq elt (car &#x2013;dolist-temp&#x2013;1090818))                    
+      (if (eq elt 1) (cl-block-throw '&#x2013;cl-block-nil&#x2013; nil))     
+      (setq &#x2013;dolist-temp&#x2013;1090818 (cdr &#x2013;dolist-temp&#x2013;1090818)))
+    nil))                                                        
+</p>
+
+<p>
+macroexpand to find out the real expansion
+</p>
+
+<p>
+(cl-block-wrapper                                                 
+ (catch (quote &#x2013;cl-block-nil&#x2013;)                                  
+   (let ((&#x2013;dolist-temp&#x2013;1090818 (quote (1 2))) elt)              
+     (while &#x2013;dolist-temp&#x2013;1090818                                
+       (setq elt (car &#x2013;dolist-temp&#x2013;1090818))                    
+       (if (eq elt 1)                                             
+           (cl-block-throw (quote &#x2013;cl-block-nil&#x2013;) nil))         
+       (setq &#x2013;dolist-temp&#x2013;1090818 (cdr &#x2013;dolist-temp&#x2013;1090818)))
+     nil)))                                                       
+</p>
+
+<p>
+Dave Gillespie <a href="mailto:daveg@thymus.synaptics.com">daveg@thymus.synaptics.com</a> comments:
+</p>
+
+<p>
+Common Lisp loops use the Common Lisp block mechanism, not the catch mechanism. The Emacs CL package
+implements block in terms of catch, but there is a catch, so to speak.
+</p>
+
+<p>
+The CL package treats block specially in order to optimize it. Catch blocks are expensive at run-time, so I
+wanted to make sure the compiler could eliminate them when the body code didn't actually call return. (This is
+especially important since many Common Lisp constructs include implicit blocks whether you use those blocks or
+not.)
+</p>
+
+<p>
+There were technical reasons, which I don't remember exactly, why the optimization was best done in the
+compiler itself instead of in the block macro. Therefore, the CL package has some hacks to modify or delay the
+expansion of block under certain circumstances. But this will always be invisible unless you deliberately peek
+at the macro expansions. If you actually try using return or return-from in your code, you will find that it
+works properly.
+</p>
+
+<p>
+13.4 Narrow-to-region – don't use it always
+</p>
+
+<p>
+The narrow-to-region lisp form is great if you create functions that should do their job in restricted area.
+Say:
+</p>
+
+<p>
+(defun my-find-a-region-1 (beg end)       
+  "Find something from region BEG and END"
+  (interactive "r")                       
+  (let* ((i  0))                          
+    (save-restriction                     
+      (narrow-to-region beg end)          
+      (PMIN)                              
+      (while (re-search-forward "a" nil t)
+        (inc i)))                         
+    (message "%d"  i)))                   
+;; End                                    
+</p>
+
+<p>
+There is also another way to write this function by not using the narrow at all. I would prefer this another
+alternative and avoid the narrow, because you can take advantage of the END parameter of re-search-forward.
+</p>
+
+<p>
+(defun my-find-a-region-2 (beg end)       
+  "Find something from region BEG and END"
+  (interactive "r")                       
+  (let* ((i  0))                          
+    (save-excursion                       
+      (goto-char beg)                     
+      (while (re-search-forward "a" end t)
+        (inc i)))                         
+    (message "%d"  i)))                   
+;; End                                    
+</p>
+
+<p>
+13.5 Obarray: length and efficiency
+</p>
+
+<p>
+[Jamie Zawinski <a href="mailto:jwz@netscape.com">jwz@netscape.com</a>] &#x2026;A vector of length 0 can't be used as an obarray. And for performance
+reasons, an obarray should have a length which is prime, and which is roughly the size of the number of
+elements you're going to put into it; The larger the ratio of elements/length, the more time lookups will
+take.
+</p>
+<hr  />
+
+<p>
+14.0 Optimizing and byte compiler tips
+</p>
+
+<p>
+14.1 Use eq instead of =
+</p>
+
+<p>
+[24 Jan 1996, <a href="mailto:terra@diku.dk">terra@diku.dk</a> (Morten Welinder)] If you're not an Emacs wizzard you should skip these patches
+for now. You may benefit later. I have discovered that lots of Emacs Lisp code uses equal and = where they
+could have used eq or even null.
+</p>
+
+<p>
+`equal' is slow and uses a function call.                 
+`='     is fair but does unnecessary check if we can      
+        decide in advance that the arguments are integers.
+`eq'    is almost as fast as&#x2026;                           
+`null'  &#x2026;which is best.                                 
+</p>
+
+<p>
+Examples. Often you see something like these expressions:
+</p>
+
+<p>
+(= (point) (point-min))     
+(equal 'foo bar)            
+(assoc 'foo bar)            
+(equal (current-buffer) buf)
+(eq arg nil)                
+</p>
+
+<p>
+which from a functional (and style) point of view are perfectly ok. But they're not as efficient as they could
+be. The ones below are better because they use the available type information about the arguments.
+</p>
+
+<p>
+(eq (point) (point-min)) 
+(eq 'foo bar)            
+(assq 'foo bar)          
+(eq (current-buffer) buf)
+(null arg)               
+</p>
+
+<p>
+14.2 About setq and set
+</p>
+
+<p>
+Simon Marshall <a href="mailto:Simon.Marshall@esrin.esa.it">Simon.Marshall@esrin.esa.it</a> Jan 1997 in gnu.emacs.help mentined that
+</p>
+
+<p>
+&#x2026;One difference not mentioned is that they are byte-compiled differently. I think
+</p>
+
+<p>
+(setq fubar foo)    
+</p>
+
+<p>
+results in faster byte-code than
+</p>
+
+<p>
+(set 'fubar bar).    
+</p>
+
+<p>
+14.3 About let in Emacs
+</p>
+
+<p>
+[Hrvoje Niksic <a href="mailto:hniksic@srce.hr">hniksic@srce.hr</a> 1998-03-13 XE-L]
+</p>
+
+<p>
+(setq global 2)        
+(setq real-global 3)   
+(let (global)          
+  (setq global 4)      
+  (setq real-global 5))
+global                 
+==&gt; 3                  
+</p>
+
+<p>
+&#x2026;`let' sets up an unwind-protect that remembers the old value (2), and places the new value to the symbol
+value slot (nil in this case). When you assign 4 to global, it's written to its value slot, overriding nil.
+When let is left, the internal unwind-protect restores the old value (2).
+</p>
+
+<p>
+This is one of the reasons why let is extremely slow in Emacs Lisp.
+</p>
+
+<p>
+14.4 Make lambda to run code faster
+</p>
+
+<p>
+This all is actually explained well in the Emacs lisp pages, but let's refresh memory a bit. Let's start with
+the traditional example:
+</p>
+
+<p>
+(mapcar '(lambda (x) &#x2026; )   list)    
+</p>
+
+<p>
+The lisp manual page in says that "(elisp, Node: Anonymous Functions) &#x2026;Lisp compiler cannot assume this list
+is a function, even though it looks like one". So, we have to help byte compiler by adding function directive.
+</p>
+
+<p>
+(mapcar (function (lambda (x) &#x2026; )   list)    
+</p>
+
+<p>
+Which, when compiled probably speeds the code by factor 2 or more. One compatibility not to this: in Emacs
+19.29 and up you can actually write like this, which is exactly the same as the using the function syntax.
+</p>
+
+<p>
+(mapcar (lambda (x) &#x2026; )   list)    
+</p>
+
+<p>
+14.5 Deleting and inserting in buffer is slow
+</p>
+
+<p>
+[Jerry Quinn <a href="mailto:jquinn@nortel.ca">jquinn@nortel.ca</a>] &#x2026;I used to dump data to buffer and then moving to a column, making various
+changes with insert and delete-char and moving on to the next change. It would take about 22 seconds on my
+system
+</p>
+
+<p>
+I now collect the message data into lists with regexps erase the buffer and dump the new results in with
+format. This is MUCH faster. (3sec compared to previous 22sec)
+</p>
+
+<p>
+14.6 Byte compiler options
+</p>
+
+<p>
+18 Sep 1996, Andreas Schwab <a href="mailto:schwab@issan.informatik.uni-dortmund.de">schwab@issan.informatik.uni-dortmund.de</a> answered to question below
+</p>
+
+<p>
+&gt; (defalias 'pair (symbol-function 'cons))
+&gt; (defalias 'pairp (symbol-function 'consp))
+&gt;
+&gt; The trouble is that the byte-compiler doesn't optimize a
+&gt; call to e.g. pair as it would do with a call to cons
+&gt; because it doesn't recognize pair as an alias for cons.
+&gt;
+&gt; Is there a way to tell the byte-compiler to treat
+&gt; pair the same way as cons?
+</p>
+
+<p>
+(byte-defop-compiler '(pair byte-cons) 2)      
+(byte-defop-compiler '(pairp byte-consp) 1)    
+</p>
+
+<p>
+14.7 Byte compiler warnings – how to get rid of them
+</p>
+
+<p>
+19 Feb 1996, <a href="mailto:andersl@csd.uu.se">andersl@csd.uu.se</a> (Anders Lindgren)
+</p>
+
+<p>
+&gt; If you have code that depends on a library that is not
+&gt; always included in a program (be it Emacs Lisp or other
+&gt; Lisp), the correct way to insure that it's compiled
+&gt; properly is to do the require. It's not overkill; after
+&gt; all, a user presumably will only compile it once. And &gt;
+&gt; it may save you from interactions that you cannot predict
+&gt; now, e.g., when at some future time when you change your
+&gt; package or font-lock changes in a future revision of
+&gt; Emacs.
+</p>
+
+<p>
+Genrally this is a good idea. Unfortualtely, when it comes to font-lock it's not. It contains a check that it
+is runed under a window system, and barfs at load-time if it's not. This makes it impossibel to require the
+package when compiling in batch mode or on a system without a window system.
+</p>
+
+<p>
+I have been using a (very ugly) method where I replace statements by equivalent statements which doesn't raise
+the anger of the compiler:
+</p>
+
+<p>
+foo              <code>= (symbol-value 'foo)                       
+      (setq foo ...)   =</code> (set 'foo &#x2026;)                            
+                   == (funcall (symbol-funtion 'set) 'foo &#x2026;)
+        (The former fools the Emacs compile but not           
+         the XEmacs'. The latter fools both.)                 
+(foo &#x2026;)        == (funcall (symbol-function 'foo) &#x2026;)      
+</p>
+
+<p>
+This type of coding is specially useful when writing programs which should be able to run (and compile) under
+both under Emacs and XEmacs. – Anders
+</p>
+
+<p>
+14.8 Inlining and byte compiler
+</p>
+
+<p>
+The byte compiler is quite powerfull, but there is only handfull of people who really understand how its
+features can be exploited in full. Here is couple of suggestions how you could force some function to be
+inlined and thus save the function call, which in emacs is quite expensive (see the profiling results later
+and examine eg. mapcar)
+</p>
+
+<p>
+Notice that
+</p>
+
+<p>
+defsubst &#x2013;&gt; Byte Compiler inlines the function automatically.    
+</p>
+
+<p>
+But in case of func beeing a regular 'defun' you want to use special form inline to force inlining the code.
+</p>
+
+<p>
+(defun func (arg)        
+  (if arg t nil))        
+</p>
+
+<p>
+(defun my (x)            
+  (inline (func xx)))    
+</p>
+
+<p>
+See what we got:
+</p>
+
+<p>
+;; You do not need this: (byte-compile 'my)
+;; because disassemble does it for you     
+;;                                         
+(disassemble  'my)                         
+</p>
+
+<p>
+byte code for my:                          
+args: (x)                                  
+0       varref    xx                       
+1       dup                                
+2       varbind   arg                      
+3       goto-if-nil 1                      
+6       constant  t                        
+7       goto      2                        
+10:1    constant  nil                      
+11:2    unbind    1                        
+12      return                             
+</p>
+
+<p>
+As you saw; the func was open coded inside function my. Here is reminder from the byte compiler page:
+</p>
+
+<p>
+You can also open-code one particular call to a function without open-coding all calls. Use the 'inline' form
+to do this, like so:
+</p>
+
+<p>
+(inline (foo 1 2 3))    ;; `foo' will be open-coded        
+(inline                 ;;  `foo' and `baz' will be        
+  (foo 1 2 3 (bar 5))    ;; open-coded, but `bar' will not.
+  (baz 0))                                                 
+</p>
+
+<p>
+You can make a given function be inline even if it has already been defined with defun by using the
+proclaim-inline form like so:
+</p>
+
+<p>
+(proclaim-inline my-function)    
+</p>
+
+<p>
+This is, in fact, exactly what defsubst does. To make a function no longer be inline, you must use
+proclaim-notinline. Beware that if you define a function with defsubst and later redefine it with defun, it
+will still be open-coded until you use proclaim-notinline.
+</p>
+
+<p>
+14.9 Inlining an interactive function, danger ahead
+</p>
+
+<p>
+[Moral: do not make interactive functions defsubst] [Sample test file available: test-defsubst.el]
+</p>
+
+<p>
+When I was converting some very small functions from defun to defsubst, I run in to this observation. I was
+wondering what inlining would do to functions that had interactive spec. Below the terms IACT refers to
+functon that has interactive spec; Here is th epseudo code for two functions.
+</p>
+
+<p>
+defsubst fun1   
+  IACT          
+  iact-fun1-body
+</p>
+
+<p>
+defun fun2      
+  IACT          
+  call fun1     
+  body          
+;; end          
+</p>
+
+<p>
+Now, there is conflict, because when I byte compile fun2, we see
+</p>
+
+<p>
+defun fun2      
+  iact-fun1-body
+  body          
+;; end          
+</p>
+
+<p>
+Where the iact-fun1-body is copied "as is". And that was what I was afraid of. Because iact-fun1-body had
+(interactive-p) test, it gets inserted into wrong place and the whole construction isn't what I intended. Here
+are the results in case you're interested.
+</p>
+
+<p>
+(defsubst test (&amp;optional arg)                                   
+  (interactive "P")                                              
+  (if (interactive-p) (message "Gotchya")))                      
+</p>
+
+<p>
+(defun test2 (arg)                                               
+  (interactive "P")                                              
+  (test))                                                        
+</p>
+
+<p>
+(test2 1)                                                        
+&#x2013;&gt; nothing, this is okay                                        
+(call-interactively 'test2)                                      
+&#x2013;&gt; "Gotchya"        &lt;&lt; SUPRISE! That wasn't meant to happen!    
+</p>
+
+<p>
+byte code for test2 reveals how the inlining happened.
+</p>
+
+<p>
+  args: (arg)                 
+ interactive: "P"             
+0       constant  nil         
+1       varbind   arg         
+2       interactive-p         
+3       goto-if-nil-else-pop 1
+6       constant  message     
+7       constant  "Gotchya"   
+8       call      1           
+9:1     unbind    1           
+10      return                
+</p>
+
+<hr  />
+
+<p>
+15.0 Profiling
+</p>
+
+<p>
+15.1 Test envinronment
+</p>
+
+<p>
+Here is collection of tests and results I made out of curiosity which way is better to code.
+</p>
+
+<ul class="org-ul">
+<li>All the functions were in NON-COMPILED form, because the compilation optimizes different structures to the
+same byte code. Due to quota limit reasons as well as for bug tracing, I usually only use non-compiled
+elisp pacakges.</li>
+<li>elp.el v2.39</li>
+<li>Emacs 19.28</li>
+<li>HP-UX A.09.01 A 9000/715</li>
+</ul>
+
+<p>
+15.2 Elp foreword
+</p>
+
+<p>
+Note, that if you time the same functions you will get different absolute timings. Nevertheless, you should
+get same results about the fact that which one feels fastest. The values have been taken from the Elapsed row:
+IT DOES NOT REPRESENT EXACT TIME SPENT in the function, because time spent depends on of operating system and
+current load of the Unix machine.
+</p>
+
+<p>
+Strong Note: [From elp.el, Barry Warsaw] Note that there are plenty of factors that could make the times
+reported unreliable, including the accuracy and granularity of your system clock, and the overhead spent in
+lisp calculating and recording the intervals. I figure the latter is pretty constant, so while the times may
+not be entirely accurate, I think they'll give you a good feel for the relative amount of work spent in the
+various lisp routines you are profiling. Note further that times are calculated using wall-clock time, so
+other system load will affect accuracy too.
+</p>
+
+<p>
+Keep in mind that some of the tests may be very stupid or misleading to experienced lisp programmer or to
+person who knows Emacs internals very well. My sincere intention has been pure curiosity. Please feel free to
+send any comments or corrections for the used tests cases if they are not representative enough. It is
+unfortunate if some test case presented here is totally bogus and someone reads it with good intention.
+</p>
+
+<p>
+15.3 Using elp for timing – repeat test several times
+</p>
+
+<p>
+The elp.el is great, but don't trust the first results. Sometimes the timings are totally different if you
+clear the list and run the tests again. Repeat your test cases at least 3 times before you derive conclusions
+about the performance.
+</p>
+
+<p>
+In here, the harness count is mentioned; that means that the test has been repeated N times and that the most
+representative time values has been selected(usually average). Using elp, say 10 times to repeat the test and
+record the timing, should give you solid estimate what timings are right.
+</p>
+
+<p>
+You can use the elp very easily via minor mode if you ftp lisp helper module: tinylisp.el. All the tests have
+been executed with that package in the following manner:
+</p>
+
+<ul class="org-ul">
+<li>Draw region over test set, including all functions and the HARNESS case and narrow to it with C-x n n</li>
+<li>read all functions with $ - tili-eval-current-buffer</li>
+<li>Instrument all functions with $ e I tili-elp-instrument-buffer</li>
+<li>Run harness test with $ e h tili-elp-harness</li>
+</ul>
+
+<p>
+After the tili-elp-harness function (where you can give the prefix how many times to repeat the test set;
+defualt is 3) has finished the elp results are shown in separate buffer from where the average of the results
+can determined.
+</p>
+
+<p>
+15.4 Byte compilation note
+</p>
+
+<p>
+If you byte compile files, the generated code is much faster thnt what the non-byte compiled one. During byte
+compiling, some structures are also optimized so that while they may look different in the code, the byte code
+is exactly the same. This means that if you should pay attention to tests that show considerable timing
+differencies that probably are not optimized away.
+</p>
+
+<p>
+Here are som examples where you see the effect of byte compiling Pay attention to cases 1a and 1d which show
+you fine example how byte compilation optimizes structs.
+</p>
+
+<p>
+[_1a_] Using let in function.
+</p>
+
+<p>
+Here is one long way to read byte code. If you want to byte compile expressions withing functions, you
+probably want to be aware of this method too.
+</p>
+
+<p>
+(setq bcode     ;; Simple let with 2 variables           
+      (byte-compile-sexp                                 
+        (defun foo () (let ((a 1) (b 2)) (some-call))) ))
+(disassemble bcode)                                      
+</p>
+
+<p>
+Here shorter way to read byte code; which produces exactly the same byte code as previous one. The disassemble
+compiles the sexp automatically.
+</p>
+
+<p>
+(disassemble '(lambda () (let ((a 1) (b 2)) (some-call) )))
+</p>
+
+<p>
+byte code for foo:                                         
+  args: nil                                                
+0   constant  1                                            
+1   constant  2                                            
+2   varbind   b                                            
+3   varbind   a                                            
+4   constant  some-call                                    
+5   call      0                                            
+6   unbind    2                                            
+7   return                                                 
+</p>
+
+<p>
+[_1b_] Same as previous one, but using the call let*. Notice, that the only difference to previous one is the
+order how the variables are pushed into stack. In 1a case all the values were pushed there first and then
+popped in varbind. Internal stack depth is thus bigger in 1a and according to experts, that makes big let
+statements slightly slower than if one used let* for the same purpose.
+</p>
+
+<p>
+(disassemble '(lambda () (let* ((a 1) (b 2)) (some-call) )))
+</p>
+
+<p>
+byte code:                                                  
+  args: nil                                                 
+0   constant  1                                             
+1   varbind   a                                             
+2   constant  2                                             
+3   varbind   b                                             
+4   constant  some-call                                     
+5   call      0                                             
+6   unbind    2                                             
+7   return                                                  
+</p>
+
+<p>
+[_1c_] Example, where let* binds previous variables. This has same byte code as 1b.
+</p>
+
+<p>
+(disassemble '(lambda () (let* ((a 1) (b a)) (some-call) )))
+</p>
+
+<p>
+byte code for foo:                                          
+  args: nil                                                 
+0   constant  1                                             
+1   varbind   a                                             
+2   constant  1                                             
+3   varbind   b                                             
+4   constant  some-call                                     
+5   call      0                                             
+6   unbind    2                                             
+7   return                                                  
+</p>
+
+<p>
+[_1d_] In the following we use multiple let stetments and the byte compiling reports that the byte code is
+equal to 1a. A fine example how byte compiler optimizes statements.
+</p>
+
+<p>
+(disassemble             
+  '(lambda ()            
+     (let ((a 1))        
+       (let ((b 2))      
+         (some-call) ))))
+</p>
+
+<p>
+byte code:               
+  args: nil              
+0   constant  1          
+1   varbind   a          
+2   constant  2          
+3   varbind   b          
+4   constant  some-call  
+5   call      0          
+6   unbind    2          
+7   return               
+</p>
+
+<p>
+[_4_] Things change if there is some call between the let stetments
+</p>
+
+<p>
+(disassemble         
+  '(lambda ()        
+     (let ((a 1))    
+       (call1)       
+       (let ((b 2))  
+         (call2) ))))
+</p>
+
+<p>
+byte code:           
+  args: nil          
+0   constant  1      
+1   varbind   a      
+2   constant  call1  
+3   call      0      
+4   discard          
+5   constant  2      
+6   varbind   b      
+7   constant  call2  
+8   call      0      
+9   unbind    2      
+10  return           
+</p>
+
+<p>
+15.5 Byte compiler can optimise smartly
+</p>
+
+<p>
+Let me start by and example. I was not sure what the impact of callf would be if I used it my code, so I
+pulled out byte compiler and dissassempled some of test defun.
+</p>
+
+<p>
+The call (callf or var 0) expand to statement (let* nil (setq var (or var 0))), so I wrote three function and
+compared their dissassemble results: They were identical. Generated empty let statement was optimised away.
+This is a good sign that you can safely use cl macros.
+</p>
+
+<p>
+[_1_] The cl way                                   
+</p>
+
+<p>
+(defun my1 () (callf or var 0))                
+</p>
+
+<p>
+[_2_] The regular code writing way                 
+</p>
+
+<p>
+(defun my2 () (setq var (or var 0)))           
+</p>
+
+<p>
+[_3_] The `callf' like it would macroexpand to     
+</p>
+
+<p>
+(defun my3 () (let* nil (setq var (or var 0))))
+</p>
+
+<p>
+byte code for my[1-3 are identical:            
+  args: nil                                    
+0       varref    var                          
+1       goto-if-not-nil-else-pop 1             
+4       constant  0                            
+5:1     dup                                    
+6       varset    var                          
+7       return                                 
+</p>
+
+<hr  />
+
+<p>
+16.0 Profiling results
+</p>
+
+<p>
+16.1 Refence functions
+</p>
+
+<p>
+The format of the test function was presented by [Vladimir] and from the timing you can see how much the this 
+wrapper affects the timings measured. Because the timing is measured from the Elapsed(accumulted time) row,
+here are the reference times for different loop-for values: 5 and 10 that are normally used in test.
+</p>
+
+<p>
+0.32 (10)                                                 
+</p>
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-left" />
+</colgroup>
+<tbody>
+<tr>
+<td class="org-left">&#xa0;</td>
+</tr>
+
+<tr>
+<td class="org-left">how many times function is called (loop-for count)</td>
+</tr>
+</tbody>
+</table>
+<p>
+Elapsed time                                              
+</p>
+
+<p>
+;;  Reference function, without any extra calls            
+;;                                                         
+(defun t01 ()                   ;; 0.16(5) 0.32(10)        
+  (let ((i    0))                                          
+    (while (&lt; i 1000)                                      
+        ;;                                                 
+        ;;  TEST CODE IS PUT HERE                          
+        ;;                                                 
+        (setq i (1+ i)))))                                 
+</p>
+
+<p>
+;; function with one parameter                             
+;;                                                         
+(defun t02 (list)               ;; 0.16(5) 0.32(10)        
+  (let ((i    0))                                          
+    (while (&lt; i 1000)                                      
+        ;;                                                 
+        ;;  TEST CODE IS PUT HERE                          
+        ;;                                                 
+        (setq i (1+ i)))))                                 
+</p>
+
+<p>
+(when HARNESS                                   ;; 10 times
+  (setq list (make-list 200 nil))                          
+  (loop-for 0 5                                            
+    (t01) (t02 list) ))                                    
+</p>
+
+<p>
+16.2 How to get first element?
+</p>
+
+<p>
+As you can see; there is no difference between the element retrieval functions.
+</p>
+
+<p>
+(defun t1 (list)                            ;; 0.4, car
+  (let ((i    0))                                      
+    (while (&lt; i 1000)                                  
+        ;;                                             
+        (car list)                                     
+        ;;                                             
+        (setq i (1+ i)))))                             
+</p>
+
+<p>
+(defun t2 (list)                            ;; 0.4, nth
+  (let ((i    0))                                      
+    (while (&lt; i 1000)                                  
+        ;;                                             
+        (nth 0 list)                                   
+        ;;                                             
+        (setq i (1+ i)))))                             
+</p>
+
+<p>
+(defun t3 (list)                            ;; 0.4,elt 
+  (let ((i    0))                                      
+    (while (&lt; i 1000)                                  
+        ;;                                             
+        (elt list 0)                                   
+        ;;                                             
+        (setq i (1+ i)))))                             
+</p>
+
+<p>
+(when HARNESS                               ;;10 times 
+  (setq list (make-list 200 nil))                      
+  (loop-for 0 10                                       
+    (t1 list) (t2 list) (t3 list)))                    
+</p>
+
+<p>
+16.3 How to access last element?
+</p>
+
+<p>
+The results were quite impressive. Naturally using the reverse command is slower, because it has to access
+each elemnt, where addressing last element directly is the fastest possible way.
+</p>
+
+<p>
+;;  Reading the last element by counting the position.
+;;                                                    
+(defun t1 (list)                                      
+  (let ((i    0))                                     
+    (while (&lt; i 1000)                                 
+        ;;                                            
+        (nth (1- (length list)) list)       ;; 1.3    
+        ;;                                            
+        (setq i (1+ i)))))                            
+</p>
+
+<p>
+;; Using the reverse command                          
+;;                                                    
+(defun t2 (list)                                      
+  (let ((i   0))                                      
+    (while (&lt; i 1000)                                 
+        ;;                                            
+        (car (reverse list))                ;; 8.0    
+        ;;                                            
+        (setq i (1+ i)))))                            
+</p>
+
+<p>
+(when HARNESS                               ;;3 times 
+  (setq list (make-list 200 nil))                     
+  (loop-for 0 5                                       
+    (t1 list) (t2 list)  ))                           
+</p>
+
+<p>
+16.4 Which loop method is faster?
+</p>
+
+<p>
+There seems to be huge diffrence between while and mapcar. probably due to function call the mapcar does every
+time when passing element to lambda function.
+</p>
+
+<p>
+(defun t1 (list)                            ;; 28, mapcar
+  (let ((i    0))                                        
+    (while (&lt; i 1000)                                    
+        ;;                                               
+        (mapcar '(lambda (x) nil) list)                  
+        ;;                                               
+        (setq i (1+ i)))))                               
+</p>
+
+<p>
+(defun t2 (list)                            ;; 0.2, while
+  (let ((i    0))                                        
+    (while (&lt; i 1000)                                    
+        ;;                                               
+        (while list nil (setq list (cdr list)))          
+        ;;                                               
+        (setq i (1+ i)))))                               
+</p>
+
+<p>
+(when HARNESS                               ;;3 times    
+ (setq list (make-list 200 nil))                         
+  (loop-for 0 5                                          
+   (t1 list) (t2 list) ))                                
+</p>
+
+<p>
+16.5 Adding to list fast
+</p>
+
+<p>
+If I want to append things to a list, should I do it with append or with nconc or cons? So that results are
+comparable to each other, every function must return the list in the same order and that's why you see
+nreverse calls prior returning the list in some functions.
+</p>
+
+<p>
+(defun t11 ()                           ;;3.3, nconc 1        
+  (let ((i    0)                                              
+        list)                                                 
+    (while (&lt; i 1000)                                         
+        ;;                                                    
+        (setq list (nconc list (list i)))                     
+        ;;                                                    
+        (setq i (1+ i)))                                      
+    list))   ;; (0 1 2 3 ..)                                  
+</p>
+
+<p>
+;;  Traditional nconc                                         
+;;                                                            
+(defun t12 ()                           ;; 3.3, nconc 2       
+  (let ((i    0)                                              
+        list)                                                 
+    (while (&lt; i 1000)                                         
+        ;;                                                    
+        (if (null list)                                       
+            (setq list (list i))                              
+          (nconc list (list i)))                              
+        ;;                                                    
+        (setq i (1+ i)))                                      
+     list))   ;; (0 1 2 3 ..)                                 
+</p>
+
+<p>
+(defun t21 ()                           ;; 24.0, append to end
+  (let ((i    0)                                              
+        list)                                                 
+    (while (&lt; i 1000)                                         
+        ;;                                                    
+        (setq list (append list (list i)))                    
+        ;;                                                    
+        (setq i (1+ i)))))                                    
+</p>
+
+<p>
+(defun t22 ()                           ;; 0.5, append to beg 
+  (let ((i    0)                                              
+        list)                                                 
+    (while (&lt; i 1000)                                         
+        ;;                                                    
+        (setq list (append (list i) list))                    
+        ;;                                                    
+        (setq i (1+ i)))                                      
+     (nreverse list)))  ;; (0 1 2 3 ..)                       
+</p>
+
+<p>
+(defun t3 ()                            ;; 0.7, list*         
+  (let ((i    0)                                              
+        list)                                                 
+    (while (&lt; i 1000)                                         
+        ;;                                                    
+        (setq list (list* 1 list))                            
+        ;;                                                    
+        (setq i (1+ i)))                                      
+     (nreverse list)))   ;; (0 1 2 3 ..)                      
+</p>
+
+<p>
+(defun t4 ()                            ;; 1.0, push          
+  (let ((i    0)                                              
+        list)                                                 
+    (while (&lt; i 1000)                                         
+        ;;                                                    
+        (push i list)                                         
+        ;;                                                    
+        (setq i (1+ i)))                                      
+     (nreverse list)))    ;; (0 1 2 3 ..)                     
+</p>
+
+<p>
+(defun t5 ()                            ;; 0.3, cons          
+  (let ((i    0)                                              
+        list)                                                 
+    (while (&lt; i 1000)                                         
+        ;;                                                    
+        (setq list (cons i list))                             
+        ;;                                                    
+        (setq i (1+ i)))                                      
+     (nreverse list)))    ;; (0 1 2 3 ..)                     
+</p>
+
+<p>
+(when HARNESS                               ;; 3 times        
+  (loop-for 0 5                                               
+    (t11) (t12) (t21) (t22) (t3) (t4) (t5) ))                 
+</p>
+
+<p>
+Wow. using append to add to the end of list is enermously slower than when compared to fastest way cons. You
+should only use append to add to the beginning of list.
+</p>
+
+<p>
+[Vladimir]
+</p>
+
+<p>
+This is expected. For every call, append traverses to the end of the list, making a copy along the way, then
+adds a new element at the end, then discards the old list. This may even lead to garbage collection, which can
+take unpredictably long.
+</p>
+
+<p>
+nconc is better in that it doesn't copy the list ("doesn't cons", which means that doesn't create new conses.
+Cons creation is quick when the new cons is taken from the free cons list, but if that is exhausted, memory
+allocation should be done). However, nconc still traverses the list at every iteration.
+</p>
+
+<p>
+cons just adds a new cell at the beginning. append and nconc take O(n^2/2): when the list length is l they
+perform O(l) operations to traverse the list. cons has amortized cost O(1) (ie constant). "Amortized" means
+that it may cause memory allocation and/or garbage collection every once in a while, but most of the time it
+won't.
+</p>
+
+<p>
+16.6 How to copy a alist fast
+</p>
+
+<p>
+Idea by Morten Welinder <a href="mailto:terra@diku.dk">terra@diku.dk</a> (copy-sequence minor-mode-alist) only copies the cdr structure of the
+list (mapcar 'copy-sequence minor-mode-alist) ought to copy the pairs in the alist `copy-alist copies' list
+structure and pairs: it does slightly more than we need but it is much faster.
+</p>
+
+<p>
+(defun t1 (list)                                ;; 3.5           
+  (let ((i    0))                                                
+    (while (&lt; i 100)                                             
+        ;;                                                       
+        (mapcar 'copy-sequence list)                             
+        ;;                                                       
+        (setq i (1+ i)))))                                       
+</p>
+
+<p>
+(defun t2 (list)                                ;; 2.5           
+  (let ((i    0))                                                
+    (while (&lt; i 100)                                             
+        ;;                                                       
+        (copy-list list)                                         
+        ;;                                                       
+        (setq i (1+ i)))))                                       
+</p>
+
+<p>
+(when HARNESS                                   ;;10 times       
+  ;; Make '((t 1) (t 1) ..) list first.                          
+  (setq list (mapcar '(lambda (x) (list x 1)) (make-list 100 t)))
+  (loop-for 0 10                                                 
+    (t1 list) (t2 list) ))                                       
+</p>
+
+<p>
+16.7 Let: is using let* slower than let
+</p>
+
+<p>
+See explanation in <a href="http://www.nongnu.org/emacs-tiny-tools/elisp-coding/index-body.html#let_is_using_let_slower">(benchmarks)</a> which explains the unexpected result where let* is marginally faster.
+</p>
+
+<p>
+[Vladimir]
+</p>
+
+<p>
+From common sense, it wouldn't matter how you arrange your lets and how you init the vars, even if your
+function is called in a long loop. The function call time will still dominate the lets. If fc=100 and let=1, a
+second let will only add 1% to the overall time. The only time it matters is when the inner let is inside a
+loop, in which case it will probably pay to take it outside.
+</p>
+
+<p>
+We'll find that using let inside loop (defining variable j again and again) slightly decreases the
+performance. Yes, only slightly, because you don't normally use 1000 let statements in your function. This
+would also suggest that even if you put several let statements into the function, that wouldn't be be very
+much slower that using just one let statement at the beginning of file.
+</p>
+
+<p>
+(t01)                               ;; 0.32, without let
+</p>
+
+<p>
+(defun t1 ()                        ;; 0.7, let         
+  (let ((i 0))                                          
+    (while (&lt; i 1000)                                   
+       ;;                                               
+       (let (j) )                                       
+       ;;                                               
+       (setq i (1+ i)))))                               
+</p>
+
+<p>
+(defun t2 ()                        ;; 0.6 let*         
+  (let ((i 0))                                          
+    (while (&lt; i 1000)                                   
+       ;;                                               
+       (let* (j) )                                      
+       ;;                                               
+       (setq i (1+ i)))))                               
+</p>
+
+<p>
+(when HARNESS                       ;;10 times          
+  (loop-for 0 10                                        
+    (t1) (t2)  ))                                       
+</p>
+
+<p>
+It seems that there is not much difference in tested emacs. I wouldn't be that thrilled of the results, but
+I'd guess that let* would have been definitely slower that let. Let try with variation where let* is used for
+the purpose is it meant to: binding previous values's content.
+</p>
+
+<p>
+(defun t1 ()                        ;; 1.2, let
+  (let ((i 0))                                 
+    (while (&lt; i 1000)                          
+       ;;                                      
+       (let ((a 0) (b 1) (c 1) (d 1) (e 1))   )
+       ;;                                      
+       (setq i (1+ i)))))                      
+</p>
+
+<p>
+(defun t2 ()                        ;; 1.1 let*
+  (let ((i 0))                                 
+    (while (&lt; i 1000)                          
+       ;;                                      
+       (let* ((a 0) (b 1) (c b) (d c) (e d)) ) 
+       ;;                                      
+       (setq i (1+ i)))))                      
+</p>
+
+<p>
+(when HARNESS                       ;;10 times 
+  (loop-for 0 10                               
+    (t1) (t2)  ))                              
+</p>
+
+<p>
+Hm. While the let* binds previous variables values to successive ones, there still doesn't seem to be a big
+difference. Don't pay attention to marginal 0.1 advantage which let* seems to have gained.
+</p>
+
+<p>
+16.8 Let: or function arg list
+</p>
+
+<p>
+Some times I only need one variable and I have a bad habbit of defining it in the function call argument list
+to save typing and indentation of let call. Like following.
+</p>
+
+<p>
+(setq xxx-function                      
+  '(lambda (&amp;optional ignore)           
+     (if (setq ignore (my-call-someone))
+         (symbol-value ignore))))       
+</p>
+
+<p>
+Above I only needed one variable, that I named ignore, and used it to record the return status of function.
+But does this buy anything for me? lets find out.
+</p>
+
+<p>
+(defun  t1 (&amp;optional a) (setq a (ignore)))     ;; 0.11   
+(defun  t2 () (let (a) (setq a (ignore))))      ;; 0.12   
+</p>
+
+<p>
+(defun t11 ()                                             
+  (let ((i    0))                                         
+    (while (&lt; i 100)                                      
+        ;;                                                
+        (t1)                                              
+        ;;                                                
+        (setq i (1+ i)))))                                
+</p>
+
+<p>
+(defun t22 ()                                             
+  (let ((i    0))                                         
+    (while (&lt; i 100)                                      
+        ;;                                                
+        (t2)                                              
+        ;;                                                
+        (setq i (1+ i)))))                                
+</p>
+
+<p>
+(when HARNESS                                   ;; 3 times
+  (setq hook nil)                                         
+  (loop-for 0 10                                          
+    (t11) (t22) ))                                        
+</p>
+
+<p>
+If doesn't seem to matter much. I have just had a bad habbit and I should get rid of it.
+</p>
+
+<p>
+16.9 Variables: count of them
+</p>
+
+<p>
+The count of variables starts gradually affecting the performance. Decide yourself how big threath using many
+variables is to your function: usually there are other statements that affect the overall perfomance of the
+function much more. The function call alone takes considerable amount of time when compared to sole let
+statement.
+</p>
+
+<p>
+(defun t1 ()                        ;; 0.5                  
+  (let ((i 0))                                              
+    (while (&lt; i 1000)                                       
+      ;;                                                    
+      (let* (a1 a2 a3) )                                    
+      ;;                                                    
+      (setq i (1+ i)))))                                    
+</p>
+
+<p>
+(defun t2 ()                        ;; 0.7 2x more variables
+  (let ((i 0))                                              
+    (while (&lt; i 1000)                                       
+      ;;                                                    
+      (let* (a1 a2 a3 a4 a5 a6) )                           
+      ;;                                                    
+      (setq i (1+ i)))))                                    
+</p>
+
+<p>
+(defun t3 ()                        ;; 0.9 3x more variables
+  (let ((i 0))                                              
+    (while (&lt; i 1000)                                       
+      ;;                                                    
+      (let* (a1 a2 a3 a4 a5 a6 a7 a8 a9) )                  
+      ;;                                                    
+      (setq i (1+ i)))))                                    
+</p>
+
+<p>
+(when HARNESS                                   ;; 3 times 
+ (loop-for 0 10                                            
+   (t1) (t2) (t3) ))                                       
+</p>
+
+<p>
+16.10 Variables: using let or setq
+</p>
+
+<p>
+I always question myself, does it make difference shere I set the variables value. Some times If I complex
+initializations I would like to declare variable (not set it) in let stament and leave the initializing after
+the let. This seems to indicate that using the let to set the variables is better.
+</p>
+
+<p>
+(defun t1 ()                                    ;; 2.7    
+  (let ((i 0))                                            
+    (while (&lt; i 1000)                                     
+      ;;                                                  
+      (let ((str1 (format "%s" "1"))                      
+            (str2 (format "%s" "1"))                      
+            (str3 (format "%s" "1"))                      
+            (str4 (format "%s" "1")))                     
+      ;;                                                  
+      (setq i (1+ i))))))                                 
+</p>
+
+<p>
+(defun t2 ()                                    ;; 3.5    
+  (let ((i 0))                                            
+    (while (&lt; i 1000)                                     
+      ;;                                                  
+      (let (str1 str2 str3 str4)                          
+        (setq str1 (format "%s" "1")                      
+              str2 (format "%s" "1")                      
+              str3 (format "%s" "1")                      
+              str4 (format "%s" "1")))                    
+      ;;                                                  
+      (setq i (1+ i)))))                                  
+</p>
+
+<p>
+(when HARNESS                                   ;;10 times
+  (loop-for 0 10                                          
+    (t1) (t2) ))                                          
+</p>
+
+<p>
+16.11 Variables: many <b>setq</b> commands
+</p>
+
+<p>
+Yes they do. Using one setq command is naturally faster than many of them. For comparision there is t0
+function which does the same, but does not use setq at all.
+</p>
+
+<p>
+;;  Reference function                                   
+;;                                                       
+(defun t0 ()                                    ;; 1.1   
+  (let ((i 0))                                           
+    (while (&lt; i 1000)                                    
+      ;;                                                 
+      (let ((a 1) (b 1) (c 1) (d 1) (e 1) (f 1) (g 1) )) 
+      ;;                                                 
+      (setq i (1+ i)))))                                 
+</p>
+
+<p>
+(defun t1 ()                                    ;; 1.4   
+  (let ((i 0))                                           
+    (while (&lt; i 1000)                                    
+      ;;                                                 
+      (let (a b c d e f g)                               
+        (setq a 1  b 1 c 1 d 1 e 1 f 1 g 1))             
+      ;;                                                 
+      (setq i (1+ i)))))                                 
+</p>
+
+<p>
+(defun t2 ()                                    ;; 1.9   
+  (let ((i 0))                                           
+    (while (&lt; i 1000)                                    
+      ;;                                                 
+      (let (a b c d e f g)                               
+        (setq a 1) (setq b 1 ) (setq c 1 ) (setq d 1 )   
+        (setq e 1) (setq f 1 ) (setq g 1 ))              
+      ;;                                                 
+      (setq i (1+ i)))))                                 
+</p>
+
+<p>
+(when HARNESS                                   ;;3 times
+  (loop-for 0 10                                         
+    (t0) (t1) (t2)  ))                                   
+</p>
+
+<p>
+16.12 If and cond, which is faster one?
+</p>
+
+<p>
+Neither. Common sense tells you that too: this is actually a stupid test, but I was curious what elp says.
+From here you can see that elp.el isn't that bad if you use it for timing.
+</p>
+
+<p>
+(defun t1 ()                                    ;; 0.4    
+  (let ((i 0))                                            
+    (while (&lt; i 1000)                                     
+      ;;                                                  
+      (if t nil)                                          
+      ;;                                                  
+      (setq i (1+ i)))))                                  
+</p>
+
+<p>
+(defun t2 ()                                    ;; 0.4    
+  (let ((i 0))                                            
+    (while (&lt; i 1000)                                     
+      ;;                                                  
+      (cond (t nil))                                      
+      ;;                                                  
+      (setq i (1+ i)))))                                  
+</p>
+
+<p>
+(when HARNESS                                   ;;10 times
+  (loop-for 0 10                                          
+    (t1) (t2) ))                                          
+</p>
+
+<p>
+16.13 Concat and format commands
+</p>
+
+<p>
+I have very hard time to determine which elp results would describe the average timing difference. I ran the
+elp test several times, but the deviation between the results were too big to give any reliable estimate. Be
+very skeptical.
+</p>
+
+<p>
+(defun t1 ()                                    ;; 1.2    
+  (let ((i 0))                                            
+    (while (&lt; i 1000)                                     
+      ;;                                                  
+      (concat "1" "2" "3" "4" "5" "6" "7" "8")            
+      ;;                                                  
+      (setq i (1+ i)))))                                  
+</p>
+
+<p>
+(defun t2 ()                                    ;; 1.0    
+  (let ((i 0))                                            
+    (while (&lt; i 1000)                                     
+      ;;                                                  
+      (format "%s%s%s%s%s%s%s%s"                          
+              "1" "2" "3" "4" "5" "6" "7" "8")            
+      ;;                                                  
+      (setq i (1+ i)))))                                  
+</p>
+
+<p>
+(when HARNESS                                   ;; 5 times
+  (loop-for 0 10                                          
+    (t1) (t2) ))                                          
+</p>
+
+<p>
+16.14 Using <b>if</b> before running run-hooks
+</p>
+
+<p>
+I just wonder if it makes sense to test hook contents before running it. Why should I call function run-hooks
+if there is nothing in a hook? From the results point of view, the there is small time difference: we prevent
+a function call to run-hooks.
+</p>
+
+<p>
+(defun t1 ()                                           
+  (let ((i 0))                                         
+    (while (&lt; i 1000)                                  
+      ;;                                               
+      (run-hooks 'hook)                         ;;0.83 
+      ;;                                               
+      (setq i (1+ i)))))                               
+</p>
+
+<p>
+(defun t2 ()                                           
+  (let ((i 0))                                         
+    (while (&lt; i 1000)                                  
+      ;;                                               
+      (if hook (run-hooks 'hook))                      
+      ;;                                               
+      (setq i (1+ i)))))                               
+</p>
+
+<p>
+(when HARNESS                                   ;; 0.41
+  (defconst hook nil "temp hook variable")             
+  (loop-for 0 10                                       
+    (t1) (t2) ))                                       
+</p>
+
+<p>
+16.15 Returning boolean or <b>data</b> from function
+</p>
+
+<p>
+Supposes you have some data in some variable, but you wonder does ot make a difference to return that data to
+calling program or just plain boolean t or nil
+</p>
+
+<p>
+Consider that we have some string data that we could return to mean True value, or success. The t2 changes the
+final return value to boolean.
+</p>
+
+<p>
+;; Remark: this is actually not a very good test set.       
+;;                                                          
+(defun  t1 () (let ((ret a)) (setq ret a) ret))             
+(defun  t2 () (let ((ret a)) (setq ret a) (setq ret t) ret))
+</p>
+
+<p>
+(when HARNESS                               ;; 3 times      
+  (setq a (make-string (* 2 80) ?a))                        
+  (loop-for 0 500                                           
+   (t1)                                     ;; 0.13         
+   (t2)))                                   ;; 0.13         
+</p>
+
+<p>
+No, it doesn't seem to make any difference, so we just return anything we have already in the variable.
+</p>
+
+<p>
+[Vladimir] &#x2026;There is nothing that could slow down the t1 function, because returning the variable does not
+make copy of it, it only delays garbage collection of that structure for a while.
+</p>
+
+<p>
+16.16 Calling length or using len variable
+</p>
+
+<p>
+If you use the length of list in many places, calculating it every time with length function decreases
+performance considerably.
+</p>
+
+<p>
+(defun t1 ()                                   ;; 2.3     
+  (let ((i 0))                                            
+    (while (&lt; i 1000)                                     
+      ;;                                                  
+      (progn  (length list) (length list) (length list))  
+      ;;                                                  
+      (setq i (1+ i)))))                                  
+</p>
+
+<p>
+(defun t2 ()                                              
+  (let ((i 0)                                             
+        (len (length list)))                    ;; 0.5    
+    (while (&lt; i 1000)                                     
+      ;;                                                  
+      (progn  len len len)                                
+      ;;                                                  
+      (setq i (1+ i)))))                                  
+</p>
+
+<p>
+(when HARNESS                                   ;; 3 times
+  (setq list (make-list 100 nil))                         
+  (loop-for 0 10                                          
+    (t1) (t2) ))                                          
+</p>
+
+<hr  />
+
+<p>
+17.0 Xemacs and Emacs compatibility
+</p>
+
+<p>
+17.1 About compatibility
+</p>
+
+<p>
+During development of my packages I run into many incompatibities not only between Emacs and XEmacs, but also
+between Emacs version. If you care to write XEmacs and Emacs compatible code without hashless, I'd recommend
+using fucntions from my main library: they offer transparent interface to certain Emacs and XEmacs specific
+features. See these libraries and funcktions
+</p>
+
+<p>
+tinylib.el   &#x2013; functions ti::xe-*                    
+tinylibxe.el &#x2013; XEmacs and Emacs emulation library    
+</p>
+
+<p>
+17.2 Overlay and extent compatibility
+</p>
+
+<p>
+Good news! XEmacs 19.15 now has package overlay.el which mimics the calls of Emacs overlay functions. This
+means, that you no longer need to try to accomodate both Emacs(overlay) and XEmacs(extent) commands into your
+code. Following is enough to make your overlay code work in XEmacs.
+</p>
+
+<p>
+(eval-and-compile           
+  (if (xemacs-p)            
+      (load "overlay")))    
+</p>
+
+<p>
+17.3 Portable Menus
+</p>
+
+<p>
+Don't use Emacs specific menus, but see easymenu.el and compose your menus with it. Below you see a very
+simple minor mode and it's menu definition. The menu appears when the minor mode is turned on and disappears
+when the minor mode is turned off (at least in Emacs). Pay attention to the Selection 3 that can be enabled
+and disabled on the fly.
+</p>
+
+<p>
+Note: The easymenu's enable/disable choice is buggy in Emacs 19.28 - 19.34 (in non-windowed mode), so if the
+progn tests at the end of file fail, don't mind that. Newer Emacs releases have fixed the problems.
+</p>
+
+<p>
+;; test.el &#x2013; Just sample .el file                               
+</p>
+
+<p>
+(require 'easymenu)                                              
+(require 'cl)                                                    
+</p>
+
+<p>
+(defconst my-map (make-sparse-keymap))                           
+(defconst my-menu nil)                                           
+(defconst my-mode nil)                                           
+(defvar   my-flag nil)                                           
+</p>
+
+<p>
+(define-key my-map "\ez1" 'my-1)                                 
+(define-key my-map "\ez2" 'my-2)                                 
+(define-key my-map "\ez3" 'my-3)                                 
+</p>
+
+<p>
+(easy-menu-define                                                
+   my-menu                                                       
+   (if (boundp 'xemacs-logo) nil (list my-map))                  
+   "My test menu"                                                
+   (list                                                         
+    "My Menu"                                                    
+    ["Selection 1" my-1 t]                                       
+    ;;                                                           
+    ;;  X window note:                                           
+    ;;  Works in 19.14, but not in Emacs.                        
+    ;;                                                           
+    ;;  This is a bug in 19.34 but will be                       
+    ;;  corrected to later release                               
+    ;;                                                           
+    ["Selection 2" my-2 nil]                                     
+    ;;                                                           
+    ;;  let's try something more fancier here.                   
+    ;;                                                           
+    ["Selection 3" my-3 (get 'my-menu 'menu-flag) ]))            
+</p>
+
+<p>
+;;  Add mode to minor mode list                                  
+;;                                                               
+(unless my-flag                         ;Add only once           
+  (setq my-flag t)                                               
+  (push (cons 'my-mode my-map)  minor-mode-map-alist))           
+</p>
+
+<p>
+(defun my-1 () (interactive) (message "1"))                      
+(defun my-2 () (interactive) (message "2"))                      
+(defun my-3 () (interactive) (message "3"))                      
+</p>
+
+<p>
+;;   Toggle mode and add the menu, not the menu is available     
+;;                                                               
+(setq my-mode nil)                                               
+(setq my-mode t)                                                 
+(easy-menu-add my-menu)                                          
+</p>
+
+<p>
+;; X window note:                                                
+;; Trying this does not enable choice "3" in XEmacs 19.14        
+;; In Emacs 19.30 it works ok.                                   
+;;                                                               
+;; (progn (put 'my-menu 'menu-flag t) (force-mode-line-update))  
+;; (progn (put 'my-menu 'menu-flag nil) (force-mode-line-update))
+</p>
+
+<p>
+;; Another Test, you need this in XEmacs, but not actually       
+;; in Emacs. &#x2013;&gt; Use it for portability.                         
+;;                                                               
+;; (easy-menu-remove my-menu)                                    
+</p>
+
+<p>
+;; end of code                                                   
+</p>
+
+<p>
+17.4 List of simple incompatibilities.
+</p>
+
+<p>
+Here is a small list of functions that do not work in both emacs versions.
+</p>
+
+<ul class="org-ul">
+<li>force-mode-line-update, XEmacs, labeled as obsolete</li>
+<li>mailabbrev package, XEmacs, calls it mail-abbrevs</li>
+<li>transient-mark-mode, does not exist in XEmacs 19.14</li>
+<li>mailabbrev package, XEmacs, calls it mail-abbrevs</li>
+<li><p>
+eval-after-load, XEmacs, function does not exist in 19.14 Use instead:
+</p>
+
+<p>
+(defvar XXX-package-load-hook nil "")                
+..code..                                             
+(run-hooks 'XXX-package-load-hook)                   
+;; End of package XXX.el                             
+</p>
+
+<p>
+XEmacs 19.15 and 20.1 does have this form though.    
+</p></li>
+</ul>
+
+<p>
+17.5 Hash table compatibility
+</p>
+
+<p>
+Hrvoje Niksic <a href="mailto:hniksic@srce.hr">hniksic@srce.hr</a> 17 May 1997 comp.emacs.xemacs
+</p>
+
+<p>
+Use CL package's hash function which are compatible with Common Lisp and GNU Emacs. They use XEmacs hashtables
+on XEmacs and emulate CL hashtables on GNU Emacs.
+</p>
+
+<p>
+(let ((foo (make-hash-table :test 'equal)))
+  (setf (gethash "David" foo) 'cool)       
+  (setf (gethash "Hrvoje" foo) 'wow)       
+  &#x2026;                                      
+</p>
+
+<p>
+foo                                      
+  =&gt; #&lt;hashtable 2/29 0x1ef7&gt;            
+</p>
+
+<p>
+Now, if you want to dump the hash-table anywhere, the simplest thing to do is dump it to a list. For example,
+your program crunches data in and out of hashtable for
+</p>
+
+<p>
+(let (alist)                                
+  (maphash (lambda (key val)                
+             (push (cons key val) alist))   
+           foo)                             
+  alist)                                    
+  =&gt; (("Hrvoje" . wow) ("David" . cool))    
+</p>
+
+<p>
+There you have all your entries in alist, which you can print, save to file etc. All of this is, of course,
+much faster than if you had used an alist all the time, since the search time would have been O(n) instead of
+much better hashtable characteristics.
+</p>
+
+<p>
+17.6 Character handling changes
+</p>
+
+<p>
+If you had any character tests in your code, it will likely break in XEmacs20 and Emacs20, where a single
+integer does no longer present a charcter code. Beware especially contructs where you read characters directly
+and test the input:
+</p>
+
+<p>
+(setq ch (read-char)) 
+(if (memq ch '(?y ?Y))
+    &#x2026;               
+</p>
+
+<p>
+That will no longer work as expected. Also if you have test like this
+</p>
+
+<p>
+(if (eq (following-char) ?.)
+    &#x2026;                     
+</p>
+
+<p>
+Those will fail also because you can't use old operators like eq. In my latest 'm' library there is emulation
+for some of the following functions that are from XEmacs20's documentation. The above example can now be
+converted into
+</p>
+
+<p>
+(require 'tinylibm)                
+(if (char-in-list-case ch '(?y ?Y))
+</p>
+
+<p>
+(if (char= (following-char) ?.)    
+</p>
+
+<p>
+And the code will work in every Emacs 19.28+, XEmacs 19.14+.
+</p>
+
+<p>
+17.6.1 Characterp: (object), XEmacs20
+</p>
+
+<p>
+t if OBJECT is a character. Unlike in FSF Emacs, a character is its own primitive type. Any character can be
+converted into an equivalent integer using char-to-int. To convert the other way, use int-to-char; however,
+only some integers can be converted into characters. Such an integer is called a char-to-int; see char-int-p.
+</p>
+
+<p>
+Some functions that work on integers (e.g. the comparison functions &lt;, &lt;=, =, /=, etc. and the arithmetic
+functions +, -, *, etc.) accept characters and implicitly convert them into integers. In general, functions
+that work on characters also accept char-ints and implicitly convert them into characters. WARNING: Neither of
+these behaviors is very desirable, and they are maintained for backward compatibility with old E-Lisp programs
+that confounded characters and integers willy-nilly. These behaviors may change in the future; therefore, do
+not rely on them. Instead, use the character-specific functions such as char=.
+</p>
+
+<p>
+17.6.2 Char-int (ch) XEmacs20
+</p>
+
+<p>
+– a built-in function. Convert a character into an equivalent integer. The resulting integer will always be
+non-negative. The integers in the range 0 - 255 map to characters as follows:
+</p>
+
+<p>
+0 - 31      Control set 0               
+32 - 127    ASCII                       
+128 - 159   Control set 1               
+160 - 255   Right half of ISO-8859-1    
+</p>
+
+<p>
+If support for Mule does not exist, these are the only valid character values. When Mule support exists, the
+values assigned to other characters may vary depending on the particular version of XEmacs, the order in which
+character sets were loaded, etc., and you should not depend on them.
+</p>
+
+<p>
+17.6.3 Char-to-int: (ch) XEmacs20
+</p>
+
+<p>
+– a built-in function. Convert a character into an equivalent integer. The resulting integer will always be
+non-negative. The integers in the range 0 - 255 map to characters as follows:
+</p>
+
+<p>
+0 - 31          Control set 0               
+32 - 127        ASCII                       
+128 - 159       Control set 1               
+160 - 255       Right half of ISO-8859-1    
+</p>
+
+<p>
+If support for Mule does not exist, these are the only valid character values. When Mule support exists, the
+values assigned to other characters may vary depending on the particular version of XEmacs, the order in which
+character sets were loaded, etc., and you should not depend on them.
+</p>
+
+<p>
+17.6.4 Int-to-char: (integer) XEmacs20
+</p>
+
+<p>
+– a built-in function. Convert an integer into the equivalent character. Not all integers correspond to valid
+characters; use char-int-p to determine whether this is the case. If the integer cannot be converted, nil is
+returned.
+</p>
+
+<p>
+17.6.5 Char-int-p: (object) XEmacs20
+</p>
+
+<p>
+– a built-in function. t if OBJECT is an integer that can be converted into a character. See char-to-int.
+</p>
+
+<p>
+17.6.6 Char-equal function (c1 c2 &amp;optional buffer) XEmacs20.0
+</p>
+
+<p>
+– a built-in function. Return t if two characters match, optionally ignoring case. Both arguments must be
+characters (i.e. NOT integers). Case is ignored if case-fold-search is non-nil in BUFFER. If BUFFER is nil,
+the current buffer is assumed.
+</p>
+
+<p>
+17.6.7 Char= (c1 c2 &amp;optional buffer) XEmacs20.1
+</p>
+
+<p>
+– a built-in function. Return t if two characters match, case is significant. Both arguments must be
+characters (i.e. NOT integers). The optional buffer argument is for symmetry and is ignored.
+</p>
+<hr  />
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2016-07-16</span>
+            <span title="last modification date" class="post-info">2016-07-16</span>
+            <span title="tags" class="post-info">:N/A:</span>
+            <span title="author" class="post-info"><a href="mailto:lujun9972 &lt;at&gt; lujun9972-F41">lujun9972</a></span>
+        </div>
+    <script src="http://lujun9972.github.io/emacs-document/media/js/jquery-2.1.3.min.js"></script>
+        <section>
+            <h1>Comments</h1>
+            <div id="comment-wrap">
+                    <a class="disqus_label">使用 Disqus 评论</a>
+                    <a class="ds-label">使用多说评论</a>
+    </ul>
+        <div id="disqus_thread"></div>
+        <script type="text/javascript">
+         //var disqus_developer = 1;
+         var preempt_signal=false;
+         var disqus_identifier = "/blog/2016/07/16/emacs-lisp-coding-thoughts/";
+         var disqus_url = "http://lujun9972.github.io/emacs-document/blog/2016/07/16/emacs-lisp-coding-thoughts/";
+         var disqus_shortname = 'emacs-document';
+         /* * * DON'T EDIT BELOW THIS LINE * * */
+         (function() {
+             var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+             dsq.src = 'http://' + disqus_shortname + '.disqus.com/embed.js';
+             (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+             $('#disqus_thread').css('display','none');
+         })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+        <div class="ds-thread"></div>
+        <script type="text/javascript">
+         var duoshuoQuery = {short_name:'emacs-document'};
+         (function() {
+             var ds = document.createElement('script');
+             ds.type = 'text/javascript';ds.async = true;
+             ds.src = 'http://static.duoshuo.com/embed.js';
+             ds.charset = 'UTF-8';
+             (document.getElementsByTagName('head')[0]
+           || document.getElementsByTagName('body')[0]).appendChild(ds);
+             $('.ds-thread').css('display','block');
+         })();
+        </script>
+    <script>
+     /* comments */
+     var ego_disqus_thread=$('#disqus_thread');
+     var ego_ds_label=$('.ds-thread');
+     $('.disqus_label').click(function(){
+         ego_disqus_thread.show();
+         ego_ds_label.hide();
+     });
+     $('.ds-label').click(function(){
+         ego_disqus_thread.hide();
+         ego_ds_label.show();
+     });
+    </script>
+        </section>
+    <script src="http://lujun9972.github.io/emacs-document/media/js/main.js"></script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 25.x(<a href="http://orgmode.org">Org mode</a> 8.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:lujun9972 &lt;at&gt; lujun9972-F41">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div></body>
+</html>
