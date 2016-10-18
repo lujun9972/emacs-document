@@ -22,14 +22,11 @@
 当然,要解决这个问题没有一定的方法. 开发程序可不是件容易的事,它需要大量的专注力. 不过我认为应该有一些方法论和工具能让整个过程变得更平滑一些.
 我觉得解决该问题的最好方法就是将一个文档作为所有活动的中心.
 
-What we want is to be able to perform the process with a single tool and in a single document such that we
-only have to focus on it without having to refocus on different tools in different windows all the time during
-the development process.
+我们希望能只在一份文档中,用一个工具就能完成所有的步骤,这样一来我们在开发的过程中就不用分心在多个工具之间切换了.
 
-In this blog post, I will describe a way to develop, and run, the unit tests (step 4) while keeping the focus
-on writing about the solution and implementing it, all in the same (Org-mode) document.
+在本文中,我将会告诉你一种方法,能够让你在专注于在一份(org-mode)文档中编写解决方案与实现方法的同时完成开发,运行,测试等工作.
 
-This blog post belong to a series of posts about Literate [Clojure] Programming:
+本文属于Clojure文学编程系列博文的一部分:
 
   * [[http://fgiasson.com/blog/index.php/2016/07/06/literate-clojure-programming-using-org-mode/][Project folder structure]]
   * [[http://fgiasson.com/blog/index.php/2016/08/11/literate-clojure-programming-anatomy-of-a-org-mode-file/][Anatomy of a Org-mode file]]
@@ -39,34 +36,25 @@ This blog post belong to a series of posts about Literate [Clojure] Programming:
 
 * Literate Programming
 
-Literate programming is many things to many people. I started to write about it on this blog and I will
-continue in the coming months. However what I want to do with this blog post is to discuss another important
-aspect (at least to me) of Literate Programming, which is that literate programming concepts and principles
-leads to create tools (such as Org-mode with Emacs) that help developers to perform the development process in
-a single document such that their focus is not distracted.
+关于文学式编程,每个人的理解可能都不一样. 我会在之后发布一系列关于这个的文章. 不过我现在想说的是,文学式编程的理念催生出了一批工具来帮助开发者在单个文档中完成所有的开发过程,从而防止分散他们的注意力. 而Emacs中的Org-mode就是其中一款工具.
 
 * Unit Testing in Org-mode (for Clojure)
 
-What I want to show in this blog post is how we can use Org-mode to:
+我在本文中会演示用Org-mode来:
 
- 1. Create a series of unit tests directly where it matters (right below the function to test)
- 2. Run the tests when it matters (all the time, while developing or improving the tested function).
+1. 直接在函数后面编写一系列相关的单元测试案例
+2. 在修改了被测试的函数后运行这些测试.
 
-Unit tests can be used for a lot of different tasks. The main task is to test the behavior of a function and
-to make sure that any future improvements to that function ends up with the expected behavior. But unit tests
-can also be used as documentation about all of the ways that a function can be used in code, how their
-parameters work and what is expected, etc. Whatever the reason, it is really helpful to have the tests
-side-by-side with the function’s code. In most, if not almost all, development environments this is impossible
-to get. However, this is really possible with Org-mode and I think this is a really effective way to develop
-computer software.
+单元测试可以用来完成各项任务. 其最主要的目的是测试函数的行为,确定对该函数的任何修改都符合要求.
+不过单元测试也可以作为展示如何使用该函数的文档来用,它能够起到诸如演示哪些参数可以传递给函数,这些函数起到什么作用,等等功能.
+不管怎么说,让测试代码尽可能的靠近要测试的函数定义是很有用的. 不过在大多数的开发环境下,是及其苦难的, 好在Org-mode能帮助我们做到这一点.
 
-Now, let’s figure out how we could properly define unit tests directly into Org-mode files while developing an
-application. The goal is to let unit tests be developed at the same time as we develop the code and the
-discussions surrounding the code. We shouldn’t have 4 distinct steps: we should do all of them, at the same
-time, in the same document. The goal is that all this should happen at the same time such that the focus
-doesn’t change all the time.
+现在让我们看看如何在开发过程中直接在Org-mode文件中定义单元测试.
+我们的目标是在编写应用代码的同时编写单元测试代码,而且在这些代码的附近还需要有相关的说明.
+我们不会分别实施开发的那四个步骤,相反我们会在同一个文档中将这四个步骤融为一体.
+The goal is that all this should happen at the same time such that the focus doesn’t change all the time.
 
-Let’s start with a simple function that gives the factorial of a number n.
+下面假设我们有一个函数计算N的阶乘.
 
 #+BEGIN_SRC clojure
 (defn n!
@@ -79,7 +67,7 @@ Let’s start with a simple function that gives the factorial of a number n.
       (recur (dec x) (* f x)))))
 #+END_SRC
 
-Now let’s use the function to see what it returns:
+我们可以测试一下这个函数:
 
 #+BEGIN_SRC clojure
 (n! 10)
@@ -87,7 +75,7 @@ Now let’s use the function to see what it returns:
 3628800
 #+END_SRC
 
-Now let’s define some tests to make sure that this implementation works as expected:
+现在我们再来定义一些测试案例:
 
 #+BEGIN_SRC clojure
 (require '[clojure.test :refer :all])
@@ -117,7 +105,7 @@ Now let’s define some tests to make sure that this implementation works as exp
     (is (= 121 (n! 5)))))
 #+END_SRC
 
-Then we can run all the tests at once:
+我们可以一次性运行所有的测试:
 
 #+BEGIN_SRC clojure 
 (run-tests)
@@ -135,28 +123,17 @@ Ran 6 tests containing 6 assertions.
 1 failures, 0 errors.
 #+END_EXAMPLE
 
-There are a few things we have to understand regarding how org-mode and clojure work together. When code
-blocks are executed directly from a Org-mode document, all of the Clojure code is executed in the namespace
-started by Cider, namely the user namespace. When we first define the n! function then it gets defined in the
-user namespace, and then when we define the tests, they get defined in that namespace as well. Finally when we
-call the run-tests function without any parameter, then it runs the tests from the current namespace, which is
-user.
+关于整合org-mode与clojure的原理,有些事情需要说明一下. 当在Org-mode文档中直接执行代码库时,所有的Clojure代码都是在Cider启动的一个名为 =user= 的命名空间内执行的.
+当我们首先定义函数 =n!= 时,它实际上是定义在 =user= 这个命名空间中的, 然后我们定义的那些测试案例也是定义在那个命名空间中.
+最后当我们不带任何参数调用 =run-tests= 时,它会运行当前命名空间中的测试案例,而当前命名空间又恰恰就是 =user= 这个命名空间.
 
-This is why it works flawlessly: because each block is executed from the same Clojure namespace; everything
-runs from there. If I update that function in the future, I will be able to re-run the tests directly from
-that same development context without having to switch to another file or anything.
+由于每个代码块都是在相同的Clojure命名空间内执行的,这样一来,clojure能就与org-mode无缝整合起来了.
+倘若我在后面又修改了这个函数,我可以直接在当前文档中重新发起测试,而无需切换到其他文件.
 
-This is really interesting since we can define the functions that compose our application, then we can
-immediately start writing the tests to make sure that the function behaves appropriately as expected, and we
-can run the tests as often as we want, directly from the same context (development document). Then every time
-I save the Org-mode document, then it gets “tangled” into the tests suites that will be normally be run when
-the application get compiled, or used in other contexts that requires these tests to run. (Note that “tangle”
-is an Org-mode term for generating only the code from an Org-mode document.)
+这就很有意思了,我们一边编写应用代码一边编写测试案例以保证应用代码的正确性. 我们还可以直接在开发文档中尽可能频繁地运行测试案例.
+每次我保存Org-mode文档时,这些测试代码会被抽取出来保存为tests suites,然后在编译应用时被调用或者在其他需要运行测试时被调用.
 
-What is fantastic with Org-mode is that every time you execute every code block in the document by pressing
-C-c C-v b you define the functions and the unit tests in the default namespace, you tangle the code, and you
-execute all the code which includes the tests and immediately see, contextually in your work, if any
-modifications you made to your code broke some earlier assumptions.
+使用Org-mode很爽的一点在于, 你可以通过按下 =C-c C-v b= 运行文档中的所有代码块, 这样一来你就在默认的命名空间内定义了所有的应用函数及其相应的测试案例, 而且当你运行那些包含测试的代码块时,你能立即看到测试的结果.
 
 * Running One or Multiple Tests
 
