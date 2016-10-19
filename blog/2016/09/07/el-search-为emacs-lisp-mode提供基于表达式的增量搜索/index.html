@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>el-search:为emacs-lisp-mode提供基于表达式的增量搜索 - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <style>
+   #ds-thread #ds-reset .ds-comment-body p {color: #ffffff;}
+   #ds-thread #ds-reset .ds-comment-body p a {color: #ff0;}
+   #ds-thread #ds-reset .ds-comment-body p a:hover {color: #0ff;}
+   #disqus_thread a {color: #00ffff;}
+  </style>
+  <link rel="stylesheet" href="http://lujun9972.github.io/emacs-document/media/css/main.css" type="text/css"/>
+  <link rel="stylesheet" href="http://lujun9972.github.io/emacs-document/media/css/comment.css" type="text/css"/>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="http://lujun9972.github.io/emacs-document/">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;集思广益</p>
+    <nav class="site-nav">
+      <div class="menu-icon">
+        <svg viewBox="0 0 18 15">
+          <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.031C17.335,0,18,0.665,18,1.484L18,1.484z" fill="#ffff00"/>
+          <path d="M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0c0-0.82,0.665-1.484,1.484-1.484 h15.031C17.335,6.031,18,6.696,18,7.516L18,7.516z" fill="#ffff00"/>
+          <path d="M18,13.516C18,14.335,17.335,15,16.516,15H1.484C0.665,15,0,14.335,0,13.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.031C17.335,12.031,18,12.696,18,13.516L18,13.516z" fill="#ffff00"/>
+        </svg>
+      </div>
+      <ul class="trigger">
+        <li><a href="http://lujun9972.github.io/emacs-document/years/">Years</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/authors/">Authors</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/tags/">Tags</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document">Github</a></li>
+        <li><a href="http://lujun9972.github.io/emacs-document/rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="http://www.google.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">el-search:为emacs-lisp-mode提供基于表达式的增量搜索</h1>
+<div id="table-of-contents">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#orgheadline1">1. Introduction</a></li>
+<li><a href="#orgheadline2">2. Convenience</a></li>
+<li><a href="#orgheadline3">3. Replacing</a></li>
+<li><a href="#orgheadline4">4. Suggested key bindings</a></li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-orgheadline1" class="outline-2">
+<h2 id="orgheadline1"><span class="section-number-2">1</span> Introduction</h2>
+<div class="outline-text-2" id="text-1">
+<p>
+最常用的命令是 <code>el-search-pattern</code>. 该命令提示你输入一个 <code>pcase</code> 模式然后通过反复"读取"当前buffer内容的方式搜索匹配的表达式.
+若找到了匹配的表达式,则会将光标放在匹配表达式的开头部分(与isearch不同,isearch会将光标放在匹配结果的末尾).
+</p>
+
+<p>
+为什么 <code>el-search-pattern</code> 要基于 <code>pcase</code> 呢? 因为模式匹配(以及这种整合destructuring 与 condition testing的能力)很适合于完成这项任务.
+而且pcase允许添加专门的模式类型,还能以一种自然而透明的方式将这些模式类型整合起来.
+</p>
+
+<p>
+<code>el-search-pattern</code> 并不关心代码的组织格式. 它在搜索时会自动忽略代码中的注释,并将字符串当作原子对象来处理而不会去搜索它的具体内容.
+</p>
+
+<p>
+案例1: 假设你在提示符中输入 <code>97</code>, 它会在代码中搜索所有出现数字97的地方,但是不会搜索出 <code>977</code> 或 <code>(+ 90 7)</code> 或 "My string containing 97" 这些内容.
+相对的,它所搜索的是所有read后 `eq` 97的内容,例如 <code>#x61</code> 或 <code>?a</code>.
+</p>
+
+<p>
+案例2: 如果你输入模式 <code>`(defvar ,_)</code>, 你会搜索出所有没有指定初始值的 <code>defvar</code> 语句.
+</p>
+
+<p>
+下面的模式会搜索出所有docstring的第一行超过70字符的 <code>defvar</code> 语句.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp">`<span style="color: #4f97d7;">(</span><span style="color: #4f97d7; font-weight: bold;">defvar</span> ,_ ,_
+   ,<span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">and</span> s <span style="color: #2d9574;">(</span>guard <span style="color: #67b11d;">(</span>&lt; <span style="color: #a45bad;">70</span> <span style="color: #b1951d;">(</span>length <span style="color: #4f97d7;">(</span>car <span style="color: #bc6ec5;">(</span>split-string s <span style="color: #2d9574;">"\n"</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+在搜索过程中,会看到光标不断的跳跃到正在被测试的表达式前.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgheadline2" class="outline-2">
+<h2 id="orgheadline2"><span class="section-number-2">2</span> Convenience</h2>
+<div class="outline-text-2" id="text-2">
+<p>
+在输入要匹配的模式时,minibuffer会进入emacs-lisp-mode.
+</p>
+
+<p>
+任何输入的模式都会被转换成(and exp PATTERN)这种格式,因此你可以在模式中用变量 <code>exp</code> 来指代当前测试的表达式.
+</p>
+
+<p>
+案例3:
+</p>
+
+<p>
+假设你想在buffer中搜索在 <code>cl-lib</code> 中定义的符号,你可以这些些匹配模式:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span>guard <span style="color: #bc6ec5;">(</span><span style="color: #4f97d7; font-weight: bold;">and</span> <span style="color: #2d9574;">(</span>symbolp exp<span style="color: #2d9574;">)</span>
+            <span style="color: #2d9574;">(</span><span style="color: #4f97d7; font-weight: bold;">when-let</span> <span style="color: #67b11d;">(</span><span style="color: #b1951d;">(</span>file <span style="color: #4f97d7;">(</span>symbol-file exp<span style="color: #4f97d7;">)</span><span style="color: #b1951d;">)</span><span style="color: #67b11d;">)</span>
+                      <span style="color: #67b11d;">(</span>string-match-p <span style="color: #2d9574;">"cl-lib\\.elc?$"</span> file<span style="color: #67b11d;">)</span><span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">)</span><span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+,-&#x2014;&#x2014;&#x2014;&#x2014;&#x2014;&#x2014;&#x2014;&#x2014;&#x2014;&#x2014;&#x2014;&#x2014;&#x2014;&#x2014;&#x2014;&#x2014;&#x2014;&#x2014;&#x2014;&#x2014;&#x2014;&#x2014;&#x2014;
+</p>
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-left" />
+</colgroup>
+<tbody>
+<tr>
+<td class="org-left">Q: "But I hate `pcase'!  Can't we just do without?"</td>
+</tr>
+
+<tr>
+<td class="org-left">&#xa0;</td>
+</tr>
+
+<tr>
+<td class="org-left">A: Respect that you kept up until here! Just use (guard CODE), where</td>
+</tr>
+
+<tr>
+<td class="org-left">CODE is any normal Elisp expression that returns non-nil when and</td>
+</tr>
+
+<tr>
+<td class="org-left">only when you have a match.  Use the variable `exp' to refer to</td>
+</tr>
+
+<tr>
+<td class="org-left">the currently tested expression.  Just like in the last example!</td>
+</tr>
+</tbody>
+</table>
+<p>
+`-&#x2014;&#x2014;&#x2014;&#x2014;&#x2014;&#x2014;&#x2014;&#x2014;&#x2014;&#x2014;&#x2014;&#x2014;&#x2014;&#x2014;&#x2014;&#x2014;&#x2014;&#x2014;&#x2014;&#x2014;&#x2014;&#x2014;&#x2014;
+</p>
+
+<p>
+要一遍又一遍地在minibuffer中输入相同的复杂模式是一件很烦人的事情. 幸运的是,你可以用 <code>el-search-defpattern</code> 来为el-search定义自己的pcase模式类型.
+它的语法与 <code>pcase-defmacro</code> 一样,但是只会对本package起作用. 可以用 <code>C-h f el-search-pattern</code> 来查看预定义的附加的模式列表.
+</p>
+
+<p>
+"el-search-x.el"中定义了其他更多的模式.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgheadline3" class="outline-2">
+<h2 id="orgheadline3"><span class="section-number-2">3</span> Replacing</h2>
+<div class="outline-text-2" id="text-3">
+<p>
+你可以用命令 <code>el-search-query-replace</code> 来替换表达式. 你会被要求输入一个pcase模式,以及一个替换表达式. 每次找到一个匹配模式的表达式,就会在pcase匹配环境下执行替换表达式,并将原表达式替换成其返回值.
+</p>
+
+<p>
+举个例子: 若你想交换所有foo函数中头两个参数的位置, 例如将 <code>(foo 'a (* 2 (+ 3 4)) t)</code> 替换成 <code>(foo (* 2 (+ 3 4)) 'a t)</code>, 你可以这样做:
+</p>
+
+<pre class="example">
+M-x el-search-query-replace RET
+`(foo ,a ,b . ,rest) RET
+`(foo ,b ,a . ,rest) RET
+</pre>
+
+<p>
+按下 <code>y</code> 会替换匹配值然后跳到下一个匹配的地方, <code>r</code> 则表示只替换匹配值而不会移动光标位置, <code>SPC</code> 会跳到下一个匹配位置不替换, <code>!</code> 会自动替换剩下的所有匹配值. <code>q</code> 表示退出替换过长. <code>n</code> 的效果与 <code>SPC</code> 是一样的.
+如果你熟悉isearch的话,就会发现 <code>y</code> 和 <code>n</code> 的用法与isearch是一样的,分别表示"yes"和"no".
+</p>
+
+<p>
+通过启用 <code>splicing mode</code> 还可以将一个匹配的表达式替换为多个表达式. 当启用了 <code>splicing mode</code> 之后,替换表达式的计算结果必须是一个list,然后这个list的内容(而不是这个list本身)会被用于替代匹配的表达式.
+在 <code>el-search-query-replace</code> 的session中按下 <code>s</code> 可以切换 <code>splicing mode</code>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgheadline4" class="outline-2">
+<h2 id="orgheadline4"><span class="section-number-2">4</span> Suggested key bindings</h2>
+<div class="outline-text-2" id="text-4">
+<div class="org-src-container">
+
+<pre class="src src-emacs-lisp"><span style="color: #4f97d7;">(</span>define-key emacs-lisp-mode-map <span style="color: #bc6ec5;">[</span><span style="color: #2d9574;">(</span>control ?S<span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">]</span> #'el-search-pattern<span style="color: #4f97d7;">)</span>
+<span style="color: #4f97d7;">(</span>define-key emacs-lisp-mode-map <span style="color: #bc6ec5;">[</span><span style="color: #2d9574;">(</span>control ?%<span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">]</span> #'el-search-query-replace<span style="color: #4f97d7;">)</span>
+
+<span style="color: #4f97d7;">(</span>define-key isearch-mode-map <span style="color: #bc6ec5;">[</span><span style="color: #2d9574;">(</span>control ?S<span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">]</span> #'el-search-search-from-isearch<span style="color: #4f97d7;">)</span>
+<span style="color: #4f97d7;">(</span>define-key isearch-mode-map <span style="color: #bc6ec5;">[</span><span style="color: #2d9574;">(</span>control ?%<span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">]</span> #'el-search-replace-from-isearch<span style="color: #4f97d7;">)</span>
+
+<span style="color: #4f97d7;">(</span>define-key el-search-read-expression-map <span style="color: #bc6ec5;">[</span><span style="color: #2d9574;">(</span>control ?S<span style="color: #2d9574;">)</span><span style="color: #bc6ec5;">]</span> #'exit-minibuffer<span style="color: #4f97d7;">)</span>
+</pre>
+</div>
+
+<p>
+<code>isearch-mode-map</code> 中的快捷键设置让你可以很容易的从isearch切换到el-search. 
+<code>el-search-read-expression-map</code> 中的快捷键设置则允许你通过按两次 <code>C-S</code> 重复上一次的模式搜索.
+</p>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2016-09-07</span>
+            <span title="last modification date" class="post-info">2016-10-17</span>
+            <span title="tags" class="post-info">:N/A:</span>
+            <span title="author" class="post-info"><a href="mailto:lujun9972 &lt;at&gt; lujun9972-F41">lujun9972</a></span>
+        </div>
+    <script src="http://lujun9972.github.io/emacs-document/media/js/jquery-2.1.3.min.js"></script>
+        <section>
+            <h1>Comments</h1>
+            <div id="comment-wrap">
+                    <a class="disqus_label">使用 Disqus 评论</a>
+                    <a class="ds-label">使用多说评论</a>
+    </ul>
+        <div id="disqus_thread"></div>
+        <script type="text/javascript">
+         //var disqus_developer = 1;
+         var preempt_signal=false;
+         var disqus_identifier = "/blog/2016/09/07/el-search-为emacs-lisp-mode提供基于表达式的增量搜索/";
+         var disqus_url = "http://lujun9972.github.io/emacs-document/blog/2016/09/07/el-search-为emacs-lisp-mode提供基于表达式的增量搜索/";
+         var disqus_shortname = 'emacs-document';
+         /* * * DON'T EDIT BELOW THIS LINE * * */
+         (function() {
+             var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+             dsq.src = 'http://' + disqus_shortname + '.disqus.com/embed.js';
+             (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+             $('#disqus_thread').css('display','none');
+         })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+        <div class="ds-thread"></div>
+        <script type="text/javascript">
+         var duoshuoQuery = {short_name:'emacs-document'};
+         (function() {
+             var ds = document.createElement('script');
+             ds.type = 'text/javascript';ds.async = true;
+             ds.src = 'http://static.duoshuo.com/embed.js';
+             ds.charset = 'UTF-8';
+             (document.getElementsByTagName('head')[0]
+           || document.getElementsByTagName('body')[0]).appendChild(ds);
+             $('.ds-thread').css('display','block');
+         })();
+        </script>
+    <script>
+     /* comments */
+     var ego_disqus_thread=$('#disqus_thread');
+     var ego_ds_label=$('.ds-thread');
+     $('.disqus_label').click(function(){
+         ego_disqus_thread.show();
+         ego_ds_label.hide();
+     });
+     $('.ds-label').click(function(){
+         ego_disqus_thread.hide();
+         ego_ds_label.show();
+     });
+    </script>
+        </section>
+    <script src="http://lujun9972.github.io/emacs-document/media/js/main.js"></script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 25.x(<a href="http://orgmode.org">Org mode</a> 8.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:lujun9972 &lt;at&gt; lujun9972-F41">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div></body>
+</html>
