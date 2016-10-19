@@ -1,0 +1,40 @@
+#+TITLE: 在org-mode中用链接的形式嵌入Youtube视频
+#+URL: http://endlessparentheses.com/embedding-youtube-videos-with-org-mode-links.html
+#+AUTHOR: lujun9972
+#+CATEGORY: org-mode
+#+DATE: [2016-10-16 日 08:03]
+#+OPTIONS: ^:{}
+
+如果经常阅读本博客的话,你应该有注意到 [[http://endlessparentheses.com/debugger-improvements-in-cider-0-10-0.html][我在本文中插入了一篇youtube视频]]. 要插入Youtube视频其实很简单,只需要在HTML中插入它提供给你的iframe HTML代码就行了.
+不过如果我们还需要手工操作的话,那就太不像是Emacs风格了. 只需要插入下面代码到你的初始化文件中,你就解脱了.
+
+#+BEGIN_SRC emacs-lisp
+  (defvar yt-iframe-format
+    ;; You may want to change your width and height.
+    (concat "<iframe width=\"440\""
+            " height=\"335\""
+            " src=\"https://www.youtube.com/embed/%s\""
+            " frameborder=\"0\""
+            " allowfullscreen>%s</iframe>"))
+
+  (org-add-link-type
+   "yt"
+   (lambda (handle)
+     (browse-url
+      (concat "https://www.youtube.com/embed/"
+              handle)))
+   (lambda (path desc backend)
+     (cl-case backend
+       (html (format yt-iframe-format
+                     path (or desc "")))
+       (latex (format "\href{%s}{%s}"
+                      path (or desc "video"))))))
+#+END_SRC
+
+使用方法如下所示(可以添加描述信息).
+
+#+BEGIN_SRC org
+  [[yt:A3JAlWM8qRM]]
+#+END_SRC
+
+当你导出HTML时,org-mode会自动为你生成Youtube的嵌入代码. 相比于直接嵌入Youtube的iframe代码,这种方式你不仅可以直接在org-mode中点击链接,还能把该链接导出成其他格式.
