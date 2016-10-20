@@ -1,4 +1,9 @@
+#+TITLE: 教你用Org-mode管理dotfiles
 #+URL: https://expoundite.net/guides/dotfile-management
+#+AUTHOR: org-mode
+#+CATEGORY: org-mode dotfile
+#+DATE: [2016-10-20 周四 10:56]
+#+OPTIONS: ^:{}
 
 某一天,'polm23'在Hack News上提了个问题, [[https://news.ycombinator.com/item?id=11070797][你们都是怎么管理dotfiles的]]. 我分享了一下我的方法并贴上了[[https://news.ycombinator.com/item?id=11070970][两个例子]]. 
 Turns out, rare for me, I stumbled upon an original way to edit, document and deploy dotfiles. 
@@ -209,10 +214,8 @@ encryption_mechanism=HMAC-SHA1
 
 * 3 Managing remote dotfiles and configs
 
-In :tangle head argument or subtree property, you can specify a remote
-location, typically a remote server which you have SSH access. Suppose you are
-in charge of a web server, you can save yourself a lot of remote editing by
-using Org-Mode to manage its configuration:
+你可以为 =:tangle= 这个head argument或者其对应的子树属性赋一个远程主机上的位置,一般来说这个主机你能够用SSH访问. 
+假设你在管理一台web服务器,你可以通过Org-mode来管理它的相关配置而无需远程登录到web服务器上编辑文件:
 
 #+BEGIN_SRC org
   ,* Nginx
@@ -231,44 +234,30 @@ using Org-Mode to manage its configuration:
   ,#+END_SRC
 #+END_SRC
 
-The first code block get tangled into the remote file /home/webadmin/
-nginx.conf, the second code block has :tangle no and will not be tangled into
-any file, but you can run the code block from your local Emacs, it will ask
-you your sudo password, and copy the file to the right location and set
-owners.
+第一个代码块的内容会写入到远程文件 =/home/webadmin/nginx.conf= 中, 二第二个代码块由于参数 =:tangle= 为 =no= 因此不会tangle到任何文件中去.
+不过你可以在本地的Emacs中运行这段代码,它会提示你输入sudo的密码,然后拷贝配置文件到指定的地方,并设置好配置文件的宿主.
 
 * 4 Caveats
 
-  * Emacs is single-threaded. If you use Org-Mode to deal with files/shells on
-    remote systems through a slow connection, you will have to wait during
-    tangling remote files and executing remote commands.
-  * You don't have to deal with symlinks, and you don't get its benefits. For
-    example, you change your Git settings through command git config --global
-    .... Such changes don't automatically get updated in your Org-Mode file.
-    It is your responsibility to update your dotfile.org by hand.
-      + UPDATE: Ken Mankoff sends me a tip that partially solves the problem.
-        You can add the following line to the top of your dotfile.org:
++ Emacs是单线程的. 如果你是通过一个非常缓慢的链接来tangle远程文件或执行远程shell,可能会有明显的延迟.
++ 你没有用到符号链接,自然也就享受不到符号链接带来的好处. 假设你通过命令 =git config --global ....= 修改了Git的配置,那么这个修改并不能自动同步到你的Org文件中去.
+  你需要手工更新你的 =dotfile.org=.
+
+  UPDATE: Ken Mankoff告诉了我一个技巧可以部分的解决这个问题.
+  你可以在你的dotfile.org的顶端加上这么一行:
        
-        #+BEGIN_SRC org
-          ,#+PROPERTY: header-args:conf  :comments link :tangle-mode (identity #o444)
-        #+END_SRC
+  #+BEGIN_SRC org
+    ,#+PROPERTY: header-args:conf  :comments link :tangle-mode (identity #o444)
+  #+END_SRC
         
-        In Ken's own words: "This makes the files read-only, so I can't edit
-        them by mistake. It also creates a commented link at the top of each,
-        so I can jump from the dotfile to its Org origin if I open the dotfile
-        by mistake." Kudos.
+  用Ken自己的话说就是: "这使得tangle出来的文件是只读的,这就防止我一不小心错改了这些文件. 我还在没份代码前创建了一份注释链接,这样我就可以直接从这份dotfile直接跳转到相对应的原Org文件中去"
        
-  * Your dotfile.org may become to big and unwieldy. For most people this is
-    not a big deal. On my late-2012 MacBook Pro, opening Org files of a few
-    hundred KB is as smooth as opening a new file. But if this system is used
-    for a long time, the files may grow with all those logs and documents. In
-    that case, you may want to split the files by, say, putting each top-level
-    headline in a separate file. It is easy to create links to other files in
-    Org-Mode, so you can still conveniently navigate through all the files.
++ 你的 =dotfile.org= 可能会变得很庞杂. 不过这对大多数人来说并不是什么大不了的问题.
+  在我的 late-2012 MacBook Pro上打开一个几百K的Org文件,跟打开一个新文件没啥区别.
+  不过随着时间的推移,文件中可能会被log和文档说明所充斥. 这是你可能需要按标题将原文件划分成多个org文件.
+  不过在Org-Mode中创建不同文件之间的链接很容易,你也可以很方便的在这些文件中之间跳转.
 
 * 5 Acknowledgements
 
-This system is inspired by [[http://sachachua.com/blog/about/][Sacha Chua]]'s Emacs [[http://pages.sachachua.com/.emacs.d/Sacha.html][config]]. I did not realize
-Org-Mode was such a powerful tool for system administration until I see
-Howardism's talk on [[http://howardism.org/Technical/Emacs/literate-devops.html][literate devops]]. Last but not least, thanks to all the
-people behind Org-Mode, Tramp and GNU Emacs.
+这套系统是受到了 [[http://sachachua.com/blog/about/][Sacha Chua]] 的[[http://pages.sachachua.com/.emacs.d/Sacha.html][Emacs配置]] 所启发. 我也是在看到Howardism关于 [[http://howardism.org/Technical/Emacs/literate-devops.html][literate devops]] 的演讲之后才意识到原来Org-Mode可以作为这么强大的系统管理工具来用的.
+最后,十分感谢那些创建和维护 Org-Mode, Tramp 以及 GNU Emacs的人.
