@@ -1,0 +1,274 @@
+#+URL: https://expoundite.net/guides/dotfile-management
+
+某一天,'polm23'在Hack News上提了个问题, [[https://news.ycombinator.com/item?id=11070797][你们都是怎么管理dotfiles的]]. 我分享了一下我的方法并贴上了[[https://news.ycombinator.com/item?id=11070970][两个例子]]. 
+Turns out, rare for me, I stumbled upon an original way to edit, document and deploy dotfiles. 
+虽然我们Emacs用户早已开始用Org-Mode来管理.emacs文件了, 但还是只有极少数的人用它来管理其他的dotfile.
+
+用Org-Mode来管理dotfile,我至少能想到三个优势.
+
++ 你可以对每一行的配置都加上文档说明. 你可以记录下你是什么时候写下这行配置的,为什么要写下这行配置. 你也可以在这段代码块附件记下其他可能的配置,这样你就无需老是去查看man或其他文档信息了.
++ 你不再需要创建那些容易出错的符号链接了. 我们经常会写出像 =ln -s dotfiles/vimrc ~/.vimrc= 这样的创建符号链接对吧? 
+  即使我们记得总是在创建符号链接时使用绝对路径,那当你想把dotfile从BSD迁移到Linux时怎么办呢? =~= 在两个系统可是表示不同路径的呀!
+  当然,你可以在发布脚本中为不同操作系统创建不同的分支,但是借助Org-Mode,你根本无需这么麻烦.
++ 你甚至可以管理远程服务器上的dotfile. Org-Mode可以将代码块'tangle'到远程主机上去, 所以你可以象管理本机上的 =.bashrc= 一样管理服务器上的 =nginx.conf= 文件.
+
+* 1 Here's how
+
+** 1.1 Requirements
+
+24.x及以上版本的Emacs, 8.x或更新的Org-Mode, 还有你最喜爱的键盘.
+
+然后在Emacs中创建一个新文件,你可以把它叫做 =dotfiles.org= 或其他什么名字.
+
+** 1.2 "Normal" dotfiles
+
+这些文件直接就存放在你的home目录下. 因此可以很直接的在Emacs中管理这些文件. 为了便于组织,你可以将同类的文件放在同一个标题下. 
+比如,对于那些与email相关的文件,你可以创建这样一些标题:
+
+#+BEGIN_SRC org
+  ,* Email
+  ,** Muttrc
+  ,** Aliases
+  ,** goobookrc
+#+END_SRC
+
+然后将你文件的内容放在每个子标题下的代码块中,像这样:
+
+#+BEGIN_SRC org
+  ,* Email
+  ,** Muttrc
+   ,#+BEGIN_SRC conf :tangle ~/.muttrc
+   #source "/etc/Muttrc"   # Not available on OS X
+   source "gpg --batch --passphrase-file ~/.sec/.passphrase --textmode -d ~/.sec/mutt.gpg |"
+   set realname="Haoyang Xu"
+
+   set sig_dashes
+
+   ...
+
+   ,#+END_SRC
+#+END_SRC
+
+这样一来,当你运行 =M-x org-babel-tangle= 或按下 =C-c C-v t= 时,上面代码块的内容会写入到 =$HOME/.muttrc= 文件中, 并覆盖原内容.
+
+其他的子标题也是一样的处理方式:
+
+#+BEGIN_SRC org
+  ,* Email
+  ,** Muttrc ...
+  ,** Aliases
+    ,#+BEGIN_SRC conf :tangle ~/.aliases
+    alias mumon      foobar@example.com
+    ,#+END_SRC
+  ,** goobookrc
+    ,#+BEGIN_SRC conf :tangle ~/.goobookrc
+    [DEFAULT]
+     # The following are optional, defaults are shown
+
+     # This file is written by the oauth library, and should be kept secure,
+     # it's like a password to your google contacts.
+     ;oauth_db_filename: ~/.goobook_auth.json
+
+     # The client secret file is not really secret.
+     ;client_secret_filename: ~/.goobook_client_secret.json
+
+     ;cache_filename: ~/.goobook_cache
+     ;cache_expiry_hours: 24
+     ;filter_groupless_contacts: yes
+    ,#+END_SRC
+#+END_SRC
+
+现在当你执行 =org-babel-tangle= 后,会产生3个dotfile. 你可以将这个org文件纳入到版本控制系统中,在Emacs中编辑dotfile然后一键发布它们.
+deploy them with one command.
+
+** 1.3 Dotfiles in a dotdir
+
+假设,你想管理你的存放在 =.ssh= 目录下的SSH配置文件. 它的管理方式大致上与上面的没什么两样.
+不过如果你是在一台新机器上,尚没有 =.ssh= 目录,那Org-mode在tangle时会报错.
+
+这种情况下,你需要在文件的开头写上一行:
+
+#+BEGIN_SRC org
+  # -*- eval: (make-directory ".ssh" "~") -*-
+#+END_SRC
+
+你也可以在文件开始前创建一个代码块来帮你运行创建目录的命令.
+
+#+BEGIN_SRC org
+  ,#+BEGIN_SRC sh
+  mkdir ~/.ssh
+  ,#+END_SRC
+#+END_SRC
+
+不过,最好的方法还是设置header argument =mkdirpl= 为 =yes=. 像这样:
+
+#+BEGIN_SRC org
+  ,#+BEGIN_SRC sh :mkdirp yes :tangle ~/.ssh/config
+  (your .ssh/config contents)
+  ,#+END_SRC
+#+END_SRC
+
+这样一来,若没有 =.ssh= 目录的话,Org-Mode会自动帮你创建.
+
+** 1.4 Emacs dotfiles
+
+如果你是采用的老旧的 =.emacs= 或 =init.el= 来存放你的Emacs配置,那么管理的方法跟上面说的一样.
+然而,若你的配置本来就是嵌入到其他.org文件中的,我想你应该不会喜欢把这些org文件的内容再放到 =dotfile.org= 中的org代码块中.
+我的解决方案是在 =home.org(我的dotfile)= 所在目录下创建一个目录来存放这些Emacs dotfile.
+这种方法不太完美,不过我目前也没有其他什么好的方法了. 这还真是讽刺啊.
+
+** 1.5 Credentials and secrets
+
+若你把你的dotfile放到网上去,那么你需要给dotfile加密. 好在,Emacs对加解密文件支持得很好.
+你把那些不想公开的东西写入一个特定的org问你就暗中,然后用 =epa-encrypt-file= 来将该文件进行加密,加密后的文件以 =.gpg= 为后缀. 然后你就可以删掉明文的org文件了. 
+下一次你在编辑加密过的 =.org.gpg= 文件时, Emacs会通过 =gpg-agent= 提示你输入密码,然后自动为你解密.
+
+* 2 Documenting changes
+
+上面的方法能够让你简单而快速的把所有的dotfile都放到少量的org文件中去. 但是仅仅这样还不够. 用Org-mode来管理dotfile的好处更在于能够无缝的整合文档说明,并且能够快速的进行部署.
+
+你可以把一段非常长的配置内容细分到多个代码块中去,然后在部署时将这些代码块中的内容整合到一个文件中去.
+你甚至可以把这些代码块放置在不同的子标题下.
+
+这种情况下, 你无需为每个代码块的属性(官方文档称之为head arguments)都设置以此要写到哪个文件中, 你可以直接在标题的属性中(为该标题下的所有代码块)指定该文件的路径.
+下面举个例子:
+
+#+BEGIN_SRC org
+  ,* Git
+    :PROPERTIES:
+    :tangle:   ~/.gitconfig   # <- all src blocks under this 'Git' subtree will be written to ~/.gitconfig
+    :END:
+  ,** personal information
+  ,#+BEGIN_SRC conf
+    [user]
+    name = John Doe
+    email = john.doe@example.net
+  ,#+END_SRC
+  ,** push settings
+  ,#+BEGIN_SRC conf
+    [push]
+    default = upstream
+  ,#+END_SRC
+  ...
+#+END_SRC
+
+当你tangle该文件时,所有 =* Git= 子树下的代码块都会被写入到 =$HOME/.gitconfig= 中.
+
+现在假设我们要修改一下Git的推送配置,我们可以很方便的定位到相关位置然后做出一些修改:
+
+#+BEGIN_SRC org
+  ,** push settings
+  ,#+BEGIN_SRC conf
+    [push]
+    default = simple
+  ,#+END_SRC
+#+END_SRC
+
+过了一段时候后,你可能就会忘记改了哪部分内容了. 那么为什么为这次的修改留下一些笔记呢?
+
+#+BEGIN_SRC org
+  ,** push settings
+  ,#+BEGIN_SRC conf
+    [push]
+    default = simple
+  ,#+END_SRC
+  [2016-03-19 Sat 22:31] change push default from 'upstream' to 'simple'.
+#+END_SRC
+
+你可以在几乎任何位置通过按下 =C-u C-c != 来插入一段时间戳. 如果你只需要插入日期而不关心具体的时间,那么你可以按下 =C=c != 来插入.
+
+如果你经常需要修改某项配置,可以考虑为所有可能的选项加上说明:
+
+#+BEGIN_SRC org
+  ,** push settings
+  With ~push.default~ set to ~simple~, ~git push~ will fail if the current local branch is not tracking a remote branch, even if remote has a branch with the same name. This seems to be the safest option. Other possible values are:
+
+   - ~upstream~: push the local branch to its upstream branch.
+   - ~current~: push the local branch to a branch of the same name.
+
+  ,#+BEGIN_SRC conf
+    [push]
+    default = simple
+  ,#+END_SRC
+  [2016-03-19 Sat 22:31] change push default from 'upstream' to 'simple'.
+#+END_SRC
+
+有时,你可能想体验一下各类选项的组合效果,你可以将这些组合都写下来,然后告诉Org-mode不要tangle其中的某些代码块:
+
+#+BEGIN_SRC conf :tangle no
+safe_threshold=1
+encryption_mechanism=ECDHE_RSA
+#+END_SRC
+
+#+BEGIN_SRC conf
+safe_threshold=0
+encryption_mechanism=HMAC-SHA1
+#+END_SRC
+
+上面例子中,只有后面的代码块会被写入配置文件中.
+
+* 3 Managing remote dotfiles and configs
+
+In :tangle head argument or subtree property, you can specify a remote
+location, typically a remote server which you have SSH access. Suppose you are
+in charge of a web server, you can save yourself a lot of remote editing by
+using Org-Mode to manage its configuration:
+
+#+BEGIN_SRC org
+  ,* Nginx
+    :PROPERTIES:
+    :tangle:   /webadmin@ssh.example.org:configs/nginx.conf
+  ,#+BEGIN_SRC conf
+    worker_processes 4;
+
+    events { worker_connections 1024; }
+    ...
+  ,#+END_SRC
+
+  ,#+BEGIN_SRC sh :dir /ssh:webadmin@ssh.example.org|sudo:ssh.example.org :tangle no
+  cp /home/webadmin/configs/nginx.conf /etc/nginx/
+  chown nginx:nginx /etc/nginx/nginx.conf
+  ,#+END_SRC
+#+END_SRC
+
+The first code block get tangled into the remote file /home/webadmin/
+nginx.conf, the second code block has :tangle no and will not be tangled into
+any file, but you can run the code block from your local Emacs, it will ask
+you your sudo password, and copy the file to the right location and set
+owners.
+
+* 4 Caveats
+
+  * Emacs is single-threaded. If you use Org-Mode to deal with files/shells on
+    remote systems through a slow connection, you will have to wait during
+    tangling remote files and executing remote commands.
+  * You don't have to deal with symlinks, and you don't get its benefits. For
+    example, you change your Git settings through command git config --global
+    .... Such changes don't automatically get updated in your Org-Mode file.
+    It is your responsibility to update your dotfile.org by hand.
+      + UPDATE: Ken Mankoff sends me a tip that partially solves the problem.
+        You can add the following line to the top of your dotfile.org:
+       
+        #+BEGIN_SRC org
+          ,#+PROPERTY: header-args:conf  :comments link :tangle-mode (identity #o444)
+        #+END_SRC
+        
+        In Ken's own words: "This makes the files read-only, so I can't edit
+        them by mistake. It also creates a commented link at the top of each,
+        so I can jump from the dotfile to its Org origin if I open the dotfile
+        by mistake." Kudos.
+       
+  * Your dotfile.org may become to big and unwieldy. For most people this is
+    not a big deal. On my late-2012 MacBook Pro, opening Org files of a few
+    hundred KB is as smooth as opening a new file. But if this system is used
+    for a long time, the files may grow with all those logs and documents. In
+    that case, you may want to split the files by, say, putting each top-level
+    headline in a separate file. It is easy to create links to other files in
+    Org-Mode, so you can still conveniently navigate through all the files.
+
+* 5 Acknowledgements
+
+This system is inspired by [[http://sachachua.com/blog/about/][Sacha Chua]]'s Emacs [[http://pages.sachachua.com/.emacs.d/Sacha.html][config]]. I did not realize
+Org-Mode was such a powerful tool for system administration until I see
+Howardism's talk on [[http://howardism.org/Technical/Emacs/literate-devops.html][literate devops]]. Last but not least, thanks to all the
+people behind Org-Mode, Tramp and GNU Emacs.
