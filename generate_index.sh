@@ -13,7 +13,7 @@ function generate_headline()
     echo "* " $catalog
     echo ${catalog_comment_dict[$catalog]}
     echo 
-    generate_links $catalog |sort -k3 -r
+    generate_links $catalog |sort -t "<" -k2 -r
 }
 
 function generate_links()
