@@ -9,16 +9,16 @@ catalogs=$(for catalog in ${!catalog_comment_dict[*]};do
 
 function generate_headline()
 {
-    catalog=$1
+    local catalog=$1
     echo "* " $catalog
     echo ${catalog_comment_dict[$catalog]}
     echo 
-    generate_links $catalog
+    generate_links $catalog |sort -k3 -r
 }
 
 function generate_links()
 {
-    catalog=$1
+    local catalog=$1
     posts=$(ls -t $catalog)
     old_ifs=$IFS
     IFS="
@@ -26,8 +26,7 @@ function generate_links()
     for post in $posts
     do
         modify_date=$(git log --date=short $catalog/$post |grep ^Date:|head -1|cut -f2 -d ':'|sed "s/^\s*//") # 去除日期前的空格
-        echo "[[https://github.com/lujun9972/emacs-document/blob/master/$catalog/$post][$post]]		<$modify_date>"
-        echo
+        echo "+ [[https://github.com/lujun9972/emacs-document/blob/master/$catalog/$post][$post]]		<$modify_date>"
     done
     IFS=$old_ifs
 }
