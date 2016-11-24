@@ -1,0 +1,110 @@
+#+TITLE: read-and-write-files-in-emacs-lisp
+#+URL: http://www.lunaryorn.com/posts/read-and-write-files-in-emacs-lisp.html
+#+AUTHOR: lujun9972
+#+TAGS: raw
+#+DATE: [2016-11-24 四 14:13]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+
+Apparently it is not so uncommon to use interactive commands like find-file or
+write-file to read or write files in Emacs Lisp. [[https://github.com/company-mode/company-statistics/pull/8][Small libraries]] do it, Org
+Mode is [[http://orgmode.org/cgit.cgi/org-mode.git/tree/lisp/org-clock.el?id=d9070419119cf6b19f2f471aa2eb81ec3d9b0d0f#n2922][no exception]], even built-in libraries [[https://github.com/emacs-mirror/emacs/blob/5b774598f4911975444120f56e448c4ca5f8c11f/lisp/emacs-lisp/autoload.el#L927][use this pattern]] ^[[http://www.lunaryorn.com/posts/read-and-write-files-in-emacs-lisp.html#fn:1][1]]. Which is a
+good example that Emacs’ own code is not always to be followed as in fact it
+is not a good idea to use these commands from Emacs Lisp.
+
+* User-Visible Effects?
+
+When you are writing internal state to disk it is a good idea to do that
+without interfering with the user. However interactive commands like find-file
+or write-file are meant to have user-visible effects—and they do have
+user-visible effects even when used in non-interactive Emacs Lisp. These
+effects—while normally desirable—will confuse users and interrupt their
+workflow if they show up unexpectedly.
+
+write-file for instance sets the major mode of the current buffer which in
+turn runs the major mode hook—one of the central extension points in Emacs.
+Writing to a file can thus end up running arbitrary code from the user’s
+configuration! Another example: find-file tries to set local variables for the
+current buffer which can prompt the user if there is an unsafe value or a
+risky variable—imagine if you would see an unexpected prompt about a local
+variable in a buffer that you did not even create yourself!
+
+* Libraries To The Rescue
+
+The best way for non-interactive IO is the excellent [[https://github.com/rejeep/f.el][f.el]] by [[https://github.com/rejeep][Johan Andersson]]
+of [[https://github.com/cask/cask][Cask]] fame. With this library reading and writing files is easy enough with
+f-read-text and f-write-text respectively:
+
+#+BEGIN_SRC emacs-lisp
+  (let* ((filename (locate-user-emacs-file "foo.txt"))
+         (contents (f-read-text filename 'utf-8)))
+    (f-write-text (upcase contents) 'utf-8 filename))
+#+END_SRC
+
+f.el also provides f-read-bytes and f-write-bytes for reading and writing raw
+bytes. And while you are at it take a look at the rest of f.el—there are a
+couple of nice functions in there for dealing with paths and files in Emacs
+Lisp.
+
+* The Tedious Way
+
+That said f.el can do no magic; it uses the same Emacs Lisp primitives that
+that are also available to you. If you cannot use external libraries—perhaps
+you are contributing to a GNU ELPA package where non-gnu dependencies are
+outlawed?—you can still read files safely, albeit with a little more
+boilerplate. Use insert-file-contents-literally which avoids almost every side
+effect that reading files normally has in Emacs Lisp^[[http://www.lunaryorn.com/posts/read-and-write-files-in-emacs-lisp.html#fn:2][2]] to insert the raw
+contents of the file into a temporary buffer and then decode the raw bytes
+with decode-coding-region^[[http://www.lunaryorn.com/posts/read-and-write-files-in-emacs-lisp.html#fn:3][3]]:
+
+#+BEGIN_SRC emacs-lisp
+  (with-temp-buffer
+    (insert-file-contents-literally file-name)
+    (decode-coding-region (point-min) (point-max) 'utf-8 t))
+#+END_SRC
+
+The inverse direction is a little more involved. There is no “write”
+equivalent to insert-file-contents-literally so you need to be a little more
+explicitly to prevent Emacs from making guesses. Bind coding-system-for-write
+to force Emacs to write binary data and then insert the utf-8-encoded data
+into a special temporary buffer which automatically gets written to the target
+path at the end of the form^[[http://www.lunaryorn.com/posts/read-and-write-files-in-emacs-lisp.html#fn:4][4]]:
+
+#+BEGIN_EXAMPLE
+  (let ((coding-system-for-write 'binary))
+    (with-temp-file path
+      (set-buffer-multibyte nil)
+      (encode-coding-string contents ’utf-8 nil 'insert-into-buffer)))
+#+END_EXAMPLE
+
+* Summary
+
+Do not use find-file, write-file or any other interactive command to read or
+write files from Emacs Lisp, to avoid unintended side-effects like mode hooks
+or even prompts about local variables. Use f-read-text and f-write-text from
+the [[https://github.com/rejeep/f.el][f.el]] library instead, or write your own safe alternatives as shown above.
+
+* foot
+ 1. I’m linking to the GitHub mirror of the Emacs sources because the UI is
+    noticeably faster. When I looked for the link to the specific source
+    location I couldn’t help but loose a few minutes on the list of pull
+    requests. One would assume that it’s a well-known fact that Emacs isn’t
+    hosted on GitHub, and the GitHub page even says that it’s a mirror, but
+    people seem to be so eager to contribute that they ignore that. Now, of
+    course, the PRs are mostly trivial, but still… imagine the potential
+    contributors lost here, imagine where Emacs could be if it was [[http://www.lunaryorn.com/posts/I-wished-gnu-emacs-had.html][more]]
+    [[http://www.lunaryorn.com/posts/I-wished-gnu-emacs-had.html][welcoming to contributors]]. [[http://www.lunaryorn.com/posts/read-and-write-files-in-emacs-lisp.html#fnref:1][↩]]
+   
+ 2. now According to a [[https://twitter.com/vermiculus/status/798883500636143616][reader]] it does not even run find-file-hook. [[http://www.lunaryorn.com/posts/read-and-write-files-in-emacs-lisp.html#fnref:2][↩]]
+   
+ 3. The arguments to decode-coding-region are self-explanatory—except the last
+    one. Why should you have to pass t? And t literally, not following the
+    good practice of passing named symbols for non-nil arguments? I dearly
+    recommend to look up this parameter in the docstring: It’s a nice lesson
+    about flawed API design and the pain of programming Emacs Lisp. [[http://www.lunaryorn.com/posts/read-and-write-files-in-emacs-lisp.html#fnref:3][↩]]
+   
+ 4. with-temp-file is a very unfortunate and confusing name. It doesn’t
+    actually refer to temporary files at all, but instead to a temporary 
+    buffer that gets written to a file. Emacs Lisp can be quite confusing at
+    whiles. [[http://www.lunaryorn.com/posts/read-and-write-files-in-emacs-lisp.html#fnref:4][↩]]
