@@ -1,0 +1,63 @@
+#+TITLE: 在EmacsLisp中读写文件
+#+URL: http://www.lunaryorn.com/posts/read-and-write-files-in-emacs-lisp.html
+#+AUTHOR: lujun9972
+#+CATEGORY: elisp-common
+#+DATE: [2016-11-26 周六 00:00]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+
+在EmacsLisp中用类似 =find-file=, =write-file= 这样的交互式命令来读写文件是很常见的事情.
+[[https://github.com/company-mode/company-statistics/pull/8][有写小型的library]] 就是这么作的,连Org-mode [[http://orgmode.org/cgit.cgi/org-mode.git/tree/lisp/org-clock.el?id=d9070419119cf6b19f2f471aa2eb81ec3d9b0d0f#n2922][也不例外]], 甚至有一些内置的librariy[[https://github.com/emacs-mirror/emacs/blob/5b774598f4911975444120f56e448c4ca5f8c11f/lisp/emacs-lisp/autoload.el#L927][都是这么做的]] ^[[http://www.lunaryorn.com/posts/read-and-write-files-in-emacs-lisp.html#fn:1][1]]. 
+这充分的说明了Emacs本身的代码也不是那么的完美,因为事实上在EmacsLisp用这些命令并不是一个好的方法.
+
+* 影响到用户?
+
+当你将内部状态写入磁盘时最好不要影响到用户. 然而像 =find-file= 和 =write-file= 这样的交互式命令会产生用户可察觉的影响-这会使得即使在运行非交互式的EmacsLisp代码时也会产生用户可察觉的影响.
+这些影响会让用户觉得疑惑从而打断用户的工作流.
+
+举个例子, =write-file= 会为当前buffer设置major mode,而这又会运行major mode的hook(这是Emacs的核心扩展机制之一).
+因此,写入文件这个动作最终可能会运行用户配置中的某段代码!
+再举个例子: =find-file= 会为当前buffer设置局部变量的值,而当这些局部变量包含不安全的值或者带风险的变量时会提示用户是否设置这些变量值.
+想象一下当你看到一个莫名其妙的提示,问你是否设置一个你根本没有创建过的buffer中的局部变量的值时是什么感觉!
+
+* 解决问题的库
+
+提供最好的非交互式IO的库非[[https://github.com/rejeep/f.el][f.el]] 莫属. 它的作者是[[https://github.com/rejeep][Johan Andersson]],以[[https://github.com/cask/cask][Cask]] 而闻名. 
+这个库提供了 =f-read-text= 和 =f-write-text= 这两个函数,让读写文件变得非常简单.
+
+#+BEGIN_SRC emacs-lisp
+  (let* ((filename (locate-user-emacs-file "foo.txt"))
+         (contents (f-read-text filename 'utf-8)))
+    (f-write-text (upcase contents) 'utf-8 filename))
+#+END_SRC
+
+f.el还提供了 =f-read-bytes= 与 =f-write-bytes= 这两个函数来读写纯字节.
+你还可以看一下f.el中的其他函数-它还提供了大量的函数来处理Emacs Lisp中的路径和文件.
+
+* 自己实现的方式
+
+f.el也不可能变魔术; 它跟你一样也是用的那些Emacs Lisp primitives.
+如果你无法使用第三方库(也许你正在修改一个GNU ELPA package所以才无法使用那些非gnu依赖?),只要准照一定的模板,你依然可以安全地读取文件内容.
+使用 =insert-file-contents-literally= 来读取文件几乎不带任何副作用.^[[http://www.lunaryorn.com/posts/read-and-write-files-in-emacs-lisp.html#fn:2][2]] 你可以用它来插入文件内容到一个临时buffer中然后用 =decode-coding-region= 来解码这些纯字节 ^[[http://www.lunaryorn.com/posts/read-and-write-files-in-emacs-lisp.html#fn:3][3]]:
+
+#+BEGIN_SRC emacs-lisp
+  (with-temp-buffer
+    (insert-file-contents-literally file-name)
+    (decode-coding-region (point-min) (point-max) 'utf-8 t))
+#+END_SRC
+
+写入文件则稍微麻烦点. 由于并不存在一个类似 =insert-file-contents-literally= 的写函数,因此你需要明确告诉Emacs写入内容的编码格式而不要让Emacs自己猜测.
+通过设置 =coding-system-for-write= 的值可以强迫Emacs以二进制的格式将那些utf-8编码的数据写入特定的临时buffer中,这种buffer在语句执行完毕后会自动将这些数据写入目标文件中 ^[[http://www.lunaryorn.com/posts/read-and-write-files-in-emacs-lisp.html#fn:4][4]]:
+
+#+BEGIN_EXAMPLE
+  (let ((coding-system-for-write 'binary))
+    (with-temp-file path
+      (set-buffer-multibyte nil)
+      (encode-coding-string contents ’utf-8 nil 'insert-into-buffer)))
+#+END_EXAMPLE
+
+* 总结
+
+在Emacs Lisp中不要使用 =find-file=, =write-file= 以及任何其他交互式的命令, 这可以避免类似mode hook或提示是否设置局部变量值这样的副作用.
+使用 [[https://github.com/rejeep/f.el][f.el]] 库中提供的 =f-read-text= 和 =f-write-text= 来代替,当然也可以像上面例子那样书写你自己的安全替品.
