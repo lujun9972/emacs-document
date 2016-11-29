@@ -1,0 +1,91 @@
+#+TITLE: Debug时显示Emacs的加载时间
+#+URL: http://qsdfgh.com/articles/2016/11/02/emacs-loading-time.html        
+#+AUTHOR: lujun9972
+#+TAGS: emacs-common
+#+DATE: [2016-11-29 二 21:19]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+* The goal
+
+Gitlab/Github/Bitbucket (以及其他的VCS前端) 上可以看到大量的Emacs配置项目, 从这些项目中可以看出有一种流行的配置方法是: 在 =init.el= 文件中做一些基础性的设置,然后从指定目录中加载其他文件.
+
+这是一种很流行的配置方式,这种方式可以实现按主题或者包来划分配置.
+
+现在我们假设Emacs的加载速度超慢,而你希望能找出这是加载哪个文件导致的.
+
+* The prerequisites
+
+假设被加载的配置文件存在 =/home/you/src/lisp= 中.
+
+#+BEGIN_EXAMPLE
+total 16
+-rw-r--r--  1 you you    41B  2 nov 10:48 super-feature.el
+-rw-r--r--  1 you you    41B  2 nov 10:48 extra-feature.el
+#+END_EXAMPLE
+
+同时要保证你在配置文件中用了 [[https://www.gnu.org/software/emacs/manual/html_node/elisp/Named-Features.html][provide]] 函数来提供了feature:
+
+#+BEGIN_SRC emacs-lisp
+  ;;; super-feature.el --- My super feature
+
+  ;;; Commentary:
+
+  ;;; Code:
+
+  (some-heavy-configuration)
+
+  (provide 'super-feature)
+
+  ;;; super-feature.el ends here
+#+END_SRC
+
+到目前为止还没什么神奇的!
+
+Tip: 你的文件不要以数字开头,否则该文件不会被加载的.
+
+* The snippet
+
+我们要实现的是,当使用 =--debug-init= 参数启动Emacs时,开始度量加载各文件的时间.
+
+我们可以通过变量 [[http://git.savannah.gnu.org/cgit/emacs.git/tree/lisp/startup.el#n1007][init-file-debug]] 来查看Emacs启动时是否带了 =--debug-init= 参数. 然后使用内建的 [[http://git.savannah.gnu.org/cgit/emacs.git/tree/lisp/emacs-lisp/benchmark.el][benchmark]] 库来进行度量.
+
+要做到这一点,你的 =init.el= 应该看起来像这样:
+
+#+BEGIN_SRC emacs-lisp
+  ;; Display the total loading time in the minibuffer
+
+  (defun display-startup-echo-area-message ()
+    "Display startup echo area message."
+    (message "Initialized in %s" (emacs-init-time)))
+
+  ;; Benchmark loading time file by file and display it in the *Messages* buffer
+
+  (when init-file-debug
+    (require 'benchmark))
+
+  (let ((lisp-dir "/home/you/src/lisp"))
+    (add-to-list 'load-path lisp-dir)
+    (mapc (lambda (fname)
+            (let ((feat (intern (file-name-base fname))))
+              (if init-file-debug
+                  (message "Feature '%s' loaded in %.2fs" feat
+                           (benchmark-elapse (require feat fname)))
+                (require feat fname))))
+          (directory-files lisp-dir t "\\.el")))
+#+END_SRC
+
+这样一来,当你用 =emacs --debug-init= 启动Emacs时,就会在 =*Messages*= buffer中看到有详细的加载时间了.
+
+这段代码只有在启动Emacs时带了 =--debug-init= 才会生效,不带该参数时就跟普通的启动过程一样了.
+
+* The result
+
+你将会在 =*Messages*= buffer中看到类似下面的结果:
+
+#+BEGIN_EXAMPLE
+Feature ’extra-feature’ loaded in 0.08s
+Feature ’super-feature’ loaded in 2.27s
+#+END_EXAMPLE
+
+Happy debugging!
