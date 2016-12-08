@@ -1,0 +1,182 @@
+#+TITLE: 在Emacs之外使用org-mode
+#+AUTHOR: lujun9972
+#+TAGS: org-mode
+#+DATE: [2016-12-08 四 20:51]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+我之前写过一篇关于把Emacs当成脚本语言来用的博文(http://kitchingroup.cheme.cmu.edu/blog/2014/08/06/Writing-scripts-in-Emacs-lisp/ ). 
+有人觉得很奇怪,我们已经有了shell,python和perl,为啥还要把Emacs当成脚本语言来用呢? 有一个很好的场景就是用来获取org文件中的数据和代码!
+这样一来你无需使用Emacs就能利用org-mode的强大能力了. 
+
+下面来看几个例子.
+
+* Extracting tables from an org-file
+
+若一个表格是有名字的,我们可以从org文件中将其内容抽取出来. 
+
+比如有两个表格:
+
+#+BEGIN_SRC org
+  | x 	 | y |
+  |------+---|
+  | 1 	 | 1 |
+  | 2 	 | 4 |
+  | 3 	 | 9 |
+#+END_SRC
+
+和
+
+#+BEGIN_SRC org
+  | a 	 |  b |
+  | 1 	 |  1 |
+  | 2 	 |  8 |
+  | 3 	 | 27 |
+#+END_SRC
+
+我们希望能够有一个命令行工具可以像下面这样抽取出表格中的数据:
+
+#+BEGIN_SRC sh
+  extract-org-table tblname orgfile --format lisp|csv|tab
+#+END_SRC
+
+我们可以这样来实现这个工具:
+
+#+BEGIN_SRC emacs-lisp
+  ;; org-table tblname orgfile lisp|csv|tab
+
+  (let ((tblname (pop command-line-args-left))
+        (org-file (pop command-line-args-left))
+        (format)
+        (table)
+        (content))
+    (when command-line-args-left
+      (setq format (pop command-line-args-left)))
+    (find-file org-file)
+    (setq table 
+	  (org-element-map (org-element-parse-buffer) 'table 
+	    (lambda (element)
+	      (when (string= tblname (org-element-property :name element))
+	        element))
+	    nil ;info
+	    t )) ; first-match
+
+    (unless table
+      (error "no table found for %s" tblname))
+
+    (when table
+      (goto-char (org-element-property :contents-begin table))
+      (let ((contents (org-table-to-lisp)))
+        (if (string= format "lisp")
+	    (print contents)
+	  ;else      
+	  (dolist (row contents)
+	    (unless (eq row 'hline)
+	      (cond
+	       ((string= format "csv")
+	        (princ (mapconcat 'identity row ",")))
+	       ((string= format "tab")
+	        (princ (mapconcat 'identity row "\t")))
+	       (t
+	        (error "unsupported format: %s" format)))
+	      (princ "\n")))))))
+#+END_SRC
+
+让我们试试这个工具.
+
+#+BEGIN_SRC sh
+  ./extract-org-table data-2 org-outside-emacs.org lisp
+#+END_SRC
+
+#+BEGIN_EXAMPLE
+(("a" "b") ("1" "1") ("2" "8") ("3" "27"))
+#+END_EXAMPLE
+
+#+BEGIN_SRC sh
+  ./extract-org-table data-1 org-outside-emacs.org csv
+#+END_SRC
+
+#+BEGIN_EXAMPLE
+  x,y
+  1,1
+  2,4
+  3,9
+#+END_EXAMPLE
+
+#+BEGIN_SRC sh
+  ./extract-org-table data-2 org-outside-emacs.org tab
+#+END_SRC
+
+#+BEGIN_EXAMPLE
+a       b
+1       1
+2       8
+3       27
+#+END_EXAMPLE
+
+看起来完全满足我们的需求,你甚至可以运用管道将结果传送给其他unix命令. 比如我们要获取第二列的内容:
+
+#+BEGIN_SRC sh
+  ./extract-org-table data-1 org-outside-emacs.org csv | cut -d , -f 2
+#+END_SRC
+
+#+BEGIN_EXAMPLE
+y
+1
+4
+9
+#+END_EXAMPLE
+
+这个效果看起来就好像不用org就获取到org文件中的数据了. 当然实际上我们还是用到了Emacs和org-mode来做到这一点的,但是用户无需知道这些,只要他们安装了Emacs和Org-mode就行了.
+
+* Running code in an org-file
+
+可能遇到这么一种情况,你需要调用org文件中的某一段代码块中的代码,但是由于某种原因,你不想将这段代码从org文件中拷贝出来存成独立的脚本来用.
+我们假设org文件中有这么一段代码块:
+
+#+BEGIN_SRC org
+  ,#+BEGIN_SRC python
+  import time
+  with open('results.dat', 'w') as f:
+      f.write(time.asctime())
+  ,#+END_SRC
+#+END_SRC
+
+要调用这段代码块,我们需要先找到这段代码,然后再运行这段代码.
+
+#+BEGIN_SRC emacs-lisp
+  ;; org-run blockname org-file
+  ;; run a code block in an org file
+  (let ((blockname (pop command-line-args-left))
+        (org-file (pop command-line-args-left))
+        (src))
+    (find-file org-file)
+    (setq src
+          (org-element-map (org-element-parse-buffer) 'src-block
+            (lambda (element)
+              (when (string= blockname (org-element-property :name element))
+                element))
+            nil ;info
+            t )) ; first-match
+    (when src
+      (goto-char (org-element-property :begin src))
+      ;; since we start with a fresh emacs, we have to configure some things.
+      (org-babel-do-load-languages
+       'org-babel-load-languages
+       '((python . t)))
+      (let ((org-confirm-babel-evaluate nil))
+        (org-babel-execute-src-block))))
+#+END_SRC
+
+#+BEGIN_SRC sh
+  ./org-call.el python-block org-outside-emacs.org
+  cat results.dat
+#+END_SRC
+
+#+BEGIN_EXAMPLE
+  Mon Aug 11 20:17:01 2014
+#+END_EXAMPLE
+
+上面的例子说明了确实可以调用org文件中的代码块,但是同时也存在者局限性: 你一次只能调用一个代码块,而且我们无法捕获代码块运行时输出的那些内容,只能够检测运行产生的副作用. 
+我们只能通过文件向代码中传递数据,除此之外别无他法. 也许可以修改上面代码,让它在调用 =org-babel-execute-src-block= 时传递一些参数给代码块吧,不过这不是本文的重点. 
+顺便说一下,emacs script还可以从stdin中读取数据,具体方法请参见这里: http://stackoverflow.com/questions/2879746/idomatic-batch-processing-of-text-in-emacs .
