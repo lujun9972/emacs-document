@@ -1,0 +1,92 @@
+#+TITLE: running-multiple-emacs-daemons-on-a-single-system
+#+URL: http://tychoish.com/post/running-multiple-emacs-daemons-on-a-single-system/
+#+AUTHOR: lujun9972
+#+TAGS: raw
+#+DATE: [2016-12-19 一 09:56]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+
+Surely I'm not the only person who's wanted to run multiple distinct instances
+of the emacs daemon at once. Here's the use case:
+
+I use one laptop, but I work on a number of very distinct projects many of
+which involve having a number of different buffers open, most of which don't
+overlap with each other at all. This wouldn't be a huge problem except that
+I've easily gotten up to two hundred buffers open at once. It can get a bit
+confusing. Particularly since I never really need to touch my work related
+stuff when I'm writing blags, and my blogging and website design buffers never
+intersect with fiction writing.
+
+If I weren't using emacs in daemon mode (that is, invoked with the "emacs 
+--daemon" command) I'd just open separate instances of emacs. The problem with
+that is, when X11 crashes (as it is so wont to do) the emacs instances crash
+too and that's no good. Under normal conditions if you start emacs as a
+daemon, you can only run one at a time, because it grabs a socket and the
+emacsclient program isn't smart enough to be able to decide which instance of
+emacs you want. So it's a big ball of failure.
+
+Except I figured out a way to make this work.
+
+In your .emacs file, at the very beginning, put the following line:
+
+#+BEGIN_SRC emacs-lisp
+  (setq server-use-tcp t)
+#+END_SRC
+
+In the default configuration, the emacs daemon listens on a UNIX/system
+socket. However, in emacs can also, with the above option set, can also listen
+for connections over TCP. I've not yet figured out how to create the required
+SSH tunnel to make this particularly cool, but it makes this use case
+possible.
+
+Now, when you start emacs, use commands in the following form:
+
+#+BEGIN_SRC shell
+  emacs --daemon=tychoish
+  emacs --daemon=work
+#+END_SRC
+
+Each server process creates a state file in the "~/.emacs.d/server/" folder.
+If you are using version control on this file, you may want to consider
+explicitly ignoring this folder to avoid confusion.
+
+To open an emacs client (i.e. an emacs frame attached to the emacs daemon,)
+use commands in the following form
+
+#+BEGIN_SRC shell
+  emacsclient --server-file=tychoish -c -n
+  emacsclient --server-file=work -c -n
+#+END_SRC
+
+You may append a file name to open a specific client with one of these
+emacsclient invocations, or use any of the other emacsclient options. Although
+these commands are long, I have integrated them into my default zsh
+configuration as aliases, and as key shortcuts in my window manager. So
+opening a frame on a specific emacs instance isn't particularly difficult.
+
+And that's it. It just works. I have the following two lines in my user's
+crontab file:
+
+#+BEGIN_SRC shell
+@reboot    emacs --daemon=tychoish
+@reboot    emacs --daemon=work
+#+END_SRC
+
+These lines ensure that the usual (and expected) named emacs daemons are
+started following reboot. More generally, the @reboot cronjob is great for
+making the "my computer just rebooted, and now I have to fuss over it for ten
+minutes before I can work" problem seem much less daunting.
+
+In conclusion I'd like to present one piece of unsolicited advice, and ask a
+question the assembled.
+
+  + Advice: Even though it's possible to create a large number of emacs
+    instances, and on modern systems the required RAM is pretty low, avoid
+    this temptation. The more emacs instances you have to juggle the greater
+    the chance that you'll forget what buffers are open in what instance.
+    Undesirable.
+  + Question: Is there a way to get the value of server-name in into emacs
+    lisp so that I can if things against it? Haven't figured this one out yet,
+    but it seems like it would be nice for conditionally loading buffers and
+    things like org-mode agenda. Any ideas?
