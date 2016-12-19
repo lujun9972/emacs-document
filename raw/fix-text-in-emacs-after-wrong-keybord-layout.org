@@ -1,0 +1,93 @@
+#+TITLE: fix-text-in-emacs-after-wrong-keybord-layout
+#+URL: http://heikkil.github.io/blog/2016/12/11/fix-text-in-emacs-after-wrong-keyboard-layout/
+#+AUTHOR: lujun9972
+#+TAGS: raw
+#+DATE: [2016-12-19 一 09:52]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+
+My default keyboard layout is US, but I also write in Finnish language that
+has its own layout that differs from the US one for a few special letters.
+Quite often, I have started writing in Finnish with the US keyboard layout,
+and then had to laboriously replace the wrong letters manually.
+
+UNIX command line has a tool tr (translate characters) that makes it really
+easy to do what I need:
+
+#+BEGIN_SRC shell
+  tr ";'[:\"{" "öäåÖÄÅ"
+#+END_SRC
+
+Emacs should be able to the same. It has a standard function 
+[[https://www.gnu.org/software/emacs/manual/html_node/elisp/Substitution.html][subst-char-in-region]] that seemed to do exactly what I needed. Unfortunately,
+it turned out needing both old and new character to have the same byte-length.
+A badly outdated requirement nowadays when Unicode should be expected
+everywhere.
+
+A [[https://www.emacswiki.org/emacs/ElispCookbook#toc33][standard]] regexp search and replace for all character pairs did the trick.
+Combining that with code that [[http://ergoemacs.org/emacs/elisp_idioms.html][automatically applies changes to the current]]
+[[http://ergoemacs.org/emacs/elisp_idioms.html][paragraph]] proved to be really powerful combination. I bound the translation
+function to a key combination and found using it much easier than switching
+between layouts. I now regularly write short Finnish notes using the US layout
+and in the end just press my key combination to fix the characters.
+
+After I got it working, I refactored the code into two functions: the general
+purpose function translate-characters and the interactive function my/us2fi
+that solves my translation problem. It is now easy to add more functions that
+translate between any other two layouts.
+
+The function translate-characters takes four obligatory arguments: A string of
+from characters, a corresponding string of to characters, and start and end
+points of the region to apply the translation to. The interactive function
+takes care of determining the region of interest and passes on the exact
+coordinates together with the two strings.
+
+#+BEGIN_SRC emacs-lisp
+  (defun translate-characters (from-string to-string begin end)
+    "Translate characters in the current buffer.
+
+  FROM-STRING and TO-STRING are equal length strings that contain
+  translatable characters in order like in the tr command line tool.
+
+  Works on the given region of the current buffer between locations
+  BEGIN and END."
+
+    (let ((from-regexp (concat "[" (regexp-quote from-string) "]"))
+          (tr-alist (pairlis (split-string from-string "" t)
+                             (split-string to-string "" t))))
+      (save-excursion
+        (goto-char begin)
+        (while (and
+                (re-search-forward from-regexp nil t)
+                (<= (point) end))
+          (goto-char (match-beginning 0))
+          (if (match-string 0)
+              (replace-match (cdr (assoc (match-string 0) tr-alist)) t))
+          (goto-char (match-end 0))))))
+
+  (defun my/us2fi (&optional begin end)
+    "Convert characters written with US keyboard layout to matching Finnish ones.
+
+  Converts only characters that translate to Scandinavian letters
+  åäöÅÄÖ. All other characters are ignored.
+
+  Works on the current paragraph or text selection (between BEGIN
+  and END.
+
+  Calls `translate-characters' to do the work.
+
+  In Finnish text, the character ä occurs roughly as every 20th
+  character, ö only every 200 and å is only used in Swedish derived
+  words."
+
+    (interactive
+     (if (use-region-p)
+         (list (region-beginning) (region-end))
+       (let ((bds (bounds-of-thing-at-point 'paragraph)))
+         (list (car bds) (cdr bds)))))
+
+    (let* ((us-string ";'[:\"{")
+           (fi-string "öäåÖÄÅ"))
+      (translate-characters us-string fi-string begin end)))
+#+END_SRC
