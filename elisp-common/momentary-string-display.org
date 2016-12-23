@@ -1,0 +1,101 @@
+#+TITLE: momentary-string-display
+#+URL: http://mbork.pl/2016-12-12_momentary-string-display                  
+#+AUTHOR: lujun9972
+#+TAGS: elisp-common
+#+DATE: [2016-12-23 五 14:32]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+
+[[http://mbork.pl/2016-11-07_Displaying_nonexistent_text_in_Emacs_buffers][Some time ago]] I wrote about making Emacs display things without actually
+modifying any buffer. I used text properties then, and I mentioned that a
+similar thing could be done using overlays, too.
+
+Well, it turns out that there exists a very interesting function in Emacs (and
+it indeed uses overlays internally), which could be of help in a situation
+like that: momentary-string-display. It does more or less what you’d expect
+from a function called like that: given a string (and a position in the
+buffer), it displays it there until the next keypress (or mouse click – in
+general, any input event). One thing I don’t particularly like about
+momentary-string-display is that you have to choose a character which will
+“terminate” it, e.g. SPC or RET, and pressing that character will make the
+temporary text disappear – but the character itself won’t be inserted in the
+buffer. (Any other self-inserting character will normally insert itself.) And
+giving nil as the character won’t help, since then momentary-string-display
+will use the default SPC. Well, you can’t have everything.
+
+Or can you. Here’s the source code of momentary-string-display.
+
+#+BEGIN_SRC emacs-lisp
+  (defun momentary-string-display (string pos &optional exit-char message)
+    "Momentarily display STRING in the buffer at POS.
+  Display remains until next event is input.
+  If POS is a marker, only its position is used; its buffer is ignored.
+  Optional third arg EXIT-CHAR can be a character, event or event
+  description list.  EXIT-CHAR defaults to SPC.  If the input is
+  EXIT-CHAR it is swallowed; otherwise it is then available as
+  input (as a command if nothing else).
+  Display MESSAGE (optional fourth arg) in the echo area.
+  If MESSAGE is nil, instructions to type EXIT-CHAR are displayed there."
+    (or exit-char (setq exit-char ?\s))
+    (let ((ol (make-overlay pos pos))
+      (str (copy-sequence string)))
+    (unwind-protect
+      (progn
+        (save-excursion
+        (overlay-put ol 'after-string str)
+        (goto-char pos)
+        ;; To avoid trouble with out-of-bounds position
+        (setq pos (point))
+        ;; If the string end is off screen, recenter now.
+        (if (<= (window-end nil t) pos)
+          (recenter (/ (window-height) 2))))
+        (message (or message "Type %s to continue editing.")
+             (single-key-description exit-char))
+      (let ((event (read-key)))
+      ;; `exit-char' can be an event, or an event description list.
+      (or (eq event exit-char)
+      (eq event (event-convert-list exit-char))
+      (setq unread-command-events
+              (append (this-single-command-raw-keys)
+                  unread-command-events)))))
+      (delete-overlay ol))))
+#+END_SRC
+
+And here’s a slightly modified version, which makes any self-inserting
+character terminate the momentary display and insert the character:
+
+#+BEGIN_SRC emacs-lisp
+  (defun momentary-string-display-no-key (string pos &optional message)
+    "Momentarily display STRING in the buffer at POS.
+  Display remains until next event is input.  If POS is a marker,
+  only its position is used; its buffer is ignored.  Display
+  MESSAGE (optional third arg) in the echo area."
+    (let ((ol (make-overlay pos pos))
+          (str (copy-sequence string)))
+      (unwind-protect
+          (progn
+            (save-excursion
+              (overlay-put ol 'after-string str)
+              (goto-char pos)
+              ;; To avoid trouble with out-of-bounds position
+              (setq pos (point))
+              ;; If the string end is off screen, recenter now.
+              (if (<= (window-end nil t) pos)
+                  (recenter (/ (window-height) 2))))
+            (message "%s" (or message "Press any key to continue editing."))
+            (let ((event (read-key)))
+              (setq unread-command-events
+                    (append (this-single-command-raw-keys)
+                            unread-command-events))))
+        (delete-overlay ol))))
+#+END_SRC
+
+
+As you can see, it’s not rocket science. Probably the only mysterious thing is
+the use of read-key and this-single-command-raw-keys. I have to admit that I
+did not examine that in detail, but it seems that read-key somehow mutates the
+global state – i.e., remembers the input event somewhere – and
+this-single-command-raw-keys retrieves it. Not the cleanest way to do it, but
+given the fact that Emacs is a [[http://mbork.pl/2014-07-25_What_is_Emacs%252c_really][text editor toolkit]] after all, not that bad
+either. Anyway, another thing I learned.
