@@ -1,0 +1,59 @@
+#+TITLE: rac-conditions-in-Emacs's-process-filter-functions
+#+URL: http://blog.jorgenschaefer.de/2014/05/race-conditions-in-emacs-process-filter.html
+#+AUTHOR: lujun9972
+#+TAGS: elisp-common
+#+DATE: [2016-12-23 五 14:52]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+
+Race conditions are always fun. They are particularly surprising when they
+happen in a single-threaded program like Emacs. I just ran into this problem
+for the second time.
+
+When Emacs reads data from a process, it executes a filter function associated
+with that process. The idea is that this filter function handles the data, and
+after it returns, Emacs continues with other work. Due to some peculiarities
+of Emacs, it is easily possible for filter functions to run while other filter
+functions are running, seemingly randomly.
+
+Emacs runs filter functions whenever it reads data from a process, even if
+this happens while a filter function is already running. And there are many
+places where Emacs reads data from processes. Even if you knew all the
+functions that do so, you do not control or know about the code Emacs runs
+most of the time. For example, if you create a buffer in a particular mode,
+that mode’s hook is run, which could execute pretty much anything.
+
+I first encountered this problem in [[https://github.com/jorgenschaefer/circe][Circe]], my IRC client for Emacs. In a
+filter function, it can open a new buffer in a specific mode (a query). That
+mode can have flyspell active, Emacs spell checker. But flyspell starts a new
+process for spell checking. Starting a new process can cause Emacs to read
+from processes, running filter functions. This resulted in a difficult to
+debug problem that happened only when a user received two messages in very
+close succession.
+
+You can [[https://github.com/jorgenschaefer/circe/blob/d69c4c0f781aab1fe53a82247099433ff52805b1/lisp/circe.el#L675-L688][read my comments on the problem]] in the Circe source code.
+
+I just ran into [[https://github.com/jorgenschaefer/elpy/issues/234#issuecomment-44249993][the same problem]] again in [[https://github.com/jorgenschaefer/elpy][Elpy]], my Python development
+environment. To my surprise, Emacs’ process-send-string does not only send
+data, it also reads data from the process and handles it in the same call. In
+this particular case, the usual sequence of action is to run an initialization
+function, and then set a flag that initialization happened, so no need to run
+it again. But the initialization function sends data to a process. And the
+filter function for this process might call the original function. Which would
+notice that no initialization happened, send data, which would read data,
+which would notice that no initialization happened yet, so send data again …
+stack overflow.
+
+Solution? A dynamic scope “lock” (not a real lock as it does not block, but
+close enough).
+
+#+BEGIN_SRC emacs-lisp
+  (defvar my-lock nil)
+  (when (not my-lock)
+    (let ((my-lock t))
+      ...))
+#+END_SRC
+
+For a single-threaded application like Emacs, this looks completely useless.
+But it works.
