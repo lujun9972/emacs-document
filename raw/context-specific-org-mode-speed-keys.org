@@ -1,0 +1,67 @@
+#+TITLE: context-specific-org-mode-speed-keys
+#+URL: http://kitchingroup.cheme.cmu.edu/blog/2016/12/22/Context-specific-org-mode-speed-keys/
+#+AUTHOR: lujun9972
+#+TAGS: raw
+#+DATE: [2016-12-23 五 15:01]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+
+I have been using org-mode to make a contact database. A contact is basically
+just a headline with an EMAIL property, e.g. 
+[[https://julien.danjou.info/projects/emacs-packages#org-contacts][https://julien.danjou.info/projects/emacs-packages#org-contacts]]. I thought it
+would be nice to have an org-mode speed key so that if I was at the beginning
+of a contact headline, I could just press "e" to open an email buffer to that
+contact. This might generally be useful to have different speed keys that
+serve different purposes or are only defined on specific types of headlines.
+
+Org-mode already had this feature in mind for speed keys. All you have to do
+is define the list of speed keys and their functions, provide a function that
+picks the right one, and add it to the org-speed-command-hook. Here is the
+code that makes this possible. This defines "c" to copy the email to the
+clipboard, "e" to email the contact, and "m" to copy a "name <email>" string
+to the clipboard, but only when you are on a headline with an EMAIL property.
+If there is not a contact specific speed key defined, then a user-defined
+speed key or a default key will be used if it is defined. In case I do not
+remember the keys, "?" will show them to me. It is small hack, but if you end
+up using the contact headlines for much, it might be really helpful as an
+alternative to M-x some-contacts-command.
+
+#+BEGIN_SRC emacs-lisp
+  (setq org-speed-commands-contacts
+        '(("c" . (lambda ()
+                   "Copy the email address to the clipboard."
+                   (message (kill-new (org-entry-get (point) "EMAIL")))))
+          ("e" . (lambda ()
+                   "Send an email to the contact."
+                   (let ((email (org-entry-get (point) "EMAIL")))
+                     (compose-mail)
+                     (message-goto-to)
+                     (insert email)
+                     (message-goto-subject)))) 
+          ("m" . (lambda ()
+                   "Copy \"name <email>\""
+                   (message (kill-new
+                             (format "%s <%s>"
+                                     (nth 4 (org-heading-components))
+                                     (org-entry-get (point) "EMAIL"))))))
+          ("?" . (lambda ()
+                   "Print contacts speed key help."
+                   (with-output-to-temp-buffer "*Help*"
+                     (princ "Contacts Speed commands\n===========================\n")
+                     (mapc #'org-print-speed-command org-speed-commands-contacts)
+                     (princ "\n")
+                     (princ "User-defined Speed commands\n===========================\n")
+                     (mapc #'org-print-speed-command org-speed-commands-user)
+                     (princ "Built-in Speed commands\n=======================\n")
+                     (mapc #'org-print-speed-command org-speed-commands-default))
+                   (with-current-buffer "*Help*"
+                     (setq truncate-lines t))))))
+
+  (defun org-speed-contacts (keys)
+    (when (and (bolp) (looking-at org-outline-regexp)
+               (not (null (org-entry-get (point) "EMAIL"))))
+      (cdr (assoc keys org-speed-commands-contacts))))
+
+  (add-hook 'org-speed-command-hook 'org-speed-contacts)
+#+END_SRC
