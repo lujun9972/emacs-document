@@ -1,0 +1,64 @@
+#+TITLE: 在单机上运行多个emacs守护进程
+#+URL: http://tychoish.com/post/running-multiple-emacs-daemons-on-a-single-system/
+#+AUTHOR: lujun9972
+#+TAGS: emacs-common
+#+DATE: [2016-12-26 周一 15:55]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+
+我敢说肯定不止我一个人想一次性运行多个独立的emacs daemon实体. 我是基于以下情况所以才想这么作的:
+
+我在同一台笔记本上面有很多独立的项目,每个项目都有许多打开的buffer.  这样一来我经常一次性要打开两百多个buffer. 这让我难以管理这些buffer.
+更何况,当我写博客时,我并不关心我工作上的那些东西, 而当我设计网站时也跟我写小说的buffer没有任何关系.
+
+如果我不是以daemon的方式运行emacs的话(调用"emacs --daeon"命令),我大可以直接运行几个emacs实例就行了.
+然而直接运行emacs实例的问题在于,若X11崩溃的话,这些emacs实例也会跟着崩溃. 这可是个大问题.
+而以daemon的方式运行emacs虽然可以避免这个问题,但一般来说你只能运行一个这样的实例,比较emacsclient如何知道你想要连接上的是哪个实例呢? 这也是个大问题.
+
+好在最终我还是找到了解决之道.
+
+你可以在配置文件的最上面加上这么一行:
+
+#+BEGIN_SRC emacs-lisp
+  (setq server-use-tcp t)
+#+END_SRC
+
+默认情况下,emacs daemon监听的是UNIX/system socket. 然而通过设置上面的选项,可以让它监听基于TCP的连接.
+I've not yet figured out how to create the required SSH tunnel to make this particularly cool, but it makes this use case possible.
+
+然后,你可以使用下面这种格式来启动emacs:
+
+#+BEGIN_SRC shell
+  emacs --daemon=tychoish
+  emacs --daemon=work
+#+END_SRC
+
+每个Emacs服务进程都会在"~/.emacs.d/server/"目录下创建一个状态文件.
+如果你使用版本控制软件来管理你的emacs配置的话,你恐怕需要让版本控制软件忽略该目录下的文件才行了.
+
+当运行emacs client时,使用类似下面的命令: 
+
+#+BEGIN_SRC shell
+  emacsclient --server-file=tychoish -c -n
+  emacsclient --server-file=work -c -n
+#+END_SRC
+
+当然你可以在命令后面添加要编辑的文件或者任何其他emacsclient支持的option都可以.
+这些命令看起来蛮长的,因此我在zsh配置中为它们设置了别名,并且在我的窗口管理器中也设置了快捷键.
+这样能很方便的在指定emacs实例上打开frame了.
+
+我还在我的用户crontab文件中添加了下面两行的配置:
+
+#+BEGIN_SRC shell
+@reboot    emacs --daemon=tychoish
+@reboot    emacs --daemon=work
+#+END_SRC
+
+这两行可以使得操作系统重启后自动启动 =tychoish= 和 =work= 这两个带名字的emacs守护进程.
+一般来说,在crontab中设置 =@reboot= 项,可以使得那些每次重启电脑都需要执行,而启动过程又巨耗时的任务看起来更快一些.
+
+最后,我想提供一个建议并咨询一个问题:
+
++ 建议: 虽说你可以创建大量的emacs实例,而且这些实例实际也不怎么占用内存,但是实例太多的话,你很可能会忘掉哪个buffer在哪个实例中.
++ 问题: 是否有办法在emacs lisp中获取server-name的值呢? 这样我就能根据不同的server-name加载不同的配置了.
