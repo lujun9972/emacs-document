@@ -7,46 +7,30 @@
 #+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
 
 
-Race conditions are always fun. They are particularly surprising when they
-happen in a single-threaded program like Emacs. I just ran into this problem
-for the second time.
+竞态条件总是很有趣. 有其当它出现在类似Emacs这样的单线程程序中时就更显诡异了. 不过我已经遇到这个问题两次了.
 
-When Emacs reads data from a process, it executes a filter function associated
-with that process. The idea is that this filter function handles the data, and
-after it returns, Emacs continues with other work. Due to some peculiarities
-of Emacs, it is easily possible for filter functions to run while other filter
-functions are running, seemingly randomly.
+当Emacs从process(译者注:由于Emacs中的process即可以是进程,也可以是一个网络链接,因此还是保持process不翻译)中读取数据时,会执行相应的filter函数. Emacs调用这个filter函数处理获得的数据后,再进行其他的工作.
+然而在某些情况下,可能会发生在某个filter函数正在运行时运行另一个filter函数的情况. 触发的条件貌似是随机的.
 
-Emacs runs filter functions whenever it reads data from a process, even if
-this happens while a filter function is already running. And there are many
-places where Emacs reads data from processes. Even if you knew all the
-functions that do so, you do not control or know about the code Emacs runs
-most of the time. For example, if you create a buffer in a particular mode,
-that mode’s hook is run, which could execute pretty much anything.
+Emacs只要一从process中读取到数据就会运行filter函数,即时这时候正在运行另一个filter函数.
+很多情况下都会造成Emacs从process中读取数据. 即时你知道所有能触发Emacs从process中读取数据的函数也没什么用, 因为在大多数时候你无法控制,甚至无法知道Emacs运行的代码有哪些.
+比如, 当你创建某个mode的buffer时,就会触发该mode的hook,而这个hook可能运行几乎任何代码.
 
-I first encountered this problem in [[https://github.com/jorgenschaefer/circe][Circe]], my IRC client for Emacs. In a
-filter function, it can open a new buffer in a specific mode (a query). That
-mode can have flyspell active, Emacs spell checker. But flyspell starts a new
-process for spell checking. Starting a new process can cause Emacs to read
-from processes, running filter functions. This resulted in a difficult to
-debug problem that happened only when a user received two messages in very
-close succession.
+我首次遇到这个问题是在使用 [[https://github.com/jorgenschaefer/circe][Circe]] 时发现的, 我用它作为Emacs上的IRC客户端. 
+在一个filter函数中,它会创建一个某个特定mode下的buffer. 而该mode可能会激活flyspell(Emacs的拼写检查工具).
+flyspell又会运行一个新来进行拼写检查. 运行新进程又会导致Emacs从process中读取数据,运行filter函数.
+这个问题很难调试,因为只有当用户刚好在极短的事件内连续收到两条消息时才会触发.
 
-You can [[https://github.com/jorgenschaefer/circe/blob/d69c4c0f781aab1fe53a82247099433ff52805b1/lisp/circe.el#L675-L688][read my comments on the problem]] in the Circe source code.
+你可以在Circe代码中看 [[https://github.com/jorgenschaefer/circe/blob/d69c4c0f781aab1fe53a82247099433ff52805b1/lisp/circe.el#L675-L688][我对该问题的说明]] 
 
-I just ran into [[https://github.com/jorgenschaefer/elpy/issues/234#issuecomment-44249993][the same problem]] again in [[https://github.com/jorgenschaefer/elpy][Elpy]], my Python development
-environment. To my surprise, Emacs’ process-send-string does not only send
-data, it also reads data from the process and handles it in the same call. In
-this particular case, the usual sequence of action is to run an initialization
-function, and then set a flag that initialization happened, so no need to run
-it again. But the initialization function sends data to a process. And the
-filter function for this process might call the original function. Which would
-notice that no initialization happened, send data, which would read data,
-which would notice that no initialization happened yet, so send data again …
-stack overflow.
+然后我又在 [[https://github.com/jorgenschaefer/elpy][Elpy]] 中遇到了 [[https://github.com/jorgenschaefer/elpy/issues/234#issuecomment-44249993][相同的问题]], 它是我的Python开发环境.
+让我没想到的是, Emacs的 =process-send-string= 不仅仅只是发送数据,它还会同时从process中读取并处理数据.
+这个问题出现的场景是,正在运行一个初始化函数,然后设置一个标志来标示初始化过程已经做过了,没有必要再进行以此初始化了.
+然而该初始化函数会王process发送数据. 而该process的filter函数由会重新调用该初始化函数.
+该初始化函数发现尚未初始化后又会向process发送数据,而这又会触发从process读取数据的过程,然后又一次触发初始化函数,再发送数据...
+如此死循环下去最后栈溢出了.
 
-Solution? A dynamic scope “lock” (not a real lock as it does not block, but
-close enough).
+你问怎么办? 只能使用一个动态作用域的"锁"了 (当然不是真的缩,它并不会阻塞程序的运行,不过也差不多吧).
 
 #+BEGIN_SRC emacs-lisp
   (defvar my-lock nil)
@@ -55,5 +39,4 @@ close enough).
       ...))
 #+END_SRC
 
-For a single-threaded application like Emacs, this looks completely useless.
-But it works.
+对于像Emacs这样的单线程应用, 这样搞看起来没什么用,但事实证明它的能起作用.
