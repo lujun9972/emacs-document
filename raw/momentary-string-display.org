@@ -11,18 +11,12 @@
 当时我是通过text properties来做到这一点的,然后我还提到了,其实借助于overlays,我们也能实现这一功能.
 
 结果我发现,Emacs针对这种情况已经内置了一个函数:momentary-string-display(而且它的内部就是使用overlay来实现的).
- It does more or less what you’d expect
-from a function called like that: given a string (and a position in the
-buffer), it displays it there until the next keypress (or mouse click – in
-general, any input event). One thing I don’t particularly like about
-momentary-string-display is that you have to choose a character which will
-“terminate” it, e.g. SPC or RET, and pressing that character will make the
-temporary text disappear – but the character itself won’t be inserted in the
-buffer. (Any other self-inserting character will normally insert itself.) And
-giving nil as the character won’t help, since then momentary-string-display
-will use the default SPC. Well, you can’t have everything.
+该函数接受一个字符串以及要在buffer中显示的位置,它就会在指定位置显示出这个字符串了,直到你按一下键盘或点一下鼠标.
+不过 =momentary-string-display= 有一点让我不爽的就是,你必须选择一个 =退出字符=,(通常是空格或者回车), 按下这个字符也会让临时显示的字符串消失,但是该字符本身不会被插入(相对的按下其他字符则会插入).
+我试过将该参数设置为 =nil= ,然而并没有什么卵用,这种情况下, =momentary-string-display= 默认实用空格作为 =退出字符=.
+怎么说呢,毕竟人生总是不完满的.
 
-Or can you. Here’s the source code of momentary-string-display.
+不过也说不定. 下面是 =momentary-string-display= 的源代码.
 
 #+BEGIN_SRC emacs-lisp
   (defun momentary-string-display (string pos &optional exit-char message)
@@ -60,8 +54,7 @@ Or can you. Here’s the source code of momentary-string-display.
       (delete-overlay ol))))
 #+END_SRC
 
-And here’s a slightly modified version, which makes any self-inserting
-character terminate the momentary display and insert the character:
+只需要经过少许修改就能让所有字符都能够在取消临时字符的同时插入自身:
 
 #+BEGIN_SRC emacs-lisp
   (defun momentary-string-display-no-key (string pos &optional message)
@@ -90,10 +83,7 @@ character terminate the momentary display and insert the character:
 #+END_SRC
 
 
-As you can see, it’s not rocket science. Probably the only mysterious thing is
-the use of read-key and this-single-command-raw-keys. I have to admit that I
-did not examine that in detail, but it seems that read-key somehow mutates the
-global state – i.e., remembers the input event somewhere – and
-this-single-command-raw-keys retrieves it. Not the cleanest way to do it, but
-given the fact that Emacs is a [[http://mbork.pl/2014-07-25_What_is_Emacs%252c_really][text editor toolkit]] after all, not that bad
-either. Anyway, another thing I learned.
+你会发现,这并不复杂. 可能也就是 =read-key= 和 =this-single-command-raw-keys= 的使用难以理解一点. 
+我必须承认,我并没有很仔细地检查这段代码,不过似乎 =read-key= 会通过某种方式修改全局状态 – i.e., 它会将输入事件保存到某个地方 – 而 =this-single-command-raw-keys= 能够取出这些输入事件. 
+这可能不是实现该功能的最清晰的方法,不过它确实证实了Emacs真算得上是一个[[http://mbork.pl/2014-07-25_What_is_Emacs%252c_really][文本编辑器工具箱]]. 
+不管怎样,我又学到了新东西.
