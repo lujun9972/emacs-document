@@ -184,17 +184,13 @@ I speculate this is due to its roots compiling under dynamic scope.
 另外,将x和y这样名字的变量标记为特殊变量可不太好,因为它会影响到其他使用到这些名字的代码.
 作为一个package的编写者,你应该只将那些属于你独有的变量标记为特殊变量,这些独有变量一般都带有命名空间的前缀.
 
-The only way to unmark a special variable is with the undocumented function
-internal-make-var-non-special. I expected makunbound to do this, but as of
-Emacs 25.1 it does not. This could possibly be considered a bug.
+目前只有一种方法可以将特殊变量变回普通变量,那就是使用函数 =internal-make-var-non-special=, 但该函数并没有提供文档说明. 
+我本以为 =makunbound= 也能起到相同的作用,但是在 Emacs 25.1 中它做不到这一点. 也算是各bug吧.
 
 * Accidental closures
 
-I’ve said there are are absolutely no advantages to lexical-binding: nil. It’s
-only the default for the sake of backwards-compatibility. However, there is
-one case where lexical-binding: t introduces a subtle issue that would
-otherwise not exist. Take this code for example (and nevermind prin1-to-string
-for a moment):
+我说过的, =lexical-binding: nil= 根本没有任何优势. 纯粹是为了向后兼容才让它成为默认项的.
+不过有一种情况, =lexical-binding: t= 可能会有点小麻烦. 比如下面这段代码(请暂时忽略 =prin1-to-string= 的存在):
 
 #+BEGIN_SRC emacs-lisp
   ;; -*- lexical-binding: t; -*-
@@ -205,38 +201,30 @@ for a moment):
       (buffer-string)))
 #+END_SRC
 
-This creates and serializes a closure, which is [[http://nullprogram.com/blog/2013/12/30/][one of Elisp’s unique features]]
-. It doesn’t close over any variables, so it should be pretty simple. However,
-this function will only work correctly under lexical-binding: t when
-byte-compiled.
+这会创建并序列化一个闭包, 能够创建并序列化闭包应该算是Elisp独一无二的特性了吧.
+该闭包并没有捕获任何变量,因此它的序列化结果本应该很简单的. 可是,在 =lexical-bingding: t= 的情况下,该函数必须被编译成字节码才能够得到正确的结果.
 
 #+BEGIN_SRC emacs-lisp
   (function-as-string)
   ;; => "(closure ((temp-buffer . #<buffer  *temp*>) t) nil :example)"
 #+END_SRC
 
-The interpreter doesn’t analyze the closure, so just closes over everything.
-This includes the hidden variable temp-buffer created by the with-temp-buffer
-macro, resulting in an abstraction leak. Buffers aren’t readable, so this will
-signal an error if an attempt is made to read this function back into an
-s-expression. The byte-compiler fixes this by noticing temp-buffer isn’t
-actually closed over and so doesn’t include it in the closure, making it work
-correctly.
+出现问题的原因在于,解释器并不会区分析闭包,它只是单纯第捕获所有的变量. 
+因此 =with-temp-buffer= 创建的隐藏变量 =temp-buffer= 也会被捕获进来,这样一来就出现问题了.
+Buffer本身是不能通过read被读取出来的,因此当读取该函数时回引发一个错误.
+而编译器会注意到 =temp-buffer= 并没有被捕获,因此就不会包括到闭包中,也就没有问题了.
 
-Under lexical-binding: nil it works correctly either way:
+当然在 =lexical-binding: nil= 的环境下,它也没问题:
 
 #+BEGIN_SRC emacs-lisp
   (function-as-string)
   ;; -> "(lambda nil :example)"
 #+END_SRC
 
-This may seem contrived — it’s certainly unlikely — but [[https://github.com/jwiegley/emacs-async/issues/17][it has come up in]]
-[[https://github.com/jwiegley/emacs-async/issues/17][practice]]. Still, it’s no reason to avoid lexical-binding: t.
+这个例子看起来很做作 — 这种情况确实不太可能发生 — 但是 [[https://github.com/jwiegley/emacs-async/issues/17][它确实是取之于现实的]].
+不过虽然如此,依然不是什么不使用 =lexical-binding: t= 的理由.
 
 * Use lexical scope in all new code
 
-As I’ve said again and again, always use lexical-binding: t. Use dynamic
-variables judiciously. And lexical-let is no replacement. It has virtually
-none of the benefits, performs worse, and it only applies to let, not any of
-the other places bindings are created: function parameters, dotimes, dolist,
-and condition-case.
+重要的事情说三遍: 总是使用 =lexical-binding: t=. 谨慎使用动态变量.
+要认识到 =lexical-let= 并不是一个好的替代. 它几乎一无是处,糟糕的性能,还只能用于let,对于其他像函数参数,dotimes,dolist和condition-case语句中的绑定就无能为力了.
