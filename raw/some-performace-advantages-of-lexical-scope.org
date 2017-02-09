@@ -7,26 +7,18 @@
 #+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
 
 
-I recently had a discussion with [[http://ergoemacs.org/][Xah Lee]] about lexical scope in Emacs Lisp.
-The topic was why lexical-binding exists at a file-level when there was
-already lexical-let (from cl-lib), prompted by my previous article on [[http://nullprogram.com/blog/2016/12/11/][JIT]]
-[[http://nullprogram.com/blog/2016/12/11/][byte-code compilation]]. The specific context is Emacs Lisp, but these concepts
-apply to language design in general.
+最近与 [[http://ergoemacs.org/][Xah Lee]] 就Emacs Lisp中的静态作用域进行了一番讨论. 主题是既然cl-lib已经提供了 =lexical-let= 那为什么还需要搞出个 =lexical-binding= 来为整个文件设定静态作用域, prompted by my previous article on [[http://nullprogram.com/blog/2016/12/11/][JIT]]
+[[http://nullprogram.com/blog/2016/12/11/][byte-code compilation]]. 
+讨论的内容是关于Emacs Lisp的,但是对大多数的其他语言也同样适用.
 
-Until Emacs 24.1 (June 2012), Elisp only had dynamically scoped variables — a
-feature, mostly by accident, common to old lisp dialects. While dynamic scope
-has some selective uses, it’s widely regarded as a mistake for local
-variables, and virtually no other languages have adopted it.
+在 Emacs 24.1 (June 2012)之前, Elisp只支持动态作用域 — 这一特性是从lisp的早期方言中继承下来的.
+虽说动态作用域在某些情况下会有些用处,但是仍然普遍被认为不适于用来定义局部变量,而且基本上没有其他语言再支持动态作用域的了.
 
-Way back in 1993, Dave Gillespie’s deviously clever lexical-let macro [[http://git.savannah.gnu.org/cgit/emacs.git/commit/?h=fcd73769&id=fcd737693e8e320acd70f91ec8e0728563244805][was]]
-[[http://git.savannah.gnu.org/cgit/emacs.git/commit/?h=fcd73769&id=fcd737693e8e320acd70f91ec8e0728563244805][committed]] to the cl package, providing a rudimentary form of opt-in lexical
-scope. The macro walks its body replacing local variable names with
-guaranteed-unique gensym names: the exact same technique used in macros to
-create “hygienic” bindings that aren’t visible to the macro body. It
-essentially “fakes” lexical scope within Elisp’s dynamic scope by preventing
-variable name collisions.
+cl package于1993年将Dave Gillespie所写的 =lexical-let= 宏[[http://git.savannah.gnu.org/cgit/emacs.git/commit/?h=fcd73769&id=fcd737693e8e320acd70f91ec8e0728563244805][纳入其中]], 该宏可以提供对 opt-in 静态作用域的简单模拟. 
+该宏会遍历它的body,并用 =gensym= 来生成一个唯一的名字来代替局部变量的名字: 该技术本身就常用于为宏提供一个不与宏body中变量冲突的绑定.
+通过保证变量名的唯一性就可以很好的为Elisp动态作用域模拟出静态作用域的效果来.
 
-For example, here’s one of the consequences of dynamic scope.
+举个例子, 在动态作用域下:
 
 #+BEGIN_SRC emacs-lisp
   (defun inner ()
@@ -41,12 +33,10 @@ For example, here’s one of the consequences of dynamic scope.
   ;; => :inner
 #+END_SRC
 
-The “local” variable v in outer is visible to its callee, inner, which can
-access and manipulate it. The meaning of the free variable v in inner depends
-entirely on the run-time call stack. It might be a global variable, or it
-might be a local variable for a caller, direct or indirect.
+=v= 是 =outer= 的局部变量,但却对它的被调函数 =inner= 可见, 因此会被 =inner= 访问和修改.
+=inner= 中自由变量 =v= 具体指代的是谁完全由当时的运行时调用栈所决定的. 它既可能是一个全局变量,也可能某个直接或非直接调用者中的局部变量.
 
-Using lexical-let deconflicts these names, giving the effect of lexical scope.
+适用 =lexical-let= 将这些名称变得各不相同可以达到类似静态作用域的效果.
 
 #+BEGIN_SRC emacs-lisp
   (defvar v)
@@ -60,22 +50,13 @@ Using lexical-let deconflicts these names, giving the effect of lexical scope.
   ;; => :outer
 #+END_SRC
 
-But there’s more to lexical scope than this. Closures only make sense in the
-context of lexical scope, and the most useful feature of lexical-let is that
-lambda expressions evaluate to closures. The macro implements this using a
-technique called [[https://en.wikipedia.org/wiki/Lambda_lifting][closure conversion]]. Additional parameters are added to the
-original lambda function, one for each lexical variable (and not just each
-closed-over variable), and the whole thing is wrapped in another lambda
-function that invokes the original lambda function with the additional
-parameters filled with the closed-over variables — yes, the variables (e.g.
-symbols) themselves, not just their values, (e.g. pass-by-reference). The last
-point means different closures can properly close over the same variables, and
-they can bind new values.
+不过静态作用域可不仅仅只是这个作用而已,它还常被用于创建闭包. =lexical-let= 也常被用于将lambda表达式转换成闭包.
+为了模拟闭包,该宏使用了一种称之为 [[https://en.wikipedia.org/wiki/Lambda_lifting][closure conversion]] 的技术. 它会向原lambda函数中添加参数,每个静态变量(而不仅仅是那些被捕获的变量(closed-over variable))都有一个对应的参数,
+然后它再用另一个lambda函数来将原lambda函数和参数封装起来,并且在内部,它会把这些参数赋值成被捕获的变量本身(symbol)而不是他们的值(就好像引用传递一样)哦,然后适用这些参数来调用原lambda函数.
+The last point means different closures can properly close over the same variables, and they can bind new values.
 
-To roughly illustrate how this works, the first lambda expression below, which
-closes over the lexical variables x and y, would be converted into the latter
-by lexical-let. The #: is Elisp’s syntax for uninterned variables. So #:x is a
-symbol x, but not the symbol x (see print-gensym).
+下面简单地展示一下这个过程, 假设第一个lambda表达式通过 =lexical-let= 捕获 x 和 y变量,则会被转换成后面那种形式.
+其中 =#:= 是Elisp用于表达 uninterned variables 的语法. So #:x is a symbol x, but not the symbol x(看不懂这个例子,也不知道这句话怎么翻译~~) (详情请参阅 print-gensym 变量的说明).
 
 #+BEGIN_SRC emacs-lisp
   ;; Before conversion:
@@ -90,45 +71,29 @@ symbol x, but not the symbol x (see print-gensym).
            '#:x '#:y args))
 #+END_SRC
 
-I’ve said on multiple occasions that lexical-binding: t has significant
-advantages, both in performance and static analysis, and so it should be used
-for all future Elisp code. The only reason it’s not the default is because it
-breaks some old (badly written) code. However, lexical-let doesn’t realize any
-of these advantages! In fact, it has worse performance than straightforward
-dynamic scope with let.
+我曾在多种场合都说过: 将 =lexical-binding= 设为 t ,在性能和静态分析时带来极大的优势, 因此你在编写新Elisp代码时应该总是将选项打开.
+该选项之所以没有默认打开,纯粹是因为它会使得那些老旧的代码无法正常工作.
+可惜的是, =lexical-let= 并不具备这些优势! 事实上,它比动态作用域下的let性能要更低下.
 
- 1. New symbol objects are allocated and initialized (make-symbol) on each
-    run-time evaluation, one per lexical variable.
+1. 每次运行时都需要为那些被捕获的变量创建并初始化新的symbol对象.
    
- 2. Since it’s just faking it, lexical-let still uses dynamic bindings, which
-    are more expensive than lexical bindings. It varies depending on the C
-    compiler that built Emacs, but dynamic variable accesses (opcode varref)
-    take around 30% longer than lexical variable accesses (opcode stack-ref).
-    Assignment is far worse, where dynamic variable assignment (varset) takes
-    650% longer than lexical variable assignment (stack-set). How I measured
-    all this is a topic for another article.
+2. lexical-let依然使用的是动态绑定,而访问动态绑定要比访问静态绑定的性能要低大约30%,具体低多少有赖于编译Emacs的C编译器.
+   赋值的性能就更糟糕了,对动态绑定赋值要比对静态绑定赋值多出大约650%的时间.
+   至于具体怎么算的,我有在其他文件中说过.
    
- 3. The “lexical” variables are accessed using symbol-value, a full function
-    call, so they’re even slower than normal dynamic variables.
+3. 它是使用 =symbol-value= 来访问这些所谓的 “静态”变量的, 函数调用本身就消耗巨大,因此它甚至比访问普通的动态变量还慢.
    
- 4. Because converted lambda expressions are constructed dynamically at
-    run-time within the body of lexical-let, the resulting closure is only
-    partially byte-compiled even if the code as a whole has been
-    byte-compiled. In contrast, lexical-binding: t closures are fully
-    compiled. How this works is worth its own article.
+4. =lexical-let= 需要动态地在运行时拼装lambda表达式,因此它不能完全地被编译成字节码. 而 =lexical-binding: t= 闭包能完全地被编译成字节码.
+   至于它是怎么被编译到,那又得写另一篇文章来说明了.
    
- 5. Converted lambda expressions include the additional internal function
-    invocation, making them slower.
+5. 转换后的lambda表达式在内部又会产生一次函数调用,使得速度更慢了.
    
-While lexical-let is clever, and occasionally useful prior to Emacs 24, it may
-come at a hefty performance cost if evaluated frequently. There’s no reason to
-use it anymore.
+虽说 =lexical-let= 实现的很精妙,对于Emacs24之前的版本也蛮有用的,但是若用的太频繁的话会带来繁重的性能消耗. 因此已经没有理由再用它了.
 
 * Constraints on code generation
 
-Another reason to be weary of dynamic scope is that it puts needless
-constraints on the compiler, preventing a number of important optimization
-opportunities. For example, consider the following function, bar:
+另一个启用动态作用域的理由是,它给编译器带来了无谓的约束,使得编译器无法很好的优化代码.
+举个例子,假设有这么一个bar函数:
 
 #+BEGIN_SRC emacs-lisp
   (defun bar ()
@@ -138,15 +103,14 @@ opportunities. For example, consider the following function, bar:
       (+ x y)))
 #+END_SRC
 
-Byte-compile this function under dynamic scope (lexical-binding: nil) and 
-[[http://nullprogram.com/blog/2014/01/04/][disassemble it]] to see what it looks like.
+在动态作用域中将之编译成字节码,然后 [[http://nullprogram.com/blog/2014/01/04/][将它翻译成汇编代码]] 看看是什么东西:
 
 #+BEGIN_SRC emacs-lisp
   (byte-compile #'bar)
   (disassemble #'bar)
 #+END_SRC
 
-That pops up a buffer with the disassembly listing:
+这会弹出一个buffer有以下内容:
 
 #+BEGIN_EXAMPLE
 0       constant  1
@@ -163,16 +127,12 @@ That pops up a buffer with the disassembly listing:
 11      return
 #+END_EXAMPLE
 
-It’s 12 instructions, 5 of which deal with dynamic bindings. The byte-compiler
-doesn’t always produce optimal byte-code, but this just so happens to be 
-nearly optimal byte-code. The discard (a very fast instruction) isn’t
-necessary, but otherwise no more compiler smarts can improve on this. Since
-the variables x and y are visible to foo, they must be bound before the call
-and [[http://nullprogram.com/blog/2016/07/25/][loaded after the call]]. While generally this function will return 3, the
-compiler cannot assume so since it ultimately depends on the behavior foo. Its
-hands are tied.
+一共有12条指令,其中5条是用来处理动态绑定的. 字节码编译器并不总是会生成最优化的字节码,只不过刚好这次产生的字节码优化程度比较高而已.
+其中的 =discard= 指令 (这是个非常快的指令) 是多余的, 除此之外已经无法再进一步优化了. 
+由于变量x,y对foo可见,这两个变量必须在foo调用前与它们的值绑定然后再 [[http://nullprogram.com/blog/2016/07/25/][在函数调用后加载它们的值]]. 
+虽说一般情况下,这个函数的结果应该是3,但是编译器不能做这样的条件假设,因为最终的结果还有赖于foo函数的行为,这种情况下,编译器没法尽情地进行优化.
 
-Compare this to the lexical scope version (lexical-binding: t):
+现在来比较一下静态作用域(lexical-binding: t)下是怎样的 :
 
 #+BEGIN_EXAMPLE
 0       constant  1
@@ -186,14 +146,11 @@ Compare this to the lexical scope version (lexical-binding: t):
 8       return
 #+END_EXAMPLE
 
-It’s only 8 instructions, none of which are expensive dynamic variable
-instructions. And this isn’t even close to the optimal byte-code. In fact, as
-of Emacs 25.1 the byte-compiler often doesn’t produce the optimal byte-code
-for lexical scope code and still needs some work. Despite not firing on all
-cylinders, lexical scope still manages to beat dynamic scope in performance
-benchmarks.
+只有8条指令,而且并没有任何与动态变量相关的指令(这类指令都比较昂贵). 而这还不能算是最优化的字节码. 
+事实上, Emacs 25.1 的字节码编译器一般都无法为静态作用域变量生成最优化的字节码,这还有待进一步的改进.
+即时如此,静态作用域在性能评测上依然比摔动态作用域几条街.
 
-Here’s the optimal byte-code, should the byte-compiler become smarter someday:
+如果某一天编译器足够聪明的话,它应该会产生这样的最优化字节码:
 
 #+BEGIN_EXAMPLE
 0       constant  foo
@@ -202,21 +159,16 @@ Here’s the optimal byte-code, should the byte-compiler become smarter someday:
 3       return
 #+END_EXAMPLE
 
-It’s down to 4 instructions due to computing the math operation at compile
-time. Emacs’ byte-compiler only has rudimentary constant folding, so it
-doesn’t notice that x and y are constants and misses this optimization. I
-speculate this is due to its roots compiling under dynamic scope. Since x and
-y are no longer exposed to foo, the compiler has the opportunity to optimize
-them out of existence. I haven’t measured it, but I would expect this to be
-significantly faster than the dynamic scope version of this function.
+它会在编译期就计算好了,因此就只需要产生4条指令. 
+Emacs的字节编译器还不完善,因此它无法发觉x和y其实是常量,因此无法优化到这个层次.
+I speculate this is due to its roots compiling under dynamic scope. 
+由于x和y对foo不可见, 因此编译器可以尽情地进行优化,就好像foo不存在一样.
+我没有具体测量过,但是可以遇见,这要比动态作用域下快得多的多.
 
 * Optional dynamic scope
 
-You might be thinking, “What if I really do want x and y to be dynamically
-bound for foo?” This is often useful. Many of Emacs’ own functions are
-designed to have certain variables dynamically bound around them. For example,
-the print family of functions use the global variable standard-output to
-determine where to send output by default.
+你可能会想, “要是我就是想x和y处于动态作用域下怎么办?” 有时候动态作用域是有用的. 许多Emacs的函数当初设计的时候就是要与某些动态绑定的变量配合使用的.
+比如,print家族里的函数就使用全局变量 =standard-output= 来决定默认将结果输出到哪里去.
 
 #+BEGIN_SRC emacs-lisp
   (let ((standard-output (current-buffer)))
@@ -224,18 +176,13 @@ determine where to send output by default.
     (prin1 value))
 #+END_SRC
 
-Have no fear: With lexical-binding: t you can have your cake and eat it too.
-Variables declared with defvar, defconst, or defvaralias are marked as
-“special” with an internal bit flag (declared_special in C). When the compiler
-detects one of these variables (special-variable-p), it uses a classical
-dynamic binding.
+不要担心: 使用 =lexical-binding: t= 可以让你做到两全其美.
+使用 =defvar=, =defconst=, 以及 =defvaralias= 定义的变量都会标记为"特殊的".
+当编译器发现是这些特殊变量时 (special-variable-p), 它会使用经典的动态绑定.
 
-Declaring both x and y as special restores the original semantics, reverting
-bar back to its old byte-code definition (next time it’s compiled, that is).
-But it would be poor form to mark x or y as special: You’d de-optimize all
-code (compiled after the declaration) anywhere in Emacs that uses these names.
-As a package author, only do this with the namespace-prefixed variables that
-belong to you.
+将x和y声明为特殊变量会使得bar在编译时生成之前旧的字节码.
+另外,将x和y这样名字的变量标记为特殊变量可不太好,因为它会影响到其他使用到这些名字的代码.
+作为一个package的编写者,你应该只将那些属于你独有的变量标记为特殊变量,这些独有变量一般都带有命名空间的前缀.
 
 The only way to unmark a special variable is with the undocumented function
 internal-make-var-non-special. I expected makunbound to do this, but as of
