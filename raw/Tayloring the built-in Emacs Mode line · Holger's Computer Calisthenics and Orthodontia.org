@@ -1,0 +1,147 @@
+#+URL: http://www.holgerschurig.de/en/emacs-tayloring-the-built-in-mode-line/
+
+For some time, I used [[https://github.com/Malabarba/smart-mode-line][smart-mode-line]]. And then [[https://github.com/milkypostman/powerline][powerline]]. And than, for just
+some hours, I tried [[https://github.com/TheBB/spaceline][spaceline]], because powerline was a tad to unwieldy for me.
+After all those experiments with fancy mode-lines I wondered “What don’t I
+just customization the built-in mode-line to my need, it can’t be hard!”
+
+So, here’s a teaser on how the result might look:
+
+[[http://www.holgerschurig.de/en/emacs-tayloring-the-built-in-mode-line/example.png]]
+
+It’s plain, but also much less complex than my [[https://bitbucket.org/holgerschurig/emacsconf/src/98558d622df3e45e12114e0654691a18ad52c007/config.org?at=master&fileviewer=file-view-default#config.org-523][powerline setup]].
+
+* Show line and column numbers in the mode-line
+
+The first thing is quite straightforward, I want to have column numbers.
+Omitting them is probably a remnant from the 1980s, when computers were as
+slow as molasses.
+
+#+BEGIN_SRC emacs-lisp
+  (column-number-mode 1)
+#+END_SRC
+
+* Faces
+
+My “design” (if one can use that word for my poor skills) is based around
+blue:
+
++ the buffer name, as it is (for me) the most important part of the mode
+    line, needs to stand out.
++ the directory, not as important as the buffer name, but still interesting,
+    needs to stand out, too. Just not as much.
++ the mouse-over highlighting with boxes was ugly, I use some bluish
+    background instead
++ and finally, the inactive mode line might blend into the background.
+
+#+BEGIN_SRC emacs-lisp
+  (set-face-attribute 'mode-line           nil :background "light blue")
+  (set-face-attribute 'mode-line-buffer-id nil :background "blue" :foreground "white")
+  (defface mode-line-directory
+    '((t :background "blue" :foreground "gray"))
+    "Face used for buffer identification parts of the mode line."
+    :group 'mode-line-faces
+    :group 'basic-faces)
+  (set-face-attribute 'mode-line-highlight nil :box nil :background "deep sky blue")
+  (set-face-attribute 'mode-line-inactive  nil :inherit 'default)
+#+END_SRC
+
+* Simplify the cursor position
+
+I redefine mode-line-position to only contain the pure position. I have no
+need for a proportional position (percentage) nor for texts like “Bot”, “Top”
+or “All”. When I was a new emacs user, they confused me for quite some time
+:-)
+
+So, for documentation purposes I kept the elements of the original value of
+mode-line-position here, just uncommented. And I also added explanation for
+the various %-escaped elements:
+
+#+BEGIN_SRC emacs-lisp
+  (setq mode-line-position
+        '(;; %p print percent of buffer above top of window, o Top, Bot or All
+          ;; (-3 "%p")
+          ;; %I print the size of the buffer, with kmG etc
+          ;; (size-indication-mode ("/" (-4 "%I")))
+          ;; " "
+          ;; %l print the current line number
+          ;; %c print the current column
+          (line-number-mode ("%l" (column-number-mode ":%c")))))
+#+END_SRC
+
+* Directory shortening
+
+Before the buffer-id, I want to place the directory. But not the whole
+directory, but shortened version. (I didn’t write this function, I have it
+from some internet web page, unsure from where. It’s used quite often, try too
+google for “defun shorten-directory” …)
+
+#+BEGIN_SRC emacs-lisp
+  (defun shorten-directory (dir max-length)
+    "Show up to `max-length' characters of a directory name `dir'."
+    (let ((path (reverse (split-string (abbreviate-file-name dir) "/")))
+          (output ""))
+      (when (and path (equal "" (car path)))
+        (setq path (cdr path)))
+      (while (and path (< (length output) (- max-length 4)))
+        (setq output (concat (car path) "/" output))
+        (setq path (cdr path)))
+      (when path
+        (setq output (concat ".../" output)))
+      output))
+#+END_SRC
+
+* Directory name
+
+Some buffers however don’t have files (and thus no directories, too), e.g. the
+*scratch* buffer. In such cases the result of (buffer-file-name) is nil. In
+such a case I omit the shortened directory.
+
+But no matter if we emit a directory name, we always emit a starting space.
+This space get’s propertized with the rest, and let our directory / buffer-id
+stand out nicely.
+
+#+BEGIN_SRC emacs-lisp
+  (defvar mode-line-directory
+    '(:propertize
+      (:eval (if (buffer-file-name) (concat " " (shorten-directory default-directory 20)) " "))
+      face mode-line-directory)
+    "Formats the current directory.")
+  (put 'mode-line-directory 'risky-local-variable t)
+#+END_SRC
+
+Having an empty space before directory part calls for an space after the
+buffer id:
+
+#+BEGIN_SRC emacs-lisp
+  (setq-default mode-line-buffer-identification
+                (propertized-buffer-identification "%b "))
+#+END_SRC
+
+* Binding it together
+
+The final mode-line-format is a simpler version of the built-on. I however
+deleted some items that I don’t need. For documentation, I kept them here but
+just commented them out.
+
+#+BEGIN_SRC emacs-lisp
+  (setq-default mode-line-format
+                '("%e"
+                  mode-line-front-space
+                  ;; mode-line-mule-info -- I'm always on utf-8
+                  mode-line-client
+                  mode-line-modified
+                  ;; mode-line-remote -- no need to indicate this specially
+                  ;; mode-line-frame-identification -- this is for text-mode emacs only
+                  " "
+                  mode-line-directory
+                  mode-line-buffer-identification
+                  " "
+                  mode-line-position
+                  ;;(vc-mode vc-mode)  -- I use magit, not vc-mode
+                  (flycheck-mode flycheck-mode-line)
+                  " "
+                  mode-line-modes
+                  mode-line-misc-info
+                  mode-line-end-spaces))
+#+END_SRC
