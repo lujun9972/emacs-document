@@ -1,0 +1,237 @@
+#+URL: http://cachestocaches.com/2016/12/vim-within-emacs-anecdotal-guide/  
+
+Who this guide is for: If you've been using Emacs for a while, you should
+probably try the Vim way of doing things[ ]The reverse of this is probably
+true as well, and if you use Vim I encourage you to give Emacs a try, but
+that's not the purpose of this guide . Too many resources online push people
+in the direction of giving Spacemacs a try; most such guides are designed to
+encourage Vim users to try out Emacs and have a habit of alienating
+established Emacs users such as myself. During my efforts to embrace [[https://www.emacswiki.org/emacs/Evil][Evil]],
+Emacs' Vim emulator, I hit a few road blocks and decided I would put this
+article together to help others through them. Whether you'd like to try out
+evil-mode or you're simply curious to see how the other half do development,
+keep reading.
+
+My first thought in conducting this experiment was just to open my mind and
+learn something new. In addition, my Emacs pinky occasionally bothers me, and
+I wanted to try a more ergonomic way to appreciate the editing tools I use on
+a daily basis. This is a log of my experience, and some code for setting up
+your .emacs.d files. My verdict after roughly a week:
+
+#+BEGIN_QUOTE
+    Having tried the Vim way, I won't likely revert to using pure Emacs
+#+END_QUOTE
+
+I really love the way everything came together; the modal system of editing
+has started to change the way I think about composing text and code. The macro
+system and a couple of other niceties I'll talk about below blew me away, and
+I've quickly integrated them into how I work. Finally, Evil is quite popular,
+so many of the packages I use on a regular basis, like [[https://magit.vc][magit]] and [[http://orgmode.org][org-mode]] have
+extensions to add more vim-like default keybindings.
+
+* Stage 1: Getting Started
+
+To get started, I added evil-mode to my configuration files, and made it a
+point to do all of my work for (at least) a few days within the new
+environment. Full disclosure: I never really got into using Vim with any
+regularity. At this point, I understand how very basic movement works, relying
+on the hjkl keys to move around the cursor, however that's really the extent
+of my knowledge within Vim. This means that I have just taken an editor I've
+loved to work with for nearly two years and crippled my ability to interact
+with it. How delightfully evil (*cough*).
+
+In order to use my "new" editor, I followed [[http://www.openvim.com][a vim tutorial]]. It wasn't
+particularly long, so I'm sure there's a lot I still need to know[ ]I won't
+cover basic movement or the "modal" editing scheme in this guide. If you're
+serious about following along, I'd recommend you at least try them out before
+proceeding. . In addition, I found it useful to have a reference card at hand,
+[[http://tnerual.eriogerg.free.fr/vimqrc.pdf][like this one]], so that whenever I found myself forgetting some of the
+functions I could quickly look it up.
+
+One of my primary annoyances is having to reach for the ESC key every time I
+want to leave insert mode. A colleague of mine recommended remapping the
+caps-lock key to ESC so it was easier to access[ ]To do this, I used [[https://github.com/tekezo/Karabiner-Elements][Karabiner]]
+, since I'm on macOS . This made a huge difference is ease of use, and allowed
+me to truly embrace the idea of leaving the home row as little as possible.
+
+* Stage 2: Grinning and Bearing It
+
+Okay, deleting is a bit of a pain; I still don't quite have the hang of
+deleting en masse using d plus movement, though I'm starting to get better. I
+haven't yet quite embraced the "modal" way of editing, but I keep discovering
+little shortcut features for navigating that I'm really enjoying. For
+instance, being able to move to the beginning/end of sentences using ( and )
+is very convenient while writing.
+
+One thing which I've found rather infuriating is the lack of support for
+people who want to transition from using 'vanilla' Emacs to Evil. Following
+Vim tutorials is only half of the story. Sure they teach you the basic
+movement commands and some interesting ways of editing commands, but how do I
+split the window into different buffers[ ]:sp and :vsp are the commands for
+horizontal and vertical window splitting. and then how do I switch between
+them[ ]C-w + [hjkl] will switch between open windows, which is a really nice
+feature! ? In addition, how do I open and edit different files at once, and
+how can I make all of these features play nicely with Helm, an Emacs package?
+Clearly, it was time for me to edit my configuration files.
+
+* Stage 3: Integrating Other Packages
+
+I use Helm, Org, and Magit a lot[ ]If you're unfamiliar with these three, I've
+included a brief description of each with their respective sections below. .
+Really a lot. They're the tools I've pointed to in the past whenever anyone
+asks me if they should choose Emacs over Vim, so it was especially important
+that I get these tools to work properly. Fortunately, with Evil being quite
+popular and the Spacemacs distribution including a bunch of solutions for
+smaller issues, getting everything to work in tandem wasn't particularly
+difficult.
+
+** Helm
+
+[[https://emacs-helm.github.io/helm/][Helm]] is a tool that provides a clean graphical interface for narrowing long
+lists of commands, files or pretty much anything. Helm overhauls the Emacs
+interface so that when one is looking for a file, for instance, a list of all
+files in the current directory appears, can be narrowed using fuzzy search,
+and each file or folder can be easily opened and explored[ ]I also use the
+fantastic [[https://github.com/syohex/emacs-helm-ag][helm-ag]] extension, which lets me search my files using the [[https://github.com/ggreer/the_silver_searcher][Silver]]
+[[https://github.com/ggreer/the_silver_searcher][Searcher]] tool within a buffer. .
+
+Before enabling Evil, I used Helm do navigate all of my files and open
+buffers, however, the built-in commands don't open Helm. To fix this, I added
+some key bindings, so that whenever I type :e or :b, Helm will open as
+desired:
+
+Use Helm for Files and Buffers lisp
+#+BEGIN_SRC emacs-lisp
+  (define-key evil-ex-map "b " 'helm-mini)
+  (define-key evil-ex-map "e" 'helm-find-files)
+#+END_SRC
+
+When Evil is enabled, one issue I discovered was that an ugly, blank rectangle
+would appear at the beginning of any line which was currently selected within
+Helm. This code, taken from [[https://github.com/syl20bnr/spacemacs/blob/522366bbd179bc332a863efeb523daa09c603458/layers/%252Bdistribution/spacemacs-base/packages.el#L681-L685][the Spacemacs source]] provides the solution:
+
+Fix visual cursor glitch for Helm lisp
+#+BEGIN_SRC emacs-lisp
+  (defun spacemacs//hide-cursor-in-helm-buffer ()
+    "Hide the cursor in helm buffers."
+    (with-helm-buffer
+      (setq cursor-in-non-selected-windows nil)))
+  (add-hook 'helm-after-initialize-hook 
+            'spacemacs//hide-cursor-in-helm-buffer)
+#+END_SRC
+
+Finally, the movement keys within Helm are still Emacs derivative, and rely on
+C-p and C-n for cycling through options rather than the more vim-like hjkl.
+Fortunately, [[https://github.com/syl20bnr/spacemacs/blob/522366bbd179bc332a863efeb523daa09c603458/layers/+distribution/spacemacs-base/packages.el#L787-L795][Spacemacs again provides a solution]]:
+
+Add vim-like movement to Helm lisp
+#+BEGIN_SRC emacs-lisp
+  (define-key helm-map (kbd "C-j") 'helm-next-line)
+  (define-key helm-map (kbd "C-k") 'helm-previous-line)
+  (define-key helm-map (kbd "C-h") 'helm-next-source)
+  (define-key helm-map (kbd "C-S-h") 'describe-key)
+  (define-key helm-map (kbd "C-l") (kbd "RET"))
+  (define-key helm-map [escape] 'helm-keyboard-quit)
+  (dolist (keymap (list helm-find-files-map helm-read-file-map))
+    (define-key keymap (kbd "C-l") 'helm-execute-persistent-action)
+    (define-key keymap (kbd "C-h") 'helm-find-files-up-one-level)
+    (define-key keymap (kbd "C-S-h") 'describe-key)))
+#+END_SRC
+
+I've also added an additional binding for [escape] to quit Helm, which comes
+from [[https://emacs.stackexchange.com/questions/4062/evil-mode-make-helm-quit-with-the-escape-key/4064#4064][this StackOverflow question]]. Note that, to work, these bindings may need
+to be called from the after-init-hook. With all of these changes implemented,
+Helm is nicely integrated into my new workflow:
+
+[[http://cachestocaches.com/media/post_files/helm_files_example_smaller.gif]]
+
+** Magit
+
+[[https://magit.vc][Magit]] is the most popular Emacs wrapper for Git, the version control system.
+It's ease of use is phenomenal, and I can't imagine doing my job without it.
+Getting Vim-like keybindings in Magit was relatively simple, and required only
+installing the [[https://github.com/justbur/evil-magit][evil-magit]] package from MELPA, the Emacs package manager, and
+to require it from my init file. Once I installed the package, I could use the
+standard jk keys can be used to navigate between entries[ ]There are a few
+more changes as well, though none are particularly surprising. See the full
+list here: [[https://github.com/justbur/evil-magit#key-bindings][evil-magit]]. and everything felt whole again.
+
+Just about everything worked the way I would have wanted, except that the
+window that pops up when making a commit would begin in Vim's command mode,
+rather than allowing me to immediately insert text (which is its primary
+function). Furthermore, I wanted to avoid using the Emacs C-c C-c to accept
+the commit, so I defined some new bindings of my own to apply in that mode.
+
+Better Magit-commits for Evil lisp
+#+BEGIN_SRC emacs-lisp
+  ;; Start the commit window in insert mode
+  (add-hook 'with-editor-mode-hook 'evil-insert-state)
+  ;; Add Evil bindings to accept/cancel commit
+  (evil-define-key 'normal with-editor-mode-map
+    (kbd "RET") 'with-editor-finish
+    [escape] 'with-editor-cancel)
+#+END_SRC
+
+My complete configuration can be found [[https://github.com/gjstein/emacs.d/blob/cb126260d30246dc832d6e456b06676f517b35b0/config/init-40-coding-gen.el#L90-L111][on my GitHub]].
+
+** Org
+
+I use [[http://orgmode.org][Org]] for my note-taking, clocking my time, keeping appointments, and
+organizing my projects. I could discuss it's features for days, but instead,
+I'll just link to an article I wrote on how I use it to manage much of my
+life: [[http://cachestocaches.com/2016/9/my-workflow-org-agenda/][My Workflow with Org-Agenda]].
+
+Unfortunately, unlike Magit and Helm, Org didn't have any out-of-the-box
+packages which fully satisfied me. Fortunately, I very much enjoy putting
+together a clean set of key bindings[ ]Don't judge; everyone's got their
+hobbies. . Editing .org files is easy enough, since it opens in the normal
+mode, however org-agenda still relies on the old Emacs bindings and required
+some changes; For brevity, I'll omit all of the bindings here, but you can
+view my additions [[https://github.com/gjstein/emacs.d/blob/cb126260d30246dc832d6e456b06676f517b35b0/config/init-31-doc-org.el#L50-L77][on GitHub]].
+
+* Stage 4: Learning To Code (Again)
+
+Today's the real test: how can I write code using the newer setup. So far,
+it's not so bad. Right off the bat, it's clear that u (for undo) is my new
+best friend. Ensuring that I can properly undo changes whenever I make a
+mistake (which happens quite frequently) is important.
+
+Some of the features, like indenting with = then a movement command, weren't
+exactly what I expected, but how these work and I can see how I'll get used to
+them over time. I'm starting to really embrace the "modal" way of doing
+things, like using the different "insert" commands to put the cursor precisely
+where I want it before entering new text. The navigation is really "snappy"
+too; within Emacs, I'd always get roughly where I wanted to go within a
+document, but all of the different commands within Vim are much more precise
+and feel overwhelmingly more natural for moving around quickly (that is, once
+I'm accustomed to using them). The % command, which switches between
+corresponding parentheses and brackets within my code is a very nice feature.
+So too is the :s[ubstitute] command[ ]The "live" search and replace
+functionality is gorgeous: [substi] , which allows for
+regular-expression-based search and replace inline. One of the nicest features
+of all (include a separate image for the interface in the sidebar) is the
+"live" search and replace feature, which shows the matched search and replace
+candidates in real time.
+
+Finally, the most pleasant surprises was Vim's [[http://cachestocaches.com/2016/12/vim-within-emacs-anecdotal-guide/][macro system]], which, because of
+the sophistication of the movement commands, allows one to record very complex
+and versatile functions in real time and bind them to a "register"
+(essentially a key on the keyboard). This is best shown via an example:
+
+[[http://cachestocaches.com/media/post_files/vim_macro_example_3.gif]]
+
+Using a Vim macro to turn a C++ Eigen matrix into a python Numpy matrix.
+Notice that, once the macro is defined using qa[commands]q, I can easily call
+it again on the remaining examples using @a. Note that, even through the
+length of the numbers changes for the third variable definition, the macro
+still works as expected, since sensical movement commands were used to define
+it.
+
+* Stage 5: Embracing My New Workflow
+
+I've been editing code for a little while now and I have to say that I'm
+really beginning to enjoy it and my new workflow is here to stay. Certainly,
+there are times during which I have to stop and consult a guide or miss some
+of my old way of doing things, however I'm likely going to keep the new
+bindings for a little while longer. There's a lot I didn't cover here, but a
+bit of doing is all one needs to really learn.
