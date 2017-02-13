@@ -6,56 +6,36 @@
 #+LANGUAGE:  zh-CN
 #+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
 
-Not everything written in Emacs Lisp needs to be fast. Most of Emacs itself —
-around 82% — is written in Emacs Lisp because those parts are generally not
-performance-critical. Otherwise these functions would be built-ins written in
-C. Extensions to Emacs don’t have a choice and — outside of a few exceptions
-like [[http://nullprogram.com/blog/2016/11/05/][dynamic modules]] and inferior processes — must be written in Emacs Lisp,
-including their performance-critical bits. Common performance hot spots are
-automatic indentation, [[https://github.com/mooz/js2-mode][AST parsing]], and [[http://nullprogram.com/blog/2016/12/11/][interactive completion]].
+不是所有的EmacsLisp代码都需要优化速度. Emacs本身就有大约82%是由EmacsLisp来实现的,这些用EmacsLisp实现的功能一般都对性能不敏感. 那些对性能有要求的函数都用C来实现了.
+对Emacs的扩展,即时对性能有要求,也只能用EmacsLisp来实现,别无他法(当然 [[http://nullprogram.com/blog/2016/11/05/][dynamic modules]] 和 调用外部程序这两种方法除外).
+一般自动缩进, [[https://github.com/mooz/js2-mode][语法树分析]], 以及 [[http://nullprogram.com/blog/2016/12/11/][自动补全]] 这几大类插件对性能要求都较高.
 
-Here are 5 guidelines, each very specific to Emacs Lisp, that will result in
-faster code. The non-intrusive guidelines could be applied at all times as a
-matter of style — choosing one equally expressive and maintainable form over
-another just because it performs better.
+有5条针对EmacsLisp的准则可以改善代码性能. 这些准则并不会为了性能而牺牲掉代码的可读性.
 
-There’s one caveat: These guidelines are focused on Emacs 25.1 and “nearby”
-versions. Emacs is constantly evolving. Changes to the [[http://nullprogram.com/blog/2014/01/04/][virtual machine]] and
-byte-code compiler may transform currently-slow expressions into fast code,
-obsoleting some of these guidelines. In the future I’ll add notes to this
-article for anything that changes.
+需要说明的是: 这些准则只是针对 Emacs 25.1 及相近的版本来说的. Emacs不断的在改进. 对[[http://nullprogram.com/blog/2014/01/04/][虚拟机]] 和 字节码编译器的修改可能会将当前运行很慢的表达式优化成快速的字节码,从而使得这些准则变得过时.
+未来如果真的有这种情况发生的话,我会再对本文做出修改.
 
 * (1) Use lexical scope
 
-This guideline refers to the following being the first line of every Emacs
-Lisp source file you write:
+本准则要求你在写EmacsLisp时始终将下面这行内容作为文件的首行.
 
 #+BEGIN_SRC emacs-lisp
   ;;; -*- lexical-binding: t; -*-
 #+END_SRC
 
-This point is worth mentioning again and again. Not only will [[http://nullprogram.com/blog/2016/12/22/][your code be]]
-[[http://nullprogram.com/blog/2016/12/22/][more correct]], it will be measurably faster. Dynamic scope is still opt-in
-through the explicit use of special variables, so there’s absolutely no reason
-not to be using lexical scope. If you’ve written clean, dynamic scope code,
-then switching to lexical scope won’t have any effect on its behavior.
+无论怎么强调这点都不过分. 这不仅仅使得[[http://nullprogram.com/blog/2016/12/22/][你的代码更健壮]] 还能显著地提高代码的运行速度.
+而且对于那些特殊变量(译者注:defvar,defconst,defcustom定义的变量)来说,它们依然是处于动态作用域下的,所以完全没有什么理由不用静态作用域.
+你在动态作用域下编写的代码即时切换到动态作用域下也不会影响到它的功能.
 
-Along similar lines, special variables are a lot slower than local, lexical
-variables. Only use them when necessary.
+特殊变量要比局部变量和静态作用域下的变量慢得多,因此请只在必要的时候才用.
 
 * (2) Prefer built-in functions
 
-Built-in functions are written in C and are, as expected, significantly faster
-than the equivalent written in Emacs Lisp. Complete as much work as possible
-inside built-in functions, even if it might mean taking more conceptual steps
-overall.
+内建函数使用C写的,当然会比用EmacsLisp写得同类函数要快得多. 请尽量用内建函数来完成工作,即使因此会增加代码语句.
 
-For example, what’s the fastest way to accumulate a list of items? That is,
-new items go on the tail but, for algorithm reasons, the list must be
-constructed from the head.
+举个例子, 创建一个累加队列的最快方法是什么? 也就是说新元素要不断累加到列表的末尾,而且应算法的要求,列表必须从头部开始组建.
 
-You might be tempted to keep track of the tail of the list, appending new
-elements directly to the tail with setcdr (via setf below).
+你可能会尝试追踪列表的末尾位置,然后使用 =setcdr(由下面的setf来调用)= 来将新元素直接添加到列表的末尾处.
 
 #+BEGIN_SRC emacs-lisp
   (defun fib-track-tail (n)
@@ -73,8 +53,7 @@ elements directly to the tail with setcdr (via setf below).
   ;; => (1 1 2 3 5 8 13 21 34)
 #+END_SRC
 
-Actually, it’s much faster to construct the list in reverse, then
-destructively reverse it at the end.
+然而实际上,先创建一个逆序的列表,然后反转它要快得多.
 
 #+BEGIN_SRC emacs-lisp
   (defun fib-nreverse (n)
@@ -87,12 +66,10 @@ destructively reverse it at the end.
         (push b list))))
 #+END_SRC
 
-It might not look it, but nreverse is very fast. Not only is it a built-in,
-it’s got its own opcode. Using push in a loop, then finishing with nreverse is
-the canonical and fastest way to accumulate a list of items.
+你可能不相信,但是 =nreverse= 非常的快. 不仅仅因为它是内建函数,它甚至有自己的操作码!
+在循环中使用push然后在最用用nreverse反转列表是创建累加列表的最快方法.
 
-In fib-track-tail, the added complexity of tracking the tail in Emacs Lisp is
-much slower than zipping over the entire list a second time in C.
+在 fib-track-tail 中, 用EmacsLisp追中列表尾部,不仅增加了复杂度而且要比用C遍历两次列表要慢得多.
 
 * (3) Avoid unnecessary lambda functions
 
