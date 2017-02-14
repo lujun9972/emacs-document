@@ -73,7 +73,7 @@
 
 * (3) Avoid unnecessary lambda functions
 
-I’m talking about mapcar and friends.
+这部分内容跟 =mapcar= 家族的函数比较相关了.
 
 #+BEGIN_SRC emacs-lisp
   ;; Slower
@@ -81,23 +81,16 @@ I’m talking about mapcar and friends.
     (mapcar (lambda (x) (expt x e)) list))
 #+END_SRC
 
-Listen, I know you love [[https://github.com/magnars/dash.el][dash.el]] and higher order functions, but this habit
-ain’t cheap. The byte-code compiler does not know how to inline these lambdas,
-so there’s an additional per-element function call overhead.
+很多人喜欢用 [[https://github.com/magnars/dash.el][dash.el]] 也喜欢用高阶函数, 但其代价可不菲.
+编译器并不知道该如何内联这些匿名函数,因此必然会产生一次函数调用的消耗.
 
-Worse, if you’re using lexical scope like I told you, the above example forms
-a closure over e. This means a new function object is created (e.g.
-make-byte-code) each time expt-list is called. To be clear, I don’t mean that
-the lambda is recompiled each time — the same byte-code string is shared
-between all instances of the same lambda. A unique function vector (#[...])
-and constants vector are allocated and initialized each time expt-list is
-invoked.
+更糟的是, 如果你遵照我前面的建议使用了静态作用域, 上面的例子会创建一个捕获e变量的闭包. 也就是说,每次调用 =expt-list= 的时候都会用诸如 =make-byte-code= 这类函数创建一个新的函数对象.
+请注意,我并没有说在mapcar中每一次lambda语句都会被重新编译一次 — 所有同样lambda实例都是共用同一个字节码字符串的.
+但每次调用 =expt-list= 确实都会分配和初始化一个唯一的函数数组(#[...])以及多个常量数组.
 
-Related mini-guideline: Don’t create any more garbage than strictly necessary
-in performance-critical code.
+这就引入了一个更泛化的规则: 不要在性能相关的代码中产生不必要的垃圾.
 
-Compare to an implementation with an explicit loop, using the nreverse
-list-accumulation technique.
+让我们把上面的例子改成明确的循环来看看.
 
 #+BEGIN_SRC emacs-lisp
   (defun expt-list-fast (list e)
@@ -106,14 +99,13 @@ list-accumulation technique.
         (push (expt x e) result))))
 #+END_SRC
 
-+ No unnecessary garbage is created.
-+ No unnecessary per-element function calls.
+相比之下,它有以下好处
++ 不会创建非必须的垃圾对象.
++ 没有函数调用的消耗.
 
-This is the fastest possible definition for this function, and it’s what you
-need to use in performance-critical code.
+这可能是该函数的最快实现了,你应该在性能敏感的代码中使用这个版本的实现.
 
-Personally I prefer the list comprehension approach, using cl-loop from
-cl-lib.
+不过就个人来说,我比较喜欢使用cl-lib中的 =cl-loop=.
 
 #+BEGIN_SRC emacs-lisp
   (defun expt-list-fast (list e)
