@@ -136,10 +136,8 @@ the weeds, so don’t be shy.
 
 也就是说,在效率敏感的代码中,你应该尽可能使用 =assq=, 甚至于你的alist也应该尽可能使用 =eq= 能比较的类型来作为key. 当然是否真的需要做出这个改变,还是要通过性能测试后才能决定.
 
-Another example is eq, =, eql, and equal. Some macros and functions use eql,
-especially cl-lib which inherits eql as a default from Common Lisp. Take
-cl-case, which is like switch from the C family of languages. It compares
-elements with eql.
+另一个类似的例子是 ~eq~, ~=~, ~eql~, 以及 ~equal~. 有些宏/函数默认使用 =eql= 来进行比较, 尤其是 =cl-lib= package,它从Common Lisp中继承了使用 =eql= 来比较的这种行为.
+比如 =cl-case= 就是用 =eql= 来进行比较的,它跟C语言中的 =switch= 语句很类似.
 
 #+BEGIN_SRC emacs-lisp
   (defun op-apply (op a b)
@@ -149,8 +147,7 @@ elements with eql.
       (:isin (/ b (sin a)))))
 #+END_SRC
 
-The cl-case expands into a cond. Since Emacs byte-code lacks support for jump
-tables, there’s not much room for cleverness.
+=cl-case= 会扩展成为一条 =cond= 语句. 由于Emacs字节码并不支持 jump tables,因此实际上也没有什么优化的空间.
 
 #+BEGIN_SRC emacs-lisp
   (defun op-apply (op a b)
@@ -160,10 +157,8 @@ tables, there’s not much room for cleverness.
      ((eql op :isin) (/ b (sin a)))))
 #+END_SRC
 
-It turns out eql is pretty much always the worst choice for cl-case. Of the
-four equality functions I listed, the only one lacking an opcode is eql. A
-faster definition would use eq. (In theory, cl-case could have done this
-itself because it knows all the keys are symbols.)
+然而实际上,在 =cl-case= 中使用 =eql= 几乎可以说是最差劲的选择. 在我上面列出的4个判断相等的函数中,只有 =eql= 是没有自己的操作码的.
+相比来说,使用 =eq= 的速度就要快的多. (理论上, =cl-case= 完全可以在发现所有比较的key都是symbol的时候,改成用 =eq= 来作比较.)
 
 #+BEGIN_SRC emacs-lisp
   (defun op-apply (op a b)
@@ -173,14 +168,11 @@ itself because it knows all the keys are symbols.)
      ((eq op :isin) (/ b (sin a)))))
 #+END_SRC
 
-Fortunately eq can safely compare integers in Emacs Lisp. You only need eql
-when comparing symbols, integers, and floats all at once, which is unusual.
+在EmacsLisp中,你还可以用 =eq= 来比较整数. 只有在你需要让symbol,整数和浮点数相互进行比较时才需要用到 =eql=,而这种情况十分罕见.
 
 * (5) Unroll loops using and/or
 
-Consider the following function which checks its argument against a list of
-numbers, bailing out on the first match. I used % instead of mod since the
-former has an opcode (166) and the latter does not.
+让我们来看一下下面这个函数,这个函数在一个数字列表中搜索能整除参数的数字,并返回第一个匹配. 我这里使用 =%= 而不是 =mod= 的原因在于, =%= 有它自己的操作码(166),而 =mod= 没有.
 
 #+BEGIN_SRC emacs-lisp
   (defun detect (x)
@@ -190,9 +182,8 @@ former has an opcode (166) and the latter does not.
           (throw 'found f)))))
 #+END_SRC
 
-The byte-code compiler doesn’t know how to unroll loops. Fortunately that’s
-something we can do for ourselves using and and or. The compiler will turn
-this into clean, efficient jumps in the byte-code.
+编译器本身并不知道如何展开循环式. 不过我们完全可以自己用 =and= 和 =or= 将其展开.
+然后编译器就能生成干净高效的字节码了.
 
 #+BEGIN_SRC emacs-lisp
   (defun detect-unrolled (x)
@@ -209,22 +200,13 @@ this into clean, efficient jumps in the byte-code.
         (and (= 0 (% x 31)) 31)))
 #+END_SRC
 
-In Emacs 24.4 and earlier with the old-fashioned lambda-based catch, the
-unrolled definition is seven times faster. With the faster pushcatch-based
-catch it’s about twice as fast. This means the loop overhead accounts for
-about half the work of the first definition of this function.
+在Emacs 24.4及其更早的版本中,那时候 =catch= 还用得是基于 =lambda= 的实现, 展开后的实现要比循环的实现快了7倍.
+而即使是后来使用了基于 =pushcatch= 指令的 =catch= 实现, 展开后的实现速度也是循环的实现的两倍.
+也就是说,在第一个实现的函数中,有一半的性能消耗都花费在了循环上了.
 
-Update: It was pointed out in the comments that this particular example is
-equivalent to a cond. That’s literally true all the way down to the byte-code,
-and it would be a clearer way to express the unrolled code. In real code it’s
-often not quite equivalent.
+应用这条规则时请确定你写得代码真的是对性能有特殊要求. 毕竟,手工展开循环是一件无聊而又易错的工作.
 
-Unlike some of the other guidelines, this is certainly something you’d only
-want to do in code you know for sure is performance-critical. Maintaining
-unrolled code is tedious and error-prone.
-
-I’ve had the most success with this approach by not by unrolling these loops
-myself, but by [[http://nullprogram.com/blog/2016/12/27/][using a macro]], or [[http://nullprogram.com/blog/2016/12/11/][similar]], to generate the unrolled form.
+不过我一般不会真的去手工展开这些循环, [[http://nullprogram.com/blog/2016/12/27/][使用宏]] [[http://nullprogram.com/blog/2016/12/11/][之类的技术]], 来自动生成展开式是一个不错的选择.
 
 #+BEGIN_SRC emacs-lisp
   (defmacro with-detect (var list)
@@ -236,9 +218,7 @@ myself, but by [[http://nullprogram.com/blog/2016/12/27/][using a macro]], or [[
     (with-detect x (2 3 5 7 11 13 17 19 23 29 31)))
 #+END_SRC
 
-How can I find more optimization opportunities myself?
+那么我要如何发现还有哪些地方可以优化呢?
 
-Use M-x disassemble to inspect the byte-code for your own hot spots. Observe
-how the byte-code changes in response to changes in your functions. Take note
-of the sorts of forms that allow the byte-code compiler to produce the best
-code, and then exploit it where you can.
+使用 =M-x disassemble= 来看看你的热点代码会产生什么样的字节码. 修改一下你的函数然后看看字节码是怎么随之改变的.
+关注哪些能产生最好字节码的编码形式,然后尽可能地使用这种编码形式进行编码.
