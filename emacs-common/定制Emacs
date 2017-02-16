@@ -1,21 +1,17 @@
 #+URL: http://www.holgerschurig.de/en/emacs-tayloring-the-built-in-mode-line/
 
-For some time, I used [[https://github.com/Malabarba/smart-mode-line][smart-mode-line]]. And then [[https://github.com/milkypostman/powerline][powerline]]. And than, for just
-some hours, I tried [[https://github.com/TheBB/spaceline][spaceline]], because powerline was a tad to unwieldy for me.
-After all those experiments with fancy mode-lines I wondered “What don’t I
-just customization the built-in mode-line to my need, it can’t be hard!”
+为了美化mode-line,我做了很多实验.最开始的时候,我用过 [[https://github.com/Malabarba/smart-mode-line][smart-mode-line]]. 然后换成了 [[https://github.com/milkypostman/powerline][powerline]]. 但是觉得powerline太笨重了,因此换成了 [[https://github.com/TheBB/spaceline][spaceline]].
+最后我想:"为什么我不直接配置modeline呢,应该不会太难的!"
 
-So, here’s a teaser on how the result might look:
+下面就是我配置的最终结果:
 
 [[http://www.holgerschurig.de/en/emacs-tayloring-the-built-in-mode-line/example.png]]
 
-It’s plain, but also much less complex than my [[https://bitbucket.org/holgerschurig/emacsconf/src/98558d622df3e45e12114e0654691a18ad52c007/config.org?at=master&fileviewer=file-view-default#config.org-523][powerline setup]].
+而最终的配置甚至比我的 [[https://bitbucket.org/holgerschurig/emacsconf/src/98558d622df3e45e12114e0654691a18ad52c007/config.org?at=master&fileviewer=file-view-default#config.org-523][powerline的配置]] 还要简洁明了的多.
 
 * Show line and column numbers in the mode-line
 
-The first thing is quite straightforward, I want to have column numbers.
-Omitting them is probably a remnant from the 1980s, when computers were as
-slow as molasses.
+首先,我想要知道光标所在的列数,这一步很容易实现.
 
 #+BEGIN_SRC emacs-lisp
   (column-number-mode 1)
@@ -23,16 +19,12 @@ slow as molasses.
 
 * Faces
 
-My “design” (if one can use that word for my poor skills) is based around
-blue:
+我的“设计”的基色是蓝色:
 
-+ the buffer name, as it is (for me) the most important part of the mode
-    line, needs to stand out.
-+ the directory, not as important as the buffer name, but still interesting,
-    needs to stand out, too. Just not as much.
-+ the mouse-over highlighting with boxes was ugly, I use some bluish
-    background instead
-+ and finally, the inactive mode line might blend into the background.
++ buffer name,对我来说是最重要的内容,需要突出显示.
++ buffer所在的目录, 比buffer name的重要程度差点, 但是依然很重要,也需要突出显示,只不过不要像buffer name那么突出.
++ 使用box来突出显示光标指示的地方太难看了,我把它修改成用蓝色背景色来显示.
++ 最后,the inactive mode line 需要与背景融为一体.
 
 #+BEGIN_SRC emacs-lisp
   (set-face-attribute 'mode-line           nil :background "light blue")
@@ -48,14 +40,11 @@ blue:
 
 * Simplify the cursor position
 
-I redefine mode-line-position to only contain the pure position. I have no
-need for a proportional position (percentage) nor for texts like “Bot”, “Top”
-or “All”. When I was a new emacs user, they confused me for quite some time
-:-)
+我重新定义了一下 =mode-line-position=, 让它只显示光标所在的位置.  我根本不需要以百分比的方式来显示位置,也不需要显示像 “Bot”, “Top” , “All” 这样的文本. 
+当我还是Emacs新手的时候,这些东西时常把我搞迷糊了:-)
 
-So, for documentation purposes I kept the elements of the original value of
-mode-line-position here, just uncommented. And I also added explanation for
-the various %-escaped elements:
+我这里保留了 =mode-line-position= 初始值中各元素的设置,如果需要的话可以取消对这些元素的注释即可.
+而且我还为这些以 =%= 开头的转义字符做了说明.
 
 #+BEGIN_SRC emacs-lisp
   (setq mode-line-position
@@ -71,10 +60,8 @@ the various %-escaped elements:
 
 * Directory shortening
 
-Before the buffer-id, I want to place the directory. But not the whole
-directory, but shortened version. (I didn’t write this function, I have it
-from some internet web page, unsure from where. It’s used quite often, try too
-google for “defun shorten-directory” …)
+我希望能在buffer-id前面显示目录信息.
+但我不希望显示完整的目录信息,因此需要进行一些精简(下面这个函数并不是我原创的,而是从网上找到的,不过我忘了具体在哪找到的了. 你可以试着在google上搜索一下 “defun shorten-directory”)
 
 #+BEGIN_SRC emacs-lisp
   (defun shorten-directory (dir max-length)
@@ -93,13 +80,10 @@ google for “defun shorten-directory” …)
 
 * Directory name
 
-Some buffers however don’t have files (and thus no directories, too), e.g. the
-*scratch* buffer. In such cases the result of (buffer-file-name) is nil. In
-such a case I omit the shortened directory.
+这里存在的一个问题是,有些buffer,比如 =*scratch*= buffer,可能并没有相关联的文件(当然就更不可能有所属目录了), 这时 =(buffer-file-name)= 的返回值为 =nil=.
+这种情况下,我就不能去尝试简化目录的显示.
 
-But no matter if we emit a directory name, we always emit a starting space.
-This space get’s propertized with the rest, and let our directory / buffer-id
-stand out nicely.
+不过不管是否显示目录,我们总是要在最开始的位置上显示一个空格用于将directory/buffer-id与其他的内容隔离开,这样显得好看点.
 
 #+BEGIN_SRC emacs-lisp
   (defvar mode-line-directory
@@ -110,8 +94,7 @@ stand out nicely.
   (put 'mode-line-directory 'risky-local-variable t)
 #+END_SRC
 
-Having an empty space before directory part calls for an space after the
-buffer id:
+为了对称,我们在buffer-id后也加一个空格:
 
 #+BEGIN_SRC emacs-lisp
   (setq-default mode-line-buffer-identification
@@ -120,9 +103,7 @@ buffer id:
 
 * Binding it together
 
-The final mode-line-format is a simpler version of the built-on. I however
-deleted some items that I don’t need. For documentation, I kept them here but
-just commented them out.
+最后组装出来的 =mode-line-format= 要比默认的设置更简单一些. 我将一些不需要的显示项都注释掉了.
 
 #+BEGIN_SRC emacs-lisp
   (setq-default mode-line-format
