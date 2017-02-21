@@ -1,0 +1,458 @@
+#+URL: https://ericabrahamsen.net/tech/2016/feb/bbdb-eieio-object-oriented-elisp.html
+BBDB on EIEIO – An Introduction to Object-Oriented Emacs Lisp
+
+This is a basic introduction to EBDB, an EIEIO re-write of BBDB.
+
+What does that mean?
+
+BBDB is the [[http://savannah.nongnu.org/projects/bbdb/][insidious Big Brother DataBase]], Emacs’ principle
+contact-management/addressbook package. [[https://www.gnu.org/software/emacs/manual/html_mono/eieio.html][EIEIO]] apparently stands for “Enhanced
+Implementation of Emacs Interpreted Objects”, otherwise known as Emacs Lisp’s
+version of Common Lisp’s [[https://www.gnu.org/software/emacs/manual/html_mono/eieio.html][CLOS]], which itself stands for the Common Lisp Object
+System. Ergo, EBDB stands for the
+“Enhanced-implementation-of-emacs-interpreted-objects/
+common-lisp-object-system version of the insidious big Brother DataBase”.
+
+In plain English, EBDB is a rewrite of BBDB using Emacs’ CLOS-inspired
+object-orientation package. It’s currently on [[https://github.com/girzel/ebdb][Github]], though I’d like to move
+it to Emacs’ ELPA repository once it’s out of beta. This post touches on some
+observations I made during the course of the rewrite.
+
+* Why rewrite?
+
+First of all: why do this at all? There were two reasons. One was the
+observation that the object-oriented paradigm is nicely suited to keeping a
+database of records, and that BBDB could be made quite a bit more extensible
+via subclassing. The other was simply to gain some practice in using EIEIO.
+
+* The Basics
+
+There are three main classes in EBDB:
+
+ 1. Databases, which hold records and persist them somehow
+ 2. Records, which represent people/organizations
+ 3. Fields, which represent record data such as email addresses or phone
+    numbers
+
+There are multiple implementations of each class, and room for third-party
+developers to create more. The idea was to make the framing code as
+class-agnostic as possible: ie, the classes themselves are responsible for
+nearly all behavior, and simply accept messages from user-initiated code.
+Fairly standard object-oriented stuff. However, CLOS/EIEIO differs from other
+OO systems in some fundamental ways.
+
+* Classes and Generic Functions
+
+My current excuse for being a smug Lisp weenie is generic methods with
+multiple dispatch. I can’t explain it any better than [[http://www.gigamonkeys.com/book/object-reorientation-generic-functions.html][Peter Seibel did]], but if
+you’re too lazy to read that: Lisp’s object-oriented Copernican revolution was
+to make methods top-level objects (I’d be curious to hear if Lisp borrowed
+this from another language). They no longer “belong to” classes, instead they
+behave just like normal functions. In Python you might write:
+
+#+BEGIN_SRC python
+  class ThingOne():
+
+      def foo(self):
+          print("calling thing one foo on %s" % self)
+
+  class ThingTwo():
+
+      def foo(self):
+          print("calling thing two foo on %s" % self)
+
+  ThingOne().foo()
+  ThingTwo().foo()
+#+END_SRC
+
+In Lisp you would write the exact equivalent code like so:
+
+#+BEGIN_SRC emacs-lisp
+  (defclass thing-one ()
+    nil)
+
+  (defclass thing-two ()
+    nil)
+
+  (cl-defmethod foo ((obj thing-one))
+    (message "calling thing one foo on %s" obj))
+
+  (cl-defmethod foo ((obj thing-two))
+    (message "calling thing two foo on %s" obj))
+
+  (foo (make-instance 'thing-one))
+  (foo (make-instance 'thing-two))
+#+END_SRC
+
+Note that the only difference between the two is that the cl-defmethod
+definition is top-level. Its only relationship to the classes is that it
+expects a class instance as its first argument.
+
+The implication of this is that methods are essentially orthogonal to classes.
+Generic functions can dispatch not only on argument class, but also on
+argument type or equality. They can easily be used without defining classes at
+all:
+
+#+BEGIN_SRC emacs-lisp
+  (cl-defmethod type-test ((arg string))
+    (message "I was called with string argument %s" arg))
+
+  (cl-defmethod type-test ((arg integer))
+    (message "I was called with integer argument %d" arg))
+
+  (cl-defmethod type-test (arg)
+    (message "I don't know what %s is" arg))
+#+END_SRC
+
+The last version is a “catch-all” definition. In “normal” elisp, you’d do this
+with a cond statement:
+
+#+BEGIN_SRC emacs-lisp
+  (defun type-test (arg)
+    (cond ((stringp arg)
+           (message "I was called with string argument %s" arg))
+          ((integerp arg)
+           (message "I was called with integer argument %d" arg))
+          (t (message "I don't know what %s is" arg))))
+#+END_SRC
+
+Exactly equivalent, the only difference being that the methods can be defined
+anywhere you like.
+
+* Multiple Dispatch
+
+So: methods are top-level creatures, can specialize on the type of their
+arguments, and can accept more than one argument. The upshot is that you can
+have methods that behave differently depending on the class of more than one
+object – aka “multiple dispatch”. That looks like:
+
+#+BEGIN_SRC emacs-lisp
+  (cl-defmethod bar ((obj1 thing-one)
+                     (obj2 thing-two))
+    (message "bar called with thing-one %s and thing-two %s" obj1 obj2))
+#+END_SRC
+
+Methods can dispatch on an arbitrary number of arguments, by examining their
+class, their type, or a few other tricks. More-specific specializers override
+less-specific specializers.
+
+EBDB uses multiple dispatch all over the place – for instance, when editing a
+field on a record. When the user hits “e” on a field to edit it, that
+eventually results in a call to this (simplified for explanatory purposes)
+method:
+
+#+BEGIN_SRC emacs-lisp
+  (cl-defmethod ebdb-record-change-field ((record ebdb-record)
+                                          (old-field ebdb-field)
+                                          &optional new-field)
+    "Change the value of FIELD belonging to RECORD."
+    (let* ((fieldclass (eieio-object-class old-field))
+           (new-field (or new-field (ebdb-read fieldclass nil old-field))))
+      (ebdb-record-delete-field record old-field)
+      (ebdb-record-insert-field record new-field)))
+#+END_SRC
+
+Because ebdb-record and ebdb-field are low-level base classes, this call works
+for everything in the database. A new field instance is read, using the old
+field instance as a default, and the old field is replaced with the new field.
+The code knows nothing about records or fields, it just makes a new field
+instance by calling ebdb-read on the field class, and then adds that instance
+to the record with ebdb-record-insert-field.
+
+It gets more complicated, of course.
+
+For instance, person records can have “role” fields at organization records.
+The role is a relationship that can include a label, a special email address,
+and an arbitrary number of other fields. The roles are kept in a slot on the
+person record, and that’s how they’re saved in the database. But when you’re
+looking at the record for the organization, you also want to see the people
+who have roles there, right? So when displaying organizations, a hashtable is
+used to do a reverse lookup, and display all the role fields as if they were
+part of the organization record.
+
+Once the role fields are visible on an organization record, of course, then
+users are bound to try to edit/delete the role fields from there. Technically
+the role fields don’t belong to the organization, so some trickery has to be
+perpetrated: we need to special-case the situation where the user tries to
+edit a role field on an organization record. This turned out to be remarkably
+simple, by adding a new method:
+
+#+BEGIN_SRC emacs-lisp
+  (cl-defmethod ebdb-record-change-field ((org ebdb-record-organization)
+                                          (old-field ebdb-field-role)
+                                          &optional new-field)
+    (let ((person (ebdb-gethash (slot-value old-field 'record-uuid) 'uuid)))
+      (cl-call-next-method person old-field new-field)))
+#+END_SRC
+
+We use more-specific record and field subclasses as specializers, so that this
+method only fires when editing a role field on an organization record. The
+method looks up the person record that the role field “actually” belongs to,
+switches out the organization for the person, and then uses
+cl-call-next-method (the lisp equivalent of Python’s super) to pass the new
+arguments to the more-general method below.
+
+I was a little surprised that it worked out so well. All the code “above” this
+call treats the organization as the record being edited: it has change hooks
+called on it, and gets redisplayed after editing. All the code “below” this
+treats the person as the record being edited: its slots are altered, and its
+databases are alerted to the edit.
+
+* Method Composition
+
+Calling down through a “stack” of descendant-to-ancestor methods is common
+practice, and EBDB does it quite a bit, again using cl-call-next-method. For
+instance, here’s a simplified outline of the ebdb-record-field-slot-query
+method, which is used to figure out which fields go in which slot.
+
+#+BEGIN_SRC emacs-lisp
+  (cl-defmethod ebdb-record-field-slot-query ((class (subclass ebdb-record-person))
+                                              &optional query alist)
+    (cl-call-next-method
+     class
+     query
+     (append
+      '((aka . ebdb-field-name-complex)
+        (relations . ebdb-field-relation)
+        (organizations . ebdb-field-role))
+      alist)))
+
+  (cl-defmethod ebdb-record-field-slot-query ((class (subclass ebdb-record-entity))
+                                              &optional query alist)
+    (cl-call-next-method
+     class
+     query
+     (append
+      `((mail . ebdb-field-mail)
+        (phone . ebdb-field-phone)
+        (address . ebdb-field-address))
+      alist)))
+
+  (cl-defmethod ebdb-record-field-slot-query ((class (subclass ebdb-record))
+                                              &optional query alist)
+    (let ((alist (append
+                  '((notes . ebdb-field-notes)
+                    (image . ebdb-field-image))
+                  alist)))
+      (pcase query
+        (`(nil . ,class)
+         (or (rassq class alist)
+             (signal 'ebdb-unacceptable-field (list class))))
+        (`(,slot . nil)
+         (or (assq slot alist)
+             (signal 'ebdb-unacceptable-field (list slot))))
+        (_ alist))))
+#+END_SRC
+
+These methods go from specific to general: ebdb-record-person subclasses
+ebdb-record-entity which subclasses ebdb-record. Each subclass’s method adds
+its own fields to the alist argument, then passes that argument down to the
+next ancestor class, all the way to the “bottom”, where the base
+implementation handles the actual query: it either tells us which slot the
+field class belongs to, or which field class a slot can accept, or (if “query”
+is nil) just returns a full list of slots and field classes which the record
+can accept.
+
+The above also illustrates how EIEIO provides for class-level methods, with
+the “subclass” specializer.
+
+* Qualifiers
+
+The most complicated aspect of generic methods is qualifiers. In addition to
+the usual stack of main methods (called “primary” methods), EIEIO (following
+CLOS) provides for supplementary stacks that run before, after, or around the
+primary stack. You do this with the :before, :after or :around qualifier tags,
+inserted after the method name. Methods with no qualifier tags are assumed to
+be :primary methods.
+
+When a method is called, the “first half” of the :around methods are run
+first. Then all the :before methods run. Then the :primary methods. Then the
+:after methods. Then the “second half” of the :around methods.
+
+The :around and :primary methods get to choose where in their body the next
+method is called, by placing cl-call-next-method where they want it.
+
+Clear as mud? Here’s what it looks like:
+
+#+BEGIN_SRC emacs-lisp
+  (defclass parent ()
+    nil)
+
+  (defclass child (parent)
+    nil)
+
+  (cl-defmethod foo :around ((obj child))
+                (message "one")
+                (cl-call-next-method)
+                (message "eleven"))
+
+  (cl-defmethod foo :around ((obj parent))
+                (message "two")
+                (cl-call-next-method)
+                (message "ten"))
+
+  (cl-defmethod foo :before ((obj child))
+                (message "three"))
+
+  (cl-defmethod foo :before ((obj parent))
+                (message "four"))
+
+  (cl-defmethod foo ((obj child))
+    (message "five")
+    (cl-call-next-method)
+    (message "seven"))
+
+  (cl-defmethod foo ((obj parent))
+    (message "six"))
+
+  (cl-defmethod foo :after ((obj child))
+                (message "nine"))
+
+  (cl-defmethod foo :after ((obj parent))
+                (message "eight"))
+
+  (foo (make-instance 'child))
+#+END_SRC
+
+Overuse of method qualifiers is a great way to get yourself turned around
+quick. A few things to note:
+
+ 1. The :before and :after methods cannot use cl-call-next-method. This means
+    they are always run, in order from most-specific to least-specific,
+    independently of the rest of the code.
+ 2. Because of this, :before and :after methods can’t interact with other
+    methods at all. This means they’re only good for general set-up and
+    tear-down, though of course, if a :before method signals an error, nothing
+    after it runs (which is one of the main uses of :before methods). And if a
+    :primary method signals an error, none of the :after methods run.
+ 3. The methods which are allowed to use cl-call-next-method (the :around and
+    :primary methods), can use it to fundamentally alter the behavior of the
+    composed method call. Callers can replace the arguments to the next method
+    call, and/or intercept the return value and do something with it. If
+    cl-call-next-method is called with no arguments, it receives the same
+    arguments as the caller did. If the caller wants to replace any arguments,
+    all arguments must be explicitly passed again. You can see this happening
+    in the ebdb-record-field-slot-query definitions above.
+ 4. In the :around methods, cl-call-next-method will move down the :around
+    stack. At the bottom of the :around stack, the next call will run the
+    :before, :primary, and :after stacks, after which control is passed back
+    up the :around stack. The :around methods should always contain a call to
+    cl-call-next-method, that’s their whole point.
+ 5. The :primary methods can call cl-call-next-method to run the next :primary
+    method, but they don’t have to. If they don’t, they fully override all
+    less-specific methods.
+
+In practice, I found having more than one :around method to be fairly
+baffling. It simply got too complicated to keep track of. Later I decided not
+to use :around methods at all, and to reserve them for user customization
+(that’s not entirely true, but I didn’t use them much).
+
+Did I mention the :extra methods? No, I didn’t.
+
+There’s one more qualifier, called :extra. This is a way of piling multiple
+methods onto the same set of specializers (otherwise each method would clobber
+the last). Each one carries the :extra tag, plus a string label for
+identification. They are run just before the :primary methods, and calling
+cl-call-next-method within them calls down through the :extra stack, to the
+:primary methods.
+
+This turned out to be perfect for implementing internationalization for EBDB.
+
+BBDB –and vanilla EBDB – are mostly unaware of different countries and
+scripts: they have a mild North American bias. I wanted to set things up so
+that developers could write their own country-specific customization
+libraries, which users could load as they liked, to extend EBDB’s basic
+behavior. If we know the country code of a phone number, for example, we
+should be able to display the number according to the standards of that
+country.
+
+So we have the ebdb-i18n library. This file does nothing on its own, it only
+provides the hooks for country-specific libraries. As EBDB is a work in
+progress, I’ve so far only written support for my own needs, which are
+China-centric.
+
+It always bothered me that Chinese names were displayed in BBDB as (given
+name)(space)(surname), ie “锦涛胡”, rather than the proper order of (surname)
+(given name): “胡锦涛”. If you gave records a name-format field, you could get
+“胡, 锦涛”, which was better, but still not right. (Other people have also 
+[[https://github.com/tumashu/bbdb-china][addressed this problem]].)
+
+Loading ebdb-i18n.el will load (among other things) the following :extra
+method for the display of name fields:
+
+#+BEGIN_SRC emacs-lisp
+  (cl-defmethod ebdb-string :extra "i18n" ((name ebdb-field-name-complex))
+                (let* ((str (cl-call-next-method name))
+                       (script (aref char-script-table (aref str 0))))
+                  (unless (memq script ebdb-i18n-ignorable-scripts)
+                    (condition-case nil
+                        (setq str (ebdb-string-i18n name script))
+                      (cl-no-applicable-method nil)))
+                  str))
+#+END_SRC
+
+This method shadows the primary method. The first thing it does is to call
+that :primary method, using cl-call-next-method, so it can examine the
+results. It looks at the first character of the name, looks up the script the
+character is written in, and attempts to call ebdb-string-i18n with the name
+field and the script symbol as arguments. If no country-specific libraries
+have been loaded, there will be no method that can catch these particular
+arguments, in which case the original string is returned.
+
+Loading ebdb-chn.el defines this method:
+
+#+BEGIN_SRC emacs-lisp
+  (cl-defmethod ebdb-string-i18n ((field ebdb-field-name-complex)
+                                  (_script (eql han)))
+    (with-slots (surname given-names) field
+      (format "%s%s" surname (car given-names))))
+#+END_SRC
+
+Chinese characters register as the ’han script. So we specialize on the symbol
+’han (using (_script (eql han))), and if it matches, format the name the way
+it’s usually formatted in China.
+
+If :extra methods didn’t exist, the internationalized ebdb-string method would
+clobber the primary method completely. We’d have to replicate that primary
+method here, or continually check some variable and funcall different
+functions, or even subclass the name field class with a new
+“internationalized” version. None of those options are as elegant as the
+:extra trick.
+
+The ebdb-chn.el library defines many other internationalized methods, notably
+some that memoize Chinese characters as romanized “pinyin”, so you can search
+for contacts with Chinese names without having to switch input methods. Very
+nice.
+
+Other internationalized methods allow for dispatch on the country code of
+phone numbers, or the symbol names of countries (as per [[https://en.wikipedia.org/wiki/ISO_3166-1_alpha-3][ISO 3166-1 alpha 3]]).
+
+* Problem Areas
+
+Apart from bird’s-nests of :around methods, I’ve found two other ways to make
+yourself miserable with generic methods. One is combinatorial explosion: if
+you have a method that dispatches on three arguments, and each argument has
+three potential values, you may be writing 27 different method definitions.
+Obviously one tries to avoid this, but sometimes it creeps up on you. EBDB’s
+formatting routines come close to drowning in this way – I suspect the whole
+formatting system is overengineered.
+
+The system’s other weakness is a byproduct of its strength: you don’t know
+where code is defined. The same flexibility that allows you to alter
+fundamental object behavior by defining new methods outside the codebase means
+that you don’t necessarily know where those definitions are.
+
+The original BBDB code “did polymorphism” the way that most Elisp code does
+polymorphism: with great big cond branches. This has the disadvantage that
+every function needs to be aware of every type of object it might encounter.
+But it has the advantage that everything is right there where you can see it
+(and it almost certainly goes faster).
+
+There’s not much to be done about this, it’s a trade-off that has to be
+accepted. Emacs’ self-documenting features do an okay job of showing you all
+the implementations of a particular method, but that’s all the help you get.
+Otherwise you need to keep your code under control, not pile the methods up
+too high, and always know where your towel is.
+
+I think it’s worth it.
+
