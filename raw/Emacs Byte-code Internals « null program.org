@@ -29,7 +29,7 @@ Emacs的字节码解释器就是一个简单的堆栈机. 它用栈来存放lisp
 
 * Segmentation Fault Warning
 
-字节码可比普通Elisp代码要危险得多. *它甚至可能导致Emacs崩溃*. 你可以试试运行一下(译者注:这里的\300和\207都是特殊字符,而不是普通的字符串),
+字节码可比普通Elisp代码要危险得多. *它甚至可能导致Emacs崩溃*. 你可以试试运行一下(译者注:我在Emacs25.1下实验,并没有崩溃),
 
 #+BEGIN_SRC shell
   emacs -batch -Q --eval '(print (#[0 "\300\207" [] 0]))'
@@ -116,48 +116,43 @@ Emacs开发人员默认所执行的字节码肯定是由编译器产生的有效
 
 ** Unibyte String Byte-code
 
-The second element is a unibyte string — it strictly holds octets and is not to be interpreted as any sort of Unicode encoding. These
-strings should be created with unibyte-string because string may return a multibyte string. To disambiguate the string type to the lisp
-reader when higher values are present (> 127), the strings are printed in an escaped octal notation, keeping the string literal inside the
-ASCII character set.
+第二个元素是一个单字节字符串 — 它严格地以8个比特为一组,而且并不会被挡任何一种Unicode的编码形式来看待. 这种字符串必须用函数 =unibyte-string= 来产生,因为 =string= 有可能会返回多字节字符串.
+为了防止lisp reader误判字符串类型,大于127的字符会以转义的8进制表示法来表示,这样就保证了字符串的字面量能够用ASCII码来表示.
 
 #+BEGIN_SRC emacs-lisp
   (unibyte-string 100 200 250)
   ;; => "d\310\372"
 #+END_SRC
 
-It’s unusual to see a byte-code string that doesn’t end with 135 (#o207, byte-return). Perhaps this should have been implicit? I’ll talk
-more about the byte-code below.
+一般来说,字节码字符串都是以135结尾的(即八进制的207). Perhaps this should have been implicit? 后面还会再讲到字节码.
 
 ** Constants Vector
 
-The byte-code has very limited operands. Most operands are only a few bits, some fill an entire byte, and occasionally two bytes. The meat
-of the function that holds all the constants, function symbols, and variables symbols is the constants vector. It’s a normal Elisp vector
-and can be created with vector or a vector literal. Operands reference either this vector or they index into the stack itself.
+字节码部分只能携带有限的操作数. 大多数操作数只有几个比特大小,少数能有1个字节大小,极少的有两个个字节大小的情况.
+函数是使用常量数组来存放所有的常量,函数符号以及变量符号的. 
+常量数组其实即iu是一个普通的Elisp数组,可以用 =vector= 函数或数组字面量的形式生成. 
+操作数则可能是指向常量数组中元素的应用或者是栈本身的索引(Operands reference either this vector or they index into the stack itself).
 
 #+BEGIN_SRC emacs-lisp
   (byte-compile (lambda (a b) (my-func b a)))
   ;; => #[(a b) "\302\134\011\042\207" [b a my-func] 3]
 #+END_SRC
 
-Note that the constants vector lists the variable symbols as well as the external function symbol. If this was a lexically scoped function
-the constants vector wouldn’t have the variables listed, being only [my-func].
+注意,常量数组中不仅仅有变量符号,还有外部的函数符号. 若该函数处于静态作用域下,则常量数组不会包含有变量符号,只有 =[my-func]= 而已.
 
 ** Maximum Stack Usage
 
-This is the maximum stack space used by this byte-code. This value can be derived from the byte-code itself, but it’s pre-computed so that
-the byte-code interpreter can quickly check for stack overflow. Under-reporting this value is probably another way to crash Emacs.
+该部分为字节码占用的最大栈空间. 该值本来可以通过字节码字符串本身来计算出来, 但为了让解释器能够快速发现栈溢出的情况,该值被预先计算好了放在这里.
+若该值算少了,可能也会让Emacs崩溃.
 
 ** Docstring
 
-The simplest component and completely optional. It’s either the docstring itself, or if the docstring is especially large it’s a cons cell
-indicating a compiled .elc and a position for lazy access. Only one position, the start, is needed because the lisp reader is used to load
-it and it knows how to recognize the end.
+这是最简单的部分了,而且完全可以省略. 它一般就是 docstring 本身, 不过如果docstring特别大的话,也可能是一个 cons cell 指明了docstring可以从哪个elc文件的哪个位置开始读到.
+之所以只需要记录docstring的开始位置是因为解释器使用lisp reader来读取该字符串,因此能够正确地识别出结束的位置.
 
 ** Interactive Specification
 
-If this element is present and non-nil then the function is an interactive function. It holds the exactly contents of interactive in the
-uncompiled function definition.
+若该部分存在且为非nil,则表示该函数是可交互的函数. 它的值就是函数定义源代码中 =interactive= 语句中的内容.
 
 #+BEGIN_SRC emacs-lisp
   (byte-compile (lambda (n) (interactive "nNumber: ") n))
@@ -167,8 +162,7 @@ uncompiled function definition.
   ;; => #[(n) "\010\207" [n] 1 nil (list (read))]
 #+END_SRC
 
-The interactive expression is always interpreted, never byte-compiled. This is usually fine because, by definition, this code is going to
-be waiting on user input. However, it slows down keyboard macro playback.
+interactive语句并不会被编译成字节码. 这通常没什么影响,因为根据定义,这部分代码一般需要等待用户输入. 不过它确实会拖慢键盘宏的回放速度.
 
 * Opcodes
 
