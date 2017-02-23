@@ -1,69 +1,63 @@
 #+URL: http://nullprogram.com/blog/2014/01/04/
 
-Byte-code compilation is an underdocumented — and in the case of the recent lexical binding updates, undocumented — part of Emacs. Most
-users know that Elisp is usually compiled into a byte-code saved to .elc files, and that byte-code loads and runs faster than uncompiled
-Elisp. That’s all users really need to know, and the GNU Emacs Lisp Reference Manual specifically discourages poking around too much.
+并没有文档说明Emacs是如何将源代码编译成字节码的 — 特别是是Emacs最近进行了一次升级,开始支持静态作用于了- 这部分资料尤其少. 
+大多数用于对于Elisp编译的理解仅限于编译的结果是保存在 =.elc= 文件中,以及字节码加载起来要比未编译的Elisp要快.
+对于用户来说,知道这两点基本上也足够了, GNU Emacs Lisp Reference Manual 也明确不鼓励深入了解该编译过程.
 
 #+BEGIN_QUOTE
-    People do not write byte-code; that job is left to the byte compiler. But we provide a disassembler to satisfy a cat-like curiosity.
+    人不会去手写字节码; 字节码由编译器产出就行了. 不过为了满足你的好奇心,我们也是有提供一个反汇编工具给你用.
 #+END_QUOTE
    
-Screw that! What if I want to handcraft some byte-code myself? :-) The purpose of this article is to introduce the internals of Elisp
-byte-code interpreter. I will explain how it works, why lexically scoped code is faster, and demonstrate writing some byte-code by hand.
+什么鬼! 你怎么知道我不想手写字节码? :-) 本文就将带领你了解一下Elisp编译器的内部. 我会解释一下它的工作原理,静态作用域速度更快的秘密并展示一下如何手写字节码.
 
 * The Humble Stack Machine
 
-The byte-code interpreter is a simple stack machine. The stack holds arbitrary lisp objects. The interpreter is backwards compatible but
-not forwards compatible (old versions can’t run new byte-code). Each instruction is between 1 and 3 bytes. The first byte is the opcode
-and the second and third bytes are either a single operand or a single intermediate value. Some operands are packed into the opcode byte.
+Emacs的字节码解释器就是一个简单的堆栈机. 它用栈来存放lisp对象. 解释器是向后兼容的,但是无法向前兼容(即旧版本的解释器无法运行新版本的字节码).
+每条指令占用1到3个字节大小. 第一个字节存放的是操作码,而第二,第三个字节存放的是操作数或者间接值. 不过有些操作数也会被压缩进操作码字节中.
 
-As of this writing (Emacs 24.3) there are 142 opcodes, 6 of which have been declared obsolete. Most opcodes refer to commonly used
-built-in functions for fast access. (Looking at the selection, Elisp really is geared towards text!) Considering packed operands, there
-are up to 27 potential opcodes unused, reserved for the future.
+写作该文时 (Emacs 24.3) Emacs共有142个操作码, 其中6已经被废弃了. 大多数的操作码都与那些常用的内置函数相关(看看那些内置函数,你会发现Elisp真的在优化文本处理上费了大劲了!). 
+考虑到有些操作码只是将其他操作码与操作数整合在一起,有多达27个操作码是预备给以后用的.
 
-  * opcodes 48 - 55
-  * opcode 97
-  * opcode 128
-  * opcodes 169 - 174
-  * opcodes 180 - 181
-  * opcodes 183 - 191
++ opcodes 48 - 55
++ opcode 97
++ opcode 128
++ opcodes 169 - 174
++ opcodes 180 - 181
++ opcodes 183 - 191
 
-The easiest place to access the opcode listing is in [[http://cvs.savannah.gnu.org/viewvc/emacs/emacs/lisp/emacs-lisp/bytecomp.el?view=markup][bytecomp.el]]. Beware that some of the opcode comments are currently out of date.
+查询操作码列表的最方便途径是查询 [[http://cvs.savannah.gnu.org/viewvc/emacs/emacs/lisp/emacs-lisp/bytecomp.el?view=markup][bytecomp.el]] 中的内容. 不过要小心,其中有些操作码的注释已经过时了.
 
 * Segmentation Fault Warning
 
-Byte-code does not offer the same safety as normal Elisp. *Bad byte-code can, and will, cause Emacs to crash*. You can try out for yourself
-right now,
+字节码可比普通Elisp代码要危险得多. *它甚至可能导致Emacs崩溃*. 你可以试试运行一下(译者注:这里的\300和\207都是特殊字符,而不是普通的字符串),
 
 #+BEGIN_SRC shell
   emacs -batch -Q --eval '(print (#[0 "\300\207" [] 0]))'
 #+END_SRC
 
-Or evaluate the code manually in a buffer (save everything first!),
+或者手工执行下面这段代码(请先保存好其他资料!),
 
 #+BEGIN_SRC emacs-lisp
   (#[0 "\300\207" [] 0])
 #+END_SRC
 
-This segfault, caused by referencing beyond the end of the constants vector, is not an Emacs bug. Doing a boundary test would slow down
-the byte-code interpreter. Not performing this test at run-time is a practical engineering decision. The Emacs developers have instead
-chosen to rely on valid byte-code output from the compiler, making a disclaimer to anyone wanting to write their own byte-code,
+之所以产生这个segfault,并不是因为Emacs有BUG,而是是因为这段代码尝试跨界引用了常量数组后面的元素(caused by referencing beyond the end of the constants vector). 
+因为进行边界检查会拖慢解释器的速度,因此基于实用性的考虑,在运行期并不会进行边界检查.
+Emacs开发人员默认所执行的字节码肯定是由编译器产生的有效代码, 对于手写代码不保证没有问题.
 
 #+BEGIN_QUOTE
-    You should not try to come up with the elements for a byte-code function yourself, because if they are inconsistent, Emacs may crash
-    when you call the function. Always leave it to the byte compiler to create these objects; it makes the elements consistent (we hope).
+    永远不要尝试自己去编写字节码函数,它可能会与你的Emacs不相容从而在调用该函数时引起Emacs崩溃. 
+    让编译器帮你做做这件事情;它产出的字节码肯定是相容的(希望是吧).
 #+END_QUOTE
    
-You’ve been warned. Now it’s time to start playing with firecrackers.
+我已经提前给你打好预防针了. 现在开始玩火吧.
 
 * The Byte-code Object
 
-A byte-code object is functionally equivalent to a normal Elisp vector except that it can be evaluated as a function. Elements are
-accessed in constant time, the syntax is similar to vector syntax ([...] vs. #[...]), and it can be of any length, though valid functions
-must have at least 4 elements.
+字节码对象,在功能上等价于普通的Elisp数组,只不过它同时还可以作为函数来执行.
+两者的元素访问时间都是常量,语法也很接近(=[...]= vs. =#[...]=),对其中元素的数量理论上也是没有限制的(不过一个合法的函数至少都会有4个元素).
 
-There are two ways to create a byte-code object: using a byte-code object literal or with make-byte-code. [[http://nullprogram.com/blog/2012/07/17/][Like vector literals]], byte-code
-literals don’t need to be quoted.
+有两种方法可以用来创建字节码对象: 使用字面量表示法或调用 =make-byte-code= 函数. [[http://nullprogram.com/blog/2012/07/17/][跟数组的字面量一样]], 字节码的字面量也不需要被引用起来.
 
 #+BEGIN_SRC emacs-lisp
   (make-byte-code 0 "" [] 0)
@@ -76,37 +70,33 @@ literals don’t need to be quoted.
   ;; error: Invalid byte opcode
 #+END_SRC
 
-The elements of an object literal are:
+一个字节码对象的字面量可以包括以下这些元素:
 
-  * Function parameter (lambda) list
-  * Unibyte string of byte-code
-  * Constants vector
-  * Maximum stack usage
-  * Docstring (optional, nil for none)
-  * Interactive specification (optional)
+  * 函数参数列表
+  * 表示字节码的单字节字符串
+  * 常量数组
+  * 最大栈使用量(Maximum stack usage)
+  * Docstring (可选,没有的话为nil)
+  * Interactive声明(可选)
 
 ** Parameter List
 
-The parameter list takes on two different forms depending on if the function is lexically or dynamically scoped. If the function is
-dynamically scoped, the argument list is exactly what appears in lisp code.
+参数列表依据该函数是在动态作用域下还是静态作用域下而有两种形式. 如何是在动态作用域下,那么它跟lisp代码中的参数列表一模一样.
 
 #+BEGIN_SRC emacs-lisp
   (byte-compile (lambda (a b &optional c)))
   ;; => #[(a b &optional c) "\300\207" [nil] 1]
 #+END_SRC
 
-There’s really no shorter way to represent the parameter list because preserving the argument names is critical. Remember that, in dynamic
-scope, while the function body is being evaluated these variables are globally bound (eww!) to the function’s arguments.
+我们不能修改参数名称,因此确实也没有更简短的表示参数列表的方法了. 请记住,因为在动态作用域下,函数体执行时,这些参数是要与外部变量绑定在一起的.
 
-When the function is lexically scoped, the parameter list is packed into an Elisp integer, indicating the counts of the different kinds of
-parameters: required, &optional, and &rest.
+当函数是在静态作用域中时,则参数列表会被打包成一个Elisp整数,用于指明有多少参数是必须的,有多少参数是 =&optional= 的,以及是否有 =&rest= 参数.
 
 [[http://nullprogram.com/img/diagram/elisp-params.png]]
 
-The least significant 7 bits indicate the number of required arguments. Notice that this limits compiled, lexically-scoped functions to
-127 required arguments. The 8th bit is the number of &rest arguments (up to 1). The remaining bits indicate the total number of optional
-and required arguments (not counting &rest). It’s really easy to parse these in your head when viewed as hexadecimal because each portion
-almost always fits inside its own “digit.”
+最后7位表示的是必填参数个数. 请注意,这使得静态作用域下编译后的函数最多只能有127个必填参数. 
+第8为指明是否有 =&rest= 参数(1表示有). 剩下的字节表示的是必填参数与 =&optional= 参数的数量和(不包括 =&rest= 参数). 
+你把整数的16进制画出来后就很清晰了,每一部分的意义都是非常明确的.
 
 #+BEGIN_SRC emacs-lisp
   (byte-compile-make-args-desc '())
@@ -122,9 +112,7 @@ almost always fits inside its own “digit.”
   ;; => #x382  (3 args, 1 rest, 2 required)
 #+END_SRC
 
-The names of the arguments don’t matter in lexical scope: they’re purely positional. This tighter argument specification is one of the
-reasons lexical scope is faster: the byte-code interpreter doesn’t need to parse the entire lambda list and assign all of the variables on
-each function invocation.
+在静态作用域下,这些参数的名称变得无关紧要了: 它们只是单纯地与出现的位置相关. 这种紧凑的参数声明式也是静态作用域能更快的原因之一: 解释器无需在每次函数调用时都解析整个lambda表达式然后为各参数分配绑定的变量.
 
 ** Unibyte String Byte-code
 
@@ -155,18 +143,18 @@ and can be created with vector or a vector literal. Operands reference either th
 Note that the constants vector lists the variable symbols as well as the external function symbol. If this was a lexically scoped function
 the constants vector wouldn’t have the variables listed, being only [my-func].
 
-* Maximum Stack Usage
+** Maximum Stack Usage
 
 This is the maximum stack space used by this byte-code. This value can be derived from the byte-code itself, but it’s pre-computed so that
 the byte-code interpreter can quickly check for stack overflow. Under-reporting this value is probably another way to crash Emacs.
 
-* Docstring
+** Docstring
 
 The simplest component and completely optional. It’s either the docstring itself, or if the docstring is especially large it’s a cons cell
 indicating a compiled .elc and a position for lazy access. Only one position, the start, is needed because the lisp reader is used to load
 it and it knows how to recognize the end.
 
-* Interactive Specification
+** Interactive Specification
 
 If this element is present and non-nil then the function is an interactive function. It holds the exactly contents of interactive in the
 uncompiled function definition.
