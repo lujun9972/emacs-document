@@ -234,11 +234,11 @@ Ta-da! 我们成功地手写了一个字节码函数. 我这里保留了 =+ 0= �
 #+END_SRC
 
 动态作用域下的代码会大量地使用 =varref= 指令,而静态作用域下的代码很少使用到这个指令(只有在访问全局变量时才用), 取而代之的是 =stack-ref=, 而 =stack-ref= 的速度相对要快.
-这也是两种调用规范(calling conventions)的不同之处.
+这也是两种调用约定(calling conventions)的不同之处.
 
 * Calling Convention
 
-每种作用域都有它们自己的调用规范. Here we finally get to glimpse some of the really great work by Stefan Monnier updating the compiler for lexical scope.
+每种作用域都有它们自己的调用约定. 在这里你会了解到Stefan Monniner为编译器加上静态作用域是多么重要的一项升级.
 
 ** Dynamic Scope Calling Convention
 
@@ -249,15 +249,11 @@ Ta-da! 我们成功地手写了一个字节码函数. 我这里保留了 =+ 0= �
 
 ** Lexical Scope Calling Convention
 
-With lexical scope, the argument names are not actually bound for the evaluation byte-code. The names are completely gone because the
-compiler has converted local variables into stack offsets.
+而在静态作用域下,字节码中并不包含参数名称,因为编译器已经将局部变量转换成了栈偏移量了.
 
-When calling a lexically-scoped function, the byte-code interpreter examines the integer parameter descriptor. It checks to make sure the
-appropriate number of arguments have been provided, and for each unprovided &optional argument it pushes a nil onto the stack. If the
-function has a &rest parameter, any extra arguments are popped off into a list and that list is pushed onto the stack.
+当调用静态作用域函数时, 字节码解释器会对照表示参数列表的那个整数,来检查参数个数是否一致,然后对每个没有提供参数值的 =&optional= 参数都将nil压入栈内, 如果函数有定义 =&rest= 参数,那么多出来的那些参数会被组成一个list,再被压入栈中.
 
-From here the function can access its arguments directly on the stack without any named variable misdirection. It can even consume them
-directly.
+这样一来,函数就可以直接通过栈来访问它的参数了,而无需通过变量名来跳转. 甚至函数可以直接使用该参数而无需通过栈来访问.
 
 #+BEGIN_SRC emacs-lisp
   ;; -*- lexical-binding: t -*-
@@ -267,8 +263,8 @@ directly.
   ;; => #[#x101 "\207" [] 2]
 #+END_SRC
 
-The byte-code for foo is a single instruction: return. The function’s argument is already on the stack so it doesn’t have to do anything.
-Strangely the maximum stack usage element is wrong here (2), but it won’t cause a crash.
+=foo= 的字节码只有一条指令: return. 函数的参数已经入栈所以无需而外的操作. 
+比较奇怪的是,这里最大栈使用量错误地标注成了2,不过这也没关系,并不会造成解释器崩溃.
 
 #+BEGIN_SRC emacs-lisp
   ;; (As of this writing `byte-compile' always uses dynamic scope.)
@@ -278,9 +274,10 @@ Strangely the maximum stack usage element is wrong here (2), but it won’t caus
 #+END_SRC
 
 It takes longer to set up (x is implicitly bound), it has to make an explicit variable dereference (varref), then it has to clean up by
-unbinding x (implicit unbind). It’s no wonder lexical scope is faster!
+unbinding x (implicit unbind). 
+毫无疑问,静态作用域要更快一些!
 
-Note that there’s also a disassemble function for examining byte-code, but it only reveals part of the story.
+值得注意的是,有一个 =disassemble= 函数可以帮你理解字节码.
 
 #+BEGIN_SRC emacs-lisp
   (disassemble #'foo)
@@ -292,11 +289,11 @@ Note that there’s also a disassemble function for examining byte-code, but it 
 
 * Compiler Intermediate “lapcode”
 
-The Elisp byte-compiler has an intermediate language called lapcode (“Lisp Assembly Program”), which is much easier to optimize than
-byte-code. It’s basically an assembly language built out of s-expressions. Opcodes are referenced by name and operands, including packed
-operands, are handled whole. Each instruction is a cons cell, (opcode . operand), and a program is a list of these.
+Elisp字节码编译器支持一种叫做 =lapcode= (“Lisp Assembly Program”) 的中间语言, 它要比直接使用字节码方便的多.
+=lapcode= 基本上可以看成是基于s表达式的汇编语言. 它为每个操作码都提供了一个名称,operands, including packed operands, are handled whole. 
+一个lapcode程序就是一个由指令组成的list,而每条指令又是一个行为 =(opcode . operand)= 的cons cell.
 
-Let’s rewrite our last get-foo using lapcode.
+比如,我们可以这样用lapcode来改写最后那个版本的 =get-foo= 函数.
 
 #+BEGIN_SRC emacs-lisp
   (defalias 'get-foo
@@ -309,13 +306,11 @@ Let’s rewrite our last get-foo using lapcode.
      1))
 #+END_SRC
 
-We didn’t have to worry about which form of varref we were using or even how to encode a 2-byte operand. The lapcode “assembler” took care
-of that detail.
+我们不用关心哪个版本的 =varref= 的指令格式,也不用关心如何如何对2字节长的操作数进行编码. 所有的细节都由lapcode “assembler” 帮我们保定.
 
 * Project Ideas?
 
-The Emacs byte-code compiler and interpreter are fascinating. Having spent time studying them I’m really tempted to build a project on top
-of it all. Perhaps implementing a programming language that targets the byte-code interpreter, improving compiler optimization, or, for a
-really big project, JIT compiling Emacs byte-code.
+Emacs编译器和解释器都很好玩. 在研究过它们之后,我真的打算创建一个相关的项目来试试手. 
+也许是实现一门解释器支持的新语言,也许是改进编译器的优化措施,或者干脆玩一票大的,实现运行时编译Emacs字节码.
 
-*People can write byte-code!*
+*谁说不能手工编写字节码!*
