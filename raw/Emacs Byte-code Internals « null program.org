@@ -166,25 +166,23 @@ interactive语句并不会被编译成字节码. 这通常没什么影响,因为
 
 * Opcodes
 
-The bulk of the established opcode bytes is for variable, stack, and constant access opcodes, most of which use packed operands.
+目前已有的操作码都是与变量,栈和常量存取相关的, 其中大部分都自带操作数.
 
-  * 0 - 7 : (stack-ref) stack reference
-  * 8 - 15 : (varref) variable reference (from constants vector)
-  * 16 - 23 : (varset) variable set (from constants vector)
-  * 24 - 31 : (varbind) variable binding (from constants vector)
-  * 32 - 39 : (call) function call (immediate = number of arguments)
-  * 40 - 47 : (unbind) variable unbinding (from constants vector)
-  * 129, 192-255 : (constant) direct constants vector access
+  * 0 - 7 : (stack-ref) 栈引用
+  * 8 - 15 : (varref) 变量引用(from constants vector)
+  * 16 - 23 : (varset) 变量设置(from constants vector)
+  * 24 - 31 : (varbind) 变量绑定(from constants vector)
+  * 32 - 39 : (call) 函数调用(immediate = number of arguments)
+  * 40 - 47 : (unbind) 变量解绑(from constants vector)
+  * 129, 192-255 : (constant) 常量数组的直接访问
 
-Except for the last item, each kind of instruction comes in sets of 8. The nth such instruction means access the nth thing. For example,
-the instruction “2” copies the third stack item to the top of the stack. An instruction of “9” pushes onto the stack the value of the
-variable named by the second element listed in the constants vector.
+除了最后那批指令,每种指令以8个为一组. 其中排在第N位的指令表示操作的是第N个值. 
+比如,指令 =2= 拷贝栈的中第三个值到栈顶. 而指令 =9= 表示将常量数组中第二个元素所表示变量的变量值压入栈中.
 
-However, the 7th and 8th such instructions in each set take an operand byte or two. The 7th instruction takes a 1-byte operand and the 8th
-takes a 2-byte operand. A 2-byte operand is written in little-endian byte-order regardless of the host platform.
+不过这写指令组中的第7,第8条指令很特殊,它们额外接受一个/两个字节的操作数字节. 第7条指令接受一个字节的操作数而第8条指令接受两个字节的操作数.
+不管处于哪个平台,这两个字节的操作数都遵循 little-endian 的字节序.
 
-For example, let’s manually craft an instruction that returns the value of the global variable foo. Each opcode has a named constant of
-byte-X so we don’t have to worry about their actual byte-code number.
+下面,我们来人工创建一个字节码函数,该函数会返回全局变量 =foo= 的值. 每个操作码都有一个 =byte-X= 的常量与之相对应,所以我们无需记忆这些操作码的具体值.
 
 #+BEGIN_SRC emacs-lisp
   (require 'bytecomp)  ; named opcodes
@@ -204,8 +202,9 @@ byte-X so we don’t have to worry about their actual byte-code number.
   ;; => "hello"
 #+END_SRC
 
-Ta-da! That’s a handcrafted byte-code function. I left a “+ 0” in there so that I can change the offset. This function has the exact same
-behavior, it’s just less optimal,
+Ta-da! 我们成功地手写了一个字节码函数. 我这里保留了 =+ 0= 是为了方便我以后修改偏移量. 
+
+下面这个函数的功能也是一样,只是没那么高效而已.
 
 #+BEGIN_SRC emacs-lisp
   (defalias 'get-foo
@@ -218,7 +217,9 @@ behavior, it’s just less optimal,
      1))
 #+END_SRC
 
-If foo was the 10th constant, we would need to use the 1-byte operand version. Again, the same behavior, just less optimal.
+如果 =foo= 在常量数组中排第10位的话,我们就需要使用能接受1字节操作数的操作码了. 
+
+下面函数也是一样的功能,但是不够高效.
 
 #+BEGIN_SRC emacs-lisp
   (defalias 'get-foo
@@ -232,21 +233,19 @@ If foo was the 10th constant, we would need to use the 1-byte operand version. A
      1))
 #+END_SRC
 
-Dynamically-scoped code makes heavy use of varref but lexically-scoped code rarely uses it (global variables only), instead relying
-heavily on stack-ref, which is faster. This is where the different calling conventions come into play.
+动态作用域下的代码会大量地使用 =varref= 指令,而静态作用域下的代码很少使用到这个指令(只有在访问全局变量时才用), 取而代之的是 =stack-ref=, 而 =stack-ref= 的速度相对要快.
+这也是两种调用规范(calling conventions)的不同之处.
 
 * Calling Convention
 
-Each kind of scope gets its own calling convention. Here we finally get to glimpse some of the really great work by Stefan Monnier
-updating the compiler for lexical scope.
+每种作用域都有它们自己的调用规范. Here we finally get to glimpse some of the really great work by Stefan Monnier updating the compiler for lexical scope.
 
 ** Dynamic Scope Calling Convention
 
-Remembering back to the parameter list element of the byte-code object, dynamically scoped functions keep track of all its argument names.
-Before executing a function the interpreter examines the lambda list and binds (varbind) every variable globally to an argument.
+回头来看看字节码对象力的参数列表元素, 动态作用域函数保留完整的参数名称. 在指向函数前,解释器需要检查lambda列表并用 =varbnd= 指令将变量跟参数绑定起来.
 
-If the caller was byte-compiled, each argument started on the stack, was popped and bound to a variable, and, to be accessed by the
-function, will be pushed back right onto the stack (varref). There’s a lot of argument indirection for each function call.
+如果调用者已经被编译成字节码了, 那么栈中的每个参数都需要一个一个地弹出来与变量进行绑定, 然后为了被函数能够访问,又要再压回栈中(varref).
+每次函数调用时,都需要对参数进行这么一番折腾.
 
 ** Lexical Scope Calling Convention
 
