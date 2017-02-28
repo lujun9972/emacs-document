@@ -1,0 +1,88 @@
+#+URL: http://nullprogram.com/blog/2010/07/01/
+
+A feature unique to some Lisps is the ability to compile functions
+individually at any time. This could be to a bytecode or native code,
+depending on the dialect and implementation. In a Lisp implementations where
+compilation matters (such as [[http://clisp.cons.org/][CLISP]]), there are typically two forms in which
+code can be evaluated: a slower, unoptimized uncompiled form and a fast,
+efficient compiled form. The uncompiled form would have some sort of
+advantage, even if it's merely not having to spend time on compilation.
+
+In Emacs Lisp, the uncompiled form of a function is just a lambda
+s-expression. The only thing that gives it a name is the symbol it's stored
+in. The compiled form is a (special) vector, with the actual byte codes stored
+in a string as the second element. Constants, the docstring, and other things
+are stored in this function vector as well. The Elisp function to compile
+functions is byte-compile. It can be given a lambda function or a symbol. In
+the case of a symbol, the compiled function is installed over top of the
+s-expression form.
+
+#+BEGIN_SRC emacs-lisp
+  (byte-compile (lambda (x) (* 2 x)))
+  => #[(x) "^H\301_\207" [x 2] 2]
+#+END_SRC
+
+The compiler will not only convert the function to bytecode and expand macros,
+but also perform optimizations such as removing dead code, evaluating safe
+constant forms, and inline functions. This provides a nice performance boost
+(testing using my [[http://nullprogram.com/blog/2009/05/28/][measure-time macro]]),
+
+#+BEGIN_SRC emacs-lisp
+  (defun fib (n)
+    "Fibonacci sequence."
+    (if (<= n 2) 1
+      (+ (fib (- n 1)) (fib (- n 2)))))
+
+  (measure-time
+   (fib 30))
+  => 1.0508708953857422
+
+  (byte-compile 'fib)
+
+  (measure-time
+   (fib 30))
+  => 0.4302399158477783
+#+END_SRC
+
+Most of the installed functions in a typical Emacs instance are already
+compiled, since they are loaded already compiled. But a number of them aren't
+compiled. So, I thought, why not spend a few seconds to do this?
+
+In Common Lisp, there is a predicate for testing whether a function has been
+compiled or not: compiled-function-p. For whatever reason, there is no
+equivalent predefined in Elisp, so I wrote one,
+
+#+BEGIN_SRC emacs-lisp
+  (defun byte-compiled-p (func)
+    "Return t if function is byte compiled."
+    (cond
+     ((symbolp   func) (byte-compiled-p (symbol-function func)))
+     ((functionp func) (not (sequencep func)))
+     (t nil)))
+#+END_SRC
+
+My idea was to iterate over every interned symbol and, if the function slot
+contains an uncompiled function, using the test above, I would call
+byte-compile on it. Well, it turns out that byte-compile is very flexible and
+will ignore symbols with no function and symbols with already compiled
+functions.
+
+So next, how do we iterate over every interned symbol? There is a mapatoms
+function for this. Provide it a function and it calls it on every interned
+symbol. Well, that's simple and anticlimactic.
+
+#+BEGIN_SRC emacs-lisp
+  (mapatoms 'byte-compile)
+#+END_SRC
+
+That's it! It will take only a few seconds and spew a lot of warnings. I
+haven't found a way to disable those warnings, so this isn't something you'd
+want to have run automatically, unless you like having an extra window thrown
+in your face. I've only discovered this recently, so I'm not sure what sort of
+bad things this may do to your Emacs session. Not every function was written
+with compilation in mind. There are interactions with macros to consider.
+
+I doubt there will be a noticeable performance difference. Like I said before,
+most everything is already compiled, and those are the functions that get used
+the most. There's just something nice about knowing all your functions are
+compiled and optimized.
