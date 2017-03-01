@@ -1,31 +1,21 @@
 #+URL: http://nullprogram.com/blog/2010/07/01/
 
-A feature unique to some Lisps is the ability to compile functions
-individually at any time. This could be to a bytecode or native code,
-depending on the dialect and implementation. In a Lisp implementations where
-compilation matters (such as [[http://clisp.cons.org/][CLISP]]), there are typically two forms in which
-code can be evaluated: a slower, unoptimized uncompiled form and a fast,
-efficient compiled form. The uncompiled form would have some sort of
-advantage, even if it's merely not having to spend time on compilation.
+某些Lisp有一项独门绝迹,那就是可以在任意时刻将函数编译成字节码/本地代码(具体编译成什么有赖于方言和具体实现).
+对于那些能够编译的Lisp函数(例如[[http://clisp.cons.org/][CLISP]]), 一般都支持两种形式的代码: 一种是缓慢的,未优化未编译过的代码,一种是快速,高效编译过的代码.
+但是你不要以为未编译的代码就一无是处了,除了无需花费时间在编译上之外,它也有其他的有点.
 
-In Emacs Lisp, the uncompiled form of a function is just a lambda
-s-expression. The only thing that gives it a name is the symbol it's stored
-in. The compiled form is a (special) vector, with the actual byte codes stored
-in a string as the second element. Constants, the docstring, and other things
-are stored in this function vector as well. The Elisp function to compile
-functions is byte-compile. It can be given a lambda function or a symbol. In
-the case of a symbol, the compiled function is installed over top of the
-s-expression form.
+对于Emacs Lisp来说, 未编译过的函数就是一个lambda表达式. 只不过它存在于一个symbol中,就相当与给它取了个名字.
+而编译后的form则是一个(特殊的)数组, 编译后的字节码以字符串的形式存在这个数组的第二个元素中. 其他的元素还包括常量,docstring等.
+Elisp提供了 =byte-compile= 函数来编译其他函数. 该函数能接受一个lambda函数或者一个symbol. 
+不过如果参数是symbol的话,编译后的函数回覆盖该symbol的原S表达式.
 
 #+BEGIN_SRC emacs-lisp
   (byte-compile (lambda (x) (* 2 x)))
   => #[(x) "^H\301_\207" [x 2] 2]
 #+END_SRC
 
-The compiler will not only convert the function to bytecode and expand macros,
-but also perform optimizations such as removing dead code, evaluating safe
-constant forms, and inline functions. This provides a nice performance boost
-(testing using my [[http://nullprogram.com/blog/2009/05/28/][measure-time macro]]),
+编译器不仅仅是将函数是转换成字节码并展开宏,还会进行一些优化,比如删除无用代码,预先执行 safe constant forms, 以及内联函数. 从而极大地提高执行效率.
+(通过我的 [[http://nullprogram.com/blog/2009/05/28/][measure-time macro]] 来测算的)
 
 #+BEGIN_SRC emacs-lisp
   (defun fib (n)
