@@ -34,13 +34,10 @@ Elisp提供了 =byte-compile= 函数来编译其他函数. 该函数能接受一
   => 0.4302399158477783
 #+END_SRC
 
-Most of the installed functions in a typical Emacs instance are already
-compiled, since they are loaded already compiled. But a number of them aren't
-compiled. So, I thought, why not spend a few seconds to do this?
+大多数Emacs自带的函数都预先编译过了. 不过也有部分自带的函数没有被编译,所以我想,不如我来花点时间把它们编译一下算了.
 
-In Common Lisp, there is a predicate for testing whether a function has been
-compiled or not: compiled-function-p. For whatever reason, there is no
-equivalent predefined in Elisp, so I wrote one,
+Common Lisp是有提供一个判断函数(compiled-function-p)来测试另一个函数是否有编译过的. 
+但不知为何,Elisp中没有预定义这样一个函数,我只能自己写一个了:
 
 #+BEGIN_SRC emacs-lisp
   (defun byte-compiled-p (func)
@@ -51,28 +48,18 @@ equivalent predefined in Elisp, so I wrote one,
      (t nil)))
 #+END_SRC
 
-My idea was to iterate over every interned symbol and, if the function slot
-contains an uncompiled function, using the test above, I would call
-byte-compile on it. Well, it turns out that byte-compile is very flexible and
-will ignore symbols with no function and symbols with already compiled
-functions.
+我一开始的想法是便利所有interned symbol,若通过上面的测试函数发现该symbol的function slot中是未编译的函数,那么就调用 =byte-compile= 来编译它. 
+不过后来我发现, =byte-compile=  足够聪明,它会自动忽略那些没有函数以及那些函数以及编译过的symbol.
 
-So next, how do we iterate over every interned symbol? There is a mapatoms
-function for this. Provide it a function and it calls it on every interned
-symbol. Well, that's simple and anticlimactic.
+那么,下一个问题就是,我们如何遍历每个interned symbol? 函数 =mapatoms= 可以做到这一点. 给它一个函数作为参数,它就会将该函数应用到每个interned symbol上.
+这样一来,问题就简单了. (译者注:我运行了这个语句之后,Evil彻底用不了了,不得不重启Emacs...)
 
 #+BEGIN_SRC emacs-lisp
   (mapatoms 'byte-compile)
 #+END_SRC
 
-That's it! It will take only a few seconds and spew a lot of warnings. I
-haven't found a way to disable those warnings, so this isn't something you'd
-want to have run automatically, unless you like having an extra window thrown
-in your face. I've only discovered this recently, so I'm not sure what sort of
-bad things this may do to your Emacs session. Not every function was written
-with compilation in mind. There are interactions with macros to consider.
+这就搞定了! 整个过程不过几秒钟,不过会产生大量的警告. 目前我还未找到屏蔽这些警告方法,所以你最好不要自动运行这个语句,否则你会发现时不时地会弹出一个window.
+而且,我也不确定这么做会不会损坏你的Emacs session,毕竟不是所有的函数写的时候都有好好的考虑编译后还能不能用,尤其是那些用到宏的函数. 
 
-I doubt there will be a noticeable performance difference. Like I said before,
-most everything is already compiled, and those are the functions that get used
-the most. There's just something nice about knowing all your functions are
-compiled and optimized.
+另外,我很怀疑这样能否带来性能上的明显提升. 就像我前面所得,大多数的函数预先编译过了,而这部分函数才是使用最频繁的函数.
+把所有函数都编译一次,可能只是给你你心理上安慰一点而已.
