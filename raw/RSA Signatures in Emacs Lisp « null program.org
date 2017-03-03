@@ -76,15 +76,11 @@ It increments the input until it finds a result that passes enough iterations of
 
 * Computing e and d
 
-From here the code just follows along from the Wikipedia article. After
-generating the primes p and q, two composites are computed, ~n = p * q~ and ~i = (p - 1) * (q - 1)~. 
-Lacking any reason to do otherwise, I chose 65,537 for the
-public exponent e.
+接下来就是按照 =Wikipedia= 来写代码了. 产生了质数 =p= 和 =q= 后, 使用公式 ~n = p * q~ 和 ~i = (p - 1) * (q - 1)~ 计算出两个相关数.
+另外,我随意地选择 =65,537= 来作为指数e.
 
-The function =rsa--inverse= is just a straight Emacs Lisp + calc implementation
-of the extended Euclidean algorithm from [[https://en.wikipedia.org/wiki/Extended_Euclidean_algorithm][the Wikipedia article pseudocode]],
-computing ~d ≡ e^-1 (mod i)~. It’s not much use sharing it here, so take a look
-at the repository if you’re curious.
+至于 =rsa--inverse= 不过是把Extended Euclidean算法按照 [[https://en.wikipedia.org/wiki/Extended_Euclidean_algorithm][Wiki上的伪代码]] 用 Emacs Lisp + calc 来实现罢了. 
+它本身没有什么好说的,如果你好奇怎么实现的话,直接看仓库中的代码吧.
 
 #+BEGIN_SRC emacs-lisp
   (defun rsa-generate-keypair (bits)
@@ -98,15 +94,13 @@ at the repository if you’re curious.
       `(:public  (:n ,n :e ,e) :private (:n ,n :d ,d))))
 #+END_SRC
 
-The public key is n and e and the private key is n and d. From here we can
-compute and verify cryptographic signatures.
+这里n和e就是公钥,n和d就是私钥. 下面我们就要开始计算并验证签名了.
 
 * Signatures
 
-To compute signature s of an integer m (where m < n), compute s ≡ m^d (mod n).
-I chose the right-to-left binary method, again straight from [[https://en.wikipedia.org/wiki/Modular_exponentiation#Right-to-left_binary_method][the Wikipedia]]
-[[https://en.wikipedia.org/wiki/Modular_exponentiation#Right-to-left_binary_method][pseudocode]] (lazy!). I’ll share this one since it’s short. The backslash
-denotes integer division.
+计算整数m(m<n)的签名算式是 ~s ≡ m^d (mod n)~.
+为了偷懒,我直接 [[https://en.wikipedia.org/wiki/Modular_exponentiation#Right-to-left_binary_method][将Wikipedia上right-to-left binary method的伪代码转换成Elisp实现]].
+由于实现方法很简短,我这里把它也列出来了. 注意,震撼力的反斜杠表示整型除法.
 
 #+BEGIN_SRC emacs-lisp
   (defun rsa--mod-pow (base exponent modulus)
@@ -120,27 +114,24 @@ denotes integer division.
       result))
 #+END_SRC
 
-Verifying the signature is the same process, but with the public key’s e: m ≡
-s^e (mod n). If the signature is valid, m will be recovered. In theory, only
-someone who knows d can feasibly compute s from m. If n is [[http://crypto.stackexchange.com/a/5942][small enough to]]
-[[http://crypto.stackexchange.com/a/5942][factor]], revealing p and q, then d can be feasibly recomputed from the public
-key. So mind your Ps and Qs.
+校验签名的过程跟上面是一样的,只不过使用公钥e参与运算: ~m ≡ s^e (mod n)~. 
+如果签名是正确的,那么m会被正确地还原. 
+理论上讲,只有在直到 =d= 的情况下才能从 =m= 计算出 =s= 来.
+不过,如果 =n= 的值 [[http://crypto.stackexchange.com/a/5942][太小了]], 很容易就能分解出 =p= 和 =q= 来,那么 =d= 也就很容易从公钥中推算出来. 
+所以,一定要注意你选择的 =p= 和 =q= 有足够的强度.
 
-So that leaves one problem: generally users want to sign strings and files and
-such, not integers. A hash function is used to reduce an arbitrary quantity of
-data into an integer suitable for signing. Emacs comes with a bunch of them,
-accessible through secure-hash. It hashes strings and buffers.
+现在还剩下一个问题: 一般用户都是对字符串或者文件这类东西作签名的,不太可能对一个整数去做签名.
+所幸,通过hash函数可以将任意长度的数据转换成一段适合签名的整数. 
+Emacs本身就自带了很多hash算法,可以通过 =secure-hash= 函数来调用. 它可以对字符串和buffer进行hash运算.
 
 #+BEGIN_SRC emacs-lisp
   (secure-hash 'sha224 "Hello, world!")
   ;; => "8552d8b7a7dc5476cb9e25dee69a8091290764b7f2a64fe6e78e9568"
 #+END_SRC
 
-Since the result is hexadecimal, just prefix 16# to turn it into a calc
-integer.
+由于结果是一个十六进制数,所以只要在签名加上 =16#= 就能直接当成calc中的整型来用了.
 
-Here’s the signature and verification functions. Any string or buffer can be
-signed.
+下面是实现的签名和验签函数,可以用来对字符串或buffer进行签名.
 
 #+BEGIN_SRC emacs-lisp
   (defun rsa-sign (private-key object)
@@ -163,13 +154,12 @@ signed.
         (calc-eval "$1 == $2" 'pred result hash))))
 #+END_SRC
 
-Note the hash truncation step. If this is actually necessary, then your n is 
-very easy to factor! It’s in there since this is just a toy and I want it to
-work with small keys.
+注意到这里面包含了一个对hash结果进行阶段的步骤. 这一步实际上会让你的 =n= 变得很容易被分解!
+我这里之所以有这么一个步骤是因为本来这也就是写来玩玩的,而且我也不希望太大的key造成运算速度太过缓慢.
 
 * Putting it all together
 
-Here’s the whole thing in action with an extremely small, 128-bit key.
+下面是一段演示,使用了128位的key.
 
 #+BEGIN_SRC emacs-lisp
   (setf message "hello, world!")
@@ -190,8 +180,6 @@ Here’s the whole thing in action with an extremely small, 128-bit key.
   ;; => nil
 #+END_SRC
 
-Each of these operations took less than a second. For larger, secure-length
-keys, this implementation is painfully slow. For example, generating a
-2048-bit key takes my laptop about half an hour, and computing a signature
-with that key (any size message) takes about a minute. That’s probably a
-little too slow for, say, signing ELPA packages.
+其中的每个步骤耗时不超过一秒. 不过若使用更长的,足够安全的key,那么这个实现就太慢了.
+比如,在我的笔记本上,产生一个2048位的key足足花了我半个小时, 而使用这个key来对消息进行签名又要花费大概一分钟.
+这个速度,若想用来对ELPA package进行签名恐怕还是太慢了一些.
