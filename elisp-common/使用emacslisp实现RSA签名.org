@@ -1,0 +1,191 @@
+#+TITLE: 使用emacslisp实现RSA签名
+#+URL: http://nullprogram.com/blog/2015/10/30/
+#+AUTHOR: lujun9972
+#+TAGS: elisp-common
+#+DATE: [2017-03-03 周五 17:17]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+Emacs自带一个很牛逼的,能实现任意精度计算的代数系统，名叫 [[http://www.gnu.org/software/emacs/manual/html_mono/calc.html][calc]]. 我 [[http://nullprogram.com/blog/2009/06/23/][之前有介绍过它]] 的,而且现在它已经成为我日常使用的工具之一了. 
+是的,兄弟,Emacs可以作代数运损. 而且它和Emacs中的其他玩意一样,是可编程的,可以通过EmacsLisp对其进行扩展.
+本文我就要告诉你怎么在EmacsLisp中用calc来实现 [[https://en.wikipedia.org/wiki/RSA_(cryptosystem)][RSA公钥密码体系]] 
+
+下面是完成的成果:
+
+  * [[https://github.com/skeeto/emacs-rsa][https://github.com/skeeto/emacs-rsa]]
+
+当然这只是实现来玩玩的,不是真的想把它应用起来. 而且它的速度实在是太慢了.
+
+* Evaluation with calc
+
+由于Emacs的整数型是有长度限制的,因此 =calc= package就特别的有用.
+Emacs并不会先分配一个整形对象然后用一个指针指向它,而是直接在指针中存放整数. 这样做的好处是,它的访问速度更快,但是意味着,Emacs中的整型能表示的范围要更小一些.
+
+=calc= 定义了大量的API, 其中有一个特别好用的函数叫 =calc-eval=. 它可以接受一个字符串形式的运算式并计算出结果,甚至运算式还能用 =$n= 来进行参数替换.
+
+#+BEGIN_SRC emacs-lisp
+  (calc-eval "2^16 - 1")
+  ;; => "65535"
+
+  (calc-eval "2^$1 - 1" nil 128)
+  ;; => "340282366920938463463374607431768211455"
+#+END_SRC
+
+请注意,该函数返回的结果是字符串, 这是 =calc= 用来表示任意精度数字的一种方式. 而对于传递给它的参数,则既可以是普通的Elisp数字也可以是字符串.
+默认情况下, =calc= 认为这些数字都是十进制的. 不过你也可以修改它的基,方法是在数字前加上基数和#. 就跟交互式使用 =calc= 时一样.
+举个例子:
+
+#+BEGIN_SRC emacs-lisp
+  (calc-eval "16#deadbeef")
+  ;; => "3735928559"
+#+END_SRC
+
+=calc-eval= 的第二个参数是可选的,用来修改 =calc-eval= 的计算方式. 若为nil,则表示计算运算式并返回结果. 至于其他的值是什么意思,可以去查看manual文档.
+不过在本文中,唯一用到的非nil值只有符号 =pred=,它表示让 =calc-eval= 返回时返回一个布尔值.
+
+#+BEGIN_SRC emacs-lisp
+  (calc-eval "$1 < $2" 'pred "4000" "5000")
+  ;; => t
+#+END_SRC
+
+* Generating primes
+
+RSA是建立在大数分解的复杂度基础上的. 要产生RSA键值对先需要产生两个质数 =p= 和 =q=,然后用这两个质数进行运算得到两个数学上相关的合成数(composite numbers).
+
+=calc= 提供一个 =calc-next-prime= 函数来获取大于某个数的下一个质数. 该函数使用probabilistic primarily test — the Fermat Miller-Rabin primality test — 来实现对大数据的高效测试.
+It increments the input until it finds a result that passes enough iterations of the primality test.
+
+#+BEGIN_SRC emacs-lisp
+  (calc-eval "nextprime($1)" nil "100000000000000000")
+  ;; => "100000000000000003"
+#+END_SRC
+
+那么要产生一个随机的n位的质数,只需要先产生一个n位的随机数,然后找出大于它的下一个质数就行了.
+
+#+BEGIN_SRC emacs-lisp
+  ;; Generate a 128-bit prime, 10 iterations (0.000084% error rate)
+  (calc-eval "nextprime(random(2^$1), 10)" nil 128)
+  "111618319598394878409654851283959105123"
+#+END_SRC
+
+不过 =calc= 的随机函数是基于Emacs的随机函数来实现的, 而Emacs随机函数的强度不足以被用于加密. 所以在实际实现时,我从 =/dev/urandom= 来读取n个比特作为n位的随机数.
+
+#+BEGIN_SRC emacs-lisp
+  (with-temp-buffer
+    (set-buffer-multibyte nil)
+    (call-process "head" "/dev/urandom" t nil "-c" (format "%d" (/ bits 8)))
+    (let ((f (apply-partially #'format "%02x")))
+      (concat "16#" (mapconcat f (buffer-string) ""))))
+#+END_SRC
+
+(请注意: 一定要使用 =/dev/urandom=. 原因请参见 [[http://www.2uo.de/myths-about-urandom/][no reason to use /dev/random for generating keys]])
+
+* Computing e and d
+
+接下来就是按照 =Wikipedia= 来写代码了. 产生了质数 =p= 和 =q= 后, 使用公式 ~n = p * q~ 和 ~i = (p - 1) * (q - 1)~ 计算出两个相关数.
+另外,我随意地选择 =65,537= 来作为指数e.
+
+至于 =rsa--inverse= 不过是把Extended Euclidean算法按照 [[https://en.wikipedia.org/wiki/Extended_Euclidean_algorithm][Wiki上的伪代码]] 用 Emacs Lisp + calc 来实现罢了. 
+它本身没有什么好说的,如果你好奇怎么实现的话,直接看仓库中的代码吧.
+
+#+BEGIN_SRC emacs-lisp
+  (defun rsa-generate-keypair (bits)
+    "Generate a fresh RSA keypair plist of BITS length."
+    (let* ((p (rsa-generate-prime (+ 1 (/ bits 2))))
+           (q (rsa-generate-prime (+ 1 (/ bits 2))))
+           (n (calc-eval "$1 * $2" nil p q))
+           (i (calc-eval "($1 - 1) * ($2 - 1)" nil p q))
+           (e (calc-eval "2^16+1"))
+           (d (rsa--inverse e i)))
+      `(:public  (:n ,n :e ,e) :private (:n ,n :d ,d))))
+#+END_SRC
+
+这里n和e就是公钥,n和d就是私钥. 下面我们就要开始计算并验证签名了.
+
+* Signatures
+
+计算整数m(m<n)的签名算式是 ~s ≡ m^d (mod n)~.
+为了偷懒,我直接 [[https://en.wikipedia.org/wiki/Modular_exponentiation#Right-to-left_binary_method][将Wikipedia上right-to-left binary method的伪代码转换成Elisp实现]].
+由于实现方法很简短,我这里把它也列出来了. 注意,震撼力的反斜杠表示整型除法.
+
+#+BEGIN_SRC emacs-lisp
+  (defun rsa--mod-pow (base exponent modulus)
+    (let ((result 1))
+      (setf base (calc-eval "$1 % $2" nil base modulus))
+      (while (calc-eval "$1 > 0" 'pred exponent)
+        (when (calc-eval "$1 % 2 == 1" 'pred exponent)
+          (setf result (calc-eval "($1 * $2) % $3" nil result base modulus)))
+        (setf exponent (calc-eval "$1 \\ 2" nil exponent)
+              base (calc-eval "($1 * $1) % $2" nil base modulus)))
+      result))
+#+END_SRC
+
+校验签名的过程跟上面是一样的,只不过使用公钥e参与运算: ~m ≡ s^e (mod n)~. 
+如果签名是正确的,那么m会被正确地还原. 
+理论上讲,只有在直到 =d= 的情况下才能从 =m= 计算出 =s= 来.
+不过,如果 =n= 的值 [[http://crypto.stackexchange.com/a/5942][太小了]], 很容易就能分解出 =p= 和 =q= 来,那么 =d= 也就很容易从公钥中推算出来. 
+所以,一定要注意你选择的 =p= 和 =q= 有足够的强度.
+
+现在还剩下一个问题: 一般用户都是对字符串或者文件这类东西作签名的,不太可能对一个整数去做签名.
+所幸,通过hash函数可以将任意长度的数据转换成一段适合签名的整数. 
+Emacs本身就自带了很多hash算法,可以通过 =secure-hash= 函数来调用. 它可以对字符串和buffer进行hash运算.
+
+#+BEGIN_SRC emacs-lisp
+  (secure-hash 'sha224 "Hello, world!")
+  ;; => "8552d8b7a7dc5476cb9e25dee69a8091290764b7f2a64fe6e78e9568"
+#+END_SRC
+
+由于结果是一个十六进制数,所以只要在签名加上 =16#= 就能直接当成calc中的整型来用了.
+
+下面是实现的签名和验签函数,可以用来对字符串或buffer进行签名.
+
+#+BEGIN_SRC emacs-lisp
+  (defun rsa-sign (private-key object)
+    (let ((n (plist-get private-key :n))
+          (d (plist-get private-key :d))
+          (hash (concat "16#" (secure-hash 'sha384 object))))
+      ;; truncate hash such that hash < n
+      (while (calc-eval "$1 > $2" 'pred hash n)
+        (setf hash (calc-eval "$1 \\ 2" nil hash)))
+      (rsa--mod-pow hash d n)))
+
+  (defun rsa-verify (public-key object sig)
+    (let ((n (plist-get public-key :n))
+          (e (plist-get public-key :e))
+          (hash (concat "16#" (secure-hash 'sha384 object))))
+      ;; truncate hash such that hash < n
+      (while (calc-eval "$1 > $2" 'pred hash n)
+        (setf hash (calc-eval "$1 \\ 2" nil hash)))
+      (let* ((result (rsa--mod-pow sig e n)))
+        (calc-eval "$1 == $2" 'pred result hash))))
+#+END_SRC
+
+注意到这里面包含了一个对hash结果进行阶段的步骤. 这一步实际上会让你的 =n= 变得很容易被分解!
+我这里之所以有这么一个步骤是因为本来这也就是写来玩玩的,而且我也不希望太大的key造成运算速度太过缓慢.
+
+* Putting it all together
+
+下面是一段演示,使用了128位的key.
+
+#+BEGIN_SRC emacs-lisp
+  (setf message "hello, world!")
+
+  (setf keypair (rsa-generate-keypair 128))
+  ;; => (:public  (:n "74924929503799951536367992905751084593"
+  ;;               :e "65537")
+  ;;     :private (:n "74924929503799951536367992905751084593"
+  ;;               :d "36491277062297490768595348639394259869"))
+
+  (setf sig (rsa-sign (plist-get keypair :private) message))
+  ;; => "31982247477262471348259501761458827454"
+
+  (rsa-verify (plist-get keypair :public) message sig)
+  ;; => t
+
+  (rsa-verify (plist-get keypair :public) (capitalize message) sig)
+  ;; => nil
+#+END_SRC
+
+其中的每个步骤耗时不超过一秒. 不过若使用更长的,足够安全的key,那么这个实现就太慢了.
+比如,在我的笔记本上,产生一个2048位的key足足花了我半个小时, 而使用这个key来对消息进行签名又要花费大概一分钟.
+这个速度,若想用来对ELPA package进行签名恐怕还是太慢了一些.
