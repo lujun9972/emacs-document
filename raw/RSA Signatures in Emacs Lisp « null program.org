@@ -1,30 +1,21 @@
 #+URL: http://nullprogram.com/blog/2015/10/30/                              
 
-Emacs comes with a wonderful arbitrary-precision computer algebra system
-called [[http://www.gnu.org/software/emacs/manual/html_mono/calc.html][calc]]. I’ve [[http://nullprogram.com/blog/2009/06/23/][discussed it previously]] and continue to use it on a daily
-basis. That’s right, people, Emacs can do calculus. Like everything Emacs,
-it’s programmable and extensible from Emacs Lisp. In this article, I’m going
-to implement the [[https://en.wikipedia.org/wiki/RSA_(cryptosystem)][RSA public-key cryptosystem]] in Emacs Lisp using calc.
+Emacs自带一个很牛逼的,能实现任意精度计算的代数系统，名叫 [[http://www.gnu.org/software/emacs/manual/html_mono/calc.html][calc]]. 我 [[http://nullprogram.com/blog/2009/06/23/][之前有介绍过它]] 的,而且现在它已经成为我日常使用的工具之一了. 
+是的,兄弟,Emacs可以作代数运损. 而且它和Emacs中的其他玩意一样,是可编程的,可以通过EmacsLisp对其进行扩展.
+本文我就要告诉你怎么在EmacsLisp中用calc来实现 [[https://en.wikipedia.org/wiki/RSA_(cryptosystem)][RSA公钥密码体系]] 
 
-If you want to dive right in first, here’s the repository:
+下面是完成的成果:
 
   * [[https://github.com/skeeto/emacs-rsa][https://github.com/skeeto/emacs-rsa]]
 
-This is only a toy implementation and not really intended for serious
-cryptographic work. It’s also far too slow when using keys of reasonable
-length.
+当然这只是实现来玩玩的,不是真的想把它应用起来. 而且它的速度实在是太慢了.
 
 * Evaluation with calc
 
-The calc package is particularly useful when considering Emacs’ limited
-integer type. Emacs uses a tagged integer scheme where integers are embedded
-within pointers. It’s a lot faster than the alternative
-(individually-allocated integer objects), but it means they’re always a few
-bits short of the platform’s native integer type.
+由于Emacs的整数型是有长度限制的,因此 =calc= package就特别的有用.
+Emacs并不会先分配一个整形对象然后用一个指针指向它,而是直接在指针中存放整数. 这样做的好处是,它的访问速度更快,但是意味着,Emacs中的整型能表示的范围要更小一些.
 
-calc has a large API, but the user-friendly porcelain for it is the
-under-documented calc-eval function. It evaluates an expression string with
-format-like argument substitutions ($n).
+=calc= 定义了大量的API, 其中有一个特别好用的函数叫 =calc-eval=. 它可以接受一个字符串形式的运算式并计算出结果,甚至运算式还能用 =$n= 来进行参数替换.
 
 #+BEGIN_SRC emacs-lisp
   (calc-eval "2^16 - 1")
@@ -34,21 +25,17 @@ format-like argument substitutions ($n).
   ;; => "340282366920938463463374607431768211455"
 #+END_SRC
 
-Notice it returns strings, which is one of the ways calc represents arbitrary
-precision numbers. For arguments, it accepts regular Elisp numbers and strings
-just like this function returns. The implicit radix is 10. To explicitly set
-the radix, prefix the number with the radix and #. This is the same as in the
-user interface of calc. For example:
+请注意,该函数返回的结果是字符串, 这是 =calc= 用来表示任意精度数字的一种方式. 而对于传递给它的参数,则既可以是普通的Elisp数字也可以是字符串.
+默认情况下, =calc= 认为这些数字都是十进制的. 不过你也可以修改它的基,方法是在数字前加上基数和#. 就跟交互式使用 =calc= 时一样.
+举个例子:
 
 #+BEGIN_SRC emacs-lisp
   (calc-eval "16#deadbeef")
   ;; => "3735928559"
 #+END_SRC
 
-The second argument (optional) to calc-eval adjusts its behavior. Given nil,
-it simply evaluates the string and returns the result. The manual documents
-the different options, but the only other relevant option for RSA is the
-symbol pred, which asks it to return a boolean “predicate” result.
+=calc-eval= 的第二个参数是可选的,用来修改 =calc-eval= 的计算方式. 若为nil,则表示计算运算式并返回结果. 至于其他的值是什么意思,可以去查看manual文档.
+不过在本文中,唯一用到的非nil值只有符号 =pred=,它表示让 =calc-eval= 返回时返回一个布尔值.
 
 #+BEGIN_SRC emacs-lisp
   (calc-eval "$1 < $2" 'pred "4000" "5000")
