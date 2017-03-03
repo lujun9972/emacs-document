@@ -1,0 +1,58 @@
+#+TITLE: 在Calendar中高亮有安排的日期
+#+URL: http://acidwords.com/posts/2017-02-16-displaying-org-mode-appointments-in-calendar.html
+#+AUTHOR: lujun9972
+#+TAGS: emacs-common
+#+DATE: [2017-03-01 Wed 21:24]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+[[http://orgmode.org/manual/Agenda-Views.html][org-mode agenda]] 有一个功能,能够在Emacs Calendar上显示哪些日期有约会. 不过可惜,该功能默认并没有被开启. 
+我也是在浏览Emacs主题截图时偶然发现的. 
+
+在下面的屏幕截图中,你可以看到Calendar中有安排的日子都被高亮起来了.
+
+[[https://c1.staticflickr.com/3/2082/32109271913_31d143b549.jpg]]
+
+配置很简单. 
+第一步, 设置 =calendar-mark-diary-entries-flag=:
+
+#+BEGIN_SRC emacs-lisp
+  (setq calendar-mark-diary-entries-flag t)
+#+END_SRC
+
+然后创建 =$HOME/diary= 文件, 并添加下面一行:
+
+#+BEGIN_EXAMPLE
+  %%(org-diary)
+#+END_EXAMPLE
+
+之后在Emacs中用org-agenda打开agenda view然后按 =c= 打开calendar;你会发现所有重要的日期都被高亮了.
+当然,执行
+
+#+BEGIN_EXAMPLE
+  M-x calendar
+#+END_EXAMPLE
+
+效果一样,也能打开calendar.
+
+你还能够反过来操作 - 要查看某个高亮的日期有哪些安排,只需要将光标移到特定的日期然后按下 =c=, Emacs就会打开 org-mode agenda view 并将光标放到合适的地方.
+
+* Using with appointments (appt)
+
+如果你在使用org-mode的同时还使用 [[http://sachachua.com/blog/2007/11/setting-up-appointment-reminders-in-org/][appointments]] 的话, 那就要小心了,调用 =(appt-activate 1)= 会同时运行 =diary=.
+这样的话,若在Emacs的配置文件中加了这一句话,那么在Emacs启动时就会弹出diary窗口.
+我觉得这样很不好, 为了避开这种行为,需要设置 =appt-display-diary= 变量.
+
+下面是我的 appointments 配置:
+
+#+BEGIN_SRC emacs-lisp
+  (add-hook 'org-finalize-agenda-hook
+            (lambda ()
+              (setq appt-message-warning-time 10        ;; warn 10 min in advance
+                    appt-display-diary nil              ;; do not display diary when (appt-activate) is called
+                    appt-display-mode-line t            ;; show in the modeline
+                    appt-display-format 'window         ;; display notification in window
+                    calendar-mark-diary-entries-flag t) ;; mark diary entries in calendar
+              (org-agenda-to-appt)                      ;; copy all agenda schedule to appointments
+              (appt-activate 1)))                       ;; active appt (appointment notification)
+#+END_SRC

@@ -1,0 +1,71 @@
+#+TITLE: 聊一聊Emacs的字节编译
+#+URL: http://nullprogram.com/blog/2010/07/01/
+#+AUTHOR: lujun9972
+#+TAGS: elisp-common
+#+DATE: [2017-03-02 周四 11:00]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+某些Lisp有一项独门绝迹,那就是可以在任意时刻将函数编译成字节码/本地代码(具体编译成什么有赖于方言和具体实现).
+对于那些能够编译的Lisp函数(例如[[http://clisp.cons.org/][CLISP]]), 一般都支持两种形式的代码: 一种是缓慢的,未优化未编译过的代码,一种是快速,高效编译过的代码.
+但是你不要以为未编译的代码就一无是处了,除了无需花费时间在编译上之外,它也有其他的有点.
+
+对于Emacs Lisp来说, 未编译过的函数就是一个lambda表达式. 只不过它存在于一个symbol中,就相当与给它取了个名字.
+而编译后的form则是一个(特殊的)数组, 编译后的字节码以字符串的形式存在这个数组的第二个元素中. 其他的元素还包括常量,docstring等.
+Elisp提供了 =byte-compile= 函数来编译其他函数. 该函数能接受一个lambda函数或者一个symbol. 
+不过如果参数是symbol的话,编译后的函数回覆盖该symbol的原S表达式.
+
+#+BEGIN_SRC emacs-lisp
+  (byte-compile (lambda (x) (* 2 x)))
+  => #[(x) "^H\301_\207" [x 2] 2]
+#+END_SRC
+
+编译器不仅仅是将函数是转换成字节码并展开宏,还会进行一些优化,比如删除无用代码,预先执行 safe constant forms, 以及内联函数. 从而极大地提高执行效率.
+(通过我的 [[http://nullprogram.com/blog/2009/05/28/][measure-time macro]] 来测算的)
+
+#+BEGIN_SRC emacs-lisp
+  (defun fib (n)
+    "Fibonacci sequence."
+    (if (<= n 2) 1
+      (+ (fib (- n 1)) (fib (- n 2)))))
+
+  (measure-time
+   (fib 30))
+  => 1.0508708953857422
+
+  (byte-compile 'fib)
+
+  (measure-time
+   (fib 30))
+  => 0.4302399158477783
+#+END_SRC
+
+大多数Emacs自带的函数都预先编译过了. 不过也有部分自带的函数没有被编译,所以我想,不如我来花点时间把它们编译一下算了.
+
+Common Lisp是有提供一个判断函数(compiled-function-p)来测试另一个函数是否有编译过的. 
+但不知为何,Elisp中没有预定义这样一个函数,我只能自己写一个了:
+
+#+BEGIN_SRC emacs-lisp
+  (defun byte-compiled-p (func)
+    "Return t if function is byte compiled."
+    (cond
+     ((symbolp   func) (byte-compiled-p (symbol-function func)))
+     ((functionp func) (not (sequencep func)))
+     (t nil)))
+#+END_SRC
+
+我一开始的想法是便利所有interned symbol,若通过上面的测试函数发现该symbol的function slot中是未编译的函数,那么就调用 =byte-compile= 来编译它. 
+不过后来我发现, =byte-compile=  足够聪明,它会自动忽略那些没有函数以及那些函数以及编译过的symbol.
+
+那么,下一个问题就是,我们如何遍历每个interned symbol? 函数 =mapatoms= 可以做到这一点. 给它一个函数作为参数,它就会将该函数应用到每个interned symbol上.
+这样一来,问题就简单了. (译者注:我运行了这个语句之后,Evil彻底用不了了,不得不重启Emacs...)
+
+#+BEGIN_SRC emacs-lisp
+  (mapatoms 'byte-compile)
+#+END_SRC
+
+这就搞定了! 整个过程不过几秒钟,不过会产生大量的警告. 目前我还未找到屏蔽这些警告方法,所以你最好不要自动运行这个语句,否则你会发现时不时地会弹出一个window.
+而且,我也不确定这么做会不会损坏你的Emacs session,毕竟不是所有的函数写的时候都有好好的考虑编译后还能不能用,尤其是那些用到宏的函数. 
+
+另外,我很怀疑这样能否带来性能上的明显提升. 就像我前面所得,大多数的函数预先编译过了,而这部分函数才是使用最频繁的函数.
+把所有函数都编译一次,可能只是给你你心理上安慰一点而已.
