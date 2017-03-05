@@ -11,7 +11,7 @@ function get_contributors()
 {
     echo "* Contributors"
     echo "感谢GitHub以及:"
-    for contributor in $(git shortlog --summary|cut -f2 |sort)
+    for contributor in $(git log --pretty='%an<%ae>'|grep -viEw 'darksun|lujun9972' |sort|uniq)
     do
         echo "+ $contributor"
     done
