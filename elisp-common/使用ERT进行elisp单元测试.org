@@ -1,0 +1,88 @@
+#+TITLE: 使用ERT进行elisp单元测试
+#+URL: http://nullprogram.com/blog/2012/08/15/
+#+AUTHOR: lujun9972
+#+TAGS: elisp-common
+#+DATE: [2017-03-04 Sat 15:23]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+
+Emacs 24自带了一款用于单元测试的库名叫 =ERT (Emacs Lisp Regression Testing)=. 
+我也是在看过 [[http://emacsrocks.com/][Extending Emacs Rocks!]] 之后才知道有这个东西存在的,打那以后,我就一直在用它.
+它真的很好用,以至于我甚至 [[https://github.com/skeeto/.emacs.d/commit/59d3eac73edbad8a5be72a81c7d6c5b1193bbb90][为它设定了快捷键]] 这样在任何使用我都可以方便地运行测试了.
+最近在对我的 Emacs web server 进行修改时,就用ERT添加了一套 [[https://github.com/skeeto/emacs-http-server/blob/master/simple-httpd-test.el][测试案例]].
+
+Emacs 自带了ERT的manual,所以你可以很方便的就能学到怎么用.
+它的关键自于两个宏: =ert-deftest= 以及 =should=.
+第一个宏用来创建一个测试案例,而第二个宏类似于 =assert=, 但是比它更好用.
+下面是一个例子,
+
+#+BEGIN_SRC emacs-lisp
+  (ert-deftest example-test ()
+    (should (= (+ 9 2) 11)))
+#+END_SRC
+
+=ert-deftest= 跟其他的 =def*= 一样. 它的参数列表目前没有什么实际用途,只是让它看起来更像 =defn=而已,所以为空.
+它的body则跟 =defun= 中的body一样. 最终它会生成一个匿名函数,并把这个匿名函数放入符号example-test的plist中.
+当要运行测试案例时,ERT通过搜索所有internd符号的plist来找出测试案例.
+
+而另一个宏 =should=, 会接受一个form作为参数,并检查这个form的运行结果是否为真.
+类似的宏还有 =should-not= 和 =should-error=.
+
+执行 =M-x ert= 开始进行测试. ERT首先让你选择要测试哪些案例. 输入 =t= 表示测试所有的案例.
+除此之外你也可以选择只测试部分案例(:new, :passed, :failed等).
+我的话一般直接就直接测试所有案例得了. 然后ERT会弹出一个buffer用来显示测试的结果,按 =q= 可以推出该buffer.
+
+* Running ERT
+
+=should= 的特别之处在于它会报告造成测试失败的语句及其返回值. 比如,若我将上一个测试案例修改为这样
+
+#+BEGIN_SRC emacs-lisp
+  (ert-deftest example-test ()
+    (should (= (+ 9 2) 100)))
+#+END_SRC
+
+那么该案例就会测试失败,并显示如下信息. 
+
+#+BEGIN_SRC ert-results
+  F example-test
+  (ert-test-failed
+   ((should
+     (=
+      (+ 9 2)
+      100))
+    :form
+    (= 11 100)
+    :value nil))
+#+END_SRC
+
+里面显示出了我们进行比较的语句 — (+ 9 2) 和 100 — 以及他们的执行结果: (= 11 100). 
+把光标放到测试结果中,然后按下 =.= 就会跳转到案例的定义处了,然后你就可以进行更进一步的检查了.
+你也可以按下 =b= 可以查看backtrace, 按下=m= 可以查看案例测试过程中产生的所有输出信息, 或者按 =r= 重新运行测试.
+
+* Mocking
+
+Elisp 动态绑定的能力使得我们可以很方便地用仿真函数代替实际函数进行测试.
+比如,假设我有一个函数需要检查某个特定的文件是否存在. 在函数内部我当然会使用 =file-exists-p= 来作检查.
+但是这意味着你在测试前需要往文件系统中创建或删除文件. 这样子的单元测试当使用并行的方式进行测试时就会出现问题.
+
+不过我还可以在flet语句中暂时用仿真函数重载 =file-exists-p= 的函数定义.
+注意到 =file-exists-p= 其实是用C写的函数,但是依然能够被重载掉,这跟普通的lisp函数没什么两样.
+
+#+BEGIN_SRC emacs-lisp
+  (defun determine-next-action ()
+    (if (file-exists-p "death-star-plans.org")
+        'bring-him-the-passengers
+      'tear-this-ship-apart))
+
+  (ert-deftest file-check-test ()
+    (flet ((file-exists-p (file) t))
+      (should (eq (determine-next-action) 'bring-him-the-passengers)))
+    (flet ((file-exists-p (file) nil))
+      (should (eq (determine-next-action) 'tear-this-ship-apart))))
+#+END_SRC
+
+这只是一个很间的mock例子. 在实际的单元测试中,我可能回让这个仿真函数根据文件名的模式而返回t或nil.
+ERT也确实有一个扩展包,el-mock.el,可以帮助你编写很复杂的mock,不过到目前为止似乎我还没有遇到要用它的情况.
+
+ERT实在是太好用了,我决定以后一直用它了.

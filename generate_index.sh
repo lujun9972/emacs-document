@@ -7,6 +7,17 @@ catalogs=$(for catalog in ${!catalog_comment_dict[*]};do
                echo $catalog
            done |sort)
 
+function get_contributors()
+{
+    echo "* Contributors"
+    echo "感谢GitHub以及:"
+    # for contributor in $(git log --pretty='%an<%ae>'|grep -viEw 'darksun|lujun9972' |sort|uniq)
+    # do
+    #     echo "+ $contributor"
+    # done
+    git shortlog --summary --email |grep -viEw 'darksun|lujun9972'|cut -f2|sed -e 's/^/+ /'
+}
+
 function generate_headline()
 {
     local catalog=$1
@@ -26,10 +37,14 @@ function generate_links()
     for post in $posts
     do
         modify_date=$(git log --date=short --pretty=format:"%cd" -n 1 $catalog/$post) # 去除日期前的空格
-        echo "+ [[https://github.com/lujun9972/emacs-document/blob/master/$catalog/$post][$post]]		<$modify_date>"
+        if [[ -n "$modify_date" ]];then # 没有修改日期的文件没有纳入仓库中,不予统计
+            echo "+ [[https://github.com/lujun9972/emacs-document/blob/master/$catalog/$post][$post]]		<$modify_date>"
+        fi
     done
     IFS=$old_ifs
 }
+
+get_contributors
 
 for catalog in $catalogs
 do
