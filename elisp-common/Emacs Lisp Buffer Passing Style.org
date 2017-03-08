@@ -1,0 +1,123 @@
+#+TITLE: Emacs Lisp Buffer Passing Style
+#+URL: http://nullprogram.com/blog/2014/05/27/
+#+AUTHOR: lujun9972
+#+TAGS: elisp-common
+#+DATE: [2017-03-04 Sat 21:42]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+Emacs Lisp中的字符串是可变,但定长的字符(multibyte)/字节(unibyte)数组.
+任何会改变字符串长度的操作都会生成一个全新的字符串对象.
+这并不奇怪,很多编程语言都这样. Python, Java, 和 JavaScript 甚至更过分,它们的字符串完全是不可变的.
+
+用这些语言一次性操作多个字符串(尤其是当用 ~+=~ 拼接字符串)时,往往会生成大量的临时字符串对象. 这很浪费资源.
+为了应付这种情况, Java 提供了 [[http://docs.oracle.com/javase/7/docs/api/java/lang/StringBuffer.html][StringBuilder 类]], 它提供了一个临时,高效,且可变的数据结构供那些操作使用. 
+这些操作修改完这个数据结构后再通过这个数据结构导出最终的字符串.
+
+#+BEGIN_SRC java
+  java.util.Collection<T> collection;
+
+  public String toString() {
+      StringBuilder sb = new StringBuilder();
+      for (T element : collection) {
+          sb.append(element);
+      }
+      return sb.toString();
+  }
+#+END_SRC
+
+而在JavaScript中,常用的拼接字符串的方法是,先将各部分内容放入一个数组中,然后调用数组的 =join()= 得到结果.
+
+#+BEGIN_SRC js
+  function toString(object) {
+      var output = [];
+      for (var k in object) {
+          output.push(k);
+          output.push(' -> ');
+          output.push(object[k]);
+          output.push('\n');
+      }
+      return output.join('');
+  }
+
+  toString({a: 1, b: 2});
+  // => "a -> 1\nb -> 2\n"
+#+END_SRC
+
+* Emacs Lisp
+
+那么Elisp中哪种数据结构是用来存放字符序列的,而且能够高效地实现插入,更新与删除的呢? 当然是Buffer啦!
+你别忘了,Emacs的本职工作就是修改字符序列的呀.
+通过宏 =with-temp-buffer=, 我们可以把buffer当成 string builder 来用.
+我个人还会同时设置 =standard-output= 变量让所有的 print 函数把结果输出到buffer中.
+
+#+BEGIN_SRC emacs-lisp
+  (defun to-string (alist)
+    (with-temp-buffer
+      (let ((standard-output (current-buffer)))
+        (dolist (pair alist)
+          (princ (cl-first pair))
+          (princ " -> ")
+          (princ (cl-second pair))
+          (princ "\n")))
+      (buffer-string)))
+#+END_SRC
+
+Update: Jon O. 指出 Emacs 提供了一个 =with-output-to-string= 宏,可以更方便实现相同的功能.
+
+Elisp中的buffer,其内部实现就是个 [[http://en.wikipedia.org/wiki/Gap_buffer][gap buffer]], 这是个很简单的数据结构,整个buffer的内容,以光标为界(gap)被分割成了两个序列.
+在光标处进行插入或删除操作会让gap在整个序列中上下滑动. 这使得gap buffer能够有效地应付在单个位置上进行的大量编辑操作.
+而这正是我们编辑文本的行为模式.
+
+buffer中的字符是以完整的 Unicode code point 的形式保存的.
+而且不仅如此,我们还能为这些字符分配任意多的属性(font-lock-face, read-only, nonstickiness等等).
+其中甚至还能内嵌图像对象,这使得buffer还能用来显示HTML的渲染结果.
+
+* The Catch
+
+把buffer当成可变更的字符串时,有一点要注意: 这些buffer [[http://nullprogram.com/blog/2014/01/27/][不会被垃圾回收器自动回收]]
+每个buffer都会被存入全局的buffer list中, 这个buffer list的内部实现其实是一个介入式链表(intrusive linked list). 
+任何不在该list中的buffer,都被认为是dead buffer.
+
+这就要求调用这要小心地释放(“kill”)新生成的buffer,尤其要注意当error发生时能够回收buffer.
+举个例子, =url-retrieve= 和 =url-retrieve-synchronously= 从web server收到回应后会生成一个buffer.
+而一不留神,这个buffer可能就会被泄漏掉. 像这样:
+
+#+BEGIN_SRC emacs-lisp
+  (with-current-buffer (url-retrieve-synchronously some-url)
+    (setf (point) url-http-end-of-headers)
+    (prog1 (json-read)
+      (kill-buffer)))
+#+END_SRC
+
+若 =json-read= 函数执行出错,这个buffer就无法被回收了.
+
+顺带一提: 你可以使用 [[https://github.com/skeeto/elisp-finalize][我开发的 finalize package]] 来将buffer与一个能被垃圾回收器回收的对象关联.
+这样当这个对象被垃圾回收器回收时,就会立即被kill掉了.
+
+* Buffer Passing Style
+
+为了应付这各问题,我比较推荐使用一种我称之为 buffer-passing style的编程风格.
+这种编程风格要求buffer由调用者(而不是被调用者)负责生成并把它以设置为当前buffer的方式隐式地传递给被调用函数.
+而被调用着则直接修改当前buffer的内容. 这样一来调用这就能完全地控制buffer的生命周期了.当然调用这应该使用类似 =with-temp-buffer= 这样的宏,以保证buffer能够被回收.
+
+想象一下,若 =url-retrieve-synchronously= 不是返回一个buffer,而是将结果写入当前buffer的话.
+即使出现错误,buffer也会自动被 =with-temp-buffer= 回收了.
+
+#+BEGIN_SRC emacs-lisp
+  (with-temp-buffer
+    (url-retrieve-synchronously some-url)
+    (setf (point) url-http-end-of-headers)
+    (json-read))
+#+END_SRC
+
+我在编写 =simple-httpd= 时就使用了Buffer-passing style. 
+Servlets在调用时就会将当前buffer作为output buffer,同时将 =standard-output= 也设置为该buffer.
+这样servlet只需要负责用内容填充该buffer就行了. 而 =process-send-region= 的存在使得这些内容也无需真正地再转换成字符串.
+
+#+BEGIN_SRC emacs-lisp
+  (defservlet* search :application/json (q)
+    (princ (json-encode (search-results q))))
+#+END_SRC
+
+我也是在才发现 buffer-passing style 这么一种编程风格的. 所以 =simple-httpd= 中很多地方还是使用的基于字符串的编程方法.
