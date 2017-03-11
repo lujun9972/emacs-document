@@ -19,7 +19,7 @@
     M-x package-install RET smartparens RET
   #+END_SRC
 * Configuration
-  在启动的时候启用smartparens,并把它绑定到某些主要的钩子上：
+  在启动Emacs的时候启用smartparens,并把它绑定到某些 *major mode* 的钩子上：
   #+BEGIN_SRC emacs-lisp
     (use-package smartparens-config
       :ensure smartparens
@@ -32,13 +32,361 @@
   #+END_SRC
 * Usage
   使用smartparens 来管理成对的标点符号例如括号，方括号，花括号，引号，尖括号，
-  还有那些让你痛苦的成对的符号。其他的包解决了部分的问题，但是它们仍然缺乏某些
-  功能。在下面的代码片段种，下划线 *_* 代表光标的位置：
+  还有那些让你痛苦的成对的符号。而其他的包虽然解决了部分的问题，但是它们仍然缺乏某些
+  功能。在下面的代码片段种，上划线 *^* 代表光标的位置：
 * Basics
-  当你启用 *smartparens* 的时候,输入需要匹配的符号对时
-  #+BEGIN_SRC emacs-lisp
-    (defn foo )
+  当你启用 *smartparens* 的时候,输入需要符号对的其中一个时
+  #+BEGIN_SRC 
+    (defn foo)
+             ^
   #+END_SRC
-  
+  另外一个匹配的符号也会随之插入：
+  #+BEGIN_SRC 
+    (defn foo [])
+               ^ 
+  #+END_SRC
+* Navigation
+** Starts and ends
+   如果你输入如下的表达式：
+   #+BEGIN_SRC 
+     (let [x "foo bar baz ... blah"])
+                              ^
+   #+END_SRC
+   而且你希望可以移动到字符串的开头：
+   #+BEGIN_SRC 
+     (let [x "foo bar baz .... blah"])
+              ^
+   #+END_SRC
+   只需调用 *sp-beginning-of-sexp*,我把这个函数绑定到了快捷键 *C-M-a*;
+   相反地，如果你想把光标移动到字符串的结尾：
+   #+BEGIN_SRC 
+     (let [x "foo bar baz .... blah"])
+                                   ^
+   #+END_SRC
+   只需调用 *sp-end-of-sexp*,我把该函数绑定到了快捷键 *C-M-e*.
+** Traversing Lists
+   如果你输入如下的表达式：
+   #+BEGIN_SRC 
+     (defun format-data(format)
+       (let ((system-time-locale "en_US.UTF-8"))
+         (insert (format-time-string format)))) ^
+   #+END_SRC
+   而你想把光标移动到 /insert/:
+   #+BEGIN_SRC 
+     (defun format-data(format)
+       (let ((system-time-locale "en_US.UTF-8"))
+         (insert (format-time-string format))))
+          ^
+   #+END_SRC
+   只需执行 *sp-down-sexp*,我把这个函数绑定到了 *C-down*
+   如果你有如下的表达式：
+   #+BEGIN_SRC 
+     (str "foo" "bar baz qux")
+         ^ 
+   #+END_SRC
+   而你想把光标移动到 /)/ 的后面：
+   #+BEGIN_SRC 
+     (str "foo" "bar baz qux")
+                              ^ 
+   #+END_SRC
+   只需调用 *sp-up-sexp*,我把该函数绑定到了快捷键 *C-up*
+   如果你有如下的表达式：
+   #+BEGIN_SRC 
+     (defn foo [bar] (let [x 0] x))
+                     ^
+   #+END_SRC
+   而你想把光标移动到 /]/ 后面：
+   #+BEGIN_SRC 
+     (defn foo [bar] (let [x 0] x))
+                   ^ 
+   #+END_SRC
+   你只需调用 *sp-backward-down-sexp*,我把该函数绑定到了快捷键 *M-down*
+   如果你有如下的表达式：
+   #+BEGIN_SRC 
+     (insert (format-time-string format))
+                                ^
+   #+END_SRC
+   而你想把光标 /(format 的(/ 上：
+   #+BEGIN_SRC 
+     (insert (format-time-string format))
+             ^
+   #+END_SRC
+   你只需调用函数 *sp-backward-up-sexp*.我把该函数绑定到了快捷键 *M-up*
+** Block movements
+   如果你有如下的表达式
+   #+BEGIN_SRC clojure
+(:require [clojure.string :as s])
+          ^
+   #+END_SRC
+   而你想把光标移动到 /]/ 后面：
+   #+BEGIN_SRC clojure
+(:require [clojure.string :as s])
+                                ^
+   #+END_SRC
+   你只需调用 *sp-forward-sexp*,我把该函数绑定到了快捷键 *C-M-f*
+   相反地；如果你想移动到 /[/:
+   #+BEGIN_SRC clojure
+(:require [clojure.string :as s])
+          ^
+   #+END_SRC
+   只需调用 *sp-backward-sexp*,我把该函数绑定到了快捷键 *C-M-b*
+** Top-level-ish traversal
+   假设你有如下表达式：
+   #+BEGIN_SRC 
+     (defn blah
+       "Returns blah of foo."
+       [foo]                 ^
+       )
+   #+END_SRC
+   而你想把光标移动到 /[/ :
+   #+BEGIN_SRC 
+     (defn blah
+       "Return blah of foo."
+       [foo]
+       ^
+       ) 
+   #+END_SRC
+   你只需调用函数 *sp-next-sexp*,我把该函数绑定到了 *C-M-n*
+   相反地，如果我想把光标移动回来：
+   #+BEGIN_SRC 
+     (defn blah
+       "Returns blah of foo."
+       [foo]                 ^
+       )
+   #+END_SRC
+   只需调用函数 *sp-previous-sexp*,我把该函数绑定到了 *C-M-p*
+** Free-form movements
+   假设你有如下的表达式：
+   #+BEGIN_SRC 
+     (defn blah [] (let [x 0 y 1](+ x 1)))
+                    ^
+   #+END_SRC
+   而你想把光标移动到 *blah*:
+   #+BEGIN_SRC 
+     (defn blah [] (let [x 0 y 1](+ x 1)))
+           ^
+   #+END_SRC
+   你只需调用函数 *sp-backward-symbol*,我把该函数绑定到了 *M-S-b*
+   此外，假设你有如下的表达式
+   #+BEGIN_SRC 
+     (defn blah [] (let [x 0 y 1](+ x 1)))
+                 ^
+   #+END_SRC
+   而你想把光标移动到 *(let* 后面：
+   #+BEGIN_SRC 
+     (defn blah [](let [x 0 y 1](+ x 1)))
+                      ^
+   #+END_SRC
+   你只需调用函数 *sp-forward-symbol*,我把该函数绑定到了 *C-S-f*
 
-  
+   上述各种函数所做的就是在表达式直接跳转，就好像分隔符（例如括号，方括号，花括号）
+   不存在那样。
+* Manipulation
+** Wrapping
+   假设你有如下的表达式：
+   #+BEGIN_SRC 
+     var mods="vars";
+              ^
+   #+END_SRC
+   而你想将 *vars* 包裹在 *[]* 里面：
+   #+BEGIN_SRC 
+     var mods=["vars"]
+               ^
+   #+END_SRC
+   按下 *C-M-Space*,然后在按下 *[*, *vars* 就会被一对 *[]* 所包裹；此外你同样
+   可以使用 *(*, *{* , *"*, *'*, *_*,等符号实现你想要的效果。
+   此外，你也可以定义相应的函数来简化按键操作：
+   #+BEGIN_SRC emacs-lisp
+     (defmacro def-pairs (pairs)
+       `(progn
+          ,@(loop for (key . val) in pairs
+                  collect
+                  `(defun ,(read (concat
+                                  "wrap-with-"
+                                  (prin1-to-string key)
+                                  "s"))
+                       (&optional arg)
+                     (interactive "p")
+                     (sp-wrap-with-pair ,val)))))
+
+     (def-pairs ((paren . "(")
+                 (bracket . "[")
+                 (brace . "{")
+                 (single-quote . "'")
+                 (double-quote . "\"")
+                 (back-quote . "`")))
+   #+END_SRC
+   (译者注：如果你运行上面的函数出错，可以添加一条语句 *(require 'cl)*)
+   我把前面三条函数绑定到了按键 *C-c (* *C-c [* *C-c {*.所以如果你有如下函数：
+   #+BEGIN_SRC 
+     (defn foo args (let [x 0](inc x)))
+               ^
+   #+END_SRC
+   你想用 *[]* 包裹住 *args*
+   #+BEGIN_SRC 
+     (defn foo [args](let [x 0](inc x)))
+                ^
+   #+END_SRC
+   你现在只需按下 *C-c [*.
+   有时候，我们无意间会输错了符号对中的其中一个符号，从而导致符号对的不匹配。现在，
+   你有了 *smartparens*, *smartparens* 会阻止这样的事情发生；例如你在下面的表达式
+   按下 *Backspace*
+   #+BEGIN_SRC 
+     var mods=["vars"]
+               ^ 
+   #+END_SRC
+   什么都不会改变。 *smartparens* 真的帮我们省去了很多烦恼
+** Unwrapping
+   如果你有如下的表达式：
+   #+BEGIN_SRC 
+     (foo (bar x y z))
+          ^
+   #+END_SRC
+   而你想去掉 *foo* 外面的那层括号：
+   #+BEGIN_SRC 
+     foo (bar x y z)
+         ^
+   #+END_SRC
+   你只需调用函数 *sp-backward-unwrap-sexp*,我把该函数绑定到了 *M-[*;
+   此外，如果你想去掉 *bar* 外面的那层括号：
+   #+BEGIN_SRC 
+     (foo bar x y z)
+          ^
+   #+END_SRC
+   你只需调用 *sp-unwrap-sexp*,我把该函数绑定到了 *M-]*
+** Slurp and barf
+   假设你有如下的表达式：
+   #+BEGIN_SRC 
+     [foo bar] baz
+             ^ 
+   #+END_SRC
+   而你想把 *baz* 放到方括号里面
+   #+BEGIN_SRC 
+     [foo bar baz]
+             ^
+   #+END_SRC
+   你只需 *sp-forward-slurp-sexp*,我把该函数绑定到了 *C-right*
+   此外；如果你又想把 *baz* 拿出来：
+   #+BEGIN_SRC 
+     [foo bar] baz
+             ^
+   #+END_SRC
+   你只需调用 *sp-forward-barf-sexp*,我把该函数绑定到了 *M-right*.
+   假设你有如下的表达式：
+   #+BEGIN_SRC 
+blah [foo bar]
+             ^
+   #+END_SRC
+   而你想把 *blah* 放到方括号里面：
+   #+BEGIN_SRC 
+     [blah foo bar]
+                  ^ 
+   #+END_SRC
+   你只需调用 *sp-backward-slurp-sexp*,我把该函数绑定到了 *C-left*
+   此外，如果你想把 *blah* 重新拿出来：
+   #+BEGIN_SRC 
+     blah [foo bar]
+                  ^
+   #+END_SRC
+   你只需调用函数 *sp-backward-barf-sexp*,我把该函数绑定到了 *M-left*
+** Swapping
+   假设你有如下的表达式：
+   #+BEGIN_SRC 
+     "foo" "bar"
+           ^
+   #+END_SRC
+   而你想把 *foo* 和 *bar* 交换位置：
+   #+BEGIN_SRC 
+     "bar" "foo"
+           ^
+   #+END_SRC
+   你只需调用函数 *sp-transpose-sexp*,我把该函数绑定到了 *C-M-t*
+** Killing
+   假设你有如下的表达式：
+   #+BEGIN_SRC 
+     (let [x "xxx" y "y yy yyy" z 0])
+                    ^
+   #+END_SRC
+   而你想删除掉 *y yy yyy*:
+   #+BEGIN_SRC 
+     (let [x "xxx" y z 0])
+                    ^
+   #+END_SRC
+   你只需调用 *sp-kill-sexp*,我把该函数绑定到了 *C-M-k*
+   或者你想删除 *"y yy yyy" z 0*:
+   #+BEGIN_SRC 
+     (let [x "xxx" y])
+                    ^
+   #+END_SRC
+   你只需调用函数 *sp-kill-hybrid-sexp*,我把该函数绑定到了 *C-k*
+
+   假设你有如下的表达式：
+   #+BEGIN_SRC clojure
+(:require [clojure.string :as s])
+                                ^ 
+   #+END_SRC
+   而你想删除掉 *[clojure.string :as s]*:
+   #+BEGIN_SRC clojure
+(:require)
+         ^
+   #+END_SRC
+   你只需调用函数 *sp-backward-kill-sexp*,我把该函数绑定到了 *M-k*
+* Key
+  下面的代码片段汇总了我在文章中提及的快捷键。此外，我使用 *bind-key* 来更方便地映射
+  我的快捷键;我已经在之前的[[http://ebzzry.io/emacs-hacks-2.html][文章]] 里讨论过快捷键这个问题了。
+  #+BEGIN_SRC emacs-lisp
+    (bind-keys
+     :map smartparens-mode-map
+     ("C-M-a" . sp-beginning-of-sexp)
+     ("C-M-e" . sp-end-of-sexp)
+
+     ("C-<down>" . sp-down-sexp)
+     ("C-<up>"   . sp-up-sexp)
+     ("M-<down>" . sp-backward-down-sexp)
+     ("M-<up>"   . sp-backward-up-sexp)
+
+     ("C-M-f" . sp-forward-sexp)
+     ("C-M-b" . sp-backward-sexp)
+
+     ("C-M-n" . sp-next-sexp)
+     ("C-M-p" . sp-previous-sexp)
+
+     ("C-S-f" . sp-forward-symbol)
+     ("C-S-b" . sp-backward-symbol)
+
+     ("C-<right>" . sp-forward-slurp-sexp)
+     ("M-<right>" . sp-forward-barf-sexp)
+     ("C-<left>"  . sp-backward-slurp-sexp)
+     ("M-<left>"  . sp-backward-barf-sexp)
+
+     ("C-M-t" . sp-transpose-sexp)
+     ("C-M-k" . sp-kill-sexp)
+     ("C-k"   . sp-kill-hybrid-sexp)
+     ("M-k"   . sp-backward-kill-sexp)
+     ("C-M-w" . sp-copy-sexp)
+
+     ("C-M-d" . delete-sexp)
+
+     ("M-<backspace>" . backward-kill-word)
+     ("C-<backspace>" . sp-backward-kill-word)
+     ([remap sp-backward-kill-word] . backward-kill-word)
+
+     ("M-[" . sp-backward-unwrap-sexp)
+     ("M-]" . sp-unwrap-sexp)
+
+     ("C-x C-t" . sp-transpose-hybrid-sexp)
+
+     ("C-c ("  . wrap-with-parens)
+     ("C-c ["  . wrap-with-brackets)
+     ("C-c {"  . wrap-with-braces)
+     ("C-c '"  . wrap-with-single-quotes)
+     ("C-c \"" . wrap-with-double-quotes)
+     ("C-c _"  . wrap-with-underscores)
+     ("C-c `"  . wrap-with-back-quotes))
+  #+END_SRC
+* Closing remarks
+  开始的时候， *smartparens* 那么多的命令真的让人眼花缭乱，不过你真的花时间去使用
+  *smartparens*,你就会发现，与 *smartparens* 带给你的便利相比，你花费的时间是那么值得
+
+  *smartparens* 是 [[mailto:matus.goljer@gmail.com][Matus Goljer]] 的得意之作；如果你想了解更多的信息，你可以查看 [[https://github.com/Fuco1/smartparens]]
+  如果你很喜欢这个项目，你可以[[https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=CEYP5YVHDRX8C][donate]] 一下
