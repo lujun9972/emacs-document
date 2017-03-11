@@ -1,0 +1,111 @@
+#+TITLE: Emacs Advice的局限性
+#+URL: http://nullprogram.com/blog/2013/01/22/
+#+AUTHOR: lujun9972
+#+TAGS: elisp-common
+#+DATE: [2017-03-05 Sun 22:41]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+今天工作的时候,我通过 [[http://www.50ply.com/blog/2012/08/13/introducing-impatient-mode/][impatient-mode]] 向 [[http://www.50ply.com/][Brian]] 展示部分代码. 
+我用 =narrow-to-region= 让buffer只显示相关的代码,却发现浏览器并不会同步只展示相关代码的效果.
+只有在我主动做出一些修改后,浏览器才会更像显示效果.
+这也可以理解,毕竟 impatient-mode 是为 =after-change-functions= 添加hook函数的. 
+让buffer只显示部分内容并不会实际修改buffer的内容,自然也就不会触发hook函数了.
+
+解决之道是要让buffer的显示范围发生改变时也触发hook函数. 然而可惜, [[http://www.gnu.org/software/emacs/manual/html_node/elisp/Standard-Hooks.html][Emacs并不存在这种hook]]. 
+我本想着可以通过 [[http://www.gnu.org/software/emacs/manual/html_node/elisp/Advising-Functions.html][advice]] 来模拟这种hook,结果失败了.
+
+* Emacs Advice
+
+什么是advice? 它是Emacs Lisp提供的一个很feature,能够让你在无需重定义函数的情况下改变函数的行为.
+它有点类似于Common Lisp Object System (CLOS)中的方法: 你可以在函数执行前,执行后运行一段代码. 甚至用这段代码覆盖原函数.
+
+你可以使用 =defadvice= 来定义Advice. 假设你闲的无聊,想让Emacs每次在用 =kill-line= 删除行的时候都说一句"Ouch!",你可以这样作:
+
+#+BEGIN_SRC emacs-lisp
+  (defadvice kill-line (after say-ouch activate)
+    (message "Ouch!"))
+#+END_SRC
+
+这个意思是说,我们定义并激活了一个名为 =say-ouch= 的advise,而且我们希望在运行 =kill-line= 函数后执行该advise.
+advice的定义语法跟函数类似,第一行后面剩余的语句都是作为advice的执行body. 
+执行完这条 =defadvice= 语句后, 每次我按下 =C-k=, Emacs都会在minibuffer上显示“Ouch!”. 太酷了!
+
+* narrow-to-region and widen
+
+hook是一种值为函数列表的变量. (hook也可以指该列表中的函数. Emacs的documentation把这两样东西都叫作hook)
+当某些特定事件发生时,这些函数会被调用,而且通常是不带参数的调用. 
+比如,每个mode都有它自己的mode hook,当该mode被激活时触发.
+这样就允许用户自己扩展和修改mode的行为 -比如激活其他的minor mode- 而无需直接修改mode的源代码.
+
+我现在要做的是 advise =narrow-to-region= 和 =widen= 这两个函数让它们运行后触发我定义的hook.
+这两个函数是所有narrow类函数(narrow-to-defun, narrow-to-page, 以及其他与mode相关联的narrowing)最终都会调用的函数.
+给这两个函数加上advise应该会影响到所有的narrow函数. 看起来挺简单的.
+
+#+BEGIN_SRC emacs-lisp
+  (defvar change-restriction-hook ())
+
+  (defadvice narrow-to-region (after hook activate)
+    (run-hooks 'change-restriction-hook))
+
+  (defadvice widen (after hook activate)
+    (run-hooks 'change-restriction-hook))
+#+END_SRC
+
+一开始似乎一切都挺顺利的. 我添加了一个测试用的hook,然后在运行 =M-x narrow-to-region= 和 =M-x widen= 时确实能看到激活了该hook.
+但是当我执行其他的narrow类函数时(比如 =narrow-to-defun=),我的hook函数并没有被调用.
+
+怎么回事?还有什么narrow用的元素函数被我漏掉了吗? 我检查了一下源代码,发现并没有. 这些lisp函数最终调用的就是 =narrow-to-region=. 
+怎么回事? 难道间接调用时advice无效码? 我做了一下实验.
+
+#+BEGIN_SRC emacs-lisp
+  (defun foo ()
+    (interactive)
+    (narrow-to-region 1 2))
+#+END_SRC
+
+没问题啊. Hmmm,其他函数都被编译成字节码了,也许跟这个有关.
+
+#+BEGIN_SRC emacs-lisp
+  (byte-compile 'foo)
+#+END_SRC
+
+Bingo. advice 不再生效了. 真的跟编译有关.
+
+* Bytecode
+
+让我们来看一下 =foo= 编译出来的字节码是怎样的.
+
+#+BEGIN_SRC emacs-lisp
+  (symbol-function 'foo)
+  ;; => #[nil "\300\301}\207" [1 2] 2 nil nil]
+#+END_SRC
+
+我对Emacs的字节码所知不多,但一个大概还是清楚的. 编译后的函数其实就是一个特殊形式的数组(也就是 =#[]= 这样的). 
+这是一个合法的S表达式. 你可以像普通函数一样直接用在Elisp代码中,不过你肯定看不懂它的意义.
+
+这种函数数组的第一个元素是参数列表 — 在我们这个例子中为空.
+第二个元素是一个字符串,其内容就是真正的字节码. 
+接下来的是函数体中包含的各种常量,其中也包括函数体中调用其他函数的名字(symbol).
+但是你会发现, =narrow-to-region= 并不包含其中!
+
+好奇怪啊. 让我们再来分析一下字符串中的那些字节码吧. Let’s take a closer look at the bytecode.
+
+#+BEGIN_SRC emacs-lisp
+  (coerce (aref (symbol-function 'foo2) 1) 'list)
+  ;; => (192 193 125 135)
+#+END_SRC
+
+通过对比Emacs中的 bytecomp.el 文件,我发现192和193是用来访问常量的. 它们将常量1和2作为函数参数压入栈中.
+然后是125, 它代表的是 =byte-narrow-to-region=. 哈,问题在这里!
+
+原来 =narrow-to-region= 十分的特殊 — 也许是因为很常用吧 — 它拥有自己的字节码. 
+因此,原本是函数调用的过程编译后变成了单条指令了.
+这意味着我的advice对编译后的字节码根本无效.
+同样的, =widen= 也是一样(code 126).
+
+* Where to go now?
+
+由于无法为buffer-narrow的那些函数添加hook或adivce, impatient-mode只能另辟蹊径了.
+也许每次执行命令后都检查一下buffer的显示区域是否发生了改变,如果改变了就更新对应的web客户端吧.
+我会想办法搞定的.
