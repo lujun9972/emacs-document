@@ -1,7 +1,7 @@
 #!/bin/bash
 
 declare -A catalog_comment_dict
-catalog_comment_dict=([calc]="关于Calc的内容" [dired]="文件管理" [advertisement]="别看广告,看疗效" [elisp-common]="关于elisp的内容" [org-mode]="关于org-mode的内容" [emacs-common]="其他未分类的emacs内容" [raw]="未翻译或者翻译到一半的内容" [reddit]="reddit好问题" [Eshell]="Eshell之野望")
+catalog_comment_dict=([calc]="关于Calc的内容" [dired]="文件管理" [advertisement]="别看广告,看疗效" [elisp-common]="关于elisp的内容" [org-mode]="关于org-mode的内容" [emacs-common]="其他未分类的emacs内容" [raw]="未翻译的内容,欢迎大家领取" [reddit]="reddit好问题" [Eshell]="Eshell之野望" [processing]="正在翻译的内容,别人的东西可不要抢哦~")
 
 catalogs=$(for catalog in ${!catalog_comment_dict[*]};do
                echo $catalog
@@ -20,8 +20,8 @@ function get_contributors()
 
 function generate_headline()
 {
-    local catalog=$1
-    echo "* " $catalog
+    local catalog="$*"
+    echo "* $catalog"
     echo ${catalog_comment_dict[$catalog]}
     echo 
     generate_links $catalog |sort -t "<" -k2 -r
@@ -30,6 +30,9 @@ function generate_headline()
 function generate_links()
 {
     local catalog=$1
+    if [[ ! -d $catalog ]];then
+        mkdir -p $catalog
+    fi
     posts=$(ls -t $catalog)
     old_ifs=$IFS
     IFS="
