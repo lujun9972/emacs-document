@@ -74,7 +74,7 @@ Instead of opening up a terminal to my virtual machine, I pop into Emacs and
 load this sprint’s note file^[[http://howardism.org/Technical/Emacs/literate-devops.html#fn.1][1]], create a new header, and enter the shell and
 ruby commands in this text file.
 
-替代以往打开终端连接到虚拟机的方式，现在我会进入Emacs，打开这些脚本记录文件[fn:1]，创建一个新的标题，并把shell和ruby等命令输入到这个文件中。
+不同于以往打开终端连接到虚拟机的方式，现在我会进入Emacs，打开这些脚本记录文件[fn:1]，创建一个新的标题，并把shell和ruby等命令输入到这个文件中。
 
 What good is this? Unlike a traditional terminal, this allows me to log, 
 document and execute each command.
@@ -93,7 +93,7 @@ As an old bear with very little brains, my prose can explain the background
 and purpose of each command. Clicking the hyperlink refreshes my memory of
 previous discoveries. A keychord executes the code block…
 
-作为一个记性不太好的老家伙，我的“文学作品”可以解释每一条命令的背景和目的。点击一个超链接，就可以追溯到我之前记下来的发现结果，一套组合键就能执行需要的代码块。
+作为一个记性不太好的老家伙，我的“文学作品”可以解释每一条命令的背景和目的。点击一个超链接，就可以追溯到我之前记录下来的发现结果。一套组合键就能执行需要的代码块……
 
 Yes. I execute the commands from within Emacs.
 
@@ -160,17 +160,23 @@ through different languages.
 上述的例子演示了文学化的编程是如何将不同的语言代码和数据糅合在一起产生作用的。
 
 * What about the Virtual Machine?
+* 如果是虚拟机的话该怎么办呢？
 
 Normally, specifying sh as the code block’s language, tells Emacs to run the
 code in my local system’s shell, but in this case, I want it ran on my virtual
 machine (or on my development server in my lab). I’ll describe two options for
 doing this, using [[http://www.emacswiki.org/TrampMode][Tramp]] and Babel Sessions.
 
+通常情况下，通过指定代码块语言为sh的方式来告诉Emacs在本地系统shell中执行代码。但是在这个案例中，我希望代码能够在虚拟机上执行（或在我圈养开发服务器上）。接下来我会介绍两种方式来实现这一切，一种是使用[[http://www.emacswiki.org/TrampMode][Tramp]]，而另一种则是使用各种Sessions。
+
 ** Tramp to the Rescue
+** 搬出Tramp这个救兵
 
 Tramp is an Emacs feature that allows one to edit a file on a remote machine
 using ssh and other protocols. For instance, running the find-file function
 (bound to C-x C-f) lets you type something like:
+
+Tramp是Emacs提供的一种功能，它允许使用ssh或者其它协议访问和编辑远程主机上的文件。例如你可以输入以下命令，在远程主机上执行find-file功能（Emacs快捷键“C-x C-f”）：
 
 #+BEGIN_SRC emacs-lisp
   /ssh:howard.abrams@goblin.howardism.org:web/files/robot.txt
@@ -178,12 +184,18 @@ using ssh and other protocols. For instance, running the find-file function
 
 If you put the following in your .emacs initialization file:
 
+前提是你需要在.emacs启动文件中放入如下内容：
+
 #+BEGIN_SRC emacs-lisp
   (setq tramp-default-method "ssh")
+  ;; linux系统下默认就是ssh可以不用设置
+  ;; windows系统下将ssh改为plink（putty的一个模块）。当然windows系统嘛……你懂的，祝你好运！！！
 #+END_SRC
 
 And update your ~/.ssh/config file to know what user account goes with the
 host name, the file reference above can be shorten to:
+
+同时更新你的~/.ssh/config文件，声明你希望用什么用户访问你指定的服务器，简单来说文件内容就是如下的样子：
 
 #+BEGIN_SRC emacs-lisp
   /goblin.howardism.org:web/files/robot.txt
@@ -192,16 +204,26 @@ host name, the file reference above can be shorten to:
 Emacs looks for the : character to determine if Tramp should be invoked. Tramp
 uses SSH keys if available, or will prompt you for a password if needed.
 
+Emacs会通过“:”符号后面的内容来决定Tramp要访问的目标。使用SSH keys能方便Tramp的访问，否则就要在提示符下输入密码。
+
 Each org-mode code block can specify a :dir option that specifies where the
 code snippet should run, for instance, the following blocks are equivalent:
 
-[[http://howardism.org/Technical/Emacs/literate-devops-9.png]]
+每个org-mode代码块都可以设置“:dir”来指定代码片段在哪个目录执行。就如同下图中代码块的例子：
+
+[[./literate-devops.files/literate-devops-9.png]]
+
+原图：http://howardism.org/Technical/Emacs/literate-devops-9.png
 
 The :dir option allows full Tramp functionality, allowing me to run a block on
 a different machine. Remember how I added my client Vagrant virtual machine to
 my ~/.ssh/config file?
 
-[[http://howardism.org/Technical/Emacs/literate-devops-10.png]]
+“:dir”配置项支持Tramp的全部功能，允许我在不同的主机上执行代码块。还记得我是怎么将Vagrant虚拟主机的连接信息加入到我的~/.ssh/config文件中的么？
+
+[[./literate-devops.files/literate-devops-10.png]]
+
+原图：http://howardism.org/Technical/Emacs/literate-devops-10.png
 
 But I need access to my machine behind a firewall!?
 
