@@ -6,7 +6,7 @@
 #+LANGUAGE:  zh-CN
 #+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
 
-
+* 0 Preface(self add)
 I use org-mode extensively. I write scientific papers, keep notes on meetings,
 write letters of recommendation, notes on scientific articles, keep TODO lists
 in projects, help files for software, write lecture notes, students send me
@@ -14,10 +14,12 @@ homework solutions in it, it is a contact database, … Some files are on
 Dropbox, Google Drive, Box, some in git repos, etc. The problem is that leads
 to org-files everywhere on my hard drive. At this point I have several
 thousand org-files that span about five years of work.
-我经常使用org-mode.我用org-mode写论文，记会议笔记，写推荐信，记文献笔记，维护项目的TODO列表和软件
-的帮助文档，写演讲稿，甚至学生们的。它就像一个数据库。。。一些文件存在Dropbox, GoogleDrive, Box
-上，一些在git repos 里。问题是这样org 文件就到处散布在我的硬盘中。如今我已经有了几千个org 文件记录
-着我五年的工作。
+
+我经常使用org-mode.我用它写论文，记会议笔记，写推荐信，记文献笔记，维护项目的TODO列表和软件
+的帮助文档，写演讲稿，甚至处理学生们的作业。它就像一个数据库。。。一些文件存在Dropbox, GoogleDrive, Box
+上，一些在git repos里。问题是这样org文件就散布在我硬盘各处。如今我已经有了几千个org文件记录
+着我五年来的工作。
+
 It is not that easy after a while to find them. Yes there are things like
 recent-files, bookmarks, counsel-find-file, helm-for-files, counsel/
 helm-locate, helm/counsel-grep/ag/pt, projectile for searching within a
@@ -28,9 +30,14 @@ finding what I want. What about a file I made a year ago that is not in the
 current directory or this project, and not in my org-agenda-files list? How do
 I get a dynamic todo list across all these files? Or find all the files that
 cite a particular bibtex entry, or that were authored by a particular student?
-这样过上一段时间查找文件就很困难了。确实有像recent-files, bookmarks, counsel-find-file,
+
+像这样过上一段时间，查找文件就很困难了。确实有像recent-files, bookmarks, counsel-find-file,
 helm-for-files, counsel/helm-locate, helm/counsel-grep/ag/pt, projectile 这样的工具
-可以用来搜索项目里的文件，也有recoll
+可以用来搜索项目里的文件，有一大堆工具可以搜索buffer,还有 [[https://www.lesbonscomptes.com/recoll/][recoll]] 等桌面搜索工具，当然还有良好的
+组织习惯等等。五年过去了，我找到了一个查找到目标文件的方法。如果说想找一份我一年前创建的文件，然而
+它现在既不在当前目录或项目也不在我的org-agenda-files 列表呢？我怎么得到一份包含所有文件的动态todo
+列表呢？或是怎么找到包含特定bibtex entry 或某个学生所写的所有文件呢？
+
 Previously, [[http://kitchingroup.cheme.cmu.edu/blog/2015/07/06/Indexing-headlines-in-org-files-with-swish-e-with-laser-sharp-results/][I indexed org files with Swish-e]] to make it easy to search them,
 with an ability to search just headlines, or paragraphs, etc. The problem with
 that is the nightly indexing was slow since I basically had to regenerate the
@@ -38,12 +45,21 @@ database each time due to limitations in Swish-e. Finally I have gotten around
 to the next iteration of this idea, which is a better database. In this post,
 I explore using sqlite to store headlines and links in org-files.
 
+之前， [[http://kitchingroup.cheme.cmu.edu/blog/2015/07/06/Indexing-headlines-in-org-files-with-swish-e-with-laser-sharp-results/][我用Switch-e来标注org文件]] , 这样搜索起来很容易，但它只能搜索headline 或paragraph 等。
+这个解决方法的问题是由于Swish-e 的局限我不得不每次重新生成数据库因此标注非常慢。最后我找到了
+另一个方法，一个更好的数据库。这篇贴子，我将会尝试用sqlite 来保存org 文件中的headline 和
+link.
+
 The idea is that anytime I open or save any org file, it will be added/updated
 in the database. The database will store the headlines and its properties and
 content, as well as the location and properties of all links and file
 keywords. That means I should be able to efficiently query all org files I
 have ever visited to find TODO headlines, tagged headlines, different types of
 links, etc. Here we try it out and see if it is useful.
+
+我的想法是每次打开或保存任何org 文件时，它就会被添加进或是更新数据库。数据库会保存headline, 
+property,content,... 这样我能够高效地查询那些包含我曾访问过的todo headine, tagged headline,
+各类link 的文件。这里我们来试一下看看有没有用。
 
 * 1 The database design
 
@@ -54,6 +70,11 @@ that contain the filenames, headlines, tags, properties, (optionally)
 headline-content, headline-tags, headline-properties, and links. The lisp code
 is a work in progress, and not something I use on a daily basis yet. This post
 is a proof of concept to see how well this approach works.
+
+我用 [[https://github.com/skeeto/emacsql][emacsql]] 来创建sqlite3数据库并与之交互。这样生成SQL queries的方式很lispy。我不会
+在这讨论太多代码，你可以看看这个版本 [[http://kitchingroup.cheme.cmu.edu/media/org-db.el][org-db.el]] 数据库由一些包含文件名，标题，标签，属性，标题内容（可选），
+标题标签，标题属性和链接的table组成。这里的lisp代码只作为演示而不是我日常使用的。这篇贴子
+只是用来证明这方法多有效。
 
 I use hooks to update the database when an org-file is opened (only if it is
 different than what is in the database based on an md5 hash) and when it is
@@ -69,8 +90,18 @@ be. Most of the files do not change often, the database gets updated each time
 you open a file, and you can always reindex the database from files it knows
 about. Time will tell how often that seems necessary.
 
+当org文件被打开或保存时，我用hook来更新数据库（当然只有文件与数据库中内容不同时才会更新，
+基于md5 hash比对）。通常，这些函数先删除文件在数据库中的entry再把数据添加回库。我发现
+这比用org-element来parse org文件更快，尤其是处理大文件时。因为这些都由hook来完成，
+所以无论我在何时何地打开一个org 文件，它都会被加进数据库或是更新数据库。效果尚可接受。这个
+方法不能保证数据库永远保持准确（比如文件在emacs外被更改，如一次git pull），但它也并不需要
+永远准确。大多数文件都不会经常改动，而数据库在每次打开文件时都会更新，你也可以
+
+
 emacsql lets you use lisp code to generate SQL that is sent to the database.
 Here is an example:
+
+emacsql 允许你用lisp代码生成SQL送往数据库。下面是个例子：
 
 #+BEGIN_SRC emacs-lisp
   (emacsql-flatten-sql [:select [name] :from main:sqlite_master :where (= type table)])
@@ -87,11 +118,19 @@ difficulty to figure out, and the author of emacsql was really helpful on a
 few points. I will be referring to this post in the future to remember some of
 these nuances!
 
+这里有些  ,比如main:sqlite_master被转换成main.sqlite_master. 你可以用矢量（vector）关键词
+和  来设置命令。emacsql会把像filename-id这样的名字转换成filename_id. 理解起来并不困难，
+而且emacsql 的作者在某些  . 我将来会
+
 Here is a list of tables in the database. There are a few primary tables, and
 then some that store tags, properties, and keywords on the headlines. This is
 typical of emacsql code; it is a lisp expression that generates SQL. In this
 next expression org-db is a variable that stores the database connection
 created in org-db.el.
+
+下面是一个数据库中table的列表。有一些primary tables,还有一些table保存标签，属性和标题
+关键字。这是典型的emacsql代码；它是条生成SQL的lisp表达式。表达式中的org-db是个保存
+数据库连接的变量。它由org-db.el创建。
 
 #+BEGIN_SRC emacs-lisp
   (emacsql org-db [:select [name] :from main:sqlite_master :where (= type table)])
@@ -174,9 +213,14 @@ and the headlines table.
 Tags and properties on a headline are stored in headline-tags and
 headline-properties.
 
+标题里的标签和属性保存在 headline-tags 和 headline-properties 里。
+
 The database is not large if all it has is headlines and links (no content).
 It got up to half a GB with content, and seemed a little slow, so for this
 post I leave the content out.
+
+如果只保存标题和链接（不保存内容）的话，数据库不会很大。而保存了内容后，它会达到500MB而且
+变得有点慢。所以这篇贴子里，我不会将内容加入数据库。
 
 #+BEGIN_SRC shell
   du -hs ~/org-db/org-db.sqlite
@@ -192,6 +236,10 @@ from my research and teaching projects this number grows to about 10,000! You
 do not want to run org-map-entries on that. Note this also includes all of the
 org_archive files.
 
+我们可以看看数据库里有多少文件。这些只是我Dropbox文件夹里的org文件。除此之外还有很多！如果
+我把我所有的研究和教学项目的org 文件包括进来，这个数字会达到10,000! 你是不会想要对这些文件运行
+org-map-entries的。注意这也包括了所有的org_archive文件。
+
 #+BEGIN_SRC emacs-lisp
   (emacsql org-db [:select (funcall count) :from files])
 #+END_SRC
@@ -203,6 +251,8 @@ org_archive files.
 Here is the headlines count. You can see there is no chance of remembering
 where these are because there are so many!
 
+这是标题总数。你可以看到根本不可能记住这么多标题都在哪里！
+
 #+BEGIN_SRC emacs-lisp
   (emacsql org-db [:select (funcall count) :from headlines])
 #+END_SRC
@@ -212,6 +262,8 @@ where these are because there are so many!
 +-------+
 
 And the links. So many links!
+
+还有链接总数。有如此多链接！
 
 #+BEGIN_SRC emacs-lisp
   (emacsql org-db [:select (funcall count) :from links])
@@ -223,9 +275,13 @@ And the links. So many links!
 
 That is a surprising number of links.
 
+这真是一堆数目可观的链接。
+
 * 2 Querying the link table
 
 Let's see how many are cite links from org-ref there are.
+
+让我们看看  
 
 #+BEGIN_SRC emacs-lisp
   (emacsql org-db [:select (funcall count) :from links :where (= type "cite")])
@@ -243,6 +299,11 @@ only stores the filename-id, so we join it with the files table to get useful
 information. Here we show the list of files that contain a citation of that
 reference. It is a mix of manuscripts, proposals, presentations, documentation
 files and notes.
+
+哇，这些链接也好多！我以写proposal和paper为生，我用org-ref来简化工作，所以也许这个数字
+没什么奇怪的。我们可以在link数据库里搜索引用了"kitchin-2015-examp"的文件。links table
+只有filename-id,所以我们把它和files table合并来得到有用的信息。这里我们可以看到引用了
+"kitchin-2015-examp"的文件列表。里面有手稿，
 
 #+BEGIN_SRC emacs-lisp
   (emacsql org-db [:select :distinct [files:filename]
@@ -348,6 +409,8 @@ files and notes.
 Obviously we could use this to generate candidates for something like helm or
 ivy like this.
 
+很明显，我们可以这样生成helm和ivy这类工具的候选条目。
+
 #+BEGIN_SRC emacs-lisp
   (ivy-read "Open: " (emacsql org-db [:select [files:filename links:begin]
                                               :from links :inner :join files :on (= links:filename-id files:rowid) 
@@ -368,11 +431,16 @@ Since SQL is the query language, you should be able to build really
 sophisticated queries that combine filters for multiple citations, different
 kinds of citations, etc.
 
+现在，你可以找到引用任何bibtex key的所有文件。因为SQL是查询语言，你应该可以写出像是
+
 * 3 Headline queries
 
 Every headline is stored, along with its location, tags and properties. We can
 use the database to find headlines that are tagged or with certain properties.
 You can see here I have 293 tags in the database.
+
+每个标题，连同它的位置，标签和属性都被保存了下来。我们可以用数据库找到带有标签和特定属性的标题。
+你可以看到我的数据库里有293个标签。
 
 #+BEGIN_SRC emacs-lisp
   (emacsql org-db [:select (funcall count) :from tags])
@@ -384,6 +452,8 @@ You can see here I have 293 tags in the database.
 
 Here we find headlines tagged with electrolyte. I tagged some papers I read
 with this at some point.
+
+这里我们查找带有electrolyte标签的标题。我有时用它标记一些相关的文献。
 
 #+BEGIN_SRC emacs-lisp
   (emacsql org-db [:select :distinct [files:filename headlines:title]
@@ -419,6 +489,8 @@ with this at some point.
 Here we see how many entries have an EMAIL property. These could serve as
 contacts to send email to.
 
+我们可以看到有很多带EMAIL属性的entry. 这些可以作为邮件联系人。
+
 #+BEGIN_SRC emacs-lisp
   (emacsql org-db [:select [(funcall count)] :from
                            headlines :inner :join headline-properties :on (=  headlines:rowid headline-properties:headline-id)
@@ -431,6 +503,8 @@ contacts to send email to.
 +------+
 
 If you want to see the ones that match "jkitchin", here they are.
+
+如果你想看匹配"jkitchin"的标题，它们在这。
 
 #+BEGIN_SRC emacs-lisp
   (emacsql org-db [:select :distinct [headlines:title headline-properties:value] :from
@@ -450,6 +524,8 @@ If you want to see the ones that match "jkitchin", here they are.
 Here is a query to find the number of headlines where the deadline matches
 2017. Looks like I am already busy!
 
+这是一个查找有多少deadline是2017年的标题。看来我很忙啊！
+
 #+BEGIN_SRC emacs-lisp
   (emacsql org-db [:select (funcall count) :from
                            headlines :inner :join headline-properties :on (=  headlines:rowid headline-properties:headline-id)
@@ -466,6 +542,9 @@ Here is a query to find the number of headlines where the deadline matches
 We also store file keywords, so we can search on document titles, authors,
 etc. Here are five documents with titles longer than 35 characters sorted in
 descending order.
+
+我们也能保存文件关键字，这样就能搜索文档标题，作者等等。这里是五篇title 长度超过35个字符的
+文档，按照降序排列。
 
 #+BEGIN_SRC emacs-lisp
   (emacsql org-db [:select :distinct [value] :from
@@ -492,6 +571,8 @@ It is possible to search on AUTHOR, and others. My memos have a #+SUBJECT
 keyword, so I can find memos on a subject. They also use the LATEX_CLASS of
 cmu-memo, so I can find all of them easily too:
 
+我们也可以搜索作者和其它的东西。我的  带有   关键字，所以
+
 #+BEGIN_SRC emacs-lisp
   (emacsql org-db [:select [(funcall count)] :from
                            file-keywords :inner :join keywords :on (= file-keywords:keyword-id keywords:rowid)
@@ -511,6 +592,8 @@ In theory, the database has a table for the headline content, and it should be
 fully searchable. I found the database got a little sluggish, and nearly 1/2 a
 GB in size when using it so I am leaving it out for now.
 
+理论上，数据库里有headline content的table, 它也完全是可搜索的。我发现
+
 * 6 Summary
 
 The foundation for something really good is here. It is still a little tedious
@@ -518,6 +601,10 @@ to wrote the queries with all the table joins, but some of that could be
 wrapped into a function for a query. I like the lispy style of the queries,
 although it can be tricky to map all the concepts onto SQL. A function that
 might wrap this could look like this:
+
+真正有趣的地方在这。当所有table合并在一起时，查询就会有点复杂。但是其中一些可以
+包装成函数。尽管把所有的概念转变成SQL式要费点功夫，但我喜欢lisp式的查询。一个
+包装起来的函数可能像下面这样：
 
 #+BEGIN_SRC emacs-lisp
   (org-db-query (and (= properties:property "DEADLINE") (glob headline-properties:value "*2017*")))
@@ -527,6 +614,9 @@ This is what it would ideally look like using the org tag/property match
 syntax. Somehow that string would have to get expanded to generate the code
 above. I do not have a sense for how difficult that would be. It might not be
 hard with [[https://github.com/skeeto/rdp][a recursive descent parser]], written by the same author as emacsql.
+
+这是使用org tag/property匹配语法的查询应有的样子。有时字符串要展开，就像上面的代码。
+我不觉得这有多难。用上 [[https://github.com/skeeto/rdp][a recursive descent parser]] (由emacsql作者编写) 就容易多了。
 
 #+BEGIN_SRC emacs-lisp
   (org-db-query "DEADLINE={2017}")
@@ -542,6 +632,10 @@ had my eye on [[https://xapian.org][xapian]] since that is what mu4e (and notmuc
 good to have an external library for parsing org-files, i.e. not through
 emacs, for this. It would certainly be faster. It seems like a big project
 though, maybe next summer ;)
+
+数据库的表现还可以。对于大型的org文件，更新数据库时有明显的停顿，因为更新时Emacs
+处于block的状态。我可以通过计时器 (timer) 来按顺序更新数据库甚至定时更新。并不需要
+时刻保持更新因为下次搜索时它们也不完全准确。
 
 Another feature this might benefit from is ignore patterns, or some file
 feature that prevents it from being indexed. For example, I keep an encrypted
