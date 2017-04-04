@@ -1,115 +1,49 @@
 #+URL: http://nullprogram.com/blog/2014/06/13/
+#+TITLE: Emacs Unicode陷阱
 
-GNU Emacs is seven years older than Unicode. Support for Unicode had to be
-added relatively late in Emacs’ existence. This means Emacs has existed longer
-without Unicode support (16 years) than with it (14 years). Despite this,
-Emacs has excellent Unicode support. It feels as if it was there the whole
-time.
+GNU Emacs的发布要比Unicode早7年。Emacs存在以后是在相对较晚的时候才加入了对Unicode的支持，这意味着在Emacs的历史中，不支持Unicode的时间段（16年）比支持Unicode的时间段（14年）还要长「注：文章发表于2014年」。尽管如此，Emacs对Unicode的支持十分出色，让人感觉似乎它一直都支持Unicode。
+# Emacs首次发布于1985年3月
+# Unicode首次发布于1992年6月
+然而,由于Unicode的目标是要涵盖所有已知的人类语言及其各式各样的细枝末节,结果自然会存在一些陷阱和问题。如果仅作为一个Emacs使用者的话，你可能不太会因此而受到影响。但如果作为一个扩展（插件）的开发者，你很可能会在处理Emacs的strings和buffers时遇到麻烦，这两个都是基于字符的数据结构。
 
-However, as a natural result of Unicode covering all sorts of edge cases for
-every known human language, there are pitfalls and complications. As a user of
-Emacs, you’re not particularly affected by these, but extension developers
-might run into trouble while handling Emacs character-oriented data
-structures: strings and buffers.
+在这篇文章中，我将分享Elisp中Unicode带给我们的“惊喜”。我自己就曾遇到过好几个，事实上，写这篇文章还让我在自己的扩展程序中发现了好几个编码方面的小bug。这些缺陷都不是Emcas的错，它们只是自然语言的复杂性导致的结果。
 
-In this article I’ll go over Elisp’s Unicode surprises. I’ve been caught by
-some of these myself. In fact, as a result of writing this article, I’ve
-discovered subtle encoding bugs in some of my own extensions. None of these
-pitfalls are Emacs’ fault. They’re just the result of complexities of natural
-language.
+* Unicode和编码值（Code Point）
 
-* Unicode and Code Points
+首先，网上有非常好的资料来学习Unicode，我推荐从[[http://www.cl.cam.ac.uk/~mgk25/unicode.html][UTF-8 and Unicode FAQ for Unix/Linux]]开始。我没有理由在这里重复所有的信息，但是我会尝试快速地总结一下。Unicode将一个编码值（整数）映射到某个具体的字符，并带一个标准的名字。在写这篇文章的时候Unicode定义了超过11万个的字符。为了后向兼容性，前128个编码值映射到ASCII码。这个趋势也被其他的字符编码标准接受，比如Latin-1。
 
-First, there are excellent materials online for learning Unicode. I recommend
-starting with [[http://www.cl.cam.ac.uk/~mgk25/unicode.html][UTF-8 and Unicode FAQ for Unix/Linux]]. There’s no reason for me
-to repeat all this information here, but I’ll attempt to quickly summarize it.
+在Emacs中，Unicode字符使用C-x 8 RET（insert-char）输入到buffer中。你既可以输入标准的字符名称（比如：π是“GREEK SMALL LETTER PI”），也可以直接输入十六进制的编码值。在Emacs之外的其他应用程序中如何输入是要看情况的，但是就我关心的应用来说C-S-u加上十六进制的编码值都是可以的。
 
-Unicode maps code points (integers) to specific characters, along with a
-standard name. As of this writing, Unicode defines over 110,000 characters.
-For backwards compatibility, the first 128 code points are mapped to ASCII.
-This trend continues for other character standards, like Latin-1.
+** 编码
 
-In Emacs, Unicode characters are entered into a buffer with C-x 8 RET
-(insert-char). You can enter either the official name of the character (e.g.
-“GREEK SMALL LETTER PI” for π) or the hexadecimal code point. Outside of Emacs
-it depends on the application, but C-S-u followed by the hexadecimal code
-works for most of the applications I care about.
+Unicode标准也描述了几种方法来将编码值序列转成字节序列。很明显，11万个字符无法用一个字节来编码，所以就有了多字节编码格式。最流行的两种Unicode编码格式应该是UTF-8和UTF-16。
 
-** Encodings
+UTF-8设计之初就是要后向兼容已存在的ASCII编码、Unix系统以及C语言API（以null作为终止符的C字符串）。前128个编码值直接编码为单字节，其他字符用2到6的字节来编码，所有字节的最高比特设置为1，这样所有多字节的字符都不会被解释为ASCII字符，也不会存在null（0）。这样C语言写的程序和API就能够不改变或者做稍微调整就能处理UTF-8的字符串了。最重要的是，每一个ASCII码编码的文件自动可以转换为UTF-8编码的文件。
 
-The Unicode standard also describes several methods for encoding sequences of
-code points into sequences of bytes. Obviously a selection of 110,000
-characters cannot be encoded with one byte per letter, so these are multibyte
-encodings. The two most popular encodings are probably UTF-8 and UTF-16.
+UTF-16用2个字节来编码基本多文种平面（第零平面，Basic Multilingual Plane - BMP）中的字符，甚至原本的ASCII字符也用2个字节（16比特）。第零平面基本上涵盖了所有现代语言中实际使用到的所有字符。然而,UTF-16却不包括辅助（星体）平面中重要的例如[[http://www.fileformat.info/info/unicode/char/1f379/index.htm][TROPICAL DRINK]]或者[[http://www.fileformat.info/info/unicode/char/1F4A9/index.htm][PILE OF POO]]字符。如果你需要在UTF-16中用这些字符将出现问题：超过第零平面的字符不能被放在2个字节中。为了能容纳这些字符，UTF-16使用代理对（surrogate pairs）：这些字符会用一对2字节单元来编码。
 
-UTF-8 was designed to be backwards compatible with ASCII, Unix, and existing C
-APIs (null-terminated C strings). The first 128 code points are encoded
-directly as a single byte. Every other character is encoded with two to six
-bytes, with the highest bit of each byte set to 1. This ensures that no part
-of a multibyte character will be interpreted as ASCII, nor will it contain a
-null (0). The latter means that C programs and C APIs can handle UTF-8 strings
-with few or no changes. Most importantly, every ASCII encoded file is
-automatically a UTF-8 encoded file.
+由于最后一点, UTF-16相对于UTF-8没有实用上的优势。它的[[http://www.utf8everywhere.org/][存在可能是一个巨大的错误]]。由于代理对的存在，你无法用恒定时间算法去查找，而且不能后向兼容也不能存储在以null结尾的字符串中。在Java和JavaScript中，它会导致一些字符串“长度”和字符、编码值甚至字节数不一至的窘境。最糟糕的是，它会导致[[https://speakerdeck.com/mathiasbynens/hacking-with-unicode?slide=114][严重的安全隐患]]。新的应用程序应该尽可能地避免这些问题。
 
-UTF-16 encodes all the characters from the Basic Multilingual Plane (BMP) with
-two bytes. Even the original ASCII characters get two bytes (16 bits). The BMP
-covers virtually all modern languages and is generally all you’ll ever
-practically need. However, this doesn’t include the important [[http://www.fileformat.info/info/unicode/char/1f379/index.htm][TROPICAL DRINK]]
-or [[http://www.fileformat.info/info/unicode/char/1F4A9/index.htm][PILE OF POO]] characters from the supplemental (“astral”) plane. If you need
-to use these characters in UTF-16, you’re going to run into problems:
-characters outside the BMP don’t fit in two bytes. To accommodate these
-characters, UTF-16 uses surrogate pairs: these characters are encoded with two
-16-bit units.
+* Emacs和UTF-8
 
-Because of this last point, UTF-16 offers no practical advantages over UTF-8.
-Its [[http://www.utf8everywhere.org/][existence was probably a big mistake]]. You can’t do constant-time character
-lookup because you have to scan for surrogate pairs. It’s not backwards
-compatible and cannot be stored in null-terminated strings. In both Java and
-JavaScript, it leads to the awkward situation where the “length” of a string
-is not the number of characters, code points, or even bytes. Worst of all, [[https://speakerdeck.com/mathiasbynens/hacking-with-unicode?slide=114][it]]
-[[https://speakerdeck.com/mathiasbynens/hacking-with-unicode?slide=114][has serious security implications]]. New applications should avoid it whenever
-possible.
+*在Emacs内部所有的文本都用UTF-8格式存储* ，这是个非常明智的选择！当Emacs输出文本，比如写到文件或者传到另一个进程，Emacs会自动根据文件或进程所配置的编码系统来对文本进行编码。当读取一个文件或者进程的文本时，Emacs要么它将其转换为UTF-8编码格式，要么保持原字节。
 
-* Emacs and UTF-8
+关于这点在Emacs中有2种模式：单字节和多字节。单字节strings/buffers就是原字节，它们满足常量时间O(1)访问但是进能保存单字节值[[http://nullprogram.com/blog/2014/01/04/][byte-code compiler outputs unibyte strings]]。
 
-*Emacs internally stores all text as UTF-8*. This was an excellent choice! When
-text leaves Emacs, such as writing to a file or to a process, Emacs
-automatically converts it to the coding system configured for that particular
-file or process. When it accepts text from a file or process, it either
-converts it to UTF-8 or preserves it as raw bytes.
+多字节strings/buffers保存UTF-8编码的编码值。字符访问时间复杂读是O(n)因为需要遍历一边string/buffer来计算字符个数。
 
-There are two modes for this in Emacs: unibyte and multibyte. Unibyte strings/
-buffers are just raw bytes. They have constant access O(1) time but can only
-hold single-byte values. The [[http://nullprogram.com/blog/2014/01/04/][byte-code compiler outputs unibyte strings]].
-
-Multibyte strings/buffers hold UTF-8 encoded code points. Character access is
-O(n) because the string/buffer has to be scanned to count characters.
-
-The actual encoding is rarely relevant because there’s little way (and need)
-to access it directly. Emacs automatically converts text as needed when it
-leaves Emacs and arrives in Emacs, so there’s no need to know the internal
-encoding. If you really want to see it anyway, you can use string-as-unibyte
-to get a copy of a string with the exact same bytes, but as a byte-string.
+实际的编码很少关心，因为没有太多方法（和需要）来直接访问。当文本输入或输出时，Emacs会自动将文本编码格式按需进行转换，所以不需要关心内部的编码。如果你 /确实/ 想知道，你可以用string-as-unibyte来得到以字节表示的string。
 
 #+BEGIN_SRC emacs-lisp
   (string-as-unibyte "π")
   ;; => "\317\200"
 #+END_SRC
 
-This can be reversed with string-as-multibyte), to change a unibyte string
-holding UTF-8 encoded text back into a multibyte string. Note that these
-functions are different than string-to-unibyte and string-to-multibyte, which
-will attempt a conversion rather than preserving the raw bytes.
+使用string-as-multibyte可以反向将UTF-8编码的单字节string转换成多字节文本。需要注意这两个函数与string-to-unibyte和string-to-multibyte是不同的，后者是进行的是转换而不是保持原字节。
 
-The length and buffer-size functions always count characters in multibyte and
-bytes in unibyte. Being UTF-8, there are no surrogate pairs to worry about
-here. The string-bytes and position-bytes functions return byte information
-for both multibyte and unibyte.
+length和buffer-size函数总是使用multibyte计算字符以及使用unibyte计算字节。使用UTF-8，则不需要担心代理对。string-bytes和position-bytes函数返回multibyte和unibyte两种类型的字节信息。
 
-To specify a Unicode character in a string literal without using the character
-directly, use \uXXXX. The XXXX is the hexadecimal code point for the character
-and is always 4 digits long. For characters outside the BMP, which won’t fit
-in four digits, use a capital U with eight digits: \UXXXXXXXX.
+如果想要在字符串中指定Unicode字符而又不直接使用字符，可以用\uXXXX。XXXX是该字符的十六进制编码值，长度总是4。对于第零平面外的字符，4个字符不够，要使用大写的U加上8位数字：\UXXXXXXXX。
 
 #+BEGIN_SRC emacs-lisp
   "\u03C0"
@@ -119,47 +53,30 @@ in four digits, use a capital U with eight digits: \UXXXXXXXX.
   ;; => "💩"  (PILE OF POO)
 #+END_SRC
 
-Finally, Emacs extends Unicode with 256 additional “characters” representing
-raw bytes. This allows raw bytes to be embedded distinctly within UTF-8
-sequences. For example, it’s used to distinguish the code point U+0041 from
-the raw byte #x41. As far as I can tell, this isn’t used very often.
+最后，Emacs对Unicode进行了扩展，增加了256个额外的“字符”来表示原字节。这样允许自带的原字节与UTF-8序列不同。例如，它可以用来区别编码值U+0041和原字节#x41。要我说的话，这不太常用。
 
-* Combining Characters
+* 组合字符（Combining Characters）
 
-Some Unicode characters are defined as combining characters. These characters
-modify the non-combining character that appears before it, typically with
-accents or diacritical marks.
+有些Unicode字符定义为组合字符。这些字符的作用是修改它前面的非组合字符，典型作用是加重或者变音标记。
 
-For example, the word “naïve” can be written as six characters as "nai\
-u0308ve". The fourth character, U+0308 (COMBINING DIAERESIS), is a combining
-character that changes the “i” (U+0069 LATIN SMALL LETTER I) into an umlaut
-character.
+举个例子，单词“naïve”可以写作这6个字符"nai\u0308ve"。第4个字符U+0308（组合分音符）就是一个组合字符，用来将“i” (U+0069 LATIN SMALL LETTER I)变成一个变音字符。
 
-The most commonly accented characters have a code of their own. These are
-called precomposed characters. This includes ï (U+00EF LATIN SMALL LETTER I
-WITH DIAERESIS). This means “naïve” can also be written as five characters as
-"na\u00EFve".
+通常的加重字符也有它自己的编码值，叫做预组合字符（precomposed characters），包括ï (U+00EF LATIN SMALL LETTER I WITH DIAERESIS)。所以“naïve”也可以写作这5个字符"na\u00EFve"。
 
-** Normalization
+** 归一化（Normalization）
 
-So what happens when comparing two different representations of the same text?
-They’re not equal.
+那么比较两个两个不同表示的字符会结果如何呢？
+
+不相等。
 
 #+BEGIN_SRC emacs-lisp
   (string= "nai\u0308ve" "na\u00EFve")
   ;; => nil
 #+END_SRC
 
-To deal with situations like this, the Unicode standard defines four different
-kinds of normalization. The two most important ones are NFC (composition) and
-NFD (decomposition). The former uses precomposed characters whenever possible
-and the latter breaks them apart. The functions ucs-normalize-NFC-string and
-ucs-normalize-NFD-string perform this operation.
+为了应对这种情况，Unicode标准定义了4种不同的归一化。其中最重要的两种是NFC（组合）和NFD（分解）。前者尽可能地使用预组合字符而后者尽可能地将其拆分。ucs-normalize-NFC-string和ucs-normalize-NFD-string函数用来实现这两个操作。
 
-Pitfall #1: Proper string comparison requires normalization. It doesn’t matter
-which normalization you use (though NFD should be slightly faster), you just
-need to use it consistently. Unfortunately this can get tricky when using
-equal to compare complex data structures with multiple strings.
+*陷阱提示#1： 务必先进行归一化再进行字符串比较。*  不管使用哪种归一化（NFD要稍微快一点），但需要一致。不幸的是，当你比较复杂的多字符串时依然可能产生奇怪的结果。
 
 #+BEGIN_SRC emacs-lisp
   (string= (ucs-normalize-NFD-string "nai\u0308ve")
@@ -167,9 +84,7 @@ equal to compare complex data structures with multiple strings.
   ;; => t
 #+END_SRC
 
-Emacs itself fails to do this. It doesn’t normalize strings before interning
-them, which is probably a mistake. This means you can have differently defined
-variables and functions with the same canonical name.
+用Emacs自带的函数比较会失败，它在使用intern函数前不会做归一化，也许这是个错误。这意味着你可以使用相同的名称（intern转换的canonical symbol）来定义不同的变量和函数。
 
 #+BEGIN_SRC emacs-lisp
   (eq (intern "nai\u0308ve")
@@ -188,35 +103,21 @@ variables and functions with the same canonical name.
   ;; => "I'm going to sabotage your team."
 #+END_SRC
 
-** String Width
+** 字符串宽度
 
-There are three ways to quantify multibyte text. These are often the same
-value, but in some circumstances they can each be different.
+有三种方法可以用来计算多字节文本的数量，通常它们的值相同，但是在有些情况下它们却各不不同。
 
-  * length: number of characters, including combining characters
-  * bytes: number of bytes in its UTF-8 encoding
-  * width: number of columns it would occupy in the current buffer
+  * 长度： 字符个数，包括组合字符
+  * 字节数： 用UTF-8编码的字节数
+  * 宽度： 占当前缓冲区的列数
 
-Most of the time, one character is one column (a width of one). Some
-characters, like combining characters, consume no columns. Many Asian
-characters consume two columns (U+4000, 䀀). Tabs consume tab-width columns,
-usually 8.
+大多数时候，一个字符就是一列（一个字符的宽度）。有一些字符，比如组合字符，不占用宽度。一些亚洲国家字符占两列，比如(U+4000, 䀀)。Tab占用tab-width列，通常是8。
 
-Generally, a string should have the same width regardless of which whether
-it’s NFD or NFC. However, due to bugs and incomplete Unicode support, this
-isn’t strictly true. For example, some combining characters, such as U+20DD ⃝,
-won’t combine correctly in Emacs nor in other applications.
+通常来说，不管使用NFD或者NFC，字符串的宽度是一样的。然而，由于bug和对Unicode的支持不完整，这个说法不是完全正确。例如，有些组合字符，如U+20DD, ⃝  在Emacs中或者其他应用程序中无法正确地组合。
 
-Pitfall #2: Always measure text by width, not length, when laying out a buffer
-. Width is measured with the string-width function. This comes up when laying
-out tables in a buffer. The number of characters that fit in a column depends
-on what those characters are.
+*陷阱提示#2： 当展示一个buffer时，务必使用宽度而不是长度来计算文本。*  宽度通过string-width函数来计算，当展示buffer中的表格的时候会被调用。每列中适当的字符个数要根据是什么字符而定。
 
-Fortunately I accidentally got this right in [[http://nullprogram.com/blog/2013/09/04/][Elfeed]] because I used the format
-function for layout. The %s directive operates on width, as would be expected.
-However, this has the side effect that the output of may format change
-depending on the current buffer! Pitfall #3: Be mindful of the current buffer
-when using the format function.
+幸运的是，有次碰巧通过[[http://nullprogram.com/blog/2013/09/04/][Elfeed]]得到了正确结果，因为我使用了format函数来展示。如希望地那样，%s指示符用来操作宽度。然而有个副作用：很多格式化的输出会根据当前buffer而改变！ *陷阱提示#3： 使用format函数时务必注意当前buffer。*
 
 #+BEGIN_SRC emacs-lisp
   (let ((tab-width 4))
@@ -228,9 +129,9 @@ when using the format function.
   ;; => 0
 #+END_SRC
 
-** String Reversal
+** 字符串反转
 
-Say you want to reverse a multibyte string. Simple, right?
+加入要将一个多字节字符串反转。很简单，对吗？
 
 #+BEGIN_SRC emacs-lisp
   (defun reverse-string (string)
@@ -240,44 +141,43 @@ Say you want to reverse a multibyte string. Simple, right?
   ;; => "cba"
 #+END_SRC
 
-Wrong! The combining characters will get flipped around to the wrong side of
-the character they’re meant to modify.
+错了！组合字符经反转会对之前它右边的字符进行修改而产生错误。
 
 #+BEGIN_SRC emacs-lisp
   (reverse-string "nai\u0308ve")
   ;; => "ev̈ian"
 #+END_SRC
 
-Pitfall #4: [[https://github.com/mathiasbynens/esrever][Reversing Unicode strings is non-trivial]]. The [[http://rosettacode.org/wiki/Reverse_a_string][Rosetta Code]] page is
-full of incorrect examples, and [[http://nullprogram.com/blog/2012/11/15/][I’m personally guilty]] of this, too. The other
-day I [[https://github.com/magnars/s.el/pull/58][submitted a patch to s.el]] to correct its s-reverse function for Unicode.
-If it’s accepted, you should never need to worry about this.
+*Pitfall #4: [[https://github.com/mathiasbynens/esrever][Unicode字符串反转务必小心]]。* [[http://rosettacode.org/wiki/Reverse_a_string][Rosetta Code]] 页面罗列了许多错误的案例， [[http://nullprogram.com/blog/2012/11/15/][我个人也出过错]] 。之后我[[https://github.com/magnars/s.el/pull/58][提交了一个s.el的补丁]] 来修正Unicode的s-reverse函数。
+如果这个能被接受，你就不用再担心这个了。
 
-** Regular Expressions
+** 正则表达式
 
-Regular expressions operate on code points. This means combining characters
-are counted separately and the match may change depending on how characters
-are composed. To avoid this, you might want to consider NFC normalization
-before performing some kinds of regular expressions.
+正则表达式基于编码值。组合字符单独计算，匹配会根据字符如何组合可能不不同。为了避免这种情况，你需要在做某些正则匹配之前进行NFC归一化。
 
 #+BEGIN_SRC emacs-lisp
   ;; Like string= from before:
   (string-match-p  "na\u00EFve" "nai\u0308ve")
   ;; => nil
 
+  ;; Use NFC normilization
+  (string-match-p (ucs-normalize-NFC-string "na\u00EFve") 
+                  (ucs-normalize-NFC-string "nai\u0308ve"))
+  ;; => 0
+
   ;; The . only matches part of the composition
   (string-match-p "na.ve" "nai\u0308ve")
   ;; => nil
+  
+  ;; .. matches i and the composition character
+  (string-match-p "na..ve" "nai\u0308ve")
+  ;; => 0
+
 #+END_SRC
 
-Pitfall #5: Be mindful of combining characters when using regular expressions.
-Prefer NFC normalization when dealing with regular expressions.
+*陷阱提示#5： 使用正则表达式时务必注意组合字符，且优先选择NFC归一化。*
 
-Another potential problem is ranges, though this is quite uncommon. Ranges of
-characters can be expressed in inside brackets, e.g. [a-zA-Z]. If the range
-begins or ends with a decomposed combining character you won’t get the proper
-range because its parts are considered separately by the regular expression
-engine.
+另一个潜在的问题是范围，尽管这不太常见。字符的范围可以用中括号来表达，比如[a-zA-Z]。如果范围以分解的组合字符开始或结束，将得不到正确的结果，因为组合字符部分会被正则表达式引擎单独处理。
 
 #+BEGIN_SRC emacs-lisp
   (defvar match-weird "[\u00E0-\u00F6]+")
@@ -289,36 +189,17 @@ engine.
   ;; => nil
 #+END_SRC
 
-It’s especially important to keep all of this in mind when sanitizing
-untrusted input, such as when using Emacs as a web server. An attacker might
-use a denormalized or strange grapheme cluster to bypass a filter.
+在审查一些不受信任的输入时将所有这些牢记于心是非常重要的，比如使用Emacs作为Web server，攻击者可能使用非归一化或奇怪的字符串来绕开过滤器。
+* 与世界交互
 
-* Interacting with the World
+有个错误我现在犯过两次了。Emacs内部使用UTF-8，无论输入文本原始是什么编码。
 
-Here’s a mistake I’ve made twice now. Emacs uses UTF-8 internally, regardless
-of whatever encoding the original text came in. 
-Pitfall #6: *When working with bytes of text, the counts may be different than the original source of the text*.
+*陷阱提示#6：务必注意计算文本字节数可能和原来的不一样。*
 
-For example, HTTP/1.1 introduced persistent connections. Before this, a client
-connects to a server and asks for content. The server sends the content and
-then closes the connection to signal the end of the data. In HTTP/1.1, when
-Connection: close isn’t specified, the server will instead send a
-Content-Length header indicating the length of the content in bytes. The
-connection can then be re-used for more requests, or, more importantly,
-pipelining requests.
+例如，HTTP/1.1提出了长连接（persistent connections）。在此之前，客户端连到服务端然后请求内容，一旦服务端回内容给客户端后就会发送一个信号来结束连接。在HTTP/1.1中，服务端不发送close而是发送包含Content-Length的头来指示内容的字节长度。这样有多个请求，或者，更重要管道请求时，连接可以被复用。HTTP头的主要问题在于很多时候消息体编码是不同的。Emacs不能由一个单独源来处理多种编码，所以唯一的方式是用原始的字节来与网络进程交互HTTP协议请求。我的错误在于允许Emacs进行UTF-8转换，然后以UTF-8的编码格式计算内容的长度。这碰巧在99.9%的时候能工作因为大多客户端使用UTF-8或其他类似的，但无论如何，这是不完全正确的。
+* 进一步阅读
 
-The main problem is that HTTP headers usually have a different encoding than
-the content body. Emacs is not prepared to handle multiple encodings from a
-single source, so the only correct way to talk HTTP with a network process is
-raw. My mistake was allowing Emacs to do the UTF-8 conversion, then measuring
-the length of the content in its UTF-8 encoding. This just happens to work
-fine about 99.9% of the time since clients tend to speak UTF-8, or something
-like it, anyway, but it’s not correct.
-
-* Further Reading
-
-A lot of this investigation was inspired by JavaScript’s and other languages’
-Unicode shortcomings.
+有很多研究是受JavaScript和其他语言的Unicode缺点而启发的。
 
   * [[http://www.cl.cam.ac.uk/~mgk25/unicode.html][UTF-8 and Unicode FAQ for Unix/Linux]]
   * [[https://speakerdeck.com/mathiasbynens/hacking-with-unicode][Hacking with Unicode]]
@@ -326,5 +207,4 @@ Unicode shortcomings.
   * [[http://docs.oracle.com/javase/7/docs/api/java/lang/Character.html#unicode][java.lang.Character Unicode Character Representations]]
   * [[http://www.gnu.org/software/emacs/manual/html_node/elisp/Strings-and-Characters.html][GNU Emacs Lisp Reference Manual: Strings and Characters]]
 
-Comparatively, Emacs Lisp has really great Unicode support. This isn’t too
-surprising considering that it’s primary purpose is for manipulating text.
+相比之下，Emacs Lisp有出色的Unicode支持。这也不会让人感到太意外，比较Emacs的最初目的就是进行文本处理。
