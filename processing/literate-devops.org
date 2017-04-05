@@ -3,7 +3,7 @@
 #+AUTHOR: lujun9972, KlausZL（译）
 #+CATEGORY: raw
 #+DATE: [2016-10-31 一 16:55]
-#+OPTIONS: ^:{} f:t
+#+OPTIONS: toc:t ^:{} f:t
 
 
 运维服务一般分为两个阶段：
@@ -76,7 +76,7 @@ key-list被定义在最初的代码块中，作为代码块执行结果的名字
 
 上述的例子演示了文学化的编程是如何将不同的语言代码和数据糅合在一起产生作用的。
 
-* 如果是虚拟主机的话该怎么办呢？
+* 如果是虚拟机的话该怎么办呢？
 
 通常情况下，通过指定代码块语言为sh的方式来告诉Emacs在本地系统shell中执行代码。但是在这个案例中，我希望代码能够在虚拟机上执行（或在我圈养开发服务器上）。接下来我会介绍两种方式来实现这一切，一种是使用[[http://www.emacswiki.org/TrampMode][Tramp]]，而另一种则是使用各种Sessions。
 
@@ -110,7 +110,7 @@ Emacs会通过“:”符号后面的内容来决定Tramp要访问的目标。使
 
 原图：http://howardism.org/Technical/Emacs/literate-devops-9.png
 
-“:dir”配置项支持Tramp的全部功能，允许我在不同的主机上执行代码块。还记得我是怎么将Vagrant虚拟主机的连接信息加入到我的~/.ssh/config文件中的么？
+“:dir”配置项支持Tramp的全部功能，允许我在不同的主机上执行代码块。还记得我是怎么将Vagrant虚拟机的连接信息加入到我的~/.ssh/config文件中的么？
 
 [[./literate-devops.files/literate-devops-10.png]]
 
@@ -118,13 +118,13 @@ Emacs会通过“:”符号后面的内容来决定Tramp要访问的目标。使
 
 但是如果我要访问防火墙后面的主机该怎么办呢？
 
-我的工作是需要搞定部署在受到严密保护的数据中心的虚拟主机，首先我需要登录到跳板机或者堡垒主机上。Tramp也可以按序处理这些跳跃，比如下面的例子：
+我的工作是需要搞定部署在受到严密保护的数据中心的虚拟机，首先我需要登录到跳板机或者堡垒主机上。Tramp也可以按序处理这些跳跃，比如下面的例子：
 
 #+BEGIN_SRC emacs-lisp
   /ssh:10.98.18.229|ssh:10.0.1.122|sudo:/etc/network/interfaces
 #+END_SRC
 
-先使用我的用户登录到堡垒主机，然后再使用我的用户登录到运行在私有云的虚拟主机上。再然后使用sudo命令让我编辑root权限才能编辑的文件。
+先使用我的用户登录到堡垒主机，然后再使用我的用户登录到运行在私有云的虚拟机上。再然后使用sudo命令让我编辑root权限才能编辑的文件。
 
 在org-mode代码块的“:dir”配置项中，也可以使用Tramp的管道符号“|”：
 
@@ -146,7 +146,7 @@ together. Each screen shot below, each code block below has the same session
 value, client (which is conveniently the same my virtual machine’s hostname,
 client):
 
-另一种处理方式是创建一个会话将不同的代码块串联起来。下图每一个代码块都有一个相同的会话“client”（正好是我的虚拟主机的主机名“Client”）：
+另一种处理方式是创建一个会话将不同的代码块串联起来。下图每一个代码块都有一个相同的会话“client”（正好是我的虚拟机的主机名“Client”）：
 
 [[./literate-devops.files/literate-devops-2b.png]]
 
@@ -163,70 +163,110 @@ From this point on, each code block I execute with the client session value,
 uses this connection, and the code is executed on the remote machine (a
 virtual machine in this case, but that doesn’t matter).
 
-
+这样以来，我利用“client”会话执行的每一个代码块都会通过这个连接在远程主机上执行（在这个例子中是虚拟机，但这没有关系，其原理都是一样的）。
 
 Either of these approaches works well, but the second approach, allows me to
 set variables to create a particular state that other blocks may expect.
 However, this requires execution of each block in order.
 
+上述的两种方法都能很好的工作，但是第二种方法允许我设定变量，以创建其他代码块可以利用的特定连接状态。
+
 I have a third, more interactive, approach^[[http://howardism.org/Technical/Emacs/literate-devops.html#fn.4][4]] using screen, but it doesn’t
 allow passing variables to the code, and as you’ll see below, this is pretty
 important to me.
+
+我还有第三种方法，使用ob-screen来处理[fn:4]，其交互性更强，但是不允许传递变量给代码，正如你在下文所看到的，这对我来说很有用。
 
 Regardless, I continue learning how to accomplish my goal, all the while
 documenting and validating my steps. The end result can be exported to web or
 wiki page.
 
+不管使用哪种方法，我都是通过一边记录一边验证每一步操作的方式来渐进明细的实现我的目标。最终结果可以发布到web或者wiki上去。
+
 * What about Verbose Commands?
+* 对于冗长的命令应该怎么办？
 
 Yes, executing some commands can be quite time-consuming and verbose, but
 often I need to search the results, and having the results placed in an Emacs
 buffer allows better searching.
 
+有时候执行的命令会非常耗时而且内容冗长，而往往我又需要将执行结果放入Emacs窗口中以更方便的在执行结果中搜索需要的内容。
+
 Often I use a collapsible “drawer” (which is just a way to identify the
 beginning and end of the output):
 
-[[http://howardism.org/Technical/Emacs/literate-devops-3.png]]
+这种情况我通常会使用一种可以折叠的“抽屉”（一种定义输出内容开始和结尾的方式）：
+
+[[./literate-devops.files/literate-devops-3.png]]
+
+原图：http://howardism.org/Technical/Emacs/literate-devops-3.png
 
 Place the cursor on this drawer and hit the Tab key to hide or show the
 output:
 
-[[http://howardism.org/Technical/Emacs/literate-devops-4.png]]
+将光标移动到“抽屉”处，敲击Tab键就可以隐藏或显示输出内容：
+
+[[./literate-devops.files/literate-devops-4.png]]
+
+原图：http://howardism.org/Technical/Emacs/literate-devops-4.png
 
 * Can you Use the Output?
+* 可以利用输出内容么？
 
 The results of some commands are often needed for the next command, and I’m
 sure you just love using your mouse to copy and paste part of the output, but
 I have a better way.
 
+某些命令常常会使用到上一条命令的输出结果，而且我敢肯定你习惯于使用鼠标来复制粘贴这些输出结果，但是我有更好的方式。
+
 For instance, I needed a list of an RPM’s dependencies:
 
-[[http://howardism.org/Technical/Emacs/literate-devops-5.png]]
+在下面这个例子中，我需要一个RPM包依赖关系的列表：
+
+[[./literate-devops.files/literate-devops-5.png]]
+
+原图：http://howardism.org/Technical/Emacs/literate-devops-5.png
 
 Notice I named this source code block. Also notice how Emacs automatically
 broke the results up into a table. By default, the output from shell commands
 are split along newlines and spaces.
 
+请注意，我给这个代码块定义了名字。同时也请注意Emacs自动分解了输出结果并整理到了表格中。默认情况下shell命令的输出结果会按照换行符和空格分开。
+
 I can feed the results of these execution to another code block. The following
 source block creates a variable named DEPENDS that uses rows 2 through 10 of
 the first column as an array.
 
-[[http://howardism.org/Technical/Emacs/literate-devops-6.png]]
+我可以将这次执行的输出结果传递给另一个代码块。接下来的代码块创建了一个名为DEPENDS的变量，平且使用了之前输出的第一列的第2至第10行的数组作为值。
+
+[[./literate-devops.files/literate-devops-6.png]]
+
+原图：http://howardism.org/Technical/Emacs/literate-devops-6.png
 
 I then download the RPMs I want without any mouse interaction.
 
+当我下载RPM包的时候，我不希望使用鼠标来进行交互。
+
 * Setting Variables and Values
+
+* 设置变量和赋值
 
 A key aspect of reusing devops programs (like a Chef cookbooks) is the
 separation of the code from the values the code uses…a key aspect of any
 program you reuse.
 
+重复利用devops程序的一个关键因素是将代码和代码所使用的值进行解偶。这也是重复利用任何程序的关键因素。
+
 In my world, I create a new org-mode file for each sprint, and each task or
 problem gets its own header and section. Each section can have a drawer of
 properties, including variables shared among all code blocks in that section.
 
+在我的工作中，我会为每次尝试创建一个新的org-mode文件，每一个任务或问题都会有自己的标题和段落。在每个段落中会定义一系列的属性，包括作用于整个段落中所有代码块的变量。
+
 To create a section variable, simply hit: C-c C-x p, and set the Property to
 var and the value to a variable=value, as in:
+
+为了创建段落变量，只需要简单的敲击“C-c C-x p”，然后设置名称为“var”的属性，然后以“变量名=值”的形式将值赋值给变量，就像下面这个例子：
 
 #+BEGIN_EXAMPLE
   host="10.52.224.33"
@@ -236,12 +276,20 @@ This drawer can contain any code block values you wish, like session or
 results. These values can then be overridden as settings on the code block, as
 you see in this screen-shot:
 
-[[http://howardism.org/Technical/Emacs/literate-devops-8.png]]
+这一系列属性可以包括任何你想要的代码块的值，如会话或者结果等。这些值也可以设置在代码块中进行覆盖，就像你将在下面截图中看到的：
+
+[[./literate-devops.files/literate-devops-8.png]]
+
+原图：http://howardism.org/Technical/Emacs/literate-devops-8.png
 
 Setting variables and settings (especially the session setting), ties the code
 blocks together.
 
+通过设置变量或进行其他设置（尤其是会话设置），可以将代码块关联起来。
+
 * Communicating with Others
+
+* 与其它程序进行交互
 
 While investigations in operations and administrations (as I’ve described) are
 useful to oneself when understanding the problem domain, I need to communicate
@@ -483,6 +531,9 @@ limited. Also, you must resist the temptation to fix a command by typing in
 the xterm window. If you go down that path, you may forget to put that
 information back into your org-mode file, and may regret it later.
 
+[fn:4] 
+
 * Footnotes
+
 
 
