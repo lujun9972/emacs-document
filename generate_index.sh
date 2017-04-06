@@ -13,6 +13,8 @@ function get_contributors()
     echo "感谢GitHub以及:"
     git log --pretty='%an<%ae>'|grep -viEw 'darksun|lujun9972' |sort|uniq|sed -e 's/^/+ /'
     # git shortlog --summary --email |grep -viEw 'darksun|lujun9972'|cut -f2|sed -e 's/^/+ /'
+    echo ""
+    echo "感谢大家的热情参与,也欢迎更多的志愿者参与翻译,参与的方法可以参见 [[https://github.com/lujun9972/emacs-document/wiki/%E7%BF%BB%E8%AF%91%E6%8F%90%E7%A4%BA][Emacs-document Wiki]]"
 }
 
 function generate_headline()
