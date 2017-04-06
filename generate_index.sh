@@ -11,11 +11,8 @@ function get_contributors()
 {
     echo "* Contributors"
     echo "感谢GitHub以及:"
-    # for contributor in $(git log --pretty='%an<%ae>'|grep -viEw 'darksun|lujun9972' |sort|uniq)
-    # do
-    #     echo "+ $contributor"
-    # done
-    git shortlog --summary --email |grep -viEw 'darksun|lujun9972'|cut -f2|sed -e 's/^/+ /'
+    git log --pretty='%an<%ae>'|grep -viEw 'darksun|lujun9972' |sort|uniq|sed -e 's/^/+ /'
+    # git shortlog --summary --email |grep -viEw 'darksun|lujun9972'|cut -f2|sed -e 's/^/+ /'
 }
 
 function generate_headline()
