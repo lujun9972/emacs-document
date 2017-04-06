@@ -32,7 +32,7 @@ function generate_links()
     if [[ ! -d $catalog ]];then
         mkdir -p $catalog
     fi
-    posts=$(ls -t $catalog)
+    posts=$(ls -tF $catalog | grep -v [/$])
     old_ifs=$IFS
     IFS="
 "
