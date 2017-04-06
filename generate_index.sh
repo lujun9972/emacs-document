@@ -11,8 +11,8 @@ function get_contributors()
 {
     echo "* Contributors"
     echo "感谢GitHub以及:"
-    git log --pretty='%an<%ae>'|grep -viEw 'darksun|lujun9972' |sort|uniq|sed -e 's/^/+ /'
-    # git shortlog --summary --email |grep -viEw 'darksun|lujun9972'|cut -f2|sed -e 's/^/+ /'
+    # git log --pretty='%an<%ae>'|grep -viEw 'darksun|lujun9972' |sort|uniq|sed -e 's/^/+ /'
+    git shortlog --summary --email HEAD |grep -viEw 'darksun|lujun9972'|cut -f2|sed -e 's/^/+ /'
     echo ""
     echo "感谢大家的热情参与,也欢迎更多的志愿者参与翻译,参与的方法可以参见 [[https://github.com/lujun9972/emacs-document/wiki/%E7%BF%BB%E8%AF%91%E6%8F%90%E7%A4%BA][Emacs-document Wiki]]"
 }
@@ -32,17 +32,18 @@ function generate_links()
     if [[ ! -d $catalog ]];then
         mkdir -p $catalog
     fi
-    posts=$(ls -tF $catalog | grep -v [/$])
+    posts=$(find $catalog -maxdepth 1 -type f)
     old_ifs=$IFS
     IFS="
 "
     for post in $posts
     do
-        modify_date=$(git log --date=short --pretty=format:"%cd" -n 1 $catalog/$post) # 去除日期前的空格
+        modify_date=$(git log --date=short --pretty=format:"%cd" -n 1 $post) # 去除日期前的空格
         if [[ -n "$modify_date" ]];then # 没有修改日期的文件没有纳入仓库中,不予统计
-            echo "+ [[https://github.com/lujun9972/emacs-document/blob/master/$catalog/$post][$post]]		<$modify_date>"
+            postname=$(basename $post)
+            echo "+ [[https://github.com/lujun9972/emacs-document/blob/master/$post][$postname]]		<$modify_date>"
         fi
-    done
+    done|sort -k 2
     IFS=$old_ifs
 }
 
