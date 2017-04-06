@@ -1,0 +1,417 @@
+#+TITLE: 文学化的devops（literate-devops）
+#+URL: http://howardism.org/Technical/Emacs/literate-devops.html
+#+AUTHOR: KlausZL（译）
+#+CATEGORY: raw
+#+DATE: [2016-10-31 一 16:55]
+#+OPTIONS: toc:t ^:{} f:t
+
+
+运维服务一般分为两个阶段：
+
+1. 绞尽脑汁直到服务器能正常工作；
+2. 努力引入一些自动化工具，例如Puppet和Chef，以提高效率。
+
+最近我一直在致力于使这两个阶段结合更加紧密。由于词穷，我只能将其称为文学化的devops。
+
+我曾在[[http://howardism.org/Technical/LP/introduction.html][《org-mode’s literate programming model》]]一文中讨论过研究出来的一些新想法和总结出来的思路，这些想法和思路为我总结出高超的系统管理技巧提供了良好的帮助。
+
+* 给大家讲个故事
+
+很久以前……我得到了给一个RPM包打补丁的任务，这不是我擅长的事情，所以最初的计划是这样的：
+
+1. 利用Vagrant（一个基于Ruby的工具，用于创建和部署虚拟化开发环境）来创建一个一次性的CentOS系统；
+2. SSH远程访问这个虚拟机下载需要的工具；
+3. 运行各种难以言表的命令；
+4. 推翻重来并反复进行上述过程直到成功。
+
+当然，一旦我找到了解决方法，我需要为团队中的其他成员记录下这些过程，如果条件允许的化我还会创建可重复执行的脚本。
+
+实现这些的第一步是在其它地方很好的记录下连接配置，不过现在我学到了这个小魔法使你可以直接记录SSH连接你用Vagrant创建的虚拟机的配置信息（注：clientvm是我在Vagrantfile文件中制定的虚拟机名称）：
+
+#+BEGIN_SRC sh
+  vagrant ssh-config --host clientvm >> $HOME/.ssh/config
+#+END_SRC
+
+* 文学化的Devops
+
+不同于以往打开终端连接到虚拟机的方式，现在我会进入Emacs，打开这些脚本记录文件[fn:1]，创建一个新的标题，并把shell和ruby等命令输入到这个文件中。
+
+这样做有什么好处呢？不同于传统的终端方式，这样做可以让我执行、记录、追溯任何一条命令。
+
+举个例子，以下是我的Emacs窗口的一部分截图：
+
+[[./文学化的devops.files/literate-devops.png]]
+
+原图：http://howardism.org/Technical/Emacs/literate-devops.png
+
+作为一个记性不太好的老家伙，我的“文学作品”可以解释每一条命令的背景和目的。点击一个超链接，就可以追溯到我之前记录下来的发现结果。一套组合键就能执行需要的代码块……
+
+没错，我就是直接在Emacs中执行需要的命令。
+
+敲击两次Control-C（Emacs快捷键“C-c C-c”）执行需要的代码（根据不同的语言执行）。上图的例子是在Shell中执行的。执行结果会显示在文件中，执行结果同时也可以被其它代码块调用（当然也可以有[[http://orgmode.org/manual/results.html#results][其它多种选择]]）。
+
+再举个例子，下图是一个从软件仓库中下载GPG密钥的片段的前半部分（在这个片段中指定的URL被安置在了一个作用于整个代码块的属性中）：
+
+[[./文学化的devops.files/literate-devops-14.png]]
+
+原图：http://howardism.org/Technical/Emacs/literate-devops-14.png
+
+这段Shell脚本使用wget命令下载HTML索引文件，分析和提取出密钥文件的URL。我们将使用一个Ruby脚本来完成解析工作，鉴于脚本可能还有点粗糙，我们暂时将其定义在了另一个代码块中。
+
+在[[http://howardism.org/Technical/LP/introduction.html][《literate programming》]]中提到了一个想法是将一个代码块插入到另一个代码块中的技术（通过将名字放入双层角括号进行引用，<<...>>）。Donald Knuth称这一功能为WEB。由于这有可能和某些语言（例如Ruby）产生预料不到的冲突，我默认情况下会将其关闭，但在这个代码块中我通过noweb参数将其打开。
+
+下图是Ruby脚本。将其放在一个指定为Ruby的代码块中，我就可以施展所有Emacs允许我施展的Ruby魔法了。
+
+[[./文学化的devops.files/literate-devops-15.png]]
+
+原图：http://howardism.org/Technical/Emacs/literate-devops-15.png
+
+最后一步是将第一个脚本处理过的URL数据传递给另一个Shell脚本,来调用wget下载每一个URL指向的文件：
+
+[[./文学化的devops.files/literate-devops-16.png]]
+
+原图：http://howardism.org/Technical/Emacs/literate-devops-16.png
+
+key-list被定义在最初的代码块中，作为代码块执行结果的名字。我们声明了一个LIST变量用来保存执行结果列表，这样shell脚本就可以通过$LIST的形式访问LIST变量。
+
+上述的例子演示了文学化的编程是如何将不同的语言代码和数据糅合在一起产生作用的。
+
+* 如果是虚拟机的话该怎么办呢？
+
+通常情况下，通过指定代码块语言为sh的方式来告诉Emacs在本地系统shell中执行代码。但是在这个案例中，我希望代码能够在虚拟机上执行（或在我圈养开发服务器上）。接下来我会介绍两种方式来实现这一切，一种是使用[[http://www.emacswiki.org/TrampMode][Tramp]]，而另一种则是使用各种Sessions。
+
+** 搬出Tramp这个救兵
+
+Tramp是Emacs提供的一种功能，它允许使用ssh或者其它协议访问和编辑远程主机上的文件。例如你可以输入以下命令，在远程主机上执行find-file功能（Emacs快捷键“C-x C-f”）：
+
+#+BEGIN_SRC emacs-lisp
+  /ssh:howard.abrams@goblin.howardism.org:web/files/robot.txt
+#+END_SRC
+
+前提是你需要在.emacs启动文件中放入如下内容：
+
+#+BEGIN_SRC emacs-lisp
+  (setq tramp-default-method "ssh")
+  ;; linux系统下默认就是ssh可以不用设置
+  ;; windows系统下将ssh改为plink（putty的一个模块）。当然windows系统嘛……你懂的，祝你好运！！！
+#+END_SRC
+
+同时更新你的~/.ssh/config文件，声明你希望用什么用户访问你指定的服务器，简单来说文件内容就是如下的样子：
+
+#+BEGIN_SRC emacs-lisp
+  /goblin.howardism.org:web/files/robot.txt
+#+END_SRC
+
+Emacs会通过“:”符号后面的内容来决定Tramp要访问的目标。使用SSH keys能方便Tramp的访问，否则就要在提示符下输入密码。
+
+每个org-mode代码块都可以设置“:dir”来指定代码片段在哪个目录执行。就如同下图中代码块的例子：
+
+[[./文学化的devops.files/literate-devops-9.png]]
+
+原图：http://howardism.org/Technical/Emacs/literate-devops-9.png
+
+“:dir”配置项支持Tramp的全部功能，允许我在不同的主机上执行代码块。还记得我是怎么将Vagrant虚拟机的连接信息加入到我的~/.ssh/config文件中的么？
+
+[[./文学化的devops.files/literate-devops-10.png]]
+
+原图：http://howardism.org/Technical/Emacs/literate-devops-10.png
+
+但是如果我要访问防火墙后面的主机该怎么办呢？
+
+我的工作是需要搞定部署在受到严密保护的数据中心的虚拟机，首先我需要登录到跳板机或者堡垒主机上。Tramp也可以按序处理这些跳跃，比如下面的例子：
+
+#+BEGIN_SRC emacs-lisp
+  /ssh:10.98.18.229|ssh:10.0.1.122|sudo:/etc/network/interfaces
+#+END_SRC
+
+先使用我的用户登录到堡垒主机，然后再使用我的用户登录到运行在私有云的虚拟机上。再然后使用sudo命令让我编辑root权限才能编辑的文件。
+
+在org-mode代码块的“:dir”配置项中，也可以使用Tramp的管道符号“|”：
+
+[[./文学化的devops.files/literate-devops-11.png]]
+
+原图：http://howardism.org/Technical/Emacs/literate-devops-11.png
+
+一些需要记住的技巧：
+
+  * 在最后一跳不能使用管道符号“|”，而是要用冒号“:”来指定需要访问的目标。
+  * 当你使用管道符号“|”的时候，记得声明使用的协议，哪怕使用的协议是默认的。
+  * 如果你本地主机的操作系统和远程主机的操作系统不一致，你可能需要修复org-mode中的一个bug，你可以在注脚2里找到修复的方法[fn:2]。
+
+** 利用org-mode会话
+
+另一种处理方式是创建一个会话将不同的代码块串联起来。下图每一个代码块都使用一个相同的会话“client”（正好是我的虚拟机的主机名“Client”）：
+
+[[./文学化的devops.files/literate-devops-2b.png]]
+
+原图：http://howardism.org/Technical/Emacs/literate-devops-2b.png
+
+当我执行第一个代码块的时候，后台会启动一个shell，它会ssh链接到主机。需要注意的是，要想让这些生效，你需要将你的ssh公钥放入到远程系统的“.ssh/authorized_keys”文件中以开启免密码访问，或者使用Emacs的ssh插件包。[fn:3]
+
+这样一来，我利用“client”会话执行的每一个代码块都会通过这个连接在远程主机上执行（在这个例子中是虚拟机，但这没有关系，其原理都是一样的）。
+
+上述的两种方法都工作的很好，但是第二种方法允许我设定变量，以创建其他代码块可以利用的特定连接状态。
+
+我还有第三种方法，使用ob-screen来处理[fn:4]，其交互性更强，但是不允许传递变量给代码，正如你在下文所看到的，这对我来说很有用。
+
+不管使用哪种方法，我都是通过一边记录一边验证每一步操作的方式来渐进明细的实现我的目标。最终结果可以发布到web或者wiki上去。
+
+* 对于冗长的命令应该怎么办？
+
+有时候执行的命令会非常耗时而且内容冗长，而往往我又需要将执行结果放入Emacs窗口中从而更方便的在执行结果中搜索需要的内容。
+
+这种情况我通常会使用一种可以折叠的“drawer”（一种定义输出内容开始和结尾的方式）：
+
+[[./文学化的devops.files/literate-devops-3.png]]
+
+原图：http://howardism.org/Technical/Emacs/literate-devops-3.png
+
+请将光标移动到“drawer”处，敲击Tab键就可以隐藏或显示输出内容：
+
+[[./文学化的devops.files/literate-devops-4.png]]
+
+原图：http://howardism.org/Technical/Emacs/literate-devops-4.png
+
+* 可以利用输出的内容么？
+
+某些命令常常会使用到上一条命令的输出结果，而且我敢肯定你习惯于使用鼠标来复制粘贴这些输出结果，但是我有更好的方法。
+
+在下面这个例子中，我需要一个RPM包依赖关系的列表：
+
+[[./文学化的devops.files/literate-devops-5.png]]
+
+原图：http://howardism.org/Technical/Emacs/literate-devops-5.png
+
+请注意，我给这个代码块定义了名字。同时也请注意Emacs自动分解了输出结果并整理到了表格中。默认情况下shell命令的输出结果会按照换行符和空格分开。
+
+我可以将这次执行的输出结果传递给另一个代码块。接下来的代码块创建了一个名为DEPENDS的变量，平且使用了之前输出的第一列的第2至第10行的数组作为值。
+
+[[./文学化的devops.files/literate-devops-6.png]]
+
+原图：http://howardism.org/Technical/Emacs/literate-devops-6.png
+
+当我下载RPM包的时候，我不希望使用鼠标来进行交互操作。
+
+* 设置变量和赋值
+
+重复利用devops程序(就像大厨的食谱一样)的一个关键因素是将代码和代码所使用的值进行解偶。这也是重复利用任何程序的关键因素。
+
+在我的工作中，我会为每次尝试创建一个新的org-mode文件，每一个任务或问题都会有自己的标题和段落。在每个段落中会定义一系列的属性，包括作用于整个段落中所有代码块的变量。
+
+为了创建段落变量，只需要简单的敲击“C-c C-x p”，然后设置名称为“var”的属性，然后以“变量名=值”的形式将值赋值给变量，就像下面这个例子：
+
+#+BEGIN_EXAMPLE
+  host="10.52.224.33"
+#+END_EXAMPLE
+
+这一系列属性可以包括任何你想要的代码块的值，如会话或者结果等。这些值也可以设置在代码块中进行覆盖，就像你将在下面截图中看到的：
+
+[[./文学化的devops.files/literate-devops-8.png]]
+
+原图：http://howardism.org/Technical/Emacs/literate-devops-8.png
+
+通过设置变量或进行其他设置（尤其是会话设置），可以将代码块关联起来。
+
+* 与他人进行沟通
+
+在日常运营或系统管理（正如我之间描述的）中，如果相关问题领域调查研究出了有用的信息，我需要针对调查结果和我的组员进行沟通交流。我的[[https://github.com/howardabrams/dot-files/blob/master/emacs-mail.org#sending-email][Emacs配置文件]]允许我通过Emacs发送邮件，我开启了org-mime-org-buffer-htmlize功能，可以将我的org-mode文件导出成为HTML格式的邮件正文（这个功能由最新版的org-plus-contrib插件包提供）。
+
+当然，有些时候导出的HTML邮件正文也不是非常令人满意。
+
+举个例子，某些代码块会输出一段JSON数据，如果我指定输出格式为JavaScript的时候，HTML输出结果就会高亮显示，这样看起来会更美观方便。只要使用“wrap”参数，就像下图这样：
+
+[[./文学化的devops.files/literate-devops-20.png]]
+
+原图：http://howardism.org/Technical/Emacs/literate-devops-20.png
+[[http://howardism.org/Technical/Emacs/literate-devops-20.txt][文件内容]]
+
+像我的org-mode文件中这样：
+
+[[./文学化的devops.files/literate-devops-21.png]]
+
+原图：http://howardism.org/Technical/Emacs/literate-devops-21.png
+[[http://howardism.org/Technical/Emacs/literate-devops-21.txt][文件内容]]
+
+导出结果就会像如下这样：
+
+#+BEGIN_SRC json
+  {"time":{"iso":"2015-05-19T23:12:40Z","timestamp":1432077160,"date":"19 May 2015","time":"7:12 PM"}}
+#+END_SRC
+
+再举一个例子，我现在的项目中使用到了OpenStack，其nova命令行工具会将输出数据格式化为表格：
+
+#+BEGIN_SRC org
+  +--------------------------------------+--------------------+--------+------------+-------------+------------------------+
+  | ID                                   | Name               | Status | Task State | Power State | Networks               |
+  +--------------------------------------+--------------------+--------+------------+-------------+------------------------+
+  | f9e7aed8-e425-4808-aace-8758dadd91bf | chefserver         | ACTIVE | -          | Running     | WPC-private=10.0.1.73  |
+  | 0432f8b1-7e6d-4fc1-b181-02fa768c38ac | ha-compute1        | ACTIVE | -          | Running     | WPC-private=10.0.1.104 |
+  | a5bdd1d0-d4b3-4856-a657-5759356c186b | ha-controller1     | ACTIVE | -          | Running     | WPC-private=10.0.1.97  |
+  | 16263972-609e-44c0-83e0-f3147336071c | ha-controller2     | ACTIVE | -          | Running     | WPC-private=10.0.1.99  |
+  | 89a89d1f-7be5-4c4f-82db-64b751f15f3b | ha-controller3     | ACTIVE | -          | Running     | WPC-private=10.0.1.100 |
+  | b740095a-3f89-45d0-a2a1-9cfcadfb4ca3 | ha-monitoring      | ACTIVE | -          | Running     | WPC-private=10.0.1.95  |
+  | 6bebe823-1504-4cb1-a898-bbc7894b1a32 | ha-sdn-controller1 | ACTIVE | -          | Running     | WPC-private=10.0.1.101 |
+  | 456bf417-580e-49fb-be08-1b0153710f86 | ha-sdn-controller2 | ACTIVE | -          | Running     | WPC-private=10.0.1.102 |
+  | 7aab184c-5fb4-4996-8ab2-8a65ea7668cb | ha-sdn-controller3 | ACTIVE | -          | Running     | WPC-private=10.0.1.103 |
+  | 0c90d7b0-dab4-4af8-a970-e2e90dd8b9e4 | ha-storage-1       | ACTIVE | -          | Running     | WPC-private=10.0.1.76  |
+  | fda0666e-d656-48fd-928f-83fb47c923f2 | ha-storage-2       | ACTIVE | -          | Running     | WPC-private=10.0.1.81  |
+  | 021fc9c1-8d79-4c09-b3d4-6014d242403a | ha-storage-3       | ACTIVE | -          | Running     | WPC-private=10.0.1.96  |
+  | bc5ad0fe-9ef2-4966-8d2b-99892f3f94cd | yum-server         | ACTIVE | -          | Running     | WPC-private=10.0.1.74  |
+  +--------------------------------------+--------------------+--------+------------+-------------+------------------------+
+#+END_SRC
+
+如果你手动修改输出，这些修改在文件导出的时候将不会生效（因为输出命令在导出过程中将被重新执行）。
+
+想解决这一问题，你只需要将以下一小段Emacs Lisp代码放入你的org-mode文件中：
+
+[[./文学化的devops.files/literate-devops-22.png]]
+
+原图：http://howardism.org/Technical/Emacs/literate-devops-22.png
+[[http://howardism.org/Technical/Emacs/literate-devops-22.txt][文件内容]]
+
+这个代码块被命名为“nova-conv”，我可以用它来预处理导出结果，就像下图这样：
+
+[[./文学化的devops.files/literate-devops-23.png]]
+
+原图：http://howardism.org/Technical/Emacs/literate-devops-23.png
+[[http://howardism.org/Technical/Emacs/literate-devops-23.txt][文件内容]]
+
+在我这个例子中，我也干掉第一列中的破折号，使其更有org-mord的范儿。
+
+[[./文学化的devops.files/literate-devops-24.png]]
+
+原图：http://howardism.org/Technical/Emacs/literate-devops-24.png
+[[http://howardism.org/Technical/Emacs/literate-devops-24.txt][文件内容]]
+
+为了让这些代码真的可以被重用，你需要将其放入[[http://orgmode.org/manual/Library-of-Babel.html][Library of Babel]](一个类似org-mode函数库的地方)，这样就可以被任何文件调用了。
+
+* 总结
+
+当然我的文学化devops方法是不能完全替代自动化DevOps的，但是我发现这个方法有两点可取之处：
+
+ 1. 这是一个在些手册之前很好的记录的方式；
+ 2. 这是一个在遇到问题时能方便快捷的撰写组内邮件的方式。
+
+关于最后一点，我总是会在写我的执行代码之前编写我的“文学”文件，就像下面这样：
+
+[[./文学化的devops.files/literate-devops-25.png]]
+
+原图：http://howardism.org/Technical/Emacs/literate-devops-25.png
+[[http://howardism.org/Technical/Emacs/literate-devops-25.txt][文件内容]]
+
+如果我接下来的命令或者过程执行失败，我可以通过简单的方法将段落设置为高亮，敲击“C-x M”将文件导出为HTML格式，邮件发送给其他的组员（否则我需要话大量的时间从终端上复制粘贴，以便邮件能提供足够的上下文）。
+
+如果需要完整的例子，可以查看我的文章[[http://howardism.org/Technical/Emacs/linux-iptables.html][《notes on setting up IP Tables》]]（或者[[http://howardism.org/Technical/Emacs/linux-iptables.org.txt][《original org-mode file》]]），里面有一部分内容可以在编辑器中执行，以便查看我的主机是如何设置的，还有一部分执行并重置主机防火墙规则的脚本。
+
+感谢您的阅读！
+
+* 脚注:
+
+[fn:1] 
+
+原文：http://howardism.org/Technical/Emacs/literate-devops.html#fnr.1
+
+我会为每个新脚本创建一个[[http://orgmode.org][org-mode格式的文件]]，用来跟踪任务，备注和记录其它细节。这使得它非常契合文学化devops。
+
+[fn:2] 
+
+原文：http://howardism.org/Technical/Emacs/literate-devops.html#fnr.2
+
+每一个系统都会在不同的目录创建临时文件。大部分Unix系统在/tmp/目录下，而Macs系统在/var/folders/目录下。目前的org-mode代码，在远程系统上使用和本地系统一样的目录名。在文中的例子里，我使用Mac笔记本连接到数据中心的Linux系统上，而我会得到如下错误：
+
+#+BEGIN_EXAMPLE
+  Tramp: Decoding remote file `/ssh:x.y.z:/var/folders/0s/pcrc3rq5075gj4tm90pbh76c36sl1h/T/ob-input-32379ujY' using `base64 -d -i >%s'...failed
+  byte-code: Couldn't write region to `/ssh:x.y.z:/var/folders/0s/pcrc3rq5075gj4tm90pbh76c36sl1h/T/ob-input-32379ujY', decode using `base64 -d -i >%s' failed
+#+END_EXAMPLE
+
+我在[[http://lists.gnu.org/archive/html/emacs-orgmode/2013-09/msg00992.html][《this mailing list posting》]]这篇文章中，发现这个bug存在于8.2.10版本及之前版本的org-mode（在找到最佳的解决方案之前，我估计这个bug暂时还不会被修复）。你可以通过自行编辑ob-core.el文件的org-babel-temp-file函数来修正这个问题：
+
+#+BEGIN_SRC emacs-lisp
+  (defun org-babel-temp-file (prefix &optional suffix)
+    "Create a temporary file in the `org-babel-temporary-directory'.
+  Passes PREFIX and SUFFIX directly to `make-temp-file' with the
+  value of `temporary-file-directory' temporarily set to the value
+  of `org-babel-temporary-directory'."
+    (if (file-remote-p default-directory)
+        (let ((prefix
+               ;; We cannot use `temporary-file-directory' as local part
+               ;; on the remote host, because it might be another OS
+               ;; there.  So we assume "/tmp", which ought to exist on
+               ;; relevant architectures.
+               (concat (file-remote-p default-directory)
+                       ;; REPLACE temporary-file-directory with /tmp:
+                       (expand-file-name prefix "/tmp/"))))
+          (make-temp-file prefix nil suffix))
+      (let ((temporary-file-directory
+             (or (and (boundp 'org-babel-temporary-directory)
+                      (file-exists-p org-babel-temporary-directory)
+                      org-babel-temporary-directory)
+                 temporary-file-directory)))
+        (make-temp-file prefix nil suffix))))
+#+END_SRC
+
+[fn:3] 
+
+原文：http://howardism.org/Technical/Emacs/literate-devops.html#fnr.3
+
+如果你安装了[[https://github.com/ieure/ssh-el#start-of-content][ssh.el]]这个包，你可以通过使用“M-x ssh”来初始化你的远程系统连接。
+
+你需要输入主机的连接信息，包括密码（如果需要的话）和其他信息。举个例子，如果我要连接到我的远程主机：goblin.howardism.org，我创建会话的代码会是如下这个样子：
+
+#+BEGIN_SRC org
+  ,#+begin_src sh :session *ssh goblin.howardism.org* :var dir="/opt"
+     ls $dir
+  ,#+end_src
+#+END_SRC
+
+这段代码允许你查看远程服务器上的代码执行结果，同时也允许你调用从其它org-mode文件读取的完整功能代码块。
+
+注释：会话参数使用“*”包住（包括一部分buffer name），但如果你想传递变量的话需要使用引号包住（否则，它将被视为文档中其它位置表格的引用名）。
+
+[fn:4] 
+
+原文：http://howardism.org/Technical/Emacs/literate-devops.html#fnr.4
+
+我有第三种方法来远程执行命令，这种方法使用ob-screen扩展（它包含在[[http://orgmode.org/worg/org-contrib/][org-mode Contrib]]中）。它同时使用Gnu screen和xterm，所以在我的Mac上，我启动了XQuartz（一个内置的X Windows模拟器），并将下述代码块加入我的.emacs启动文件中（根据[[http://orgmode.org/worg/org-contrib/babel/languages/ob-doc-screen.html][这个]][[http://orgmode.org/worg/org-contrib/babel/languages/ob-doc-screen.html][说明]]）来设置我xterm程序的完整路径。
+
+#+BEGIN_SRC emacs-lisp
+  (setq org-babel-default-header-args:screen
+        '((:results  . "silent")
+          (:session  . "default")
+          (:cmd      . "bash")
+          (:terminal . "/opt/X11/bin/xterm")))
+#+END_SRC
+
+我虽然不经常使用screen，但我还是用Homebrew安装了它：
+
+#+BEGIN_SRC sh
+  brew install screen
+#+END_SRC
+
+然后告诉ob-screen如何找到screen：
+
+#+BEGIN_SRC emacs-lisp
+  (setq org-babel-screen-location "/usr/local/bin/screen")
+#+END_SRC
+
+这下代码块就被指定为调用screen，接下来我通常会通过设置“:session parameter”来指定调用哪个xterm窗口。
+
+#+BEGIN_SRC org
+  ,#+BEGIN_SRC screen :session blah
+  ls /Applications
+
+  ,#+END_SRC
+#+END_SRC
+
+运行结果不会显示在我的Emacs窗口，而是显示在xterm窗口中。
+
+使用screen的一个缺点就是不能传递变量，比如下面的例子就不行：
+
+#+BEGIN_SRC org
+  ,#+begin_src screen :session blah :var dir="/Applications"
+  ls $dir
+
+  ,#+end_src
+#+END_SRC
+
+来回切换Emacs和xterm窗口来查看结果还是比较方便的，但是不能将结果返回到文件做进一步处理会比较受限。同时你需要抵御通过在xterm窗口中输入来修改命令的诱惑，如果你改了，你有可能会因忘记把修改后的信息保存回org-mode文件中，而后悔不及。
