@@ -1,0 +1,35 @@
+#+TITLE: Marcin Borkowski: 2017-03-04 Bookmarking directories in Eshell
+#+URL: http://mbork.pl/2017-03-04_Bookmarking_directories_in_Eshell
+#+AUTHOR: lujun9972
+#+TAGS: raw
+#+DATE: [2017-04-07 五 17:08]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+
+我一朋友曾经向我展示了一个很巧妙技巧,[[http://jeroenjanssens.com/2013/08/16/quickly-navigate-your-filesystem-from-the-command-line.html][能做到在bash中将目录加为书签]]. 
+这是个很棒的技巧,不过我经常使用的是Eshell,所以我想把这个技巧也移植到Eshell中来.
+(注意,Emacs允许你在Dired中将目录加为书签,但该书签不能用在Eshell中!)
+这个技巧的关键在于共享一个书签数据库(其实就是一个名为 =~/.marks/= 的目录,用于存放指向实际目录的软链接).
+
+下面这段函数就是Eshell的移植版本.
+#+BEGIN_SRC emacs-lisp
+  (defun eshell/jump (mark)
+    "Jump to a directory symlinked to by a file called ~/.marks/MARK."
+    (eshell/cd (file-symlink-p (concat "~/.marks/" mark))))
+#+END_SRC
+注意这里的 =file-symlink-p= 可能有一定的误导性,当参数为指向文件的软链接时它会返回实际的文件路径,否则返回nil.
+另外,这里的目录名称我也写死在了代码中了,也懒得去些其他的差错处理代码  – 虽然要做到这些也挺简单的.
+
+这就已经很不错了,只是少了自动补全功能而已,而这个功能实现起来也完全没有难度:
+
+#+BEGIN_SRC emacs-lisp
+  (defun pcomplete/jump ()
+    "Complete a command that wants a name of a file in ~/.marks."
+    (pcomplete-here* (directory-files "~/.marks/")))
+#+END_SRC
+
+这就差不多搞定了!
+
+虽说让Eshell支持Emacs书签会更 Emacs-y 一点,但是这种解决方案也有它的优势,那就同时支持 Eshell 和 bash.
+更进一步,我们还可以为Emacs添加 =mark= 函数,这并不会太难.
