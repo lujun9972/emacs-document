@@ -4,66 +4,47 @@
 #+TAGS: processing
 #+LANGUAGE: zh-CN
 #+OPTIONS: H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
-A better defun for emacs-lisp
-
- [[/][The Kitchin Research Group]]    
-     
- Chemical Engineering at Carnegie Mellon University    
-
-,* [[/blog][Blog]] 
-,* [[/blog/archive][Archives]] 
-,* [[/publications/index.html][Publications]] 
-,* [[/group.html][Group]] 
-,* [[/research.html][Research]] 
-,* [[/categories.html][Categories]] 
-,* [[/about.html][About us]] 
-,* [[/subscribe.html][Subscribe]] 
-
-[[/blog/2017/03/22/A-better-defun-for-emacs-lisp/][Permanent Link to A better defun for emacs-lisp]]
-
-Posted March 22, 2017 at 04:30 PM | categories: [[/blog/category/emacs/][emacs]], [[/blog/category/elisp/][elisp]],
-[[/blog/category/macro/][macro]] | tags: |
-[[http://jkitchin.github.io/blog/2017/03/22/A-better-defun-for-emacs-lisp#disqus_thread][View Comments]] 
-
-Table of Contents
-
-,* [[#org56963be][1. Summary]] 
 
 I have been thinking of better ways to write code that is more likely to have decent docstrings that are up to date, and
 maybe that enable automatic validation. One strategy is to keep documentation and code together, and by together I mean
 /close together/ . The closer the better. I made some interesting progress in the
-[[http://kitchingroup.cheme.cmu.edu/blog/2017/03/19/A-Hy-macro-for-defining-functions-with-docstrings-on-each-argument/]
-[last post]], where I used a macro to let me put argument specific documentation in the same place that the argument is
+[[http://kitchingroup.cheme.cmu.edu/blog/2017/03/19/A-Hy-macro-for-defining-functions-with-docstrings-on-each-argument/][last post]], where I used a macro to let me put argument specific documentation in the same place that the argument is
 defined. Here I expand the idea to also provide argument default values, and validation code where the argument is defined
 inside the function, in addition to generating docstrings. This post is written in Emacs-lisp, mostly because I am more
 familiar with the macro language. The idea should apply to other lisps too. 
 
 Let's consider this prototypical, vanilla function definition, usage, and docstring. 
 
-(defun f1 (arg1 arg2)
-  "Add two numbers."
-  (+ arg1 arg2))
+#+BEGIN_SRC emacs-lisp
+  (defun f1 (arg1 arg2)
+    "Add two numbers."
+    (+ arg1 arg2))
 
-;; usage
-(f1 3 4)
+  ;; usage
+  (f1 3 4)
+#+END_SRC
 
 Here is what the help looks like from emacs. 
 
-(describe-function 'f1)
+#+BEGIN_SRC emacs-lisp
+  (describe-function 'f1)
+#+END_SRC
 
 It is clear I was lazy in writing the docstring; it does not even mention the arguments. There is also no validation of the
 arguments so if you pass a string and a number, you will get an error. There are no defaults either, so you have to provide
 both arguments. It seems like there could be significant room for improvement. Of course, I could bite the bullet and write
 a better function like this one: 
 
-(defun f1a (arg1 &optional arg2)
-  "Add ARG1 and ARG2 together.
-ARG1 and  ARG2 should both be numbers."
-  (when (null arg2) (setq arg2 2))
-  (unless (and (numberp arg1) (numberp arg2)) (error "arg1 and arg2 should both be numbers"))
-  (+ arg1 arg2))
+#+BEGIN_SRC emacs-lisp
+  (defun f1a (arg1 &optional arg2)
+    "Add ARG1 and ARG2 together.
+  ARG1 and  ARG2 should both be numbers."
+    (when (null arg2) (setq arg2 2))
+    (unless (and (numberp arg1) (numberp arg2)) (error "arg1 and arg2 should both be numbers"))
+    (+ arg1 arg2))
 
-(list (f1a 3 4) (f1a 3))
+  (list (f1a 3 4) (f1a 3))
+#+END_SRC
 
 Yes, I could do that, but it is tedious to do it all the time. And it still leaves something to be desired for me. The
 docstring does not say what the default value is for example, and that is hard-coded in the code, i.e. not introspectible
@@ -71,14 +52,16 @@ until you look at the code. Next we consider an alternative way to write the fun
 definition, usage and documentation. The function definition is a little more verbose. Providing documentation, defaults and
 validation code in any form would make it that way no matter what. 
 
-(defn f2 ((arg1 "A number" :validate numberp)
-          (arg2 "A number" :validate numberp :default 2))
-  "Add the arguments."
-  (+ arg1 arg2))
+#+BEGIN_SRC emacs-lisp
+  (defn f2 ((arg1 "A number" :validate numberp)
+            (arg2 "A number" :validate numberp :default 2))
+    "Add the arguments."
+    (+ arg1 arg2))
 
-;; usage
-(list (f2 3 4) (f2 3))
-(describe-function 'f2)
+  ;; usage
+  (list (f2 3 4) (f2 3))
+  (describe-function 'f2)
+#+END_SRC
 
 The documentation is built up from the information in the function definition, in a form that is mostly consistent with
 emacs-lisp documentation standards. defn is not a regular emacs-lisp function; it is a macro I developed to generate the
@@ -87,16 +70,17 @@ arguments and collect the docstrings, along with any information about default v
 build up the list of arguments to put in the function. Then if any default values are set, I generate some code to set those
 values if they are not set in the function call, and finally a similar block of validation code. At the end, I construct the
 defun and return it. You can check out the code if you want here:
-[[https://github.com/jkitchin/scimax/blob/master/scimax-macros.el]
-[https://github.com/jkitchin/scimax/blob/master/scimax-macros.el]]. 
+[[https://github.com/jkitchin/scimax/blob/master/scimax-macros.el][https://github.com/jkitchin/scimax/blob/master/scimax-macros.el]]. 
 
 Let's take a look at what this code expands to. 
 
-(macroexpand-1
- '(defn f2 ((arg1 "A number" :validate numberp)
-            (arg2 "A number" :validate numberp :default 2))
-    "Add the arguments."
-    (+ arg1 arg2)))
+#+BEGIN_SRC emacs-lisp
+  (macroexpand-1
+   '(defn f2 ((arg1 "A number" :validate numberp)
+              (arg2 "A number" :validate numberp :default 2))
+      "Add the arguments."
+      (+ arg1 arg2)))
+#+END_SRC
 
 You can see it expands to a regular defun, with a generated docstring, generated default settings code block, and generated
 validation code. Pretty nice. 
@@ -104,37 +88,43 @@ validation code. Pretty nice.
 Let's see what happens with a function that fails the validation. We should get an error. Here we capture the error so we
 can see it in the post. 
 
-(condition-case err
-    (f2 "oak")
-  (error
-   (error-message-string err)))
+#+BEGIN_SRC emacs-lisp
+  (condition-case err
+      (f2 "oak")
+    (error
+     (error-message-string err)))
+#+END_SRC
 
 So we even get a useful error message when the wrong type of argument is provided. Compare that to the error message from
 the original version of this function. It tells us we got the wrong type, but not which argument. 
 
-(condition-case err
-    (f1 "oak" 4)
-  (error
-   (error-message-string err)))
+#+BEGIN_SRC emacs-lisp
+  (condition-case err
+      (f1 "oak" 4)
+    (error
+     (error-message-string err)))
+#+END_SRC
 
 One last example to check out the &rest argument, with validation that every arg is a number. 
 
-(defn f4 ((rarg :rest
-                :validate (lambda (x)
-                            (-all-p 'identity (mapcar 'numberp x)))))
-  "multiply all the arguments."
-  (apply '* rarg))
+#+BEGIN_SRC emacs-lisp
+  (defn f4 ((rarg :rest
+                  :validate (lambda (x)
+                              (-all-p 'identity (mapcar 'numberp x)))))
+    "multiply all the arguments."
+    (apply '* rarg))
 
-(f4 1 2 3)
-(condition-case err
-    (f4 "oak" 4)
-  (error
-   (error-message-string err)))
-(describe-function 'f4)
+  (f4 1 2 3)
+  (condition-case err
+      (f4 "oak" 4)
+    (error
+     (error-message-string err)))
+  (describe-function 'f4)
+#+END_SRC
 
 That looks ok too. 
 
-1 Summary
+* Summary
 
 The motivation for this was to help me write better code with better documentation. Better code in the sense that it can
 provide run-time validation, with better feedback, and automatic documentation, including that there is none if that is the
@@ -143,45 +133,3 @@ on my part. I think it will make it easier to keep documentation in sync, since 
 near the argument, and you can build in validation if you want to. 
 
 It is no news to lispers that macros are good for this kind of application. 
-
-Copyright (C) 2017 by John Kitchin. See the [[/copying.html][License]] for information about copying.
-
-[[/org/2017/03/22/A-better-defun-for-emacs-lisp.org][org-mode source]]
-
-Org-mode version = 9.0.5
-
-[[https://twitter.com/share][Tweet]] 
-[[http://kitchinresearchgroup.disqus.com/?url=ref][View the discussion thread.]][[http://disqus.com][blog comments powered by  Disqus]] 
-
-Twitter
-
-[[https://twitter.com/johnkitchin][Tweets by @johnkitchin]] 
-
-Links
-
-,* [[https://www.continuum.io][Anaconda Python]] 
-,* [[/pycse][Pycse]] 
-,* [[/dft-book][DFT-book]] 
-
-Latest Posts
-
-,* [[/blog/2017/04/07/Object-oriented-font-locking-in-emacs-lisp/][Object-oriented font-locking in emacs-lisp]] 
-,* [[/blog/2017/03/22/A-better-defun-for-emacs-lisp/][A better defun for emacs-lisp]] 
-,* [[/blog/2017/03/19/A-Hy-macro-for-defining-functions-with-docstrings-on-each-argument/][A Hy macro for defining functions
- with docstrings on each argument]] 
-,* [[/blog/2017/03/18/Modeling-a-Cu-dimer-by-EMT-nonlinear-regression-and-neural-networks/][Modeling a Cu dimer by EMT,
- nonlinear regression and neural networks]] 
-,* [[/blog/2017/02/05/New-publication-in-Calphad/][New publication in Calphad]] 
-
-Latest GitHub Repos
-
-[[https://github.com/jkitchin][@jkitchin]] on GitHub. 
-
-,* Status updating… 
-
-[[/blog/feed/index.xml][RSS]] [[http://kitchinresearchgroup.disqus.com/latest.rss][Comments RSS Feed]]. 
-
-Copyright 2017 John Kitchin 
-
-Powered by [[http://www.blogofile.com][Blogofile]] 
-
