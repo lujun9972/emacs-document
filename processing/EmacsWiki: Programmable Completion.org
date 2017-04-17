@@ -1,0 +1,53 @@
+#+URL: https://www.emacswiki.org/emacs/ProgrammableCompletion
+#+AUTHOR: lujun9972
+#+DATE: [2017-04-17 一 10:31]
+#+TAGS: processing
+#+LANGUAGE: zh-CN
+#+OPTIONS: H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+文本会讲解的Emacs标准库中的 `pcomplete.el’ 及其相关库. 要看`pcomplete.el’的相关例子,请移步 [[https://www.emacswiki.org/emacs/PcompleteExamples][PcompleteExamples]].
+
+*注意:* `pcomplete.el’的意思是“programmable completion”,它与 [[https://www.emacswiki.org/emacs/EmacsLisp][EmacsLisp]] manual ([[http://www.emacswiki.org/cgi-bin/info-ref?find=dynamic-completion-table][dynamic-completion-table]]) 中所说的“programmed completion”没有任何关系.
+后者的意思是使用函数来生成补全后选项而不是直接提供一个明确的后选项列表.
+
+* Adding programmable completion using pcomplete
+
+** Write a setup function and add it to your mode’s hook
+
+下面是个例子: 
+
+#+BEGIN_SRC emacs-lisp
+  (defun pcomplete-erc-setup () 
+    "Setup erc-mode to use pcomplete." 
+    (set (make-local-variable 'pcomplete-parse-arguments-function) 
+         'pcomplete-parse-erc-arguments) 
+    (set (make-local-variable 'pcomplete-command-completion-function)  
+         'pcomplete/erc-mode/complete-command)
+    (set (make-local-variable 'pcomplete-command-name-function) 
+         'pcomplete-erc-command-name)
+    (set (make-local-variable 'pcomplete-default-completion-function)
+         (lambda () (pcomplete-here (pcomplete-erc-nicks))))
+    (set (make-local-variable 'pcomplete-suffix-list) '(?  ?:)) 
+    )                 
+  (add-hook 'erc-mode-hook 'pcomplete-erc-setup)                                                                                                                                                         
+#+END_SRC
+
+** Write the functions that you need
+
++ pcomplete-parse-arguments-function
+
+  =pcomplete-parse-arguments-function= 不接参数. 它应该返回当前命令的参数列表.
+
++ pcomplete-command-name-function
+
+  返回命令的规范名. 会根据该名称来查找对应的补全函数. 
+  例如,假设该函数返回值为 “MSG” 且当前的 major mode 为 “erc-mode” 的话, pcomplete会使用 =pcomplete/erc-mode/MSG= 和 =pcomplete/MSG= 这两个函数来进行补全.
+
++ pcomplete-default-completion-function
+
+  在没有为该命令定义补全函数的情况下,会调用 =pcomplete-default-completion-function= 所指向的函数. 
+  该函数的函数体应该是这样的 =(pcomplete-here (… list of completions …))=
+
++ pcomplete-command-completion-function
+
+  该函数的函数体应该是这样的 =(pcomplete-here (… list of completions …))=
