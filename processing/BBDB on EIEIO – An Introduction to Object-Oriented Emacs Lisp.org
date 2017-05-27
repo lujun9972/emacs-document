@@ -1,10 +1,21 @@
+#+TITLE: BBDB on EIEIO - Emacs Lisp 面向对象编程简介
 #+URL: https://ericabrahamsen.net/tech/2016/feb/bbdb-eieio-object-oriented-elisp.html
+#+AUTHOR: LdBeth
+#+CATEGORY: elisp-common
+#+STARTUP: showall
+
+
 BBDB on EIEIO – An Introduction to Object-Oriented Emacs Lisp
 
-This is a basic introduction to EBDB, an EIEIO re-write of BBDB.
+# This is a basic introduction to EBDB, an EIEIO re-write of BBDB.
+这是 EBDB，即 EIEIO 重构 BBDB 的简要介绍。
 
-What does that mean?
+# * What does that mean?
+#+BEGIN_QUOTE
+这是什么意思？
+#+END_QUOTE 
 
+#+BEGIN_COMMENT
 BBDB is the [[http://savannah.nongnu.org/projects/bbdb/][insidious Big Brother DataBase]], Emacs’ principle
 contact-management/addressbook package. [[https://www.gnu.org/software/emacs/manual/html_mono/eieio.html][EIEIO]] apparently stands for “Enhanced
 Implementation of Emacs Interpreted Objects”, otherwise known as Emacs Lisp’s
@@ -17,40 +28,70 @@ In plain English, EBDB is a rewrite of BBDB using Emacs’ CLOS-inspired
 object-orientation package. It’s currently on [[https://github.com/girzel/ebdb][Github]], though I’d like to move
 it to Emacs’ ELPA repository once it’s out of beta. This post touches on some
 observations I made during the course of the rewrite.
+#+END_COMMENT
 
-* Why rewrite?
+BBDB，即 [[http://savannah.nongnu.org/projects/bbdb/][insidious Big Brother DataBase]]，Emacs 的主流信息管理／地址簿扩展包。
+[[https://www.gnu.org/software/emacs/manual/html_mono/eieio.html][EIEIO]] 则很显然是 “Enhanced Implementation of Emacs Interpreted Objects” 的缩写，
+也就是 Emacs Lisp 版本的 Common Lisp [[https://www.gnu.org/software/emacs/manual/html_mono/eieio.html][CLOS]], Common Lisp Object System。因此 EBDB
+就是 “Enhanced implementation of emacs interpreted objects/common lisp object
+system version of the insidious big Brother DataBase“。
 
-First of all: why do this at all? There were two reasons. One was the
-observation that the object-oriented paradigm is nicely suited to keeping a
-database of records, and that BBDB could be made quite a bit more extensible
-via subclassing. The other was simply to gain some practice in using EIEIO.
+* 为什么重写？
+  # * Why rewrite?
+  #+BEGIN_COMMENT
+  First of all: why do this at all? There were two reasons. One was the
+  observation that the object-oriented paradigm is nicely suited to keeping a
+  database of records, and that BBDB could be made quite a bit more extensible
+  via subclassing. The other was simply to gain some practice in using EIEIO.
+  #+END_COMMENT
+  为什么要这样呢？有两个原因：首先是面向对象系统很适合数据库，BBDB 能用子类做更多
+  扩展；其次是为了练习使用 EIEIO。
 
-* The Basics
+* 基本知识
+  # * The Basics
+  #+begin_comment 
+  There are three main classes in EBDB:
 
-There are three main classes in EBDB:
+  1. Databases, which hold records and persist them somehow
+  2. Records, which represent people/organizations
+  3. Fields, which represent record data such as email addresses or phone
+  numbers
 
- 1. Databases, which hold records and persist them somehow
- 2. Records, which represent people/organizations
- 3. Fields, which represent record data such as email addresses or phone
-    numbers
+  There are multiple implementations of each class, and room for third-party
+  developers to create more. The idea was to make the framing code as
+  class-agnostic as possible: ie, the classes themselves are responsible for
+  nearly all behavior, and simply accept messages from user-initiated code.
+  Fairly standard object-oriented stuff. However, CLOS/EIEIO differs from other
+  OO systems in some fundamental ways.
+  #+end_comment
+  EBDB 中有三个主类：
 
-There are multiple implementations of each class, and room for third-party
-developers to create more. The idea was to make the framing code as
-class-agnostic as possible: ie, the classes themselves are responsible for
-nearly all behavior, and simply accept messages from user-initiated code.
-Fairly standard object-oriented stuff. However, CLOS/EIEIO differs from other
-OO systems in some fundamental ways.
+  1. 数据库，用于保存记录
+  2. 记录项目，代表人或组织
+  3. 字段，代表记载的数据，如 E-mail 地址或电话号码。
 
-* Classes and Generic Functions
+  每个类都包含众多实例，以及可供第三方扩展的空间。主要思想就是将主要框架尽可能用类
+  进行抽象：那些类本身已经代表了几乎所有的行为，并从用户的配置中接受基本消息。相当
+  标准的面向对象项目。不过，CLOS/EIEIO 在底层和其它的面向对象系统完全不同。
 
-My current excuse for being a smug Lisp weenie is generic methods with
-multiple dispatch. I can’t explain it any better than [[http://www.gigamonkeys.com/book/object-reorientation-generic-functions.html][Peter Seibel did]], but if
-you’re too lazy to read that: Lisp’s object-oriented Copernican revolution was
-to make methods top-level objects (I’d be curious to hear if Lisp borrowed
-this from another language). They no longer “belong to” classes, instead they
-behave just like normal functions. In Python you might write:
+* 类和广义函数
+  # * Classes and Generic Functions
+  #+begin_comment 
+  My current excuse for being a smug Lisp weenie is generic methods with
+  multiple dispatch. I can’t explain it any better than [[http://www.gigamonkeys.com/book/object-reorientation-generic-functions.html][Peter Seibel did]], but if
+  you’re too lazy to read that: Lisp’s object-oriented Copernican revolution was
+  to make methods top-level objects (I’d be curious to hear if Lisp borrowed
+  this from another language). They no longer “belong to” classes, instead they
+  behave just like normal functions. In Python you might write:
+  #+end_comment
+  作为一个自以为是的 Lisp 粉，我目前只能给出一个蹩脚的例子：传递多个消息的通用方
+  法。我想 [[http://www.gigamonkeys.com/book/object-reorientation-generic-functions.html][Peter Seibel]] (Pratical Common Lisp) 对 Lisp 面向对象编程的解释已经很
+  好了，不过如果你懒得读它，我可以简要解释一下：Lisp 的面向对象把方法作为最顶层
+  的对象（我很好奇它是不是从别的语言里借鉴了一些思想）（译者：Lisp 的确从
+  Smalltalk 借鉴了面向对象思想）。它们不再从属于类，而是像普通的函数一样。用
+  Python 你或许会写：
 
-#+BEGIN_SRC python
+  #+BEGIN_SRC python
   class ThingOne():
 
       def foo(self):
@@ -63,11 +104,12 @@ behave just like normal functions. In Python you might write:
 
   ThingOne().foo()
   ThingTwo().foo()
-#+END_SRC
+  #+END_SRC
 
-In Lisp you would write the exact equivalent code like so:
+  # In Lisp you would write the exact equivalent code like so:
+  在 Lisp 中你会把等价的实现写成：
 
-#+BEGIN_SRC emacs-lisp
+  #+BEGIN_SRC emacs-lisp
   (defclass thing-one ()
     nil)
 
@@ -82,18 +124,26 @@ In Lisp you would write the exact equivalent code like so:
 
   (foo (make-instance 'thing-one))
   (foo (make-instance 'thing-two))
-#+END_SRC
+  #+END_SRC
 
-Note that the only difference between the two is that the cl-defmethod
-definition is top-level. Its only relationship to the classes is that it
-expects a class instance as its first argument.
+  #+begin_comment 
+  Note that the only difference between the two is that the cl-defmethod
+  definition is top-level. Its only relationship to the classes is that it
+  expects a class instance as its first argument.
 
-The implication of this is that methods are essentially orthogonal to classes.
-Generic functions can dispatch not only on argument class, but also on
-argument type or equality. They can easily be used without defining classes at
-all:
+  The implication of this is that methods are essentially orthogonal to classes.
+  Generic functions can dispatch not only on argument class, but also on
+  argument type or equality. They can easily be used without defining classes at
+  all:
+  #+end_comment
+  
+   注意，两者之间唯一的差别就是 =cl-defmethod= 的定义是顶层的。它和类的唯一关心
+   在于它需要将一个类作为第一个参数。
 
-#+BEGIN_SRC emacs-lisp
+   这暗示着方法是和类相分离的。广义函数不止基于所指定的类，也基于参数的种类来传
+   递消息。它们甚至可以在没有指定类的情况下使用：
+
+  #+BEGIN_SRC emacs-lisp
   (cl-defmethod type-test ((arg string))
     (message "I was called with string argument %s" arg))
 
@@ -102,46 +152,62 @@ all:
 
   (cl-defmethod type-test (arg)
     (message "I don't know what %s is" arg))
-#+END_SRC
+  #+END_SRC
 
-The last version is a “catch-all” definition. In “normal” elisp, you’d do this
-with a cond statement:
+  # The last version is a “catch-all” definition. In “normal” elisp, you’d do this
+  # with a cond statement:
+  最后一个是个“捕捉全部”的方法定义。在“常规”的 Emacs Lisp 中，你会用一个
+  =cond= 来实现类似的事：
 
-#+BEGIN_SRC emacs-lisp
+  #+BEGIN_SRC emacs-lisp
   (defun type-test (arg)
     (cond ((stringp arg)
            (message "I was called with string argument %s" arg))
           ((integerp arg)
            (message "I was called with integer argument %d" arg))
           (t (message "I don't know what %s is" arg))))
-#+END_SRC
+  #+END_SRC
 
-Exactly equivalent, the only difference being that the methods can be defined
-anywhere you like.
+  # Exactly equivalent, the only difference being that the methods can be defined
+  # anywhere you like.
 
-* Multiple Dispatch
+  完全是等价的，用面向对象方法唯一的理由在于你可以在任何地方进行定义。
 
-So: methods are top-level creatures, can specialize on the type of their
-arguments, and can accept more than one argument. The upshot is that you can
-have methods that behave differently depending on the class of more than one
-object – aka “multiple dispatch”. That looks like:
+* 传递多个消息 
+  # * Multiple Dispatch
+  #+BEGIN_COMMENT
+  So: methods are top-level creatures, can specialize on the type of their
+  arguments, and can accept more than one argument. The upshot is that you can
+  have methods that behave differently depending on the class of more than one
+  object – aka “multiple dispatch”. That looks like:
+  #+END_COMMENT
+  所以：方法是顶层的东西，能根据参数给出具体的定义，也能接受多个参数。结果就是你
+  能得到基于建立在多个对象上的类来决定行为的方法，也就是“多重分发“，看起来就像
+  这样：
 
-#+BEGIN_SRC emacs-lisp
+  #+BEGIN_SRC emacs-lisp
   (cl-defmethod bar ((obj1 thing-one)
                      (obj2 thing-two))
     (message "bar called with thing-one %s and thing-two %s" obj1 obj2))
-#+END_SRC
+  #+END_SRC
 
-Methods can dispatch on an arbitrary number of arguments, by examining their
-class, their type, or a few other tricks. More-specific specializers override
-less-specific specializers.
+  #+BEGIN_COMMENT
+  Methods can dispatch on an arbitrary number of arguments, by examining their
+  class, their type, or a few other tricks. More-specific specializers override
+  less-specific specializers.
 
-EBDB uses multiple dispatch all over the place – for instance, when editing a
-field on a record. When the user hits “e” on a field to edit it, that
-eventually results in a call to this (simplified for explanatory purposes)
-method:
+  EBDB uses multiple dispatch all over the place – for instance, when editing a
+  field on a record. When the user hits “e” on a field to edit it, that
+  eventually results in a call to this (simplified for explanatory purposes)
+  method:
+  #+END_COMMENT
+  方法能通过检验一定数量的参数所属的类，数据类型，或者其它的技巧来发送消息。特化
+  程度高的参数特化符能覆盖特化程度低的特化符。
 
-#+BEGIN_SRC emacs-lisp
+  EBDB 在所有地方都用“多重分发”，比如，在编辑一个项目里的字段的时候。当用户按
+  下 =e= 来开始编辑的时候，最终导致如下方法被调用（当然，是简化过的）：
+
+  #+BEGIN_SRC emacs-lisp
   (cl-defmethod ebdb-record-change-field ((record ebdb-record)
                                           (old-field ebdb-field)
                                           &optional new-field)
