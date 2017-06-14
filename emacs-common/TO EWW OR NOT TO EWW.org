@@ -1,0 +1,42 @@
+#+TITLE: TO EWW OR NOT TO EWW
+#+URL: http://pragmaticemacs.com/emacs/to-eww-or-not-to-eww/
+#+AUTHOR: lujun9972
+#+TAGS: emacs-common
+#+DATE: [2017-06-14 三 15:41]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+最近版本的Emacs中搭载了一款颇为不错的文本web浏览器,叫做 eww. [[https://github.com/dakrone/eos/blob/master/eos-web.org][这里]] 有一个很不错的配置例子. 我自己有时候会使用 eww, 但有时候又想用全图形的web浏览器(我亲爱的Firefox).
+
+我将eww设置成了Emacs中的默认浏览器:
+#+BEGIN_SRC emacs-lisp
+  (setq browse-url-browser-function 'eww-browse-url)
+#+END_SRC
+
+但同时,我也创建了一些包装函数,以防有时候我想用系统默认的浏览器 (比如Firefox).
+
+在 mu4e email 界面, 按下 =g= 就会用eww打开URL, 而通过下面的配置,我可以通过按下 =G= 键来调用FIrefox打开这个URL:
+#+BEGIN_SRC emacs-lisp
+  ;; open link in firefox rather than eww
+  (defun bjm/mu4e-view-go-to-url-gui ()
+    "Wrapper for mu4e-view-go-to-url to use gui browser instead of eww"
+    (interactive)
+    (let ((browse-url-browser-function 'browse-url-default-browser))
+      (mu4e-view-go-to-url)))
+  ;; bind it
+  (define-key mu4e-view-mode-map (kbd "G") 'bjm/mu4e-view-go-to-url-gui)
+#+END_SRC
+
+类似的,在 elfeed 中, 按下 =b= 会使用eww(Emacs默认浏览器)打开文章. 而通过下面配置,我可以通过按下 =B= 来调用Firefox访问这篇文章. 
+注意,我这里是通过调用Mac的 =open= 命令来实现使用系统默认浏览器访问URL的. 
+若你是使用linux操作系统,那么应该改成使用 =xdg-open= 命令.
+#+BEGIN_SRC emacs-lisp
+  ;; browse article in gui browser instead of eww
+  (defun bjm/elfeed-show-visit-gui ()
+    "Wrapper for elfeed-show-visit to use gui browser instead of eww"
+    (interactive)
+    (let ((browse-url-generic-program "/usr/bin/open"))
+      (elfeed-show-visit t)))
+
+  (define-key elfeed-show-mode-map (kbd "B") 'bjm/elfeed-show-visit-gui)
+#+END_SRC
