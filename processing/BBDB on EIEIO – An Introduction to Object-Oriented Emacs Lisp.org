@@ -64,11 +64,16 @@ system version of the insidious big Brother DataBase“。
   Fairly standard object-oriented stuff. However, CLOS/EIEIO differs from other
   OO systems in some fundamental ways.
   #+end_comment
+
+  #+BEGIN_QUOTE
+  译者注：下面的例子中，类 = class，方法 = method，消息传递／分发 = dispatch，多重分发 = multiple dispatch。
+  #+END_QUOTE
+
   EBDB 中有三个主类：
 
-  1. 数据库，用于保存记录
-  2. 记录项目，代表人或组织
-  3. 字段，代表记载的数据，如 E-mail 地址或电话号码。
+  1. 数据库（Database），用于保存记录
+  2. 记录项目（Records），代表人或组织
+  3. 字段（Fields），代表记载的数据，如 E-mail 地址或电话号码。
 
   每个类都包含众多实例，以及可供第三方扩展的空间。主要思想就是将主要框架尽可能用类
   进行抽象：那些类本身已经代表了几乎所有的行为，并从用户的配置中接受基本消息。相当
@@ -92,38 +97,38 @@ system version of the insidious big Brother DataBase“。
   Python 你或许会写：
 
   #+BEGIN_SRC python
-  class ThingOne():
+    class ThingOne():
 
-      def foo(self):
-          print("calling thing one foo on %s" % self)
+        def foo(self):
+            print("calling thing one foo on %s" % self)
 
-  class ThingTwo():
+    class ThingTwo():
 
-      def foo(self):
-          print("calling thing two foo on %s" % self)
+        def foo(self):
+            print("calling thing two foo on %s" % self)
 
-  ThingOne().foo()
-  ThingTwo().foo()
+    ThingOne().foo()
+    ThingTwo().foo()
   #+END_SRC
 
   # In Lisp you would write the exact equivalent code like so:
   在 Lisp 中你会把等价的实现写成：
 
   #+BEGIN_SRC emacs-lisp
-  (defclass thing-one ()
-    nil)
+    (defclass thing-one ()
+      nil)
 
-  (defclass thing-two ()
-    nil)
+    (defclass thing-two ()
+      nil)
 
-  (cl-defmethod foo ((obj thing-one))
-    (message "calling thing one foo on %s" obj))
+    (cl-defmethod foo ((obj thing-one))
+      (message "calling thing one foo on %s" obj))
 
-  (cl-defmethod foo ((obj thing-two))
-    (message "calling thing two foo on %s" obj))
+    (cl-defmethod foo ((obj thing-two))
+      (message "calling thing two foo on %s" obj))
 
-  (foo (make-instance 'thing-one))
-  (foo (make-instance 'thing-two))
+    (foo (make-instance 'thing-one))
+    (foo (make-instance 'thing-two))
   #+END_SRC
 
   #+begin_comment 
@@ -171,7 +176,7 @@ system version of the insidious big Brother DataBase“。
   # Exactly equivalent, the only difference being that the methods can be defined
   # anywhere you like.
 
-  完全是等价的，用面向对象方法唯一的理由在于你可以在任何地方进行定义。
+  完全等价，和面向对象方法唯一的区别在于你可以在任何地方进行定义一个方法。
 
 * 传递多个消息 
   # * Multiple Dispatch
@@ -208,245 +213,344 @@ system version of the insidious big Brother DataBase“。
   下 =e= 来开始编辑的时候，最终导致如下方法被调用（当然，是简化过的）：
 
   #+BEGIN_SRC emacs-lisp
-  (cl-defmethod ebdb-record-change-field ((record ebdb-record)
-                                          (old-field ebdb-field)
-                                          &optional new-field)
-    "Change the value of FIELD belonging to RECORD."
-    (let* ((fieldclass (eieio-object-class old-field))
-           (new-field (or new-field (ebdb-read fieldclass nil old-field))))
-      (ebdb-record-delete-field record old-field)
-      (ebdb-record-insert-field record new-field)))
-#+END_SRC
+    (cl-defmethod ebdb-record-change-field ((record ebdb-record)
+                                            (old-field ebdb-field)
+                                            &optional new-field)
+      "Change the value of FIELD belonging to RECORD."
+      (let* ((fieldclass (eieio-object-class old-field))
+             (new-field (or new-field (ebdb-read fieldclass nil old-field))))
+        (ebdb-record-delete-field record old-field)
+        (ebdb-record-insert-field record new-field)))
+  #+END_SRC
 
-Because ebdb-record and ebdb-field are low-level base classes, this call works
-for everything in the database. A new field instance is read, using the old
-field instance as a default, and the old field is replaced with the new field.
-The code knows nothing about records or fields, it just makes a new field
-instance by calling ebdb-read on the field class, and then adds that instance
-to the record with ebdb-record-insert-field.
+  #+BEGIN_COMMENT
+  Because ebdb-record and ebdb-field are low-level base classes, this call works
+  for everything in the database. A new field instance is read, using the old
+  field instance as a default, and the old field is replaced with the new field.
+  The code knows nothing about records or fields, it just makes a new field
+  instance by calling ebdb-read on the field class, and then adds that instance
+  to the record with ebdb-record-insert-field.
 
-It gets more complicated, of course.
+  It gets more complicated, of course.
 
-For instance, person records can have “role” fields at organization records.
-The role is a relationship that can include a label, a special email address,
-and an arbitrary number of other fields. The roles are kept in a slot on the
-person record, and that’s how they’re saved in the database. But when you’re
-looking at the record for the organization, you also want to see the people
-who have roles there, right? So when displaying organizations, a hashtable is
-used to do a reverse lookup, and display all the role fields as if they were
-part of the organization record.
+  For instance, person records can have “role” fields at organization records.
+  The role is a relationship that can include a label, a special email address,
+  and an arbitrary number of other fields. The roles are kept in a slot on the
+  person record, and that’s how they’re saved in the database. But when you’re
+  looking at the record for the organization, you also want to see the people
+  who have roles there, right? So when displaying organizations, a hashtable is
+  used to do a reverse lookup, and display all the role fields as if they were
+  part of the organization record.
 
-Once the role fields are visible on an organization record, of course, then
-users are bound to try to edit/delete the role fields from there. Technically
-the role fields don’t belong to the organization, so some trickery has to be
-perpetrated: we need to special-case the situation where the user tries to
-edit a role field on an organization record. This turned out to be remarkably
-simple, by adding a new method:
+  Once the role fields are visible on an organization record, of course, then
+  users are bound to try to edit/delete the role fields from there. Technically
+  the role fields don’t belong to the organization, so some trickery has to be
+  perpetrated: we need to special-case the situation where the user tries to
+  edit a role field on an organization record. This turned out to be remarkably
+  simple, by adding a new method:
+  #+END_COMMENT
+  
+  由于 =ebdb-record= 和 =ebdb-field= 都是底层基本类，这个调用对数据库的所有内容
+  都起作用。新的字段被读取，旧的字段作为默认值，新字段代替旧字段。这个代码不懂任
+  何记录或字段，只在产生新字段的时候调用 =ebdb-read= ，然后用
+  =ebdb-record-insert-field= 加入记录。
 
-#+BEGIN_SRC emacs-lisp
-  (cl-defmethod ebdb-record-change-field ((org ebdb-record-organization)
-                                          (old-field ebdb-field-role)
-                                          &optional new-field)
-    (let ((person (ebdb-gethash (slot-value old-field 'record-uuid) 'uuid)))
-      (cl-call-next-method person old-field new-field)))
-#+END_SRC
+  当然实际操作是更加复杂的。
 
-We use more-specific record and field subclasses as specializers, so that this
-method only fires when editing a role field on an organization record. The
-method looks up the person record that the role field “actually” belongs to,
-switches out the organization for the person, and then uses
-cl-call-next-method (the lisp equivalent of Python’s super) to pass the new
-arguments to the more-general method below.
+  比如，个人记录会有“职位”字段在组织记录里。职位包括一个标签，一个电子邮件地址，
+  以及一定数量的其它字段。在这个数据库中，职位保存在个人记录的插槽里。但是当你想
+  看一个组织的信息时，你或许也会想看有多少人在那里有职位，对吧？所以在显示组织的
+  时候，哈希表被用来逆向查找，并把职位作为组织的一个子项目来展示。
 
-I was a little surprised that it worked out so well. All the code “above” this
-call treats the organization as the record being edited: it has change hooks
-called on it, and gets redisplayed after editing. All the code “below” this
-treats the person as the record being edited: its slots are altered, and its
-databases are alerted to the edit.
+  当职位字段在组织记录中显示的时候，用户或许会想编辑它们。从实际上讲职位字段并不
+  属于组织，所以这时候需要用一些特殊技巧了：我们需要写一个特例来处理这样的情况。
+  这其实很简单，加个方法的事儿嘛：
 
-* Method Composition
+  #+BEGIN_SRC emacs-lisp
+    (cl-defmethod ebdb-record-change-field ((org ebdb-record-organization)
+                                            (old-field ebdb-field-role)
+                                            &optional new-field)
+      (let ((person (ebdb-gethash (slot-value old-field 'record-uuid) 'uuid)))
+        (cl-call-next-method person old-field new-field)))
+  #+END_SRC
 
-Calling down through a “stack” of descendant-to-ancestor methods is common
-practice, and EBDB does it quite a bit, again using cl-call-next-method. For
-instance, here’s a simplified outline of the ebdb-record-field-slot-query
-method, which is used to figure out which fields go in which slot.
+  #+BEGIN_COMMENT
+  We use more-specific record and field subclasses as specializers, so that this
+  method only fires when editing a role field on an organization record. The
+  method looks up the person record that the role field “actually” belongs to,
+  switches out the organization for the person, and then uses
+  cl-call-next-method (the lisp equivalent of Python’s super) to pass the new
+  arguments to the more-general method below.
 
-#+BEGIN_SRC emacs-lisp
-  (cl-defmethod ebdb-record-field-slot-query ((class (subclass ebdb-record-person))
-                                              &optional query alist)
-    (cl-call-next-method
-     class
-     query
-     (append
-      '((aka . ebdb-field-name-complex)
-        (relations . ebdb-field-relation)
-        (organizations . ebdb-field-role))
-      alist)))
+  I was a little surprised that it worked out so well. All the code “above” this
+  call treats the organization as the record being edited: it has change hooks
+  called on it, and gets redisplayed after editing. All the code “below” this
+  treats the person as the record being edited: its slots are altered, and its
+  databases are alerted to the edit.
+  #+END_COMMENT
+  我们用更加具体的记录和字段子类来做特化参数符，所以这个方法只在编辑组织记录里的
+  职位字段的时候起作用。这个方法查找职位记录实际从属的个人记录，从组织切换到个人
+  记录，然后用 =cl-call-next-method= （Python super 的 Lisp 等价）来把参数传递给
+  通用方法。
 
-  (cl-defmethod ebdb-record-field-slot-query ((class (subclass ebdb-record-entity))
-                                              &optional query alist)
-    (cl-call-next-method
-     class
-     query
-     (append
-      `((mail . ebdb-field-mail)
-        (phone . ebdb-field-phone)
-        (address . ebdb-field-address))
-      alist)))
+  我对这能成功起作用感到吃惊。调用方法顶部的代码把组织当作要编辑的记录：这改变了
+  运行的钩子（Hook），然后在编辑完成后刷新显示。而底部的代码认为个人是要修改的记
+  录：插槽变了，相应的数据库也更改了。
 
-  (cl-defmethod ebdb-record-field-slot-query ((class (subclass ebdb-record))
-                                              &optional query alist)
-    (let ((alist (append
-                  '((notes . ebdb-field-notes)
-                    (image . ebdb-field-image))
-                  alist)))
-      (pcase query
-        (`(nil . ,class)
-         (or (rassq class alist)
-             (signal 'ebdb-unacceptable-field (list class))))
-        (`(,slot . nil)
-         (or (assq slot alist)
-             (signal 'ebdb-unacceptable-field (list slot))))
-        (_ alist))))
-#+END_SRC
+* 方法组成
+  # * Method Composition
 
-These methods go from specific to general: ebdb-record-person subclasses
-ebdb-record-entity which subclasses ebdb-record. Each subclass’s method adds
-its own fields to the alist argument, then passes that argument down to the
-next ancestor class, all the way to the “bottom”, where the base
-implementation handles the actual query: it either tells us which slot the
-field class belongs to, or which field class a slot can accept, or (if “query”
-is nil) just returns a full list of slots and field classes which the record
-can accept.
+  #+BEGIN_COMMENT
+  Calling down through a “stack” of descendant-to-ancestor methods is common
+  practice, and EBDB does it quite a bit, again using cl-call-next-method. For
+  instance, here’s a simplified outline of the ebdb-record-field-slot-query
+  method, which is used to figure out which fields go in which slot.
+  #+END_COMMENT
+  调用一摞从子类到父类的方法是常见的过程，而且 EBDB 确实也经常用
+  =ebdb-record-field-slot-query= 来这样做。比如，这里就有一个简化过的
+  =ebdb-record-field-slot-query= 方法，用于分辨一个字段在哪个插槽里。
 
-The above also illustrates how EIEIO provides for class-level methods, with
-the “subclass” specializer.
+  #+BEGIN_SRC emacs-lisp
+    (cl-defmethod ebdb-record-field-slot-query ((class (subclass ebdb-record-person))
+                                                &optional query alist)
+      (cl-call-next-method
+       class
+       query
+       (append
+        '((aka . ebdb-field-name-complex)
+          (relations . ebdb-field-relation)
+          (organizations . ebdb-field-role))
+        alist)))
 
-* Qualifiers
+    (cl-defmethod ebdb-record-field-slot-query ((class (subclass ebdb-record-entity))
+                                                &optional query alist)
+      (cl-call-next-method
+       class
+       query
+       (append
+        `((mail . ebdb-field-mail)
+          (phone . ebdb-field-phone)
+          (address . ebdb-field-address))
+        alist)))
 
-The most complicated aspect of generic methods is qualifiers. In addition to
-the usual stack of main methods (called “primary” methods), EIEIO (following
-CLOS) provides for supplementary stacks that run before, after, or around the
-primary stack. You do this with the :before, :after or :around qualifier tags,
-inserted after the method name. Methods with no qualifier tags are assumed to
-be :primary methods.
+    (cl-defmethod ebdb-record-field-slot-query ((class (subclass ebdb-record))
+                                                &optional query alist)
+      (let ((alist (append
+                    '((notes . ebdb-field-notes)
+                      (image . ebdb-field-image))
+                    alist)))
+        (pcase query
+          (`(nil . ,class)
+           (or (rassq class alist)
+               (signal 'ebdb-unacceptable-field (list class))))
+          (`(,slot . nil)
+           (or (assq slot alist)
+               (signal 'ebdb-unacceptable-field (list slot))))
+          (_ alist))))
+  #+END_SRC
 
-When a method is called, the “first half” of the :around methods are run
-first. Then all the :before methods run. Then the :primary methods. Then the
-:after methods. Then the “second half” of the :around methods.
+  #+BEGIN_COMMENT
+  These methods go from specific to general: ebdb-record-person subclasses
+  ebdb-record-entity which subclasses ebdb-record. Each subclass’s method adds
+  its own fields to the alist argument, then passes that argument down to the
+  next ancestor class, all the way to the “bottom”, where the base
+  implementation handles the actual query: it either tells us which slot the
+  field class belongs to, or which field class a slot can accept, or (if “query”
+  is nil) just returns a full list of slots and field classes which the record
+  can accept.
 
-The :around and :primary methods get to choose where in their body the next
-method is called, by placing cl-call-next-method where they want it.
+  The above also illustrates how EIEIO provides for class-level methods, with
+  the “subclass” specializer.
+  #+END_COMMENT
+  这个方法以具体到通用的方式来调度： =ebdb-record-person= 属于
+  =ebdb-record-entity= ，而后者属于 =ebdb-record= 。每个子类的方法都把属于自己的
+  字段加入参数列表里，然后把参数传递到父类，直到最底层实际调用查询方法的部分：它
+  返回一个字段类属于哪个插槽或者能被哪个插槽接受，或者（如果 query 设置为空）返
+  回一个记录能接受的插槽和字段类的列表。
 
-Clear as mud? Here’s what it looks like:
+  同样这展示了 EIEIO 是如何利用子类特化符提供类级别的方法。
 
-#+BEGIN_SRC emacs-lisp
-  (defclass parent ()
-    nil)
+* 修饰符
+  # * Qualifiers
 
-  (defclass child (parent)
-    nil)
+  #+BEGIN_COMMENT
+  The most complicated aspect of generic methods is qualifiers. In addition to
+  the usual stack of main methods (called “primary” methods), EIEIO (following
+  CLOS) provides for supplementary stacks that run before, after, or around the
+  primary stack. You do this with the :before, :after or :around qualifier tags,
+  inserted after the method name. Methods with no qualifier tags are assumed to
+  be :primary methods.
 
-  (cl-defmethod foo :around ((obj child))
-                (message "one")
-                (cl-call-next-method)
-                (message "eleven"))
+  When a method is called, the “first half” of the :around methods are run
+  first. Then all the :before methods run. Then the :primary methods. Then the
+  :after methods. Then the “second half” of the :around methods.
 
-  (cl-defmethod foo :around ((obj parent))
-                (message "two")
-                (cl-call-next-method)
-                (message "ten"))
+  The :around and :primary methods get to choose where in their body the next
+  method is called, by placing cl-call-next-method where they want it.
 
-  (cl-defmethod foo :before ((obj child))
-                (message "three"))
+  Clear as mud? Here’s what it looks like:
+  #+END_COMMENT
+  通用方法最复杂的部分就是修饰符了。除了主要方法以外，EIEIO 也提供了可以在主方法
+  前后运行或者替代主方法的补充方法。你可以用 =:before, :after, :around= 这些修饰
+  标签来声明补充方法。缺省的默认标签则是 =:primary= 主要方法。
 
-  (cl-defmethod foo :before ((obj parent))
-                (message "four"))
+  调用方法的时候，先是 =:around= 的“前一半”运行，然后是 =:before= ，接着是
+  =:primary= ，最后就是剩下的 =:around= 部分。
 
-  (cl-defmethod foo ((obj child))
-    (message "five")
-    (cl-call-next-method)
-    (message "seven"))
+  =:around= 和 =:primary= 方法主体中能用 =cl-call-next-method= 来决定下一个调用
+  的方法。
 
-  (cl-defmethod foo ((obj parent))
-    (message "six"))
+  不懂？没关系，上例子。
 
-  (cl-defmethod foo :after ((obj child))
-                (message "nine"))
+  #+BEGIN_SRC emacs-lisp
+    (defclass parent ()
+      nil)
 
-  (cl-defmethod foo :after ((obj parent))
-                (message "eight"))
+    (defclass child (parent)
+      nil)
 
-  (foo (make-instance 'child))
-#+END_SRC
+    (cl-defmethod foo :around ((obj child))
+                  (message "one")
+                  (cl-call-next-method)
+                  (message "eleven"))
 
-Overuse of method qualifiers is a great way to get yourself turned around
-quick. A few things to note:
+    (cl-defmethod foo :around ((obj parent))
+                  (message "two")
+                  (cl-call-next-method)
+                  (message "ten"))
 
- 1. The :before and :after methods cannot use cl-call-next-method. This means
-    they are always run, in order from most-specific to least-specific,
-    independently of the rest of the code.
- 2. Because of this, :before and :after methods can’t interact with other
-    methods at all. This means they’re only good for general set-up and
-    tear-down, though of course, if a :before method signals an error, nothing
-    after it runs (which is one of the main uses of :before methods). And if a
-    :primary method signals an error, none of the :after methods run.
- 3. The methods which are allowed to use cl-call-next-method (the :around and
-    :primary methods), can use it to fundamentally alter the behavior of the
-    composed method call. Callers can replace the arguments to the next method
-    call, and/or intercept the return value and do something with it. If
-    cl-call-next-method is called with no arguments, it receives the same
-    arguments as the caller did. If the caller wants to replace any arguments,
-    all arguments must be explicitly passed again. You can see this happening
-    in the ebdb-record-field-slot-query definitions above.
- 4. In the :around methods, cl-call-next-method will move down the :around
-    stack. At the bottom of the :around stack, the next call will run the
-    :before, :primary, and :after stacks, after which control is passed back
-    up the :around stack. The :around methods should always contain a call to
-    cl-call-next-method, that’s their whole point.
- 5. The :primary methods can call cl-call-next-method to run the next :primary
-    method, but they don’t have to. If they don’t, they fully override all
-    less-specific methods.
+    (cl-defmethod foo :before ((obj child))
+                  (message "three"))
 
-In practice, I found having more than one :around method to be fairly
-baffling. It simply got too complicated to keep track of. Later I decided not
-to use :around methods at all, and to reserve them for user customization
-(that’s not entirely true, but I didn’t use them much).
+    (cl-defmethod foo :before ((obj parent))
+                  (message "four"))
 
-Did I mention the :extra methods? No, I didn’t.
+    (cl-defmethod foo ((obj child))
+      (message "five")
+      (cl-call-next-method)
+      (message "seven"))
 
-There’s one more qualifier, called :extra. This is a way of piling multiple
-methods onto the same set of specializers (otherwise each method would clobber
-the last). Each one carries the :extra tag, plus a string label for
-identification. They are run just before the :primary methods, and calling
-cl-call-next-method within them calls down through the :extra stack, to the
-:primary methods.
+    (cl-defmethod foo ((obj parent))
+      (message "six"))
 
-This turned out to be perfect for implementing internationalization for EBDB.
+    (cl-defmethod foo :after ((obj child))
+                  (message "nine"))
 
-BBDB –and vanilla EBDB – are mostly unaware of different countries and
-scripts: they have a mild North American bias. I wanted to set things up so
-that developers could write their own country-specific customization
-libraries, which users could load as they liked, to extend EBDB’s basic
-behavior. If we know the country code of a phone number, for example, we
-should be able to display the number according to the standards of that
-country.
+    (cl-defmethod foo :after ((obj parent))
+                  (message "eight"))
 
-So we have the ebdb-i18n library. This file does nothing on its own, it only
-provides the hooks for country-specific libraries. As EBDB is a work in
-progress, I’ve so far only written support for my own needs, which are
-China-centric.
+    (foo (make-instance 'child))
+  #+END_SRC
 
-It always bothered me that Chinese names were displayed in BBDB as (given
-name)(space)(surname), ie “锦涛胡”, rather than the proper order of (surname)
-(given name): “胡锦涛”. If you gave records a name-format field, you could get
-“胡, 锦涛”, which was better, but still not right. (Other people have also 
-[[https://github.com/tumashu/bbdb-china][addressed this problem]].)
+  #+BEGIN_COMMENT
+  Overuse of method qualifiers is a great way to get yourself turned around
+  quick. A few things to note:
 
-Loading ebdb-i18n.el will load (among other things) the following :extra
-method for the display of name fields:
+  1. The :before and :after methods cannot use cl-call-next-method. This means
+     they are always run, in order from most-specific to least-specific,
+     independently of the rest of the code.
+  2. Because of this, :before and :after methods can’t interact with other
+     methods at all. This means they’re only good for general set-up and
+     tear-down, though of course, if a :before method signals an error, nothing
+     after it runs (which is one of the main uses of :before methods). And if a
+     :primary method signals an error, none of the :after methods run.
+  3. The methods which are allowed to use cl-call-next-method (the :around and
+     :primary methods), can use it to fundamentally alter the behavior of the
+     composed method call. Callers can replace the arguments to the next method
+     call, and/or intercept the return value and do something with it. If
+     cl-call-next-method is called with no arguments, it receives the same
+     arguments as the caller did. If the caller wants to replace any arguments,
+     all arguments must be explicitly passed again. You can see this happening
+     in the ebdb-record-field-slot-query definitions above.
+  4. In the :around methods, cl-call-next-method will move down the :around
+     stack. At the bottom of the :around stack, the next call will run the
+     :before, :primary, and :after stacks, after which control is passed back
+     up the :around stack. The :around methods should always contain a call to
+     cl-call-next-method, that’s their whole point.
+  5. The :primary methods can call cl-call-next-method to run the next :primary
+     method, but they don’t have to. If they don’t, they fully override all
+     less-specific methods.
 
-#+BEGIN_SRC emacs-lisp
+  In practice, I found having more than one :around method to be fairly
+  baffling. It simply got too complicated to keep track of. Later I decided not
+  to use :around methods at all, and to reserve them for user customization
+  (that’s not entirely true, but I didn’t use them much).
+
+  Did I mention the :extra methods? No, I didn’t.
+
+  There’s one more qualifier, called :extra. This is a way of piling multiple
+  methods onto the same set of specializers (otherwise each method would clobber
+  the last). Each one carries the :extra tag, plus a string label for
+  identification. They are run just before the :primary methods, and calling
+  cl-call-next-method within them calls down through the :extra stack, to the
+  :primary methods.
+
+  This turned out to be perfect for implementing internationalization for EBDB.
+
+  BBDB –and vanilla EBDB – are mostly unaware of different countries and
+  scripts: they have a mild North American bias. I wanted to set things up so
+  that developers could write their own country-specific customization
+  libraries, which users could load as they liked, to extend EBDB’s basic
+  behavior. If we know the country code of a phone number, for example, we
+  should be able to display the number according to the standards of that
+  country.
+
+  So we have the ebdb-i18n library. This file does nothing on its own, it only
+  provides the hooks for country-specific libraries. As EBDB is a work in
+  progress, I’ve so far only written support for my own needs, which are
+  China-centric.
+
+  It always bothered me that Chinese names were displayed in BBDB as (given
+  name)(space)(surname), ie “锦涛胡”, rather than the proper order of (surname)
+  (given name): “胡锦涛”. If you gave records a name-format field, you could get
+  “胡, 锦涛”, which was better, but still not right. (Other people have also 
+  [[https://github.com/tumashu/bbdb-china][addressed this problem]].)
+
+  Loading ebdb-i18n.el will load (among other things) the following :extra
+  method for the display of name fields:
+  #+END_COMMENT
+  大量使用方法修饰符是能让你了解具体发生了什么的一个很好的方法。但是需要注意的几
+  点有：
+
+  1. 在 =:before :after= 方法中不能用 =cl-call-next-method= 。这代表它们总是会以
+     具体到抽象的顺序运行，独立于其它代码。
+  2. 因此， =:before :after= 方法是无法和其它方法交互的。所以它们用来做通用设置
+     或销毁，比如一个 =:before= 方法出现错误时，之后的所有方法都不会生效。以及如
+     果一个 =:primary= 方法出现问题， =:after= 方法也不会运行。
+  3. =cl-call-next-method= 可以用来改变调用的方法。可以传递参数给调用的方法，也
+     可以对返回的值进行处理。默认条件下传递所有参数。如果要改变传递的参数，所有
+     参数需要做显式声明。你可以在 =ebdb-record-field-slot-query= 中看到具体的用
+     法。
+  4. 在 =:around= 之后接着运行的是 =:before :primary :after= ， =:around= 中必须
+     有 =cl-call-next-method= 。
+  5. =:primary= 方法中可以用 =cl-call-next-method= 来调用下一个 =:primary= 方法，
+     否则覆盖更加抽象的方法。
+
+  在实践中我发现太多的 =:around= 方法是很烦人的，所以我尽量避免使用它们，并把它
+  们留给用户作为可以自定义的部分。
+
+  我有提到 =:extra= 方法吗？没有。
+
+  =:extra= 修饰符是用来把多个方法塞进一个特化符中（不然它们会互相覆盖到只剩一个
+  方法），每个 =:extra= 方法用文档字符串作区分，它们在 =:primary= 方法之前运行，
+  在里面用 =cl-call-next-method= 会依次调用 =:extra= 方法栈。
+
+  这使得实现一个国际化的 EBDB 变得非常容易。
+
+  BBDB 对多国语言习惯的支持不是很好，默认的习惯有一些来自北美的偏见。我希望 EBDB
+  能提供让开发者根据当地语言习惯写出针对的扩展，并根据用户的偏好来加载。比如，如
+  果知道一个电话号码的国家区号，就应该可以根据那个国家／地区的规范来显示电话号码。
+
+  于是我们就有了 =ebdb-i18n= 库，它专门用来扩展和具体国家／地区有关的库。鉴于
+  EBDB 仍在开发中，我目前只根据自己需要开发了中文为主的部分。
+
+  在 BBDB 中，中文名字总是以【名】【空格】【姓】，比如“锦涛 胡”，而不是【姓】
+  【名】，“胡锦涛”，如果你指定了名字格式，或许会得到“胡, 锦涛”，这稍微好上一
+  点，但是并不是完全正确的。（其他人也为此作出了[[https://github.com/tumashu/bbdb-china][解决办法：bbdb-china]]）
+
+  加载 =ebdb-i18n= 会得到如下方法：
+
+  #+BEGIN_SRC emacs-lisp
   (cl-defmethod ebdb-string :extra "i18n" ((name ebdb-field-name-complex))
                 (let* ((str (cl-call-next-method name))
                        (script (aref char-script-table (aref str 0))))
@@ -455,70 +559,107 @@ method for the display of name fields:
                         (setq str (ebdb-string-i18n name script))
                       (cl-no-applicable-method nil)))
                   str))
-#+END_SRC
+  #+END_SRC
 
-This method shadows the primary method. The first thing it does is to call
-that :primary method, using cl-call-next-method, so it can examine the
-results. It looks at the first character of the name, looks up the script the
-character is written in, and attempts to call ebdb-string-i18n with the name
-field and the script symbol as arguments. If no country-specific libraries
-have been loaded, there will be no method that can catch these particular
-arguments, in which case the original string is returned.
+  #+BEGIN_QUOTE 
+  This method shadows the primary method. The first thing it does
+  is to call that :primary method, using cl-call-next-method, so it can examine
+  the results. It looks at the first character of the name, looks up the script
+  the character is written in, and attempts to call ebdb-string-i18n with the
+  name field and the script symbol as arguments. If no country-specific
+  libraries have been loaded, there will be no method that can catch these
+  particular arguments, in which case the original string is returned. 
+  #+END_QUOTE
 
-Loading ebdb-chn.el defines this method:
+  这个方法覆盖了主要方法。它先用 =cl-call-next-method= 调用主方法来得到结果。它
+  查看结果的第一个字母并推测出语言，并把参数传递给下面的 =ebdb-string-i18n= 。如
+  果没有针对这个语言的库被使用，那么返回的就是原来的字符串。
 
-#+BEGIN_SRC emacs-lisp
+  # Loading ebdb-chn.el defines this method:
+
+  #+BEGIN_SRC emacs-lisp
   (cl-defmethod ebdb-string-i18n ((field ebdb-field-name-complex)
                                   (_script (eql han)))
     (with-slots (surname given-names) field
       (format "%s%s" surname (car given-names))))
-#+END_SRC
+  #+END_SRC
 
-Chinese characters register as the ’han script. So we specialize on the symbol
-’han (using (_script (eql han))), and if it matches, format the name the way
-it’s usually formatted in China.
+  #+BEGIN_QUOTE
+  Chinese characters register as the ’han script. So we specialize on the symbol
+  ’han (using (_script (eql han))), and if it matches, format the name the way
+  it’s usually formatted in China.
 
-If :extra methods didn’t exist, the internationalized ebdb-string method would
-clobber the primary method completely. We’d have to replicate that primary
-method here, or continually check some variable and funcall different
-functions, or even subclass the name field class with a new
-“internationalized” version. None of those options are as elegant as the
-:extra trick.
+  If :extra methods didn’t exist, the internationalized ebdb-string method would
+  clobber the primary method completely. We’d have to replicate that primary
+  method here, or continually check some variable and funcall different
+  functions, or even subclass the name field class with a new
+  “internationalized” version. None of those options are as elegant as the
+  :extra trick.
 
-The ebdb-chn.el library defines many other internationalized methods, notably
-some that memoize Chinese characters as romanized “pinyin”, so you can search
-for contacts with Chinese names without having to switch input methods. Very
-nice.
+  The ebdb-chn.el library defines many other internationalized methods, notably
+  some that memoize Chinese characters as romanized “pinyin”, so you can search
+  for contacts with Chinese names without having to switch input methods. Very
+  nice.
 
-Other internationalized methods allow for dispatch on the country code of
-phone numbers, or the symbol names of countries (as per [[https://en.wikipedia.org/wiki/ISO_3166-1_alpha-3][ISO 3166-1 alpha 3]]).
+  Other internationalized methods allow for dispatch on the country code of
+  phone numbers, or the symbol names of countries (as per [[https://en.wikipedia.org/wiki/ISO_3166-1_alpha-3][ISO 3166-1 alpha 3]]).
+  #+END_QUOTE
+  
+  中文字被识别为 'han 字符，所以我们用 =(_script (eql han))= 来检查，如果符合，
+  就用中文的方法显示名字。
 
-* Problem Areas
+  如果没有 =:extra= 方法，这个用于国际化字符串的方法会完全覆盖主要方法，要实现同
+  样的效果就要增加不少复杂性。
 
-Apart from bird’s-nests of :around methods, I’ve found two other ways to make
-yourself miserable with generic methods. One is combinatorial explosion: if
-you have a method that dispatches on three arguments, and each argument has
-three potential values, you may be writing 27 different method definitions.
-Obviously one tries to avoid this, but sometimes it creeps up on you. EBDB’s
-formatting routines come close to drowning in this way – I suspect the whole
-formatting system is overengineered.
+  =ebdb-chn.el= 定义了不少其它多语言化的方法，比如汉字被记录为拼音，之后用户可以
+  直接用拼音来检索。
 
-The system’s other weakness is a byproduct of its strength: you don’t know
-where code is defined. The same flexibility that allows you to alter
-fundamental object behavior by defining new methods outside the codebase means
-that you don’t necessarily know where those definitions are.
+  以及还有一些针对国际区号和国家名称缩写（[[https://en.wikipedia.org/wiki/ISO_3166-1_alpha-3][ISO 3166-1 alpha 3]]）的方法。
 
-The original BBDB code “did polymorphism” the way that most Elisp code does
-polymorphism: with great big cond branches. This has the disadvantage that
-every function needs to be aware of every type of object it might encounter.
-But it has the advantage that everything is right there where you can see it
-(and it almost certainly goes faster).
+* 现有问题
+  # * Problem Areas
+  #+BEGIN_QUOTE
+  Apart from bird’s-nests of :around methods, I’ve found two other ways to make
+  yourself miserable with generic methods. One is combinatorial explosion: if
+  you have a method that dispatches on three arguments, and each argument has
+  three potential values, you may be writing 27 different method definitions.
+  Obviously one tries to avoid this, but sometimes it creeps up on you. EBDB’s
+  formatting routines come close to drowning in this way – I suspect the whole
+  formatting system is overengineered.
 
-There’s not much to be done about this, it’s a trade-off that has to be
-accepted. Emacs’ self-documenting features do an okay job of showing you all
-the implementations of a particular method, but that’s all the help you get.
-Otherwise you need to keep your code under control, not pile the methods up
-too high, and always know where your towel is.
+  The system’s other weakness is a byproduct of its strength: you don’t know
+  where code is defined. The same flexibility that allows you to alter
+  fundamental object behavior by defining new methods outside the codebase means
+  that you don’t necessarily know where those definitions are.
 
-I think it’s worth it.
+  The original BBDB code “did polymorphism” the way that most Elisp code does
+  polymorphism: with great big cond branches. This has the disadvantage that
+  every function needs to be aware of every type of object it might encounter.
+  But it has the advantage that everything is right there where you can see it
+  (and it almost certainly goes faster).
 
+  There’s not much to be done about this, it’s a trade-off that has to be
+  accepted. Emacs’ self-documenting features do an okay job of showing you all
+  the implementations of a particular method, but that’s all the help you get.
+  Otherwise you need to keep your code under control, not pile the methods up
+  too high, and always know where your towel is.
+
+  I think it’s worth it.
+  #+END_QUOTE
+  除了 =:around= 方法导致的困惑，我发现还有两个糟糕的地方，一个是组合爆炸：如果
+  你有一个对三个参数传递消息的方法， 每个参数可能有三种类型，你可能就需要写 27
+  个不同的方法。当然这是可以稍微避免的。但是 EBDB 的格式化功能的结构就出现了这样
+  的情况--我怀疑可能有点设计过度了。
+
+  以及面向对象系统带来的副作用：你不知道代码的定义到底在哪里。不过你可能不需要了
+  解定义在哪里就能改变方法的行为。
+
+  原本的 BBDB 代码和传统的 ELisp 代码一样，通过大量的条件分支来处理多种情况。这
+  导致了每个函数都要考虑到可能接收到的参数类型，但是你可以清楚地知道发生了什么
+  （以及这样能提升运行速度）。
+
+  这方面能做的改进不多，毕竟这是两者间的平衡。Emacs 的文档功能能正确定位具体方法
+  的定义，但也只能做的这么多。另外你也需要对自己的代码进行控制，不要滥用面向对象
+  方法。
+
+  我觉得这样是值得的。
