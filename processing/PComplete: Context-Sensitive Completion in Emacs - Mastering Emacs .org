@@ -105,16 +105,15 @@ Emacs自带了很多 =pcomplete= 函数能够加强Emacs之前那种单纯的文
 
 * Custom Completion
 
-It goes without saying that a completion library called /programmable completion/ is, well, programmable.
+一个补全库,既然号称 /programmable completion/ 那它自然就是可编程的了.
 
-Adding simple parameter completion is an easy job but anything more than that and it gets hairy as, not surprisingly, this library is virtually undocumented
-(though an optimist would say the source is all the documentation you need…)
+要用它来实现简单的参数补全是很简单的,但是除此之外的补全功能实现起来就有点棘手了,因为这个库并没有什么文档说明在里面(虽然乐观主义者会说代码就是最好的文档...).
 
-I’ll demonstrate how to add rudimentary support for git.
+我接下来会演示一下,如何为 =git= 添加初步的补全功能
 
-The first thing we need to do is establish the order in which parameters must be given; for git, it’s somewhat consistent: git [options] <command> [<args>]
+首先我们需要确认一下命令参数的顺序; 对于 =git= 命令来说,这基本上是固定的: =git [options] <command> [<args>]=
 
-For now I’ll stick to the commands as that’s what people use the most anyway. The commands, in list form, are:
+这里我只关注于常用的那几个命令. 把这些命令放在一个list中:
 
 #+BEGIN_SRC emacs-lisp
   (defconst pcmpl-git-commands
@@ -125,10 +124,11 @@ For now I’ll stick to the commands as that’s what people use the most anyway
     "List of `git' commands")
 #+END_SRC
 
-The syntax for pcomplete is rather clever: it will use dynamic dispatch to resolve the elisp function provided it is named a certain way. All commands are named
-pcomplete/COMMAND or pcomplete/MAJOR-MODE/COMMAND. Provided you follow that naming scheme your command will automagically work.
+=pcomplete= 的语法规则很灵活(clever): 它会根据一定的命名规则来动态地选择调用哪个elisp函数来进行补全(it will use dynamic dispatch to resolve the elisp function provided it is named a certain way).
+一个command的补全函数按 =pcomplete/COMMAND= 或 =pcomplete/MAJOR-MODE/COMMAND= 这两种规则进行命名. 
+只要遵照这个命名规则进行命名,就能够实现补全了.
 
-Next, we need to present a list of valid commands – in this case the ones in pcmpl-git-commands, but it could be any form – to the command pcomplete-here.
+下一步,我们需要提供一个包含有效子命令的列表 – 在这个例子中,这个列表就是 =pcmpl-git-commands= 的值, 不过实际上,提供给命令 =pcomplete-here= 的可以是任意的form(译者注:pcomplete-here内部会运行该form,然后将结果作为补全的依据).
 
 #+BEGIN_SRC emacs-lisp
   (defun pcomplete/git ()
@@ -136,7 +136,7 @@ Next, we need to present a list of valid commands – in this case the ones in p
     (pcomplete-here* pcmpl-git-commands))
 #+END_SRC
 
-Now when you try to tab-complete the first argument to git it will list our commands. Sweet.
+现在,当你按下tab来补全git的第一个参数时,就会列出所有的子命令了.真不错.
 
 Let’s extend it further by adding support for the add and rm commands. I want the aforementioned commands to provide the standard filename/filepath
 completion if, and only if, the command is add or rm.
