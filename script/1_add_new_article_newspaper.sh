@@ -31,9 +31,8 @@ content=$(echo ${response} |jq -r .content)
 echo title= "${title}"
 echo content= "${content}"
 
-cd "$(get-project-path)"
 # 生成新文章
-source_path="$(get-project-path)/raw"
+source_path="../raw"
 filename=$(date-title-to-filename "${title}")
 source_file="${source_path}"/"${filename}"
 
