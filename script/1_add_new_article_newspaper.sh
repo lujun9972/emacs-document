@@ -48,7 +48,7 @@ trap cleanup_temp  SIGHUP SIGINT SIGPIPE SIGTERM
 cat > "${source_file}"<<EOF
 #+TITLE: ${title}
 #+URL: ${url}
-#+AUTHOR: $(whoami)
+#+AUTHOR: $(get-github-user)
 #+TAGS: raw
 #+DATE: [$(date)]
 #+LANGUAGE:  zh-CN
@@ -56,7 +56,7 @@ cat > "${source_file}"<<EOF
 EOF
 
 if [[ -n "${content}" || "${content}" == "null" ]];then
-    echo ${response}|jq -r .content|pandoc --reference-links --reference-location=document -f html-native_divs-native_spans -t org --wrap=preserve --strip-comments --no-highlight --indented-code-classes=python >>  "${source_file}" 
+    pandoc --reference-links --reference-location=document -f html-native_divs-native_spans -t org --wrap=preserve --strip-comments --no-highlight --indented-code-classes=python ${url} >>  "${source_file}" 
 
 else
     eval $(get-browser) "${url}"
