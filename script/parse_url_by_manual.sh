@@ -1,5 +1,9 @@
 #!/bin/bash
 url="$*"
-source=$(w3m -dump_source "$url")
-title=$(echo "${source}" |grep -i '<title>'|sed 's/<[^>]*>//g'|sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+function trim()
+{
+    echo "$*" |sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
+}
+source=$(curl "$url")
+title=$(trim $(echo "${source}" |grep -i '<title>'|sed 's$.*<title>$$i;s$</title>.*$$i'))
 echo '{}'|jq '{"title":$title,"content":$source}' --arg title "$title" --arg source "$source"
