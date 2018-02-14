@@ -5,23 +5,10 @@ function get-cfg-option ()
     option="$@"
     egrep "^${option}=" ${CFG_PATH}/project.cfg |cut -d "=" -f 2-
 }
-function reset-project-path()
-{
-    export PROJECT=$(get-cfg-option ProjectRoot)
-
-    if [[ -z "${PROJECT}" || ! -d "${PROJECT}"  ]]; then
-        PROJECT=$(find $HOME -iname TranslateProject 2>/dev/null |\
-                   awk -F "TranslateProject"IGNORECASE=1 '{print $1}')
-    fi
-
-}
 
 function get-project-path()
 {
-    if [[ -z ${PROJECT} ]];then
-        reset-project-path
-    fi
-    echo ${PROJECT}
+    dirname "${CFG_PATH}"
 }
 
 
