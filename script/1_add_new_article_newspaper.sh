@@ -54,11 +54,11 @@ cat > "${source_file}"<<EOF
 #+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
 EOF
 
-if [[ -n "${content}" || "${content}" == "null" ]];then
-    pandoc --reference-links --reference-location=document -f html-native_divs-native_spans -t org --wrap=preserve --strip-comments --no-highlight --indented-code-classes=python ${url} >>  "${source_file}" 
+if [[ -n "${content}" && "${content}" != "null" ]];then
+    echo "${content}"| pandoc --reference-links --reference-location=document -f html-native_divs-native_spans -t org --wrap=preserve --strip-comments --no-highlight --indented-code-classes=python >>  "${source_file}" 
 
 else
-    eval $(get-browser) "${url}"
+    pandoc --reference-links --reference-location=document -f html-native_divs-native_spans -t org --wrap=preserve --strip-comments --no-highlight --indented-code-classes=python ${url} >>  "${source_file}" 
 fi
 
 
