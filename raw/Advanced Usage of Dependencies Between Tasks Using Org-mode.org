@@ -1,0 +1,355 @@
+#+TITLE: Advanced Usage of Dependencies Between Tasks Using Org-mode
+#+URL: http://karl-voit.at/2016/12/18/org-depend/
+#+AUTHOR: lujun9972
+#+TAGS: raw
+#+DATE: [2018年 03月 02日 星期五 14:19:05 CST]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+Update 2018-02-02: Link to [[https://elpa.gnu.org/packages/org-edna.html][org-edna]]
+
+This blog article is for advanced users of [[../../../../tags/emacs][Emacs]] [[http://orgmode.org][org-mode]] and people who are curious how non-trivial todo management can be accomplished using those tools.
+
+Defining dependencies between todo tasks is done via the contribution package =org-depend.el=. It offers a nice set of features. However, I do only use a sub-set for my workflows. Therefore, this article is not an exhaustive description of =org-depend.el= but it gives ideas on how to use and improve it.
+
+** Advanced Snippets With yasnippet and yankpad
+   :PROPERTIES:
+   :CUSTOM_ID: advanced-snippets-with-yasnippet-and-yankpad
+   :CLASS: section-title
+   :END:
+
+For a one-time workflow, I create the tasks and define dependencies manually. However, when I have to do things multiple times, I tend to use a [[../../../../apps-I-am-using][snippet software]] which inserts the headings and tasks on a keyboard shortcut. I wrote a [[../../../../Textbausteine][German blog article on text snippet tools]].
+
+A simple static snippet is for example =ccn= =TAB= which inserts my credit card number. A simple dynamic snippet is =dd= =TAB= which inserts the current day in ISO format such as =2016-12-17=. For a complex workflow as described further down, you'll need a snippet tool which delivers also complex, interactive snippets.
+
+For using simple to very advanced Emacs snippets there is [[https://github.com/joaotavora/yasnippet][yasnippet]]. With yasnippet, you are managing your snippets in separate files in directories according to your major modes such as org-mode. Invoking a snippet is done by typing the defined short abbreviation of the snippet (such as =dd=) followed by typically the =TAB= key.
+
+I was using yasnippet for many years when I found [[https://github.com/Kungsgeten/yankpad][yankpad]] which is a wrapper for yasnippet. In contrast to yasnippet, yankpad manages snippets in an Org-mode file as separate headings (in contrast to files in directories). Since most of my snippets are for Org-mode, I happily embraced yankpad and switched all of my Org-mode snippets to it. This makes the maintenance more easy because I have the full feature set of org-mode while writing snippets.
+
+With such a capable snippet system, I define complex workflows only once without having to cope with dependence definitions when I create an instance of this workflow. Therefore, for workflows I am using regularly, complexity is put into the snippet template which I am able to benefit instantly.
+
+** Example Use-Case: Organizing an Cabaret Evening With Friends
+   :PROPERTIES:
+   :CUSTOM_ID: example-use-case-organizing-an-cabaret-evening-with-friends
+   :CLASS: section-title
+   :END:
+
+I love going to cabaret events with my friends. To minimize the organization effort without forgetting something important, I maintain a simple workflow:
+
+1. Basic information on the event: artist, date, short description, ...
+2. Make reservations for the tickets
+3. Send out an email to my friends asking who is joining
+4. Write down everyone who is joining us
+5. Send out a reminder email shortly before the event so no one forgets
+6. Create an org-mode event for the event evening itself
+
+** Using an Advanced, Interactive Snippet
+   :PROPERTIES:
+   :CUSTOM_ID: using-an-advanced-interactive-snippet
+   :CLASS: section-title
+   :END:
+
+Let's assume, I stumbled over an news paper article of one of my favorite artists coming to town.
+
+I switch to my org-mode file which contains such events. I invoke the keyboard sequence to insert a yankpad snippet and then choose the snippet for cabaret. Emacs asks me the day of the event (using a date picker), the name of the artist, the name of the cabaret program, the location (choosing from a pre-defined list of venues), how many seats I am going to reserve, the date of the first and second email.
+
+My yankpad snippet looks like below. You also need my simple wrapper functions for asking and inserting stuff: =my-capture-prompt=, =my-capture-selection=, and =my-capture-insert= which can be found in [[https://github.com/novoid/dot-emacs/blob/master/main.el][my Emacs setup]].
+
+#+BEGIN_EXAMPLE
+     \** Cabaret `(my-capture-prompt "date of event" 'my-event-date)`: `(my-capture-prompt "artist" 'my-artist)`
+     :PROPERTIES:
+     :ID: `(my-capture-insert 'my-event-date)`-cabaret
+     :END:
+
+     - Title: `(my-capture-prompt "title" 'my-title)`
+     - `(my-capture-prompt "Num of seats" 'my-num-seats)` seats reserved:
+     - 2: My girlfriend and I
+     - 2:
+     - 2:
+     - 2:
+
+     \*** WAITING Make reservation for `(my-capture-insert 'my-num-seats)` seats
+     :PROPERTIES:
+     :ID: `(my-capture-insert 'my-event-date)`-reservation
+     :TRIGGER: `(my-capture-insert 'my-event-date)`-offer-seats(TODO) `(my-capture-insert 'my-event-date)`-reminder-email(TODO)
+     :END:
+
+     \*** Email: offer `(my-capture-insert 'my-num-seats)`-2 seats
+     SCHEDULED: <`(my-capture-prompt "date 1st email" 'my-email-date)`>
+     :PROPERTIES:
+     :ID: `(my-capture-insert 'my-event-date)`-offer-seats
+     :END:
+
+     Email template:
+     #+BEGIN_QUOTE
+     Cabaret: `(my-capture-insert 'my-artist)` on `(my-capture-insert 'my-event-date)`
+
+     Hi friends!
+
+     Who: `(my-capture-insert 'my-artist)`
+     What: "`(my-capture-insert 'my-title)`"
+     When: `(my-capture-insert 'my-event-date)` 19:15
+     Where: `(my-capture-selection '("Theatercafé" "Orpheum") 'my-location)`
+
+     First come, first served. We've got `(my-capture-insert 'my-num-seats)` seats.
+
+     Karl
+     #+END_QUOTE
+
+     \*** Send reminder email
+     SCHEDULED: <`(my-capture-prompt "date reminder" 'my-reminder-date)`>
+     :PROPERTIES:
+     :BLOCKER: `(my-capture-insert 'my-event-date)`-offer-seats
+     :ID: `(my-capture-insert 'my-event-date)`-reminder-email
+     :END:
+
+     \*** `(my-capture-insert 'my-artist)`: "`(my-capture-insert 'my-title)`" (`(my-capture-insert 'my-location)`)
+     :PROPERTIES:
+     :ID: `(my-capture-insert 'my-event-date)`-cabaret-event
+     :END:
+
+     <`(my-capture-insert 'my-event-date)` 20:00-23:30>
+         
+#+END_EXAMPLE
+
+As you can see, with the =my-capture-promt= and the =my-capture-insert= functions, it is very easy to re-use for example the date of the event multiple times.
+
+Applying the snippet and creating an instance will result in something like this:
+
+#+BEGIN_EXAMPLE
+     0_sync_master.sh 1_add_new_article_manual.sh 1_add_new_article_newspaper.sh 2_start_translating.sh 3_continue_the_work.sh 4_finish.sh 5_pause.sh base.sh parse_url_by_manual.sh parse_url_by_newspaper.py parse_url_by_newspaper.sh project.cfg reformat.sh urls_checker.sh Cabaret 2017-01-24: Thomas Maurer
+     :PROPERTIES:
+     :ID: 2017-01-24-cabaret
+     :END:
+
+     - Title: Der Tolerator
+     - 8 seats reserved:
+     - 2: My girlfriend and I
+     - 2:
+     - 2:
+     - 2:
+
+     0_sync_master.sh 1_add_new_article_manual.sh 1_add_new_article_newspaper.sh 2_start_translating.sh 3_continue_the_work.sh 4_finish.sh 5_pause.sh base.sh parse_url_by_manual.sh parse_url_by_newspaper.py parse_url_by_newspaper.sh project.cfg reformat.sh urls_checker.sh WAITING Make reservation for 8 seats
+     :PROPERTIES:
+     :ID: 2017-01-24-reservation
+     :TRIGGER: 2017-01-24-offer-seats(TODO) 2017-01-24-reminder-email(TODO)
+     :END:
+
+     0_sync_master.sh 1_add_new_article_manual.sh 1_add_new_article_newspaper.sh 2_start_translating.sh 3_continue_the_work.sh 4_finish.sh 5_pause.sh base.sh parse_url_by_manual.sh parse_url_by_newspaper.py parse_url_by_newspaper.sh project.cfg reformat.sh urls_checker.sh Email: offer 8-2 seats
+     SCHEDULED: <2017-01-05>
+     :PROPERTIES:
+     :ID: 2017-01-24-offer-seats
+     :END:
+
+     Email template:
+     #+BEGIN_QUOTE
+     Cabaret: Thomas Maurer on 2017-01-24
+
+     Hi friends!
+
+     Who: Thomas Maurer
+     What: "Der Tolerator"
+     When: 2017-01-24 19:15
+     Where: Theatercafé
+
+     First come, first served. We've got 8 seats.
+
+     Karl
+     #+END_QUOTE
+
+     0_sync_master.sh 1_add_new_article_manual.sh 1_add_new_article_newspaper.sh 2_start_translating.sh 3_continue_the_work.sh 4_finish.sh 5_pause.sh base.sh parse_url_by_manual.sh parse_url_by_newspaper.py parse_url_by_newspaper.sh project.cfg reformat.sh urls_checker.sh Send reminder email
+     SCHEDULED: <2017-01-21>
+     :PROPERTIES:
+     :BLOCKER: 2017-01-24-offer-seats
+     :ID: 2017-01-24-reminder-email
+     :END:
+
+     0_sync_master.sh 1_add_new_article_manual.sh 1_add_new_article_newspaper.sh 2_start_translating.sh 3_continue_the_work.sh 4_finish.sh 5_pause.sh base.sh parse_url_by_manual.sh parse_url_by_newspaper.py parse_url_by_newspaper.sh project.cfg reformat.sh urls_checker.sh Thomas Maurer: "Der Tolerator" (Theatercafé)
+     :PROPERTIES:
+     :ID: 2017-01-24-cabaret-event
+     :END:
+
+     <2017-01-24 20:00-23:30>
+         
+#+END_EXAMPLE
+
+Notice that with multiple cabaret events on different dates, the IDs are still unique due to the event date being part of it and all dependencies are pre-defined accordingly.
+
+Once the reservation is acknowledged and its task is marked as done, the two tasks for sending out the emails get their "TODO" status via =:TRIGGER:=.
+
+Update 2017-11-23: the propagation of the status keyword [[http://lists.gnu.org/archive/html/emacs-orgmode/2017-11/msg00260.html][does not work for some cases]].
+
+To demonstrate a blocking precondition, I added a =:BLOCKER:= dependency for the reminder email task which is a bit redundant in this particular example. There is a subtle additional difference with the =:BLOCKER:= heading as well: as long as the blocking ID is not marked as done (or canceled), the =:BLOCKER:= task does not get on my agenda. This is awesome because I don't see already defined and scheduled tasks as long as the pre-condition is not met. Therefore, I always define =:TRIGGER:= and =:BLOCKER:= dependencies in my workflows in order to keep my agenda not messed up with todos I am not able to do now.
+
+Defining a complex snippet takes time and effort. Although once you have defined a complex snippet for a workflow, the beauty is that a workflow instance can be easily set-up for many times.
+
+** Advanced Workflows
+   :PROPERTIES:
+   :CUSTOM_ID: advanced-workflows
+   :CLASS: section-title
+   :END:
+
+The cabaret example is a rather simple one just to demonstrate the basic idea. Much more complex workflows I use are project templates, eBay-purchase workflow, [[https://en.wikipedia.org/wiki/Scrum_%2528software_development%2529][Scrum]] stories management, and even whole lecture management for an entire term including exam preparation and student grading that consists of dozens of headings.
+
+Additional to the =:TRIGGER:= and =:BLOCKER:= dependencies I was using in my snippet, =org-depend.el= offers other features as well. With =chain-siblings(KEYWORD)= the next heading gets the status =KEYWORD= when the current heading gets marked as done. Then there is =chain-siblings-scheduled= which moves on the SCHEDULED date to the next heading as well. =chain-find-next(KEYWORD[,OPTIONS])= helps you finding the "next" heading.
+
+Although those are nifty features, I don't use them because I would need even more elaborate features which I discuss in the following sections.
+
+** Room for Improvements
+   :PROPERTIES:
+   :CUSTOM_ID: room-for-improvements
+   :CLASS: section-title
+   :END:
+
+Since I am a power-user of =org-depend.el= and [[https://lists.gnu.org/archive/html/emacs-orgmode/2016-12/msg00236.html][Carsten asked for ideas on improving =org-depend.el=]] I wrote down some possible improvements that would ease my personal digital life.
+
+Some of them are probably solved with a few lines of Elisp code. Unfortunately, I am very bad at coding Elisp myself and thus can't extend Emacs the way I would love to.
+
+*** Improvement: ID Picker
+    :PROPERTIES:
+    :CUSTOM_ID: improvement-id-picker
+    :CLASS: section-title
+    :END:
+
+First of all, I'd like to see some kind of ID picker when defining =:TRIGGER:= and =:BLOCKER:= dependencies.
+
+This should work like this: after setting up the task in headings and giving them IDs, I'd like to invoke a "I want to define a dependency"-command. It first asks me what property I want to set: =:TRIGGER:= or =:BLOCKER:=.
+
+Then I get asked to select any ID which could be found within the same sub-hierarchy (or even in all files?).
+
+After being asked for the KEYWORD to be set for =:TRIGGER:= dependencies (if applicable), the property is added to the current heading accordingly.
+
+This would drastically improve creating dependency definitions and prevent typing errors in the first place.
+
+*** Improvement: Generating IDs From Heading and Date
+    :PROPERTIES:
+    :CUSTOM_ID: improvement-generating-ids-from-heading-and-date
+    :CLASS: section-title
+    :END:
+
+So far, I define =:ID:= properties manually. There are settings that result in random IDs set for any new heading. I don't like random ID numbers because I would like to get a hint what heading this might be when I see it.
+
+Usually, my IDs start with the current ISO day to enforce uniqueness and look like this:
+
+*Title*
+*Manual ID*
+Update notebook
+2016-12-18-update-notebook
+Schedule a meeting with Bob
+2016-12-18-schedule-meeting-bob
+Add additional URLs to lecture notes
+2016-12-18-add-URLs-to-lecture
+
+Wouldn't it be nice when there is a command which takes the current heading title and auto-generates the ID property accordingly? I guess this is not that hard to do:
+
+*Title*
+*Auto-generated ID*
+Update notebook
+2016-12-18-Update-notebook
+Schedule a meeting with Bob
+2016-12-18-Schedule-a-meeting-with-Bob
+Add additional URLs to lecture notes
+2016-12-18-Add-additional-URLs-to-lecture-notes
+
+*** Improvement: Assistant for Creating Workflow Elements
+    :PROPERTIES:
+    :CUSTOM_ID: improvement-assistant-for-creating-workflow-elements
+    :CLASS: section-title
+    :END:
+
+This is an idea that Christophe Schockaert [[https://lists.gnu.org/archive/html/emacs-orgmode/2016-12/msg00251.html][wrote on the mailinglist]]: Why not having an assistant which does multiple things at once?
+
+#+BEGIN_QUOTE
+  [...]\\
+  Besides that, I wonder if/how we could automate the following course of
+  actions:\\
+  - let have point on an entry\\
+  - create a new "TODO-like" entry as a link to that entry\\
+  - assign an ID to both entries: lets say "ID-original" and "ID-duplicate"\\
+  - in the new entry: define a BLOCKER property set on "ID-original"\\
+  - in the original entry: define a TRIGGER property set as
+  ID-duplicate(DONE)\\
+  At first sight:\\
+  - the new entry could be created besides the original or in a file where
+  it is ready to refile\\
+  - the TODO state in the new entry could be set with a default, I think
+  it is so easy to switch afterwards with Org keystrokes\\
+  - the triggered state might better be a parameter (possibly a customized
+  default as "TODO"): otherwise, it would be necessary to go inside the
+  drawer to change it\\
+  Currently, I am doing all this manually, quite often. [...]
+#+END_QUOTE
+
+I can copy that: this is a very common set of operations which are done together. However, I personally would like to have the previously mentioned functions above *in addition* to this assistant.
+
+*** Improvement: TRIGGER in Combination With Set SCHEDULED
+    :PROPERTIES:
+    :CUSTOM_ID: improvement-trigger-in-combination-with-set-scheduled
+    :CLASS: section-title
+    :END:
+
+I love the =:TRIGGER:= property because I can mark headings as open tasks only if they can be done now. Only headings which are ready to be looked at do have the =TODO= keyword.
+
+One limitation of =org-depend.el= is that I am only to move forward scheduled dates to siblings and I am not able to define a different scheduled date.
+
+Assume following syntax:
+
+#+BEGIN_EXAMPLE
+     0_sync_master.sh 1_add_new_article_manual.sh 1_add_new_article_newspaper.sh 2_start_translating.sh 3_continue_the_work.sh 4_finish.sh 5_pause.sh base.sh parse_url_by_manual.sh parse_url_by_newspaper.py parse_url_by_newspaper.sh project.cfg reformat.sh urls_checker.sh TODO Asking the client about the project
+     :PROPERTIES:
+     :TRIGGER: 2016-12-18-send-offer(TODO,2016-12-23)
+     :END:
+
+     0_sync_master.sh 1_add_new_article_manual.sh 1_add_new_article_newspaper.sh 2_start_translating.sh 3_continue_the_work.sh 4_finish.sh 5_pause.sh base.sh parse_url_by_manual.sh parse_url_by_newspaper.py parse_url_by_newspaper.sh project.cfg reformat.sh urls_checker.sh Send offer to client
+     :PROPERTIES:
+     :ID: 2016-12-18-send-offer
+     :END:   
+#+END_EXAMPLE
+
+I extended the option of the trigger property so that I added an ISO date to the keyword parameter.
+
+What I'd expect is that on finishing the first task, the heading with the ID =2016-12-18-send-offer= not only gets the keyword =TODO= but also is scheduled for 2016-12-23 as well.
+
+Notice that the send-offer heading is not necessarily located in the same sub-hierarchy as the ask-client heading. Therefore, sibling-operations are not the whole answer here.
+
+Additional to this, I'd like to have the possibility to define relative schedule dates as stated in [[http://orgmode.org/manual/The-date_002ftime-prompt.html#The-date_002ftime-prompt][manual for the date prompt]]:
+
+=2016-12-18-send-offer(TODO,.)=
+the day when marking the asking-task as done
+=2016-12-18-send-offer(TODO,+3d)=
+3 days after the scheduled date of the asking-task
+=2016-12-18-send-offer(TODO,.+3d)=
+3 days from the day when marking the asking-task as done
+=2016-12-18-send-offer(TODO,mon)=
+nearest Monday from the day when marking the asking-task as done
+=2016-12-18-send-offer(TODO,+2tue)=
+second Tuesday from the day when marking the asking-task as done
+
+*** Improvement: Canceled Tasks Do Cancel Their Dependencies as Well
+    :PROPERTIES:
+    :CUSTOM_ID: improvement-canceled-tasks-do-cancel-their-dependencies-as-well
+    :CLASS: section-title
+    :END:
+
+Wouldn't it be nice to have a general setting (or a property?) whether or not I want to handle canceled tasks differently as tasks marked as done?
+
+Imagine the example from above. Does it really make sense to send an offer when I canceled the ask-client task? Many people probably would love to cancel all follow-up workflow tasks as well.
+
+** Conclusion
+   :PROPERTIES:
+   :CUSTOM_ID: conclusion
+   :CLASS: section-title
+   :END:
+
+While most people do not need advanced workflow management, such as dependencies between tasks, I do love this Org-mode feature. It was the reason I started with Org-mode in the first place. I love that my agenda only shows tasks which can be done *now* and whose dependencies are already met.
+
+So even when you did not feel the urge to define your workflows with a snippet/template system you might enjoyed this article. Maybe you are going to start defining simple workflows as well.
+
+I'd love to read your comments on snippets, workflows, dependencies and such: write me an email or commend via Disqus (see below).
+
+** org-edna
+   :PROPERTIES:
+   :CUSTOM_ID: org-edna
+   :CLASS: section-title
+   :END:
+
+As an alternative to org-depend, I was recommended to take a look at [[https://elpa.gnu.org/packages/org-edna.html][org-edna]]. From the first impression, it is quite similar to org-depend but different. It is more complex and allows more advanced definitions of dependencies. I am looking forward to testing org-edna and I'll blog about it.
