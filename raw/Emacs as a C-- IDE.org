@@ -1,0 +1,397 @@
+#+TITLE: Emacs as a C++ IDE
+#+URL: http://martinsosic.com/development/emacs/2017/12/09/emacs-cpp-ide.html
+#+AUTHOR: lujun9972
+#+TAGS: raw
+#+DATE: [2018年 03月 22日 星期四 17:16:52 CST]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+[[http://martinsosic.com/images/emacs-loves-cpp.png]]
+
+*TL;DR* -> take a look at the [[#summary][summary]].
+
+I have been using Emacs for a few years for development in different languages, including C++.
+Since I was working mostly on smaller C++ projects and I heard how notoriously hard it is to setup Emacs as a C++ IDE, I never took time to fully set it up. That was working fine for me until I got my hands on a bigger C++ project and figured out I am really missing some of the more advanced features.
+I decided to give it a go and realized it is not as hard as I expected!
+
+Since it did take some time to try different setups and I feel like information about them is not accessible enough, I decided to share what I learned so others can have an easier start.
+
+Some of the main features that we can expect from C++ IDE:
+
+- Navigation (jump from reference to definition and vice versa).
+- File outline (list of symbols in file for quick navigation).
+- Code completion.
+- Real-time syntax checking.
+
+While there are solutions for C that work quite well (e.g. CEDET), and some of them also work pretty well for C++, none of them fully support C++, since it is more complicated than C.
+Thanks to release of [[https://clang.llvm.org/doxygen/group__CINDEX.html][libclang]], which brought capabilities needed to create full support for C++, multiple tools/IDEs specialized for C++ were created. I am going to focus on two of them, Irony and RTags, which are among the most popular Emacs packages offering C++ IDE functionality.
+
+Also, since I work on Linux and usually use CMake with make or ninja as generators, that is what I am going to focus on in examples.
+I found a lot of great advice and inspiration in [[https://tuhdo.github.io/c-ide.html][blog post by tuhdo]], so make sure to check it out for wider overview of available solutions!
+
+* Company
+   :PROPERTIES:
+   :CUSTOM_ID: company
+   :END:
+
+[[http://company-mode.github.io][Company]] is a code completion frontend, meaning it handles all the logic regarding code completion while typing except for actually coming up with completions.
+So basically, Company does all the work with showing and handling completions, but it needs a brain (backend) to provide it with completions.
+It can use different sources (backends) of completions, including Irony and Rtags, which work really well for C++.
+
+My basic configuration looks like this (without Irony or RTags added as a backend yet):
+
+#+BEGIN_EXAMPLE
+    (req-package company
+     :config
+     (progn
+     (add-hook 'after-init-hook 'global-company-mode)
+     (global-set-key (kbd "M-/") 'company-complete-common-or-cycle)
+     (setq company-idle-delay 0)))
+#+END_EXAMPLE
+
+* Flycheck
+   :PROPERTIES:
+   :CUSTOM_ID: flycheck
+   :END:
+
+[[http://www.flycheck.org][Flycheck]] is package for Emacs that brings on-the-fly syntax checking.
+It already comes with support for a lot of languages and can also use other packages as backend.
+In our case, we are going to use it together with Irony or Rtags as backend.
+
+For me, this might just be the most important package of the ones listed here, as it helps you write code that will most likely compile in first try. I find it super useful, it saves me a lot of time.
+
+My basic configuration looks like this (without Irony or RTags added as a backend yet):
+
+#+BEGIN_EXAMPLE
+    (req-package flycheck
+     :config
+     (progn
+     (global-flycheck-mode)))
+#+END_EXAMPLE
+
+* Compilation database
+   :PROPERTIES:
+   :CUSTOM_ID: compilation-database
+   :END:
+
+In order for both Irony and Rtags to work, we need to supply them with detailed information about our C++ project.
+
+This is done by providing [[http://clang.llvm.org/docs/JSONCompilationDatabase.html][compilation database]], which is a standard way to describe how your project is compiled.
+Compilation database is (usually) just a JSON file that contains compilation information for each translation unit and there are multiple ways to generate it.
+
+If you are using Cmake to build your project, it is really easy to generate compilation database, since CMake has support for it.
+You just provide CMake with correct flag (=cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON ...=) and that is it! Later you can just call =cmake .= and it will update compilation database if needed.
+This is what I used for my project, since it uses CMake.
+
+In case tool that you are using to build your project does not have support for generation of compilation database, you can use [[https://github.com/rizsotto/Bear][bear]] tool, which records all calls to compiler by your build system and builds compilation database from it. It is easy to use and gives very good results.
+
+* Irony
+   :PROPERTIES:
+   :CUSTOM_ID: irony
+   :END:
+
+[[https://github.com/Sarcasm/irony-mode][Irony mode]] brings IDE functionality to C, C++ and Objective-C.
+It consists of Emacs package (client) and Irony server (which runs on your machine and uses libclang).
+Features are: code completion, real-time syntax checking, live documentation.
+
+Irony is not hard to set up, just follow instructions from their documentation: you put configuration in your
+=init.el= file and that is it, it will automatically run =irony-server=.
+Irony is going to find [[#compilation-database][compilation database]] on its own, as long as it is positioned in some logical place, so you only have to generate it and make sure it is up to date.
+In my case, since I have an out of source build, compilation database was in directory =build/= which is sibling of directory =source/=, and Irony had no problem picking it up.
+
+What I really like about Irony is that even on big projects (10k files) it is still fast and does not consume noticable amount of resources.
+
+** Lacking support for header files
+    :PROPERTIES:
+    :CUSTOM_ID: lacking-support-for-header-files
+    :END:
+
+Bad side when using Irony is that it does not know how to work with header files (.h, .hpp), because compilation database provides compilation information for source files but not for headers, meaning you get all the nifty features only for source files!
+This was a pretty big deal for me, and at the time of writing of this post author of Irony said he is actively working on solution for this, which is great.
+
+Luckily, Irony has fallback options when compilation database is not enough or not available, so we can use those while waiting for solution.
+In my case, I used =.clang_complete= file as a fallback option, which results with Irony using compilation database for source files and =.clang_complete= file for header files.
+
+=.clang_complete= is a file with special format, originally used by a Vim plugin to provide code completion. It is simpler than compilation database since it can not provide specific compilation commands for each source file, instead it provides compilation flags for all files in the project. In most cases that is enough for Irony to work with your header files.
+
+** Code completion
+    :PROPERTIES:
+    :CUSTOM_ID: code-completion
+    :END:
+
+Irony code completion works really well and fast, and can be provided as backend for different code completion frontends (Company, AC). I use it with Company.
+
+** Real-time syntax checking
+    :PROPERTIES:
+    :CUSTOM_ID: real-time-syntax-checking
+    :END:
+
+Irony integrates with Flycheck and works really well. Syntax checking is fast and on spot.
+
+** Configuration
+    :PROPERTIES:
+    :CUSTOM_ID: configuration
+    :END:
+
+Here is my configuration in =init.el=:
+
+#+BEGIN_EXAMPLE
+    (req-package irony
+     :config
+     (progn
+     ;; If irony server was never installed, install it.
+     (unless (irony--find-server-executable) (call-interactively #'irony-install-server))
+
+     (add-hook 'c++-mode-hook 'irony-mode)
+     (add-hook 'c-mode-hook 'irony-mode)
+
+     ;; Use compilation database first, clang_complete as fallback.
+     (setq-default irony-cdb-compilation-databases '(irony-cdb-libclang
+     irony-cdb-clang-complete))
+
+     (add-hook 'irony-mode-hook 'irony-cdb-autosetup-compile-options)
+     ))
+
+     ;; I use irony with company to get code completion.
+     (req-package company-irony
+     :require company irony
+     :config
+     (progn
+     (eval-after-load 'company '(add-to-list 'company-backends 'company-irony))))
+
+     ;; I use irony with flycheck to get real-time syntax checking.
+     (req-package flycheck-irony
+     :require flycheck irony
+     :config
+     (progn
+     (eval-after-load 'flycheck '(add-hook 'flycheck-mode-hook #'flycheck-irony-setup))))
+
+     ;; Eldoc shows argument list of the function you are currently writing in the echo area.
+     (req-package irony-eldoc
+     :require eldoc irony
+     :config
+     (progn
+     (add-hook 'irony-mode-hook #'irony-eldoc)))
+#+END_EXAMPLE
+
+[[https://github.com/Andersbakken/rtags][RTags]] is indexer for C/C++ (and ObjC/ObjC++) that comes with integration for Emacs. Basically, what it does is it actually understands your C++ project and therefore offers all the functionality that C++ IDE needs.
+
+As mentioned above, RTags indexes the whole projects and builds an index on the disk which it can query for information.
+RTags consists of =rc= (client), =rdm= (daemon that does indexing) and Emacs =rtags= package that interacts with =rc=.
+=rdm= runs in the background, re-indexes files as needed (on change) and answers to queries from =rc=.
+
+** Features
+    :PROPERTIES:
+    :CUSTOM_ID: features
+    :END:
+
+- Code completion (both source and header files).
+- Real-time syntax checking.
+- Jump to definition.
+- Find references.
+- ...
+
+** Setup
+    :PROPERTIES:
+    :CUSTOM_ID: setup
+    :END:
+
+=rdm= and =rc= can be installed through Emacs =rtags= package by running =rtags-install=, or manually.
+Manual installation gives more control, and in that case it is best to configure it as systemd socket service.
+
+I like better manual installation, since in that case I can control number of processes that RTags uses.
+This is important because on larger projects reindexing takes a lot of CPU, so it makes sense to either go with smaller number of processes or turning automatic reindexing off.
+
+We have to manually register each new project with RTags, which is done by running =rc -J <path_to_compile_commands.json>=.
+If you installed RTags through emacs, =rc= is somewhere in its internal directory structure, so you have to find it to run this command. Also, make sure that =rdm= is running when doing that, and make sure it finishes indexing.
+
+RTags will make sure to automatically detect which project currently active buffer belongs to and tell rdm to switch to that project.
+
+** Configuration
+    :PROPERTIES:
+    :CUSTOM_ID: configuration-1
+    :END:
+
+Below is my configuration for RTags:
+
+#+BEGIN_EXAMPLE
+    (req-package rtags
+     :config
+     (progn
+     (unless (rtags-executable-find "rc") (error "Binary rc is not installed!"))
+     (unless (rtags-executable-find "rdm") (error "Binary rdm is not installed!"))
+
+     (define-key c-mode-base-map (kbd "M-.") 'rtags-find-symbol-at-point)
+     (define-key c-mode-base-map (kbd "M-,") 'rtags-find-references-at-point)
+     (define-key c-mode-base-map (kbd "M-?") 'rtags-display-summary)
+     (rtags-enable-standard-keybindings)
+
+     (setq rtags-use-helm t)
+
+     ;; Shutdown rdm when leaving emacs.
+     (add-hook 'kill-emacs-hook 'rtags-quit-rdm)
+     ))
+
+    ;; TODO: Has no coloring! How can I get coloring?
+    (req-package helm-rtags
+     :require helm rtags
+     :config
+     (progn
+     (setq rtags-display-result-backend 'helm)
+     ))
+
+    ;; Use rtags for auto-completion.
+    (req-package company-rtags
+     :require company rtags
+     :config
+     (progn
+     (setq rtags-autostart-diagnostics t)
+     (rtags-diagnostics)
+     (setq rtags-completions-enabled t)
+     (push 'company-rtags company-backends)
+     ))
+
+    ;; Live code checking.
+    (req-package flycheck-rtags
+     :require flycheck rtags
+     :config
+     (progn
+     ;; ensure that we use only rtags checking
+     ;; https://github.com/Andersbakken/rtags#optional-1
+     (defun setup-flycheck-rtags ()
+     (flycheck-select-checker 'rtags)
+     (setq-local flycheck-highlighting-mode nil) ;; RTags creates more accurate overlays.
+     (setq-local flycheck-check-syntax-automatically nil)
+     (rtags-set-periodic-reparse-timeout 2.0) ;; Run flycheck 2 seconds after being idle.
+     )
+     (add-hook 'c-mode-hook #'setup-flycheck-rtags)
+     (add-hook 'c++-mode-hook #'setup-flycheck-rtags)
+     ))
+#+END_EXAMPLE
+
+Compared to Irony, RTags is more powerful but it is also more heavyweight.
+For example, RTags can jump to definitions, find references and do similar advanced stuff that Irony can't do, however Irony does not have to reindex big part of the project with each change which makes it much faster for big C++ projects.
+Also, it is worth noting that RTags works correctly with header files out of the box, while Irony does not support that yet.
+
+On smaller projects, I might go just with RTags, however on bigger projects (> 10k files) automatic reindexing becomes very resource demanding.
+What works well for me on bigger projects is using Irony for auto-complete and flycheck, since Irony works correct enough and is fast, while on the other hand I use RTags for more advanced features (jump to definition, find references, ...) and reindex manually from time to time.
+
+In this post I have shown my init.el configurations for both RTags and Irony, but I don't have all of it active at the same time.
+I do have all of it in my init.el, but usually I (un)comment parts that I am (not)using currently, so for a very big project I might comment out company-rtags and flycheck-rtags configuration in favour of Irony.
+
+In the future, as both packages advance, I expect Irony will get more features while RTags will become faster and I will able to choose just one of them.
+
+* Projectile
+   :PROPERTIES:
+   :CUSTOM_ID: projectile
+   :END:
+
+[[https://github.com/bbatsov/projectile][Projectile]] is a really nifty package, that “teaches” Emacs the concept of project.
+
+This means that when working on a certain source file, it will understand which project this file belongs to and offer some nice features based on that.
+
+Projectile usually works out of the box, since it will detect your VCS (I use git) files automatically and figure out the project root from that.
+If your case is more complicated, you can just create empty =.projectile= file in the root directory of your project and Projectile will detect it.
+
+Setting it up is as easy as:
+
+#+BEGIN_EXAMPLE
+    (req-package projectile
+     :config
+     (progn
+     (projectile-global-mode)
+     ))
+#+END_EXAMPLE
+
+Features I found most useful are jumping to a file/buffer in project and switching from source file to corresponding header file.
+
+* Helm
+   :PROPERTIES:
+   :CUSTOM_ID: helm
+   :END:
+
+[[https://emacs-helm.github.io/helm/][Helm]] is Emacs incremental completion and selection narrowing framework.
+What that actually means is that if you use Helm, most of the searches/selections (finding file/buffer, browsing kill ring, executing command, ...) you do will have the same interface: Helm interface.
+It also comes with some other useful features, and there are many integrations with other packages.
+
+Helm does not bring any C++ specific features, but since it is useful and adds to making Emacs a C++ IDE, I thought it is worth mentioning it.
+
+My setup for it goes like this:
+
+#+BEGIN_EXAMPLE
+    ;; Helm makes searching for anything nicer.
+    ;; It works on top of many other commands / packages and gives them nice, flexible UI.
+    (req-package helm
+     :config
+     (progn
+     (require 'helm-config)
+
+     ;; Use C-c h instead of default C-x c, it makes more sense.
+     (global-set-key (kbd "C-c h") 'helm-command-prefix)
+     (global-unset-key (kbd "C-x c"))
+
+     (setq
+     ;; move to end or beginning of source when reaching top or bottom of source.
+     helm-move-to-line-cycle-in-source t
+     ;; search for library in `require' and `declare-function' sexp.
+     helm-ff-search-library-in-sexp t
+     ;; scroll 8 lines other window using M-<next>/M-<prior>
+     helm-scroll-amount 8
+     helm-ff-file-name-history-use-recentf t
+     helm-echo-input-in-header-line t)
+
+     (global-set-key (kbd "M-x") 'helm-M-x)
+     (setq helm-M-x-fuzzy-match t) ;; optional fuzzy matching for helm-M-x
+
+     (global-set-key (kbd "C-x C-f") 'helm-find-files)
+
+     (global-set-key (kbd "M-y") 'helm-show-kill-ring)
+
+     (global-set-key (kbd "C-x b") 'helm-mini)
+     (setq helm-buffers-fuzzy-matching t
+     helm-recentf-fuzzy-match t)
+
+     ;; TOOD: helm-semantic has not syntax coloring! How can I fix that?
+     (setq helm-semantic-fuzzy-match t
+     helm-imenu-fuzzy-match t)
+
+     ;; Lists all occurences of a pattern in buffer.
+     (global-set-key (kbd "C-c h o") 'helm-occur)
+
+     (global-set-key (kbd "C-h SPC") 'helm-all-mark-rings)
+
+     ;; open helm buffer inside current window, not occupy whole other window
+     (setq helm-split-window-in-side-p t)
+     (setq helm-autoresize-max-height 50)
+     (setq helm-autoresize-min-height 30)
+     (helm-autoresize-mode 1)
+
+     (helm-mode 1)
+     ))
+
+    ;; Use Helm in Projectile.
+    (req-package helm-projectile
+     :require helm projectile
+     :config
+     (progn
+     (setq projectile-completion-system 'helm)
+     (helm-projectile-on)
+     ))
+#+END_EXAMPLE
+
+As you can see from the comments, I have an issue with helm-semantic not doing syntax coloring, I haven't figured out yet how to fix that.
+
+* Summary
+   :PROPERTIES:
+   :CUSTOM_ID: summary
+   :END:
+
+With few packages, Emacs can become a full-fledged C++ IDE!
+
+I use Company, Flycheck, Helm, Projectile and Irony and/or RTags. Most of these packages require pretty simple setup, Irony and RTags being the most demanding but still manageable with medium effort.
+
+Irony and RTags are the “brain”, as they understand your C++ project (thanks to libclang) and provide code completion and other features.
+Although they are alternatives to each other and are not meant to be used together, I found that combination of the two is sometimes the best option since they have different strengths and weaknesses. In the future I hope to be able to use just one of them for projects of all types/sizes.
+
+I hope this post will give you a good idea of how to get more out of Emacs for C++ development!
+I am also sure there is a lot that can be improved over my setup, so please write your suggestions and I will do my best to try them out and update this post.
+And again, big thanks to *tuhdo* for writing his [[https://tuhdo.github.io/c-ide.html][blog post]] that helped me a lot while setting up Emacs for C++ development, check it out.
