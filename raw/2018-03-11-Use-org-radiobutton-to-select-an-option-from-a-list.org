@@ -1,0 +1,134 @@
+#+TITLE: Use org-radiobutton to select an option from a list
+#+DATE: [2018-03-11 Sun 15:50]
+
+* DONE Use org-radiobutton to select an option from a list :ignore:
+CLOSED: [2018-03-11 Sun 15:50]
+:PROPERTIES:
+:BLOG_FILENAME: 2018-03-11-Use-org-radiobutton-to-select-an-option-from-a-list
+:PUBDATE:  [2018-03-11 Sun 15:50]
+:END:
+:LOGBOOK:
+- State "DONE"       from              [2018-03-11 Sun 15:50]
+:END:
+:CLOCK:
+CLOCK: [2018-03-11 Sun 15:20]--[2018-03-11 Sun 15:50] =>  0:30
+:END:
+
+#+BEGIN_SRC elisp :exports none
+(use-package org-radiobutton)
+#+END_SRC
+
+Ever since I've come across the [[http://howardism.org/Technical/Emacs/literate-devops.html][Literate DevOps]] article I was hooked
+and immediately started writing down "org notebooks" every time an
+incident occured along with all the code and steps on how to fix it in
+case it might happen in the future (protip: it /will/ happen again).
+
+Recently we had some problems with webhook requests behaving weird and
+so I created a little notebook to query the mongo database where we
+store all the requests and some more functions (ranging from elisp to
+jq to ruby) to process the results.  As you sure know, threading data
+between code blocks in different languages is painless with =org-mode=
+and babel.
+
+So imagine a block like this (using [[https://github.com/krisajenkins/ob-mongo][ob-mongo]]):
+
+#+BEGIN_SRC org
+,#+NAME: query
+,#+BEGIN_SRC mongo :db logs :host localhost :port 27017
+db.webhookLogs.find({endpoint: "AddCustomer"}).sort({_id: -1}).limit(1)
+,#+END_SRC
+#+END_SRC
+
+This gives me the most recent request to the =AddCustomer= endpoint.
+The results of this block are then piped into other code blocks to
+process the request, you can imagine how that looks.
+
+Usually I run the entire app stack locally but we also have separate
+staging and production environments.  So after I run the notebook on
+my own local stack I want to try it out in staging.
+
+I use [[https://github.com/rejeep/prodigy.el][prodigy]] to manage my ssh tunnels and so all I need to do is
+change the port to one pointing to staging and re-run the notebook.
+The problem is that I have multiple query blocks and so I have to go
+and change all of the =:port= arguments.
+
+I have solved this by creating a block that would work as a source for
+the port and then reference it dynamically in the header line:
+
+#+BEGIN_SRC org
+,#+NAME: port
+,#+BEGIN_SRC elisp
+27017
+,#+END_SRC
+
+,#+NAME: query
+,#+BEGIN_SRC mongo :db logs :host localhost :port (org-babel-ref-resolve "port")
+db.webhookLogs.find({endpoint: "AddCustomer"}).sort({_id: -1}).limit(1)
+,#+END_SRC
+#+END_SRC
+
+Since we can call elisp in the header I use =org-babel-ref-resolve= and
+give it the name of the source block and babel will automatically
+replace it with the value of the block.
+
+This solves the problem of changing the constant at one place but as I
+got to work with more environments I tended to forget what port was
+what.  So I created a list above the block to remind me of the
+available values:
+
+#+BEGIN_SRC org
+Use one of the following ports to operate on the given environment:
+
+- localhost :: 27017
+- staging :: 27004
+- production :: 27005
+
+,#+NAME: port
+,#+BEGIN_SRC elisp
+27017
+,#+END_SRC
+
+,#+NAME: query
+,#+BEGIN_SRC mongo :db logs :host localhost :port (org-babel-ref-resolve "port")
+db.webhookLogs.find({endpoint: "AddCustomer"}).sort({_id: -1}).limit(1)
+,#+END_SRC
+#+END_SRC
+
+We can use the org mode list description syntax =foo ::= to attach a
+label to each item and leave the number as the "value".
+
+This is starting to look an awful lot like a list of choices I could
+pick from.  So my thinking goes like this: let's make it a checkbox
+list and then select the option by checking the option.  The trouble
+there is that toggling the input would require me to un-toggle the
+current one and then toggle the desired option.  Ideally, toggling one
+checkbox would uncheck the other so that there is always exactly one
+option selected: in other words, I wanted a radiobutton list.
+
+After a quick google session I've found (via [[http://irreal.org/blog/?p=4644][Irreal]]) that [[http://kitchingroup.cheme.cmu.edu/blog/2015/10/05/A-checkbox-list-in-org-mode-with-one-value/][John Kitchin]]
+already figured this out.  I took his code and cleaned it up a bit to
+work with "modern" org mode (the post is three years old) and packaged
+it as [[https://github.com/Fuco1/org-radiobutton][org-radiobutton]].
+
+Now I have a nice menu I can go to and with a single =C-c C-c= on the
+option I want I can select the environment where to run the notebook.
+Org mode is so cool!
+
+#+BEGIN_SRC org
+Check one of the following ports to operate on the given environment:
+
+,#+attr_org: :radio
+,#+NAME: port
+- [ ] localhost :: 27017
+- [X] staging :: 27004
+- [ ] production :: 27005
+
+,#+NAME: query
+,#+BEGIN_SRC mongo :db logs :host localhost :port (org-radiobutton-value "port")
+db.webhookLogs.find({endpoint: "AddCustomer"}).sort({_id: -1}).limit(1)
+,#+END_SRC
+#+END_SRC
+
+I'm going over all of my notebooks converting all the ugly option
+hacks to this setup and it is so damn pleasing! :D
+
