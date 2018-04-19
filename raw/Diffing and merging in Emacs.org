@@ -1,0 +1,131 @@
+#+TITLE: Diffing and merging in Emacs
+#+URL: http://www.skybert.net/emacs/diffing-and-merging-in-emacs/
+#+AUTHOR: lujun9972
+#+TAGS: raw
+#+DATE: [2018年 04月 19日 星期四 11:36:20 CST]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+* Diffing files you've got open in your Emacs
+   :PROPERTIES:
+   :CUSTOM_ID: diffing-files-youve-got-open-in-your-emacs
+   :END:
+
+#+BEGIN_EXAMPLE
+    M-x ediff-buffers
+#+END_EXAMPLE
+
+* Diffing revisions of a file
+   :PROPERTIES:
+   :CUSTOM_ID: diffing-revisions-of-a-file
+   :END:
+
+C-x v = (=vc-diff=)
+
+You can also view the changes with =ediff= using M-x
+=ediff-revision=
+
+* Inside an ediff session
+   :PROPERTIES:
+   :CUSTOM_ID: inside-an-ediff-session
+   :END:
+
+Once inside an ediff session, put focus in the =ediff= navigator and
+use e.g.:
+
+- n/p - next/previous hunk
+- a - apply version A's hunk
+- b - apply version B's hunk
+- r - revert, undo the applying of the A/B hunk.
+- q - quit ediff session
+
+* Resolving merge conflicts in files with merge conflict markers
+   :PROPERTIES:
+   :CUSTOM_ID: resolving-merge-conflicts-in-files-with-merge-conflict-markers
+   :END:
+
+Out of the box Emacs gives us an easy interface to working with merge
+conflicts, called =smerge= (as in "simple merge").
+
+When there's a merge conflict, the version control system writes the
+diff markers into the source files themselves and Emacs will highlight
+these automatically. It will recognise which parts are "theirs" and
+which are "mine" --- as well as "ancestor" if you've set up 3 way merge.
+
+[[http://www.skybert.net/graphics/2017/2017-01-04-emacs-3-way-diff-git-merge.png]]
+
+To select the version at the bottom, I just put my pointer on it, and
+run M-x =smerge-keep-current=.
+
+* Telling Git to give us 3 way diff instead of two way
+   :PROPERTIES:
+   :CUSTOM_ID: telling-git-to-give-us-3-way-diff-instead-of-two-way
+   :END:
+
+By default git sets up 2 way diffs when there's a merge conflict ("my"
+version of the file and "their" version). However, when resolving
+merge conflicts, it's often useful to in addition see the most recent
+common ancestor of the two versions of the file you're merging.
+
+This is so useful, you may just want to set it globally for all your
+projects by adding the following to your =~/.gitconfig=:
+
+#+BEGIN_EXAMPLE
+    [merge]
+     conflictstyle = diff3
+#+END_EXAMPLE
+
+* *)
+    :PROPERTIES:
+    :CUSTOM_ID: section
+    :END:
+
+Tested on version Emacs version 25.1
+
+* P4 specific setup
+   :PROPERTIES:
+   :CUSTOM_ID: p4-specific-setup
+   :END:
+
+in =.p4enviro=:
+
+#+BEGIN_EXAMPLE
+    P4MERGE=/home/torstein/bin/p4-emacs-merge
+#+END_EXAMPLE
+
+in =.emacs=:
+
+#+BEGIN_EXAMPLE
+    (server-start)
+#+END_EXAMPLE
+
+in =/home/torstein/bin/emerge= (Gentoo users, note the full path ;-)
+
+#+BEGIN_EXAMPLE
+    ancestor=$1
+    theirs=$2
+    yours=$3
+    merge_result=$4
+
+    emacsclient -e "(ediff-merge-files-with-ancestor \"${yours}\" \"${theirs}\" \"${ancestor}\" () \"${merge_result}\")"
+    emacsclient "${merge_result}"
+#+END_EXAMPLE
+
+The full source of p4-emacs-merge can be found here:
+https://github.com/skybert/my-little-friends/blob/master/bash/vcs/p4-emacs-merge
+
+** P4 specifc post-merge notes
+    :PROPERTIES:
+    :CUSTOM_ID: p4-specifc-post-merge-notes
+    :END:
+
+After you're finished with the =ediff= session and you're back at the
+=p4=/shell prompt, choose =ae= (accept edit) Here's one merge
+conflict, with the two version presented (p4 "yours" is A and p4
+"theirs" is B):
+
+[[http://www.skybert.net/graphics/2016/2016-03-10-ediff-merge-before.png]]
+
+Now, I want "their" version, so I hit b. Emacs then replaces the
+merge conflict markers/block with the contents of the B hunk:
+
+[[http://www.skybert.net/graphics/2016/2016-03-10-ediff-merge-after.png]]
