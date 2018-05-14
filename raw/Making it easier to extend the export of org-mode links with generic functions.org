@@ -1,0 +1,143 @@
+#+TITLE: Making it easier to extend the export of org-mode links with generic functions
+#+URL: http://kitchingroup.cheme.cmu.edu/blog/2018/05/09/Making-it-easier-to-extend-the-export-of-org-mode-links-with-generic-functions/
+#+AUTHOR: lujun9972
+#+TAGS: raw
+#+DATE: [2018年 05月 14日 星期一 17:39:58 CST]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+I am a big fan of org-mode links. Lately, I have had a need to modify how some links are exported, e.g. defining new exports for different backends, or fine-tuning a particular backend. This can be difficult, depending on how the link was set up. Here is a typical setup I am used to using, where the different options for the backends are handled in a conditional statement in a single function. I will just use a link that just serves to illustrate the issues here. These links are just sytactic sugar for markup, they don't do anything else. We start with an example that just converts text to italic text for different backends like html or latex.
+
+#+BEGIN_EXAMPLE
+    (defun italic-link-export (path desc backend)
+     (cond
+     ((eq 'html backend)
+     (format "<em>%s</em>" path))
+     ((eq 'latex backend)
+     (format "\\textit{%s}" path))
+     ;; fall-through case for everything else
+     (t
+     path)))
+
+    (org-link-set-parameters "italic" :export 'italic-link-export)
+#+END_EXAMPLE
+
+:export
+italic-link-export
+
+#+BEGIN_EXAMPLE
+    (org-export-string-as "italic:text" 'html t)
+#+END_EXAMPLE
+
+#+BEGIN_EXAMPLE
+    <p>
+    <em>text</em></p>
+#+END_EXAMPLE
+
+#+BEGIN_EXAMPLE
+    (org-export-string-as "italic:text" 'latex t)
+#+END_EXAMPLE
+
+#+BEGIN_EXAMPLE
+    \textit{text}
+#+END_EXAMPLE
+
+This falls through though to the default case.
+
+#+BEGIN_EXAMPLE
+    (require 'ox-md)
+    (org-export-string-as "italic:text" 'md t)
+#+END_EXAMPLE
+
+#+BEGIN_EXAMPLE
+
+    # Table of Contents
+
+
+
+    text
+
+#+END_EXAMPLE
+
+The point I want to make here is that this is not easy to extend as a user. You have to either modify the italic-link-export function, advise it, or monkey-patch it. None of these are especially nice.
+
+I could define italic-link-export in a way that it retrieves the function to use from an alist or hash-table using the backend, but then you have to do two things to modify the behavior: define a backend specific function /and/ register it in the lookup variable. It is also possible to just look up a function by a derived symbol, e.g. using fboundp, and then using funcall to execute it. This looks something like this:
+
+#+BEGIN_EXAMPLE
+    ;; a user definable function for exporting to latex
+    (defun italic-link-export-latex (path desc backend)
+     (format "\\textit{%s}" path))
+
+    ;; generic export function that looks up functions or defaults to
+    (defun italic-link-exporter (path desc backend)
+     "Run `italic-link-export-BACKEND' if it exists, or return path."
+     (let ((func (intern-soft (format "italic-link-export-%s" backend))))
+     (if (fboundp func)
+     (funcall func path desc backend)
+     path)))
+#+END_EXAMPLE
+
+This has some indirection, but allows you to just define new functions to add new export backends, or replace single backend exports. It isn't bad, but there is room for improvement.
+
+In this [[https://github.com/jkitchin/org-ref/issues/492#issuecomment-387806180][comment]] in org-ref, I saw a new opportunity to address this issue using generic functions in elisp! The idea is to define a generic function that handles the general export case, and then define additional functions for each specific backend based on the signature of the export function. I will switch to bold markup for this.
+
+#+BEGIN_EXAMPLE
+    (cl-defgeneric bold-link-export (path desc backend)
+     "Generic function to export a bold link."
+     path)
+
+    ;; this one runs when the backend is equal to html
+    (cl-defmethod bold-link-export ((path t) (desc t) (backend (eql html)))
+     (format "<b>%s</b>" path))
+
+    ;; this one runs when the backend is equal to latex
+    (cl-defmethod bold-link-export ((path t) (desc t) (backend (eql latex)))
+     (format "\\textit{%s}" path))
+
+    (org-link-set-parameters "bold" :export 'bold-link-export)
+#+END_EXAMPLE
+
+:export
+bold-link-export
+
+Here it is in action:
+
+#+BEGIN_EXAMPLE
+    (org-export-string-as "some bold:text" 'html t)
+#+END_EXAMPLE
+
+#+BEGIN_EXAMPLE
+    <p>
+    some <b>text</b></p>
+#+END_EXAMPLE
+
+#+BEGIN_EXAMPLE
+    (org-export-string-as "some bold:text" 'latex t)
+#+END_EXAMPLE
+
+This uses the generic function.
+
+#+BEGIN_EXAMPLE
+    (require 'ox-md)
+    (org-export-string-as "some bold:text" 'md t)
+#+END_EXAMPLE
+
+#+BEGIN_EXAMPLE
+
+    # Table of Contents
+
+
+
+    some text
+
+#+END_EXAMPLE
+
+The syntax for defining the generic function is pretty similar to a regular function. The specific methods are a little different since they have to provide the specific "signature" that triggers each method. Here we only differentiate on the type of the backend. It is nice these are all separate functions though. It makes it trivial to add new ones, and less intrusive to replace in my opinion.
+
+Generic functions have many other potential applications to replace functions that use lots of conditions to control flow, with a fall-through option at the end. You can learn more about them here: [[https://www.gnu.org/software/emacs/manual/html_node/elisp/Generic-Functions.html]]. There is a lot more to them than I have illustrated here.
+
+Copyright (C) 2018 by John Kitchin. See the [[http://kitchingroup.cheme.cmu.edu/copying.html][License]] for information about copying.
+
+[[http://kitchingroup.cheme.cmu.edu/org/2018/05/09/Making-it-easier-to-extend-the-export-of-org-mode-links-with-generic-functions.org][org-mode source]]
+
+Org-mode version = 9.1.13
