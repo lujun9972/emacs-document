@@ -1,0 +1,112 @@
+#+TITLE: f-strings in emacs-lisp
+#+URL: http://kitchingroup.cheme.cmu.edu/blog/2018/05/14/f-strings-in-emacs-lisp/
+#+AUTHOR: lujun9972
+#+TAGS: raw
+#+DATE: [2018年 05月 15日 星期二 10:34:36 CST]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+I am a big fan of f-strings in Python 3. They let you put variable names and expressions in a string template that get expanded to create new strings. Here is a simple example of using those:
+
+#+BEGIN_EXAMPLE
+    username = 'John Kitchin'
+    somevar = 5**0.5
+    print(f'{username:30s}{somevar:1.2f}')
+#+END_EXAMPLE
+
+#+BEGIN_EXAMPLE
+    John Kitchin 2.24
+
+#+END_EXAMPLE
+
+String formatting in emacs-lisp is by comparison not as fun and easy. Out of the box we have:
+
+#+BEGIN_EXAMPLE
+    (let ((username "John Kitchin")
+     (somevar (sqrt 5)))
+     (format "%-30s%1.2f" username somevar))
+#+END_EXAMPLE
+
+#+BEGIN_EXAMPLE
+    John Kitchin 2.24
+#+END_EXAMPLE
+
+That is still three lines of code, but it is ugly and hard to read like the old python code:
+
+#+BEGIN_EXAMPLE
+    print('%-30s%1.2f' % (username, somevar))
+#+END_EXAMPLE
+
+#+BEGIN_EXAMPLE
+    John Kitchin 2.24
+
+#+END_EXAMPLE
+
+My experience has shown that this gets harder to figure out as the strings get larger, and f-strings are easier to read.
+
+The wonderful [[https://github.com/magnars/s.el]['s]] library provides some salvation for emacs-lisp, if you don't want the format fields. You can refer to variables in a lexical environment like this.
+
+#+BEGIN_EXAMPLE
+    (let ((username "John Kitchin")
+     (somevar (sqrt 5)))
+     (s-lex-format "${username}${somevar}"))
+#+END_EXAMPLE
+
+#+BEGIN_EXAMPLE
+    John Kitchin2.23606797749979
+#+END_EXAMPLE
+
+Today, I decided to do something about this, and wrote this little macro. It is a variation on s-lex-format that introduces a slightly new syntax. You can now add an optional format field separated from the variable name by a space.
+
+#+BEGIN_EXAMPLE
+    (defmacro f-string (fmt)
+     "Like `s-format' but with format fields in it.
+    FMT is a string to be expanded against the current lexical
+    environment. It is like what is used in `s-lex-format', but has
+    an expanded syntax to allow format-strings. For example:
+    ${user-full-name 20s} will be expanded to the current value of
+    the variable `user-full-name' in a field 20 characters wide.
+     (let ((f (sqrt 5))) (f-string \"${f 1.2f}\"))
+     will render as: 2.24
+    This function is inspired by the f-strings in Python 3.6, which I
+    enjoy using a lot.
+    "
+     (let* ((matches (s-match-strings-all"${\\(?3:\\(?1:[^} ]+\\) *\\(?2:[^}]*\\)\\)}" fmt))
+     (agetter (loop for (m0 m1 m2 m3) in matches
+     collect `(,m3 . ,(format (format "%%%s" (if (string= m2 "")
+     (if s-lex-value-as-lisp "S" "s")
+     m2))
+     (symbol-value (intern m1)))))))
+
+     `(s-format ,fmt 'aget ',agetter)))
+#+END_EXAMPLE
+
+#+BEGIN_EXAMPLE
+    f-string
+#+END_EXAMPLE
+
+Here it is in action.
+
+#+BEGIN_EXAMPLE
+    (let ((username "John Kitchin")
+     (somevar (sqrt 5)))
+     (f-string "${username -30s}${somevar 1.2f}"))
+#+END_EXAMPLE
+
+#+BEGIN_EXAMPLE
+    John Kitchin 2.24
+#+END_EXAMPLE
+
+It still lacks some of the capability of f-strings in python, e.g. in Python, arguments inside the template to be expanded get evaluated. The solution used above is too simple for that, since it just used a regexp and is limited to the value of variables in the lexical environment.
+
+#+BEGIN_EXAMPLE
+    print(f'{5**0.5:1.3f}')
+#+END_EXAMPLE
+
+#+BEGIN_EXAMPLE
+    2.236
+
+#+END_EXAMPLE
+
+Nevertheless, this simple solution matches what I do most of the time anyway, so I still consider it an improvement!
+
+Copyright (C) 2018 by John Kitchin. See the [[/copying.html][License]] for information about copying.
