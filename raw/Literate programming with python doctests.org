@@ -1,0 +1,197 @@
+#+TITLE: Literate programming with python doctests
+#+URL: http://kitchingroup.cheme.cmu.edu/blog/2018/05/17/Literate-programming-with-python-doctests/
+#+AUTHOR: lujun9972
+#+TAGS: raw
+#+DATE: [2018年 05月 18日 星期五 17:59:26 CST]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+On the org-mode mailing list we had a nice discussion about using noweb and org-mode in literate programming. The results of that discussion were blogged about [[http://kdr2.com/tech/emacs/1805-approach-org-ref-code-to-text.html][here]]. I thought of a different application of this for making [[https://pymotw.com/3/doctest/][doctests]] in Python functions. I have to confess I have never liked these because I have always thought they were a pain to write since you basically have to put code and results into a docstring. The ideas developed in the discussion above led me to think of a new way to write these that seems totally reasonable.
+
+The idea is just to put noweb placeholders in the function docstring for the doctests. The placeholders will be expanded when you tangle the file, and they will get their contents from other src-blocks where you have written and run examples to test them.
+
+I will illustrate the idea using org-mode and the ob-ipython I have in scimax. The defaults of my ob-ipython setup are not useful for this example because it puts the execution count and mime types of output in the output. These are not observed in a REPL, and so we turn this off by setting these variables.
+
+#+BEGIN_EXAMPLE
+    (setq ob-ipython-suppress-execution-count t
+     ob-ipython-show-mime-types nil)
+#+END_EXAMPLE
+
+Now, we make an example function that takes a single argument and returns one divided by that argument. This block is runnable, and the function is then defined in the jupyter kernel. The docstring contains several noweb references to doctest blocks we define later. For now, they don't do anything. See [[#org8c1103a][The noweb doctest block]] section for the block that is used to expand these. This block also has a tangle header which indicates the file to tangle the results to. When I run this block, it is sent to a Jupyter kernel and saved in memory for use in subsequent blocks.
+
+Here is the block with no noweb expansion. Note that this is easier to read in the original org source than it is to read in the published blog format.
+
+#+BEGIN_EXAMPLE
+    def func(a):
+      """A function to divide one by a.
+
+      <<doctest("doctest-1")>>
+
+      <<doctest("doctest-2")>>
+
+      <<doctest("doctest-3")>>
+
+      Returns: 1 / a.
+      """
+      return 1 / a
+#+END_EXAMPLE
+
+Now, we can write a series of named blocks that define various tests we might want to use as doctests. You can run these blocks here, and verify they are correct. Later, when we tangle the document, these will be incorporated into the tangled file in the docstring we defined above.
+
+#+BEGIN_EXAMPLE
+    func(5) == 0.2
+#+END_EXAMPLE
+
+#+BEGIN_EXAMPLE
+    True
+#+END_EXAMPLE
+
+This next test will raise an Exception, and we just run it to make sure it does.
+
+#+BEGIN_EXAMPLE
+    func(0)
+#+END_EXAMPLE
+
+#+BEGIN_EXAMPLE
+
+    ZeroDivisionErrorTraceback (most recent call last)
+    <ipython-input-23-ba0cd5a88f0a> in <module>()
+    ----> 1 func(0)
+
+    <ipython-input-21-136dd7a84026> in func(a)
+     14 Returns: 1 / a.
+     15 """
+    ---> 16 return 1 / a
+
+    ZeroDivisionError: division by zero
+#+END_EXAMPLE
+
+This is just a doctest with indentation to show how it is used.
+
+#+BEGIN_EXAMPLE
+    for i in range(1, 4):
+      print(func(i))
+#+END_EXAMPLE
+
+#+BEGIN_EXAMPLE
+    1.0
+    0.5
+    0.3333333333333333
+
+#+END_EXAMPLE
+
+That concludes the examples I want incorporated into the doctests. Each one of these blocks has a name, which is used as an argument to the noweb references in the function docstring.
+
+* 1 Add a way to run the tests
+
+This is a common idiom to enable easy running of the doctests. This will get tangled out to the file.
+
+#+BEGIN_EXAMPLE
+    if __name__ == "__main__":
+      import doctest
+      doctest.testmod()
+#+END_EXAMPLE
+
+* 2 Tangle the file
+
+So far, the Python code we have written only exists in the org-file, and in memory. Tangling is the extraction of the code into a code file.
+
+We run this command, which extracts the code blocks marked for tangling, and expands the noweb references in them.
+
+#+BEGIN_EXAMPLE
+    (org-babel-tangle)
+#+END_EXAMPLE
+
+test.py
+
+Here is what we get:
+
+#+BEGIN_EXAMPLE
+    def func(a):
+     """A function to divide one by a.
+
+     >>> func(5) == 0.2
+     True
+
+     >>> func(0)
+     Traceback (most recent call last):
+     ZeroDivisionError: division by zero
+
+     >>> for i in range(1, 4):
+     ... print(func(i))
+     1.0
+     0.5
+     0.3333333333333333
+
+
+     Returns: 1 / a.
+     """
+     return 1 / a
+
+    if __name__ == "__main__":
+     import doctest
+     doctest.testmod()
+#+END_EXAMPLE
+
+That looks like a reasonable python file. You can see the doctest blocks have been inserted into the docstring, as desired. The proof of course is that we can run these doctests, and use the python module. We show that next.
+
+* 3 Run the tests
+
+Now, we can check if the tests pass in a fresh run (i.e. not using the version stored in the jupyter kernel.) The standard way to run the doctests is like this:
+
+#+BEGIN_EXAMPLE
+    python test.py -v
+#+END_EXAMPLE
+
+Well, that's it! It worked fine. Now we have a python file we can import and reuse, with some doctests that show how it works. For example, here it is in a small Python script.
+
+#+BEGIN_EXAMPLE
+    from test import func
+    print(func(3))
+#+END_EXAMPLE
+
+#+BEGIN_EXAMPLE
+    0.3333333333333333
+#+END_EXAMPLE
+
+There are surely some caveats to keep in mind here. This was just a simple proof of concept idea that isn't tested beyond this example. I don't know how many complexities would arise from more complex doctests. But, it seems like a good idea to continue pursuing if you like using doctests, and like using org-mode and interactive/literate programming techniques.
+
+It is definitely an interesting way to use noweb to build up better code files in my opinion.
+
+* 4 The noweb doctest block
+
+These blocks are used in the noweb expansions. Each block takes a variable which is the name of a block. This block grabs the body of the named src block and formats it as if it was in a REPL.
+
+We also grab the results of the named block and format it for the doctest. We use a heuristic to detect Tracebacks and modify the output to be consistent with it. In that case we assume the relevant Traceback is on the last line.
+
+Admittedly, this does some fragile feeling things, like trimming whitespace here and there to remove blank lines, and quoting quotes (which was not actually used in this example), and removing the ": " pieces of ob-ipython results. Probably other ways of running the src-blocks would not be that suitable for this.
+
+#+BEGIN_EXAMPLE
+    (org-babel-goto-named-src-block name)
+    (let* ((src (s-trim-right (org-element-property :value (org-element-context))))
+     (src-lines (split-string src "\n"))
+     body result)
+     (setq body
+     (s-trim-right
+     (s-concat ">>> " (car src-lines) "\n"
+     (s-join "\n" (mapcar (lambda (s)
+     (concat "... " s))
+     (cdr src-lines))))))
+     ;; now the results
+     (org-babel-goto-named-result name)
+     (let ((result (org-element-context)))
+     (setq result
+     (thread-last
+     (buffer-substring (org-element-property :contents-begin result)
+     (org-element-property :contents-end result))
+     (s-trim)
+     ;; remove ": " from beginning of lines
+     (replace-regexp-in-string "^: *" "")
+     ;; quote quotes
+     (replace-regexp-in-string "\\\"" "\\\\\"")))
+     (when (string-match "Traceback" result)
+     (setq result (format
+     "Traceback (most recent call last):\n%s"
+     (car (last (split-string result "\n"))))))
+     (concat body "\n" result)))
+#+END_EXAMPLE
