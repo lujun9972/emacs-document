@@ -1,0 +1,203 @@
+#+TITLE: Blogging with Emacs Org
+#+URL: https://www.zcl.space/tools/my-blog-workflow/
+#+AUTHOR: lujun9972
+#+TAGS: raw
+#+DATE: [2018年 05月 18日 星期五 17:55:07 CST]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+Right Now, I use two blog systems to post articles. First, I use the Emacs
+built-in Org to record my learning on math, computer and wireless
+communication. For me, the built-in publishing system is obsolete (I am not
+saying Org is obsolete. My life rely heavily on Org.) because I find the
+second one is more interesting and flexible to config. The second one is
+Hugo. Naturally, the Hugo support markdown format. However, I want to use
+Emacs Org to maintain a tools consistency. Fortunately, there is [[https://ox-hugo.scripter.co/][ox-hugo]], a
+project bridging Emacs org and Hugo markdown. Ox-hugo allows you to write
+your blog using Emacs Org then publish them in the markdwon format
+automatically.
+
+* 1 Writing with Emacs Org publish
+
+It's easy to build a static website using [[https://orgmode.org/manual/Publishing.html][Emacs Org]]. [[https://orgmode.org/worg/][Worg]], the Org-mode
+community, also have comprehensive tutorials about using Org to build your
+own static site. To be honest, worg should be every serious Org users'
+starting point. So many Org experts contribute their summary of Org in
+high-quality articles on the Worg.
+
+In general, through Emacs Org mode, all you need is to set the variable
+=org-publish-project-alist= . Of course, if you want your site beautiful,
+some knowledge about CSS and JavaScript is necessary.
+
+* 2 Writing with Hugo
+
+Now, I moved from the Emacs built-in publishing system to Hugo because of
+Hugo's efficiency and flexibility. You can build your static site in just a
+few minutues. One major problem of the built-in publishing system is that
+you have to wait for a long time as your site gets larger and larger. When
+you have only several posts, there is no problem. However, when you have more
+than one hundred posts, you want to kill yourself during waiting the
+publishing.
+
+Using Hugo, everything is easy. Post an article is at the fingure.However,
+if you want to write a post, it is prioritized to finished it in the github
+format markdown. For a guy who rarely use markdown and is familiar with
+Emacs Org, this constraint is not human. Fortunately, [[https://github.com/kaushalmodi/ox-hugo][Ox-hugo]], a carefuly
+crafted Org exporter backend for Hugo, is definitely worth a try. Ox-hugo
+bridge the Emacs Org and Hugo and make the workflow at a fly. Even though,
+Hugo supports to write the posts in Org format, Ox-hugo still is a sharp
+tool which I will not give up and highly recommend it.
+
+Especially, there is tons of themes for you. Also, you can set up your own
+theme.
+
+** 2.1 architecture of the site
+
+Using =hugo= , there is a default architecture. Using =ox-hugo= , I store
+the Org file in the subdirectory =content-org= . There are several sections
+for my static site such =math= , =computer= and =communication= . I store
+the articles in the corresponding category. For example I will put an
+article on mathematical analysis in the file named =content-org/math.org=
+so that after exporting, the markdown file will be put in the subdirectory
+=content/math/= .
+
+[[/tools/20180126HugoArchitecture.png]]
+
+Figure 1: architecture of Hugo project
+
+* 3 Settings for ox-hugo
+
+** 3.1 settings for each section based on ox-hugo
+
+As mentioned before, there are several sections for my site and I use
+ox-hugo to handle articles for this sections. In the subdirectory
+=content-org/= , there are several =*.org= files such as =math.org= ,
+=computer.org= , =communications.org= and =tools.org= . All these =.org=
+files have multiple level-1 headlines. for each level-1 headline, there is
+one article. I use one-post-per-Org-subtree style preferred in the ox-hugo
+[[https://ox-hugo.scripter.co/][document]] but one-section-per-Org-file style for each section. The
+one-section-per-Org-file style is kind of like one-post-per-Org-file
+mentioned in the ox-hugo [[https://ox-hugo.scripter.co/][document]]. So I have a hybrid style.
+
+For each section, I have to set some parameters properly so that the
+articles goes to the right postion. Take =math.org= for example, the
+beginning of this file is like:
+
+#+BEGIN_EXAMPLE
+    #+HUGO_BASE_DIR: ../
+    #+HUGO_SECTION: math
+    #+SEQ_TODO: TODO NEXT DRAFT DONE
+    #+FILETAGS: math
+    #+OPTIONS: *:t <:nil timestamp:nil toc:t
+    #+HUGO_AUTO_SET_LASTMOD: t
+#+END_EXAMPLE
+
+1. the first line tells =ox-hugo= the targeting directory is =../content/= .
+2. the second line tells =ox-hugo= the article goes to =../content/math= .
+3. the third line is the Org state of the article, =TODO= will render the
+   article a draft while =DONE= a finished post.
+4. the fourth line will tell the Org all the headlines of this file has the
+   tag =math=
+5. at the fifth line. =*:t= will toggle emphasized text. =<:nil= means the
+   timestamp will not be exported. =timestamp:nil= means the creation time
+   will not be exported. =toc:t= means for the articles table of content is
+   generated. More settings like these will be detailed in the =Org=
+   manual. (You can open the Org manual by =C-h i= ,then seclect the Org
+   section.) On table of contents, ox-hugo has an [[https://ox-hugo.scripter.co/doc/org-toc][article]].
+6. the sixth line tells ox-hugo to export the latest time when the article
+   is modified.
+
+** 3.2 settings for each article based on ox-hugo
+
+I use the =org-capture= to start a article. The emacs-lisp:
+
+#+BEGIN_EXAMPLE
+    (setq org-capture-templates
+     '(
+     ("t" "todo" entry (file "~/zorg/Dropbox/base/zrefile.org")
+     "* TODO %? :TODO: \n Added:%T\n"
+     :clock-in t :clock-resume t)
+     ("h" "Hugo post")
+     ("hm" "Math"
+     entry (file+olp "~/zorg/zcl.space/content_org/math.org" "Math")
+     (function org-hugo-new-subtree-post-capture-template)
+     ":math:"
+     :clock-in t :clock-resume t)
+     ("hc" "Computer"
+     entry (file+olp "~/zorg/zcl.space/content_org/computer.org" "Computer")
+     (function org-hugo-new-subtree-post-capture-template)
+     :clock-in t :clock-resume t)
+     ("ht" "Telecommunication"
+     entry (file+olp "~/zorg/zcl.space/content_org/telecommunication.org" "Telecommunication")
+     (function org-hugo-new-subtree-post-capture-template)
+     :clock-in t :clock-resume t)
+     ("hl" "Life"
+     entry (file+olp "~/zorg/zcl.space/content_org/life.org" "Life")
+     (function org-hugo-new-subtree-post-capture-template)
+     :clock-in t :clock-resume t)
+     ("ho" "Tools"
+     entry (file+olp "~/zorg/zcl.space/content_org/tools.org" "Tools")
+     (function org-hugo-new-subtree-post-capture-template)
+     :clock-in t :clock-resume t)
+     ))
+#+END_EXAMPLE
+
+From the above code, you can see that I rely heavily on ox-hugo. there is one
+function named =org-hugo-new-subtree-post-capture-template= which is shown
+as below:
+
+#+BEGIN_EXAMPLE
+     (defun org-hugo-new-subtree-post-capture-template ()
+     "Returns `org-capture' template string for new Hugo post.
+    See `org-capture-templates' for more information."
+     (let* (;; http://www.holgerschurig.de/en/emacs-blog-from-org-to-hugo/
+     (date (format-time-string (org-time-stamp-format :inactive) (org-current-time)))
+     (title (read-from-minibuffer "Post Title: ")) ;Prompt to enter the post title
+     (fname (org-hugo-slug title)))
+     (mapconcat #'identity
+     `(
+     ,(concat "* TODO " title)
+     ":PROPERTIES:"
+     ,(concat ":EXPORT_FILE_NAME: " fname)
+     ,(concat ":EXPORT_DATE: " date) ;Enter current date and time
+     ,(concat ":EXPORT_HUGO_CUSTOM_FRONT_MATTER+: " ":summary \"summary\"")
+     ":END:"
+     "%?\n") ;Place the cursor here finally
+     "\n")))
+#+END_EXAMPLE
+
+One more point, it is awesome to preview each article after saveing it.
+Yes! you can do it according [[https://ox-hugo.scripter.co/doc/auto-export-on-saving][this article]].
+
+* 4 Settings for Hugo themes
+
+Now, there are more than 190+ [[https://themes.gohugo.io/][themes]] for Hugo. It is pretty straightforward
+to [[https://gohugo.io/themes/][install and config]] a theme as you wish. I prefer the [[https://sourcethemes.com/academic/][Academic theme]] which I
+adopt for the following reasons:
+
+1. It is easy manage my post according to different categories.
+2. I love the widget most.
+3. support of \(\mathrm{\LaTeX}\) so I can with the mathematical expressions
+   fluently.
+4. Responsive and mobile friendly.
+5. easy to update.
+
+   There are [[https://sourcethemes.com/academic/docs/install/][several ways]] to install the Academic theme. I use the Academic
+   Kickstart way:
+
+   #+BEGIN_EXAMPLE
+       git clone https://github.com/sourcethemes/academic-kickstart.git My_Website
+   #+END_EXAMPLE
+
+   The very reason I use the Kickstart way lies in the updatation of Academic.
+   In the Kickstart way, Academic is installed as a Git sub-module.
+
+   If you want to update the theme,all you have to do is:
+
+   #+BEGIN_EXAMPLE
+       git submodule update --remote --merge
+   #+END_EXAMPLE
+
+   Also, for different methods of updating the theme, you can check [[https://sourcethemes.com/academic/docs/update/][here]].
+
+
