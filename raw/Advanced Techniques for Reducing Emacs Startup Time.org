@@ -1,0 +1,293 @@
+#+TITLE: Advanced Techniques for Reducing Emacs Startup Time
+#+URL: https://blog.d46.us/advanced-emacs-startup/
+#+AUTHOR: lujun9972
+#+TAGS: raw
+#+DATE: [2018年 05月 31日 星期四 14:38:30 CST]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+Six techniques to reduce Emacs startup time by the author of the [[https://github.com/jschaf/esup][Emacs
+Start Up Profiler]].
+
+tl;dr: Do these steps:
+
+1. Profile with Esup.
+2. Adjust the garbage collection threshold.
+3. Autoload *everything* with use-package.
+4. Avoid helper functions which cause eager loads.
+5. See my Emacs [[https://github.com/jschaf/dotfiles/blob/master/emacs/start.el][config]] for an example.
+
+* From .emacs.d Bankruptcy to Now
+   :PROPERTIES:
+   :CUSTOM_ID: org427ea2a
+   :END:
+
+I recently declared my third .emacs.d bankruptcy and finished the
+fourth iteration of my Emacs configuration. The evolution was:
+
+1. Copy and paste elisp snippets into =~/.emacs= and hope it works.
+2. Adopt a more structured approach with =el-get= to manage
+   dependencies.
+3. Give up and outsource to Spacemacs.
+4. Get tired of Spacemacs intricacies and rewrite with =use-package=.
+
+This article is a collection of tips collected during the 3 rewrites
+and from creating the Emacs Start Up Profiler. Many thanks to the
+teams behind Spacemacs, use-package and general. Without these
+dedicated voluteers, this task would be vastly more difficult.
+
+* But What About Daemon Mode
+   :PROPERTIES:
+   :CUSTOM_ID: org59da114
+   :END:
+
+Before we get started, let me acknowledge the common retort when
+optimizing Emacs: “Emacs is meant to run as a daemon so you'll only
+start it once.” That's all well and good except:
+
+- Fast things feel nicer.
+- When customizing Emacs, you sometimes get into weird states that can
+  be hard to recover from without restarting. For example, if you add
+  a slow =lambda= function to your =post-command-hook=, it's tough to
+  remove it.
+- Restarting Emacs helps verify that customization will persist
+  between sessions.
+
+* 1. Establish the Current and Best Possible Start Up Time
+   :PROPERTIES:
+   :CUSTOM_ID: org771752b
+   :END:
+
+The first step is to measure the current start up time. The easy way
+is to display the information at startup which will show progress
+through the next steps.
+
+#+BEGIN_EXAMPLE
+     
+    (add-hook 'emacs-startup-hook
+     (lambda ()
+     (message "Emacs ready in %s with %d garbage collections."
+     (format "%.2f seconds"
+     (float-time
+     (time-subtract after-init-time before-init-time)))
+     gcs-done)))
+#+END_EXAMPLE
+
+Second, measure the best possible startup speed so you know what's
+possible. Mine is 0.3 seconds.
+
+#+BEGIN_EXAMPLE
+     
+    emacs -q --eval='(message "%s" (emacs-init-time))' 
+
+    ;; For macOS users:
+    open -n /Applications/Emacs.app --args -q --eval='(message "%s" (emacs-init-time))' 
+#+END_EXAMPLE
+
+* 2. Profile Emacs Startup for Easy Wins
+   :PROPERTIES:
+   :CUSTOM_ID: orga2036b6
+   :END:
+
+The [[https://github.com/jschaf/esup][Emacs StartUp Profiler]] (ESUP) will give you detailed metrics for
+top-level expressions.
+
+[[../images/esup.png]]
+
+Figure 1:
+
+Emacs Start Up Profiler Screenshot
+
+WARNING: Spacemacs users, ESUP currently chokes on the Spacemacs
+init.el file. Follow [[https://github.com/jschaf/esup/issues/48]] for
+updates.
+
+* 3. Set the Garbage Collection Threshold Higher during Startup
+   :PROPERTIES:
+   :CUSTOM_ID: org37ca53c
+   :END:
+
+This saves about **0.3 seconds** on my configuration.
+
+The default value for Emacs is 760kB which is extremely conservative on
+a modern machine. The real trick is to lower it back to something
+reasonable after initialization. This saves about 0.3 seconds on my
+init files.
+
+#+BEGIN_EXAMPLE
+     
+     
+    (setq gc-cons-threshold (* 50 1000 1000))
+
+     
+
+     
+    (setq gc-cons-threshold (* 2 1000 1000))
+#+END_EXAMPLE
+
+* 4. Never require anything; autoload with use-package instead
+   :PROPERTIES:
+   :CUSTOM_ID: orgdf956cf
+   :END:
+
+The best way to make Emacs faster is to do less. Running =require=
+eagerly loads the underlying source file. It's rare the you'll need
+functionality immediately at startup time.
+
+With [[https://github.com/jwiegley/use-package][=use-package=]], you declare which features you need from a package
+and =use-package= does the right thing. Here's what it looks like:
+
+#+BEGIN_EXAMPLE
+    (use-package evil-lisp-state 
+
+     :defer t 
+
+     :init 
+     (setq evil-lisp-state-global nil)
+
+     :config 
+     (abn/define-leader-keys "k" evil-lisp-state-map))
+#+END_EXAMPLE
+
+To see what packages Emacs currently has loaded, examine the
+=features= variable. For nice output see [[https://gist.github.com/RockyRoad29/bd4ca6fdb41196a71662986f809e2b1c][lpkg explorer]] or my variant
+in [[https://github.com/jschaf/dotfiles/blob/master/emacs/funcs/abn-funcs-benchmark.el][abn-funcs-benchmark.el]]. The output looks like:
+
+#+BEGIN_EXAMPLE
+    479 features currently loaded
+     - abn-funcs-benchmark: /Users/jschaf/.dotfiles/emacs/funcs/abn-funcs-benchmark.el
+     - evil-surround: /Users/jschaf/.emacs.d/elpa/evil-surround-20170910.1952/evil-surround.elc
+     - misearch: /Applications/Emacs.app/Contents/Resources/lisp/misearch.elc
+     - multi-isearch: nil
+     - <many more>
+#+END_EXAMPLE
+
+* 5. Avoid Helper Functions to Set Up Modes
+   :PROPERTIES:
+   :CUSTOM_ID: org142995b
+   :END:
+
+Often, Emacs packages will suggest running a helper function to set up
+keybindings. Here's a few examples:
+
+- =(evil-escape-mode)=
+- =(windmove-default-keybindings) ; Sets up keybindings.=
+- =(yas-global-mode 1) ; Complex snippet setup.=
+
+Rewrite these with use-package to improve startup speed. These helper
+functions are really just sneaky ways to trick you into eagerly
+loading packages before you need them.
+
+As an example, here's how to autoload =evil-escape-mode=.
+
+#+BEGIN_EXAMPLE
+     
+    (define-minor-mode evil-escape-mode
+     (if evil-escape-mode
+     (add-hook 'pre-command-hook 'evil-escape-pre-command-hook)
+     (remove-hook 'pre-command-hook 'evil-escape-pre-command-hook)))
+
+     
+    (evil-escape-mode)
+
+     
+    (use-package evil-escape
+     :defer t
+     
+     :commands (evil-escape-pre-command-hook) 
+
+     
+     
+     
+     :init (add-hook 'pre-command-hook 'evil-escape-pre-command-hook))
+#+END_EXAMPLE
+
+For a much trickier example, consider =org-babel=. The common recipe is:
+
+#+BEGIN_EXAMPLE
+    (org-babel-do-load-languages
+     'org-babel-load-languages
+     '((shell . t)
+     (emacs-lisp . nil)))
+#+END_EXAMPLE
+
+This is bad because =org-babel-do-load-languages= is defined in
+=org.el=, which is over 24k lines of code and takes about 0.2 seconds
+to load. After examining the source code,
+=org-babel-do-load-languages= is simply requiring the =ob-<lang>=
+package like so:
+
+#+BEGIN_EXAMPLE
+     
+    (require (intern (concat "ob-" lang)))
+#+END_EXAMPLE
+
+In the =ob-<lang>.el=, there's only two methods we care about,
+=org-babel-execute:<lang>= and =org-babel-expand-body:<lang>=. We can
+autoload the org-babel functionality instead of
+=org-babel-do-load-languages= like so:
+
+#+BEGIN_EXAMPLE
+     
+    (use-package ob-python
+     :defer t
+     :ensure org-plus-contrib
+     :commands (org-babel-execute:python))
+
+    (use-package ob-shell
+     :defer t
+     :ensure org-plus-contrib
+     :commands
+     (org-babel-execute:sh
+     org-babel-expand-body:sh
+
+     org-babel-execute:bash
+     org-babel-expand-body:bash))
+#+END_EXAMPLE
+
+* 6. Defer Packages you don't need Immediately with Idle Timers
+   :PROPERTIES:
+   :CUSTOM_ID: org3d73f8c
+   :END:
+
+This saves about **0.4 seconds** for the 9 packages I defer.
+
+Some packages are useful and you want them available soon, but are not
+essential for immediate editing. These modes include:
+
+- =recentf=: Saves recent files.
+- =saveplace=: Saves point of visited files.
+- =server=: Starts Emacs daemon.
+- =autorevert=: Automatically reloads files that changed on disk.
+- =paren=: Highlight matching parenthesis.
+- =projectile=: Project management tools.
+- =whitespace=: Highlight trailing whitespace.
+
+Instead of requiring these modes, **load them after N seconds of idle
+time**. I use 1 second for the more important packages and 2 seconds
+for everything else.
+
+#+BEGIN_EXAMPLE
+    (use-package recentf
+     
+     :defer 1)
+
+    (use-package uniquify
+     
+     :defer 2)
+#+END_EXAMPLE
+
+* Optimizations that aren't Worth It
+   :PROPERTIES:
+   :CUSTOM_ID: orgc7c3ed4
+   :END:
+
+Don't bother byte-compiling your personal Emacs files. It saved
+about 0.05 seconds. Byte compiling causes difficult to debug errors when the
+source file gets out of sync with compiled file.
+
+Published on 19 November 2017 by
+
+Joe Schafer
+
+.
