@@ -1,0 +1,282 @@
+#+TITLE: Ivy, Counsel and Swiper
+#+URL: https://writequit.org/denver-emacs/presentations/2017-04-11-ivy.html
+#+AUTHOR: lujun9972
+#+TAGS: raw
+#+DATE: [2018年 06月 04日 星期一 12:59:02 CST]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+* 1 What is Ivy?
+   :PROPERTIES:
+   :CUSTOM_ID: org121eea9
+   :END:
+
+Ivy is a completion framework, similar to Helm. When downloading
+Ivy, it comes with Counsel and Swiper, which we'll get to in a
+minute. Ivy doesn't try to do too many things, instead it provides
+an interface to list, search, filter and perform actions on a
+collection of "things". These "things" can range from strings to
+buffers, Ivy doesn't really care. It just provides a way for the
+user to interact with this collection.
+
+* 2 Installation
+   :PROPERTIES:
+   :CUSTOM_ID: orgc2d4898
+   :END:
+
+Install Ivy via MELPA. If you're unsure what MELPA is or its
+enabled, checkout [[http://melpa.milkbox.net/#/getting-started]]. Once
+MELPA is added to your package archives, run
+
+#+BEGIN_EXAMPLE
+     M-x package-install counsel
+#+END_EXAMPLE
+
+Installing Counsel will bring in Ivy and Swiper as dependencies.
+
+* 3 Usage
+   :PROPERTIES:
+   :CUSTOM_ID: orgac4d444
+   :END:
+
+Enable Ivy via =ivy-mode= (or =(ivy-mode 1)= in your Emacs file) and
+you're set! Issue the =execute-extended-command= (default keybinding
+is =M-x=) or =switch-to-buffer= (default keybinding is =C-x b=) and
+you'll notice the difference. Without any setup, Ivy has already
+worked its way into some of Emacs' commands.^{[[#fn.1][1]]}
+
+[[file:files/m-x-usage.gif]]
+
+While Ivy works without any configuration there are a couple of
+lines the maintainers suggest everyone throw in their Emacs'
+file.^{[[#fn.2][2]]}
+
+#+BEGIN_EXAMPLE
+     (use-package ivy :demand
+     :config
+     (setq ivy-use-virtual-buffers t
+     ivy-count-format "%d/%d "))
+#+END_EXAMPLE
+
+- =ivy-use-virtual-buffers= :: Add recent files and bookmarks to the
+  =ivy-switch-buffer=
+- =ivy-count-format= :: Displays the current and total number in the
+  collection in the prompt
+
+There are a number of other configurations available. Checkout the
+documentation (listed in Resources) or if you have Ivy installed,
+play around using =M-x customize-group ivy=.
+
+Amazing stuff and we've just touched the tip of the iceberg. We can
+extend the functionality of Ivy to allow us to perform several
+different actions on our list. We'll go into how to add these
+actions in the [[#org13b1c6d][Demo]] section and then see how we can take advantage
+of some ready-to-use actions in the [[#org2d4e119][Counsel]] section.
+
+** 3.1 Keybindings
+    :PROPERTIES:
+    :CUSTOM_ID: org932cd86
+    :END:
+
+When a Ivy minibuffer is active, the following keybindings are
+active
+
+| Key              | Command                     | Description                                      |
+|------------------+-----------------------------+--------------------------------------------------|
+| =M-n=            | =ivy-next-line=             | Next line                                        |
+| =M-p=            | =ivy-previous-line=         | Previous line                                    |
+| =M-<=            | =ivy-beginning-of-buffer=   | Beginning of the Ivy minibuffer                  |
+| =M->=            | =ivy-end-of-buffer=         | End of the Ivy minibuffer                        |
+| =C-v=            | =ivy-scroll-up-command=     | Page up by one Ivy buffer size                   |
+| =M-v=            | =ivy-scroll-down-command=   | Page down by one Ivy buffer size                 |
+| =C-m= or =RET=   | =ivy-done=                  | Calls the default action                         |
+| =C-M-m=          | =ivy-call=                  | Calls the default action, keeps Ivy open         |
+| =M-o=            | =ivy-dispatching-done=      | Displays the available actions                   |
+| =C-M-o=          | =ivy-dispacthing-call=      | Displays available actions, keeps Ivy open       |
+| =C-'=            | =ivy-avy=                   | Uses Avy to select candidates                    |
+| =TAB=            | =ivy-partial-or-done=       | Tab completion, repeated presses may call done   |
+|                  | =ivy-resume=                | Restart Ivy before last action                   |
+
+* 4 Demo
+   :PROPERTIES:
+   :CUSTOM_ID: org13b1c6d
+   :END:
+
+Ivy is simple to work with. To demonstrate this, we'll attempt
+to make a simplified version of the buffer list using Ivy.
+
+#+BEGIN_EXAMPLE
+     (ivy-read "My buffers: " (mapcar #'buffer-name (buffer-list)))
+#+END_EXAMPLE
+
+Just like that we have a, albeit rather useless, buffer list that
+works with Ivy. Notice the list of buffers contracts and expands
+depending on our input. However selecting a candidate does
+nothing. Lets get it to do something.
+
+** 4.1 Actions
+    :PROPERTIES:
+    :CUSTOM_ID: org29359ae
+    :END:
+
+The =ivy-read= function takes a number of optional keyword
+arguments after the collection of results. We won't be covering all
+of them here, but we'll take a look at the =:actions= keyword.
+
+Actions invoke a function on the selected candidate. The default
+action is bound to =RET= but you can give more. When working in the
+Ivy minibuffer, hit =M-o= to see available actions. Lets add an
+action to our previous example.
+
+#+BEGIN_EXAMPLE
+     (ivy-read "My buffers: "
+     (mapcar #'buffer-name (buffer-list))
+     :action '(1 ;; index (1 based) of the default action
+     ("s" (lambda (x)
+     (switch-to-buffer x)) "switch")))
+#+END_EXAMPLE
+
+Now if we try it again, selecting a candidate will open the buffer.
+
+* 5 Counsel
+   :PROPERTIES:
+   :CUSTOM_ID: org2d4e119
+   :END:
+
+To keep concerns separated, Ivy doesn't have a lot of other
+functionality. That's where Counsel comes in. Counsel comes with Ivy
+and provides some useful commands, such as =counsel-M-x= and
+=counsel-find-file=.
+
+These functions use the =ivy-read= function and provide useful
+actions on the selection candidate. An action is function that is
+preformed on the selected candidate. Try invoking an action (the
+default keybinding is =C-o= when inside the Ivy minibuffer) on
+several of the Counsel commands.
+
+[[file:files/action.gif]]
+
+** 5.1 Useful Commands
+    :PROPERTIES:
+    :CUSTOM_ID: org0be1c7d
+    :END:
+
+Even though you have most of what you need to go off and extend Ivy
+to your little heart desires, its worth seeing what Counsel has to
+offer as its done a lot of things for you.
+
+| Command                        | Actions                                             |
+|--------------------------------+-----------------------------------------------------|
+| =counsel-find-file=            | Open externally, open other window, ...             |
+| =counsel=M-x=                  | Find symbol, describe function                      |
+| =counsel-describe-function=    | Open definition, find symbol                        |
+| =counsel-describe-variable=    | Open definition, find symbol                        |
+| =counsel-find-library=         | No additional actions, jumps to library/feature     |
+| =counsel-info-lookup-symbol=   | No additional actions, jumps to symbol definition   |
+
+The following commands rely on external programs
+
+| Command              | Action                                                      |
+|----------------------+-------------------------------------------------------------|
+| =counsel-git=        | Open externally, open other window (if in git repository)   |
+| =counsel-git-grep=   | No actions, greps string (if in git repository)             |
+| =counsel-ag=         | No actions, uses ag to search strings across files          |
+| =counsel-locate=     | Open externally, dired                                      |
+| =counsel-rythmbox=   |                                                             |
+
+** 5.2 Extending Counsel
+    :PROPERTIES:
+    :CUSTOM_ID: org5467c13
+    :END:
+
+Suppose after reading this you decide Ivy is the greatest thing
+since sliced bread and you need it. You install it and are happy
+but you really want to be able to delete files when perusing your
+file system using =counsel-find-file=. No worries, we can add that.
+
+#+BEGIN_EXAMPLE
+     (ivy-set-actions
+     'counsel-find-file
+     '(("d" delete-file "delete")))
+#+END_EXAMPLE
+
+* 6 MELPA
+   :PROPERTIES:
+   :CUSTOM_ID: org01d3391
+   :END:
+
+There are a few Ivy/Counsel packages available through MELPA
+
+| Package Name             | Description                                                  |
+|--------------------------+--------------------------------------------------------------|
+| =counsel-bbdb=           | Quick search & input email from BBDB                         |
+| =counsel-dash=           | Browse Dash docsets                                          |
+| =counsel-gtags=          | Interface for GNU Global tagging                             |
+| =counsel-osx-app=        | Launch OSX application from Ivy                              |
+| =counsel-projectile=     | Integration with Projectile (manage and navigate projects)   |
+| =ivy-gitlab=             | Gitlab integration                                           |
+| =ivy-rich=               | Different interface for Ivy's switch buffer                  |
+| =ivy-todo=               | Manage org TODOs via Ivy                                     |
+| =ivy-youtube=            | Query YouTube and play videos in the browser                 |
+| =flyspell-correct-ivy=   | Flyspell interface for Ivy                                   |
+
+* 7 Swiper
+   :PROPERTIES:
+   :CUSTOM_ID: org2a0607f
+   :END:
+
+Swiper is an easy way to search through the current buffer. Very
+similar to Helm's swoop package.
+
+[[file:files/swiper.gif]]
+
+* 8 Ivy versus Helm
+   :PROPERTIES:
+   :CUSTOM_ID: org799b785
+   :END:
+
+I only used Helm for a very short period of time so I'm unable to
+provide compare the two fairly. I never ran into issues with Helm
+when I did run it. The one thing I can say was there was always a
+nagging feeling that I wasn't using Helm to its full potential. It
+felt like I had my hands on a finely crafted ninja sword that could
+slay even the mightiest of foes with a single, effortless slash and
+I was using it to chop vegetables.
+
+Ivy has always felt simple and does exactly what I need it to. Its
+stayed out of my way for the most part and made some tasks, like
+switching between buffers and finding files, easy.
+
+* 9 Resources
+   :PROPERTIES:
+   :CUSTOM_ID: org75d9679
+   :END:
+
+- Github :: [[https://github.com/abo-abo/swiper]]
+- Documentation :: [[http://oremacs.com/swiper/]]
+- From Helm, to Ivy :: [[https://sam217pa.github.io/2016/09/13/from-helm-to-ivy/]]
+
+* Footnotes:
+   :PROPERTIES:
+   :CUSTOM_ID: footnotes
+   :CLASS: footnotes
+   :END:
+
+^{[[#fnr.1][1]]}
+
+Emacs provides the variable, =completing-read-function=, for
+the user to set what completion framework to use. When invoking
+=ivy-mode=, it sets this variable to =ivy-completing-read=. For
+those curious, try enabling and disabling Ivy and call the
+=completing-read= function to see the differences.
+
+^{[[#fnr.2][2]]}
+
+Not familiar with use-package? No worries, just grab the =(setq  ...)= expression and plop it in your configuration file where
+appropriate. However, if you haven't started using it, you
+should. I won't go into it here, but I highly recommend checking
+out [[https://github.com/jwiegley/use-package]].
+
+Author: Michael Hunsinger
+
+Created: 2017-04-17 Mon 09:49
