@@ -1,0 +1,202 @@
+#+TITLE: A Brief Introduction to Literate Analytics With org-babel
+#+URL: http://ul.io/nb/2018/04/30/literate-analytics-with-org-babel/
+#+AUTHOR: lujun9972
+#+TAGS: raw
+#+DATE: [2018年 06月 05日 星期二 14:13:05 CST]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+As an engineer on an analytics and data infrastructure team, I spend
+quite a bit of time exploring and performing ad-hoc analyses of data
+scattered across SQL databases; Hive and Spark clusters; and blob
+storage. These investigations can be a chore -- a single instance might
+involve a half dozen ETL steps, ad-hoc querying to assess whether data
+needs to be cleaned, and moving code between a REPL and a program
+destined for production.
+
+Once an initial conclusion has been reached, I need to go back and
+document my process for posterity, remembering exactly what worked along
+the way. This is a recipe for mistakes and omissions, so why not
+document as you go?
+
+What I need to do is:
+
+1. Log each command
+2. Document what it does and why it's necessary
+3. Execute and examine the results as I go
+
+=org-mode= and =org-babel= provide an amazing environment for this sort
+of polyglot, multi-modal series of tasks. Prose and code can be freely
+intermingled in a [[https://en.wikipedia.org/wiki/Literate_programming][literate
+programming]] style,
+any references used during the process can be cited, and the final
+product can be exported into human- or machine-readable formats. If
+you're keen to see the final product of an analysis, [[https://gist.github.com/nickbarnwell/917c8d8bbde173ef5ad94e40ba5fa01f][here's an
+example]]
+I recently created for [[http://www.teawithstrangers.com/][Tea With
+Strangers]], reporting on growth in
+recent months that demonstrates these capabilities.
+
+* Getting Started
+   :PROPERTIES:
+   :CUSTOM_ID: getting-started
+   :END:
+
+As I typically begin my explorations with a SQL-like datastore, I'll
+begin my examples there. =sql-mode= and =ob-sql= ship with =emacs=, so
+all you have to do is allow for execution of SQL =src= blocks in the
+=org-babel= environment; to do this, add the following to your
+=init.el=:
+
+#+BEGIN_EXAMPLE
+    1
+    2
+    3
+    4
+    5
+    6
+    7
+#+END_EXAMPLE
+
+#+BEGIN_EXAMPLE
+    (add-to-list 'org-babel-load-languages '(sql . t))
+    ;;If you also want to disable confirmation for SQL blocks:
+    (setq org-confirm-babel-evaluate
+     (lambda (lang body)
+     (not (string= lang "sql"))))
+    ;;or disable it for all blocks
+    (setq org-confirm-babel-evaluate nil)
+#+END_EXAMPLE
+
+#+BEGIN_QUOTE
+  n.b. If you'd like to learn more about how =babel=‘s evaluation
+  works, its =info= page is very complete; call =(info "(org) Evaluating code blocks")= to view .
+#+END_QUOTE
+
+Now that =org-babel= is configured, it's time create a new =org= buffer
+and add some properties that will configure our SQL environment. =src=
+blocks accept a variety of arguments that control the behaviour of their
+output and export.
+
+- =#+PROPERTY: header-args:sql :session literate-analytics :engine postgresql=
+
+  - This line adds two default arguments to any =sql= =src= blocks:
+    =:session= and =:engine=. The former enables [[https://orgmode.org/worg/org-contrib/babel/intro.html#org98c324c][session-based
+    evaluation for our SQL
+    blocks]],
+    the latter tells =sql-mode= that =postgresql= is the backend
+    we're working against; this is equivalent to using
+    =sql-set-product= in a =sql-mode= buffer.
+
+- =#+PROPERTY: header-args:sql+ :exports results :database tws_dev=
+
+  - The =+= after =sql= enables appending to existing arguments
+    instead of overriding them. =:exports results= includes the
+    output of =src= blocks will be included in the output of an
+    =org-export= backend by default. Finally, =:database= is the
+    connection string that will be passed to our SQL client.
+
+Now add a =src= block in =sql-mode= by typing =<s TAB sql=. Contents of
+this block will be syntax highlighted as if they were in their own
+buffer, and you can edit its contents inline or in an indirect buffer
+using the appropriate major mode by typing =C-c '= while your point is
+over the block.
+
+Your buffer should now look like
+this:
+
+#+BEGIN_EXAMPLE
+    1
+    2
+    3
+    4
+    5
+    6
+#+END_EXAMPLE
+
+#+BEGIN_EXAMPLE
+    #+PROPERTY: header-args:sql :session literate-analytics :engine postgresql
+    #+PROPERTY: header-args:sql+ :exports results :database tws_dev
+
+    #+BEGIN_SRC sql
+     SELECT COUNT(*) FROM users;
+    #+END_SRC
+#+END_EXAMPLE
+
+Now, place your point inside the =src= block and call
+=org-babel-execute-src-block= with =C-c C-c=. If everything's configured
+correctly, a =RESULT= block should be inserted below:
+
+#+BEGIN_EXAMPLE
+    1
+    2
+    3
+    4
+#+END_EXAMPLE
+
+#+BEGIN_EXAMPLE
+    #+RESULTS:
+    | count |
+    |-------|
+    | 5 |
+#+END_EXAMPLE
+
+Results are automatically coerced into an =org= table, which can be
+quite helpful if you want to perform some tabulation or filtering with
+=elisp=, or simply want to export the results later via =org-export=.
+
+* Using Remote Resources via TRAMP
+   :PROPERTIES:
+   :CUSTOM_ID: using-remote-resources-via-tramp
+   :END:
+
+Since it's rare you'll be interacting exclusively with local resources,
+it's quite useful to be able to run commands on other machines. For
+example, we frequently =ssh= into our Hadoop cluster head nodes to
+rename, move, or find files in HDFS. Fortunately, =babel= is tightly
+integrated with [[https://www.gnu.org/software/tramp/][TRAMP]].
+
+The =:dir= property on =src= blocks accepts a TRAMP reference; execution
+of the block will then occur on the remote machine, e.g.:
+
+#+BEGIN_EXAMPLE
+    1
+    2
+    3
+    4
+    5
+    6
+    7
+    8
+    9
+    10
+#+END_EXAMPLE
+
+#+BEGIN_EXAMPLE
+    #+BEGIN_SRC sh :dir /ssh:spark: :results output list
+    hdfs dfs -ls $hdfsPath/ServiceInterface
+    #+END_SRC
+
+    #+RESULTS:
+    : - Found 5 items
+    : - drwxrwxrwx+ - ... 0 2018-04-25 17:06 $hdfsPath/ServiceInterface/Delinked
+    : - drwxrwxrwx+ - ... 0 2018-04-25 16:43 $hdfsPath/ServiceInterface/PartialValidated
+    : - drwxrwxrwx+ - ... 0 2018-04-23 19:58 $hdfsPath/ServiceInterface/PreValidated
+    : - drwxrwxrwx+ - ... 0 2018-04-25 21:24 $hdfsPath/ServiceInterface/Unvalidated
+#+END_EXAMPLE
+
+If you're going to be executing multiple commands on the same remote
+machine, you can use the =:session= header arg to keep the connection
+open. See [[https://orgmode.org/manual/session.html][the info page for
+:session]] for details.
+
+* Further Reading
+   :PROPERTIES:
+   :CUSTOM_ID: further-reading
+   :END:
+
+I've only covered a fraction of what =org-babel= is capable of, but
+hopefully it'll give you some ideas. For further reading, I recommend
+watching [[https://www.youtube.com/watch?v=dljNabciEGg][Howard Abram's Literate DevOps with emacs
+talk]] and perusing the
+=info= manual for =babel=.
