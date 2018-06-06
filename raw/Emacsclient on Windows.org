@@ -1,0 +1,119 @@
+#+TITLE: Emacsclient on Windows
+#+URL: https://scripter.co/emacsclient-on-windows/
+#+AUTHOR: lujun9972
+#+TAGS: raw
+#+DATE: [2018年 06月 06日 星期三 21:35:55 CST]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+Using emacsclient instead of the emacs binary is a very useful technique to prevent loading emacs from scratch each time you open a new file. That technique is useful on Windows too. But for this to work on Windows, we need some more elisp and Windows environment variable configuration than just the below code,
+
+#+BEGIN_EXAMPLE
+    (require 'server)
+    ;; Start a server if (server-running-p) does not return t (e.g. if it
+    ;; returns nil or :other)
+    (or (eq (server-running-p) t)
+     (server-start))
+#+END_EXAMPLE
+
+* Setup in elisp [[#setup-in-elisp][#]]
+   :PROPERTIES:
+   :CUSTOM_ID: setup-in-elisp
+   :END:
+
+** Use TCP sockets [[#use-tcp-sockets][#]]
+    :PROPERTIES:
+    :CUSTOM_ID: use-tcp-sockets
+    :END:
+
+I do not understand what this means, but you need to use TCP sockets instead of local sockets for the server to run on Windows. By default the value of =server-use-tcp= is =nil=. So for Windows, we need this,
+
+#+BEGIN_EXAMPLE
+    (when (equal window-system 'w32)
+     (setq server-use-tcp t))
+#+END_EXAMPLE
+
+** Uniquify the server authentication directory [[#uniquify-the-server-authentication-directory][#]]
+    :PROPERTIES:
+    :CUSTOM_ID: uniquify-the-server-authentication-directory
+    :END:
+
+When =server-use-tcp= is a non-nil value, the =server-auth-dir= is used to store the server authentication files. It is not unusual for me to have emacs running on two different machines (possibly different versions of emacs on the same machine too in rare occassions) sharing the same =~/.emacs.d/= via Dropbox. So I uniquify the =server-auth-dir=.
+
+#+BEGIN_EXAMPLE
+    ;; Below needs to be set before you require 'server
+    (setq server-auth-dir
+     (let ((dir (concat user-emacs-directory
+     "server_" (format "%s_%s"
+     emacs-major-version
+     emacs-minor-version)
+     "_" (system-name) ; Use the var `system-name' directly
+     ; if using emacs older than 25.1.
+     "/")))
+     (make-directory dir :parents)
+     dir))
+#+END_EXAMPLE
+
+So, if am running emacs 25.1, and if my Windows machine name is =FOO=, the value of =server-auth-dir= will be set to =~/.emacs.d/server_25_1_FOO/=.
+
+** Prevent ‘server is unsafe' errors [[#prevent-server-is-unsafe-errors][#]]
+    :PROPERTIES:
+    :CUSTOM_ID: prevent-server-is-unsafe-errors
+    :END:
+
+I also had to put the below hack in order for the server to start on Windows.
+
+#+BEGIN_EXAMPLE
+    (with-eval-after-load 'server
+     (when (equal window-system 'w32)
+     ;; Suppress error "directory ~/.emacs.d/server is unsafe". It is needed
+     ;; needed for the server to start on Windows.
+     (defun server-ensure-safe-dir (dir) "Noop" t)))
+#+END_EXAMPLE
+
+* Windows environment variables [[#windows-environment-variables][#]]
+   :PROPERTIES:
+   :CUSTOM_ID: windows-environment-variables
+   :END:
+
+You will need to set =EMACS_SERVER_FILE= and =HOME= environment variables in Windows. I came up with the below steps that work on Windows 7.
+
+- Click on Start > Control Panel.
+- Search for environment in the search field.
+- Click on Edit environment variables for your account.
+- Click on New under User variables for ...
+- Enter =EMACS_SERVER_FILE= in the Variable name field and appropriate value in the Variable value field to match the value set in =server-auth-dir=, appended by =server=.
+
+  - My =server-auth-dir= value is =~/.emacs.d/server_25_1_FOO/=. So I have set Variable value to =C:\Users\KModi\Dropbox\home\.emacs.d\server_25_1_FOO\server=. Note the use of =/= instead of =\=.
+  - Also I have set my user environment variable =HOME= in Windows to =C:\Users\KModi\Dropbox\home= using the same steps as above.
+
+- Hit OK to save your environment variable setup.
+
+* Start the server [[#start-the-server][#]]
+   :PROPERTIES:
+   :CUSTOM_ID: start-the-server
+   :END:
+
+And then you need to have the below snippet that starts the server when you start emacs.
+
+#+BEGIN_EXAMPLE
+    (require 'server)
+    ;; Start a server if (server-running-p) does not return t (e.g. if it
+    ;; returns nil or :other)
+    (or (eq (server-running-p) t)
+     (server-start))
+#+END_EXAMPLE
+
+* Using the emacsclient [[#using-the-emacsclient][#]]
+   :PROPERTIES:
+   :CUSTOM_ID: using-the-emacsclient
+   :END:
+
+1. Start emacs using the =runemacs.exe= executable for the first time on starting Windows.
+2. Use the =emacsclientw.exe= executable after that.
+
+To makes things easy, I add =runemacs.exe= Shortcut to All Programs > Startup. So emacs starts automatically each time I boot Windows.
+
+If you need to always open certain files in emacs using emacsclient, - Shift + Right-click on that file. - Select Open with. - Click Select default program and choose the =emacsclientw.exe= executable.
+
+- You can find my full setup related to emacs server setup [[https://github.com/kaushalmodi/.emacs.d/blob/6c7b77af6ea39fd6e016a873fad763a712547223/setup-files/setup-server.el][here]].
+- This has been tested to work on emacs 25.1 on the [[https://ftp.gnu.org/gnu/emacs/windows/][official emacs Windows]] as well as [[https://github.com/zklhp/emacs-w64/releases][emacs-w64]] builds.
