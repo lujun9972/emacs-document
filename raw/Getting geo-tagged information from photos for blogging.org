@@ -1,0 +1,196 @@
+#+TITLE: Getting geo-tagged information from photos for blogging
+#+URL: http://kitchingroup.cheme.cmu.edu/blog/2018/07/01/Getting-geo-tagged-information-from-photos-for-blogging/
+#+AUTHOR: lujun9972
+#+TAGS: raw
+#+DATE: [2018年 07月 02日 星期一 19:16:46 CST]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+I am kind of late to this game, but recently I turned on location services for the camera on my phone. That means the location of the photo is stored in the photo, and we can use that to create urls to the photo location in a map for example. While traveling, I thought this would be a good application for org-mode to add functionality to documents with photos in them, e.g. to be able to click on them to see where they are from, or to automate creation of html pages with links to maps, etc. In this post I explore some ways to achieve those ideas. What I would like is a custom org link that shows me a thumbnail of the image, and which exports to show the image in an html file with a link to a pin on Google maps.
+
+So, let's dig in. Imagemagick provides an identify command that can extract the information stored in the images. Here we consider just the GPS information. I some pictures on a recent vacation, and one is unimaginatively named IMG\_1759.JPG. Let's see where it was taken.
+
+#+BEGIN_EXAMPLE
+    identify -verbose IMG_1759.JPG | grep GPS
+#+END_EXAMPLE
+
+exif:GPSAltitude: 14426/387
+   
+exif:GPSAltitudeRef: 0
+   
+exif:GPSDateStamp: 2018:06:30
+   
+exif:GPSDestBearing: 11767/80
+   
+exif:GPSDestBearingRef: T
+   
+exif:GPSImgDirection: 11767/80
+   
+exif:GPSImgDirectionRef: T
+   
+exif:GPSInfo: 1632
+   
+exif:GPSLatitude: 22/1, 11/1, 614/100
+exif:GPSLatitudeRef: N
+   
+exif:GPSLongitude: 159/1, 40/1, 4512/100
+exif:GPSLongitudeRef: W
+   
+exif:GPSSpeed: 401/100
+   
+exif:GPSSpeedRef: K
+   
+exif:GPSTimeStamp: 3/1, 44/1, 3900/100
+
+The interpretation here is that I took that photo at latitude 22° 11' 6.14" N, and longitude 159° 40' 45.12" W. Evidently I was moving at 4.01 in some unit; I can confirm that I was at least moving, I was on a ship when I took that picture, and it was moving.
+
+According to [[http://alvarestech.com/temp/routeconverter/RouteConverter/navigation-formats/src/main/doc/googlemaps/Google_Map_Parameters.htm][this]] you can make a url to a Google maps pin in satellite picture mode that looks like this: [[http://maps.google.com/maps?q=22%2011%206.14N,159%2040%2045.12W&t=k][http://maps.google.com/maps?q=22 11 6.14N,159 40 45.12W&t=k]]. It doesn't seem possible to set the zoom in this url (at least setting the zoom doesn't do anything, and I didn't feel like trying all the other variations that are reported to sometimes work). I guess that is ok for now, it adds some suspense that you have to zoom out to see where the image is in some cases.
+
+We need a little function to take an image file and generate that link. We have to do some algebra on the latitude and longitude which are stored as integers with a division operator. I am going to pipe this through an old unix utility called bc mostly because it is simple, and I won't have to parse it much. bc is a little archaic, you have to set the scale first, which tells it how many decimal places to output. The degrees and minutes are integers, so we will have to deal with that later.
+
+#+BEGIN_EXAMPLE
+    echo "scale=2; 614/100" | bc
+#+END_EXAMPLE
+
+#+BEGIN_EXAMPLE
+    6.14
+#+END_EXAMPLE
+
+Here is our function. I filter out the lines with GPS in them into an a-list. Then, I grab out the specific quantities I want and construct the url. There is a little hackery since it appears the degrees and minutes should be integers in the url formulation used here, so I convert them to numbers and then take the floor. The function is a little longer than I thought, but it isn't too bad I guess. It is a little repetitious, but not enough to justify refactoring.
+
+#+BEGIN_EXAMPLE
+    (defun iphoto-map-url (fname)
+     (let* ((gps-lines (-keep (lambda (line)
+     (when (s-contains? "GPS" line) (s-trim line)))
+     (process-lines "identify" "-verbose" fname)))
+     (gps-alist (mapcar (lambda (s) (s-split ": " s t)) gps-lines))
+     (latitude (mapcar
+     (lambda (s)
+     (s-trim (shell-command-to-string
+     (format "echo \"scale=2;%s\" | bc" s))))
+     (s-split "," (cadr (assoc "exif:GPSLatitude" gps-alist)))))
+     (latitude-ref (cadr (assoc "exif:GPSLatitudeRef" gps-alist)))
+     (longitude (mapcar
+     (lambda (s)
+     (s-trim
+     (shell-command-to-string
+     (format "echo \"scale=2;%s\" | bc" s))))
+     (s-split "," (cadr (assoc "exif:GPSLongitude" gps-alist)))))
+     (longitude-ref (cadr (assoc "exif:GPSLongitudeRef" gps-alist))))
+     (s-format "http://maps.google.com/maps?q=$0 $1 $2$3,$4 $5 $6$7&t=k"
+     'elt
+     (list
+     (floor (string-to-number (nth 0 latitude)))
+     (floor (string-to-number (nth 1 latitude)))
+     (nth 2 latitude)
+     latitude-ref
+     (floor (string-to-number (nth 0 longitude)))
+     (floor (string-to-number (nth 1 longitude)))
+     (nth 2 longitude)
+     longitude-ref))))
+#+END_EXAMPLE
+
+#+BEGIN_EXAMPLE
+    iphoto-map-url
+#+END_EXAMPLE
+
+Here is the function in action, making the url.
+
+#+BEGIN_EXAMPLE
+    (iphoto-map-url "IMG_1759.JPG")
+#+END_EXAMPLE
+
+#+BEGIN_EXAMPLE
+    http://maps.google.com/maps?q=22 11 6.14N,159 40 45.12W&t=k
+#+END_EXAMPLE
+
+It is kind of slow, but that is because the identify shell command is kind of slow when you run it with the -verbose tag. Now, I would like the following things to happen when I publish it to html:
+
+1. I want the image wrapped in an img tag inside a figure environment.
+2. I want the image to by hyperlinked to its location in Google maps.
+
+In the org file, I want a thumbnail overlay on it, so I can see the image while writing, and I want it to toggle like other images. I use an iPhone to take the photos, so we will call it an iphoto link.
+
+Here is the html export function I will use. It is a little hacky that I hard code the width in at 300 pixels, but I didn't feel like figuring out how to get it from an #+attr\_html line right now. It probably requires a filter function where you have access to the actual org-elements. I put the url to the image location in a figure caption here.
+
+#+BEGIN_EXAMPLE
+    (defun iphoto-export (path desc backend)
+     (cond
+     ((eq 'html backend)
+     (format "<figure>
+    <img src=\"%s\" width=\"300\">
+    %s
+    </figure>"
+     path
+     (format "<figcaption>%s <a href=\"%s\">map</a></figcaption>"
+     (or desc "")
+     (iphoto-map-url path))))))
+#+END_EXAMPLE
+
+#+BEGIN_EXAMPLE
+    iphoto-export
+#+END_EXAMPLE
+
+Ok, the last detail I want is to put an image overlay on my new link so I can see it. I want this to work with org-toggle-inline-images so I can turn the images on and off like regular image links with C-c C-x C-v. This function creates overlays as needed, and ties into the org-inline-image-overlays so they get deleted on toggling. We have to advise the display function to redraw these, which we clumsily do by restarting the org font-lock machinery which will redraw the thumbnails from the activate-func property of the links. I also hard code the thumbnail width in this function, when it could be moved out to a variable or attribute.
+
+#+BEGIN_EXAMPLE
+    (defun iphoto-thumbnails (start end imgfile bracketp)
+     (unless bracketp
+     (when (and
+     ;; it is an image
+     (org-string-match-p (image-file-name-regexp) imgfile)
+     ;; and it exists
+     (f-exists? imgfile)
+     ;; and there is no overlay here.
+     (not (ov-at start)))
+     (setq img (create-image (expand-file-name imgfile)
+     'imagemagick nil :width 300
+     :background "lightgray"))
+     (setq ov (make-overlay start end))
+     (overlay-put ov 'display img)
+     (overlay-put ov 'face 'default)
+     (overlay-put ov 'org-image-overlay t)
+     (overlay-put ov 'modification-hooks
+     (list
+     `(lambda (&rest args)
+     (org-display-inline-remove-overlay ,ov t ,start ,end))))
+     (push ov org-inline-image-overlays))))
+
+    (defun iphoto-redraw-thumbnails (&rest args)
+     (org-restart-font-lock))
+
+    ;; this redisplays these thumbnails on image toggling
+    (advice-add 'org-display-inline-images :after 'iphoto-redraw-thumbnails)
+#+END_EXAMPLE
+
+Next, we define the link with a follow, export, tooltip and activate-func (which puts the overlay on).
+
+#+BEGIN_EXAMPLE
+    (org-link-set-parameters
+     "iphoto"
+     :follow (lambda (path) (browse-url (iphoto-map-url path)))
+     :export 'iphoto-export
+     :help-echo "Click me to see where this photo is on a map."
+     :activate-func 'iphoto-thumbnails)
+#+END_EXAMPLE
+
+So finally, here is the mysterious image.
+
+[[http://kitchingroup.cheme.cmu.edu/media/IMG_1759.JPG]]
+[[http://maps.google.com/maps?q=22%2011%206.14N,159%2040%2045.12W&t=k][map]]
+
+Now, in org-mode, I see the image in an overlay, and I can toggle it on and off. If I click on the image, it opens a browser to Google maps with a pin at the spot I took it. When I export it, it wraps the image in a <figure> tag, and puts a url in the caption to the map. If you click on it, and zoom out, you will see this is a picture of the Nāpali Coast on Kauai in Hawaii, and I was in fact out at sea when I took the picture. It was spectacular. Here is another one. This one is a little more obvious with the zoom. Here, I was on land. Since this link is bracketed, it does not show the overlay however in the org-file.
+
+[[http://kitchingroup.cheme.cmu.edu/media/IMG_1749.JPG]]
+Another vacation picture, this time with a caption. [[http://maps.google.com/maps?q=21%2057%2037.01N,159%2021%206.72W&t=k][map]]
+
+Overall, this was easier than I expected. It might be faster to outsource reading the exif data to some dedicate library, perhaps in python that would return everything you want in an easy to parse json data structure. The speed of computing the url is only annoying when you export or click on the links though.
+
+I didn't build in any error handling, e.g. if you do this on a photo with no GPS data it will probably not handle it gracefully. I also haven't tested this on any other images, e.g. south of the equator, from other cameras, etc. I assume this exif data is pretty standard, but it is a wild world out there... It would still be nice to find a way to get a string representing the nearest known location somehow, that would help the caption be more useful.
+
+There is one little footnote to speak of, and that is I had to do a little hackery to get this to work with my blog machinery. You can see what it is in the org-source, I buried it in a noexport subheading, because it isn't that interesting in the grand scheme of things. It was just necessary because I export these org-files to blogofile, which then builds the html pages, instead of just exporting them. The images have to be copied to a source directory, and paths changed in the html to point to them. See, boring stuff. Otherwise, the code above should be fine for regular org and html files! Now, my vacation is over so it is time to get back to work.
+
+Copyright (C) 2018 by John Kitchin. See the [[/copying.html][License]] for information about copying.
+
+[[/org/2018/07/01/Getting-geo-tagged-information-from-photos-for-blogging.org][org-mode source]]
+
+Org-mode version = 9.1.13
