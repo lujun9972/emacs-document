@@ -1,0 +1,165 @@
+#+TITLE: Marcin Borkowski: 2018-07-02 Smart yanking
+#+URL: http://mbork.pl/2018-07-02_Smart_yanking
+#+AUTHOR: lujun9972
+#+TAGS: raw
+#+DATE: [2018年 07月 06日 星期五 15:05:54 CST]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+Notice: this is a long, technical post about a useful piece of Emacs Lisp. What it does it allowing to yank text with a space at either end both before and after a space between words and have Emacs adjust things so that you don't end up with two spaces at one end of the yanked fragment and no space at the other one. If you just want the working code, you may get it from here: [[https://gist.github.com/mbork/9ee1bd8216424e07342e88739fe65547]]. If you want to know the gory details, read on.
+
+
+Edit: in the first version of this blog post, I made an embarrassing rookie mistake. Sorry for that. Given that this post is one of the most popular ones in recent months, it is both ironic and humbling...
+
+
+
+Anyway, the mistake is now corrected. Expect another blog post where I explain what I did wrong (I think it's easy to fall for this!).
+
+I use Emacs fairly often to write text in a natural language. While I consider Emacs support for human languages to be very good, there are still a few rough edges. One of them is connected with cutting and pasting, or, as Emacs insists on calling these, killing and yanking.
+
+It's been a long time since I wrote anything in Word, but I vaguely recall that its pasting command is fairly smart with respect to spaces. For instance, consider the following text:\\
+
+#+BEGIN_EXAMPLE
+    The quick| brown fox jumps over the lazy dog.
+#+END_EXAMPLE
+
+(The vertical bar denotes the point.) Now imagine pressing =M-d= (=kill-word=):\\
+
+#+BEGIN_EXAMPLE
+    The quick| fox jumps over the lazy dog.
+#+END_EXAMPLE
+
+and moving to the “lazy” part:\\
+
+#+BEGIN_EXAMPLE
+    The quick fox jumps over the |lazy dog.
+#+END_EXAMPLE
+
+Notice how we are now on the beginning of the word instead of at the end of the previous one. (This might have happened if we e.g. went to the end of line -- =C-e= -- and then back by two words -- =M-2 M-b=.)
+
+If we now press =C-y=, we end up with this:\\
+
+#+BEGIN_EXAMPLE
+    The quick fox jumps over the brown|lazy dog.
+#+END_EXAMPLE
+
+As you can see, we now have a double space before “brown” and no space after it.
+
+It is not difficult to code a function doing the right thing in this case. (The “right thing” could be e.g. moving the point back by a space before yanking.) The problem, however, is to know when we should do that.
+
+First of all, it is definitely a bad idea in programming modes. (Possibly unless we are editing comments or strings, but let's forget about it for now.) On the other hand, Org-mode, LaTeX modes etc. are fine. This means that we probably should put our customizations in =text-mode-hook=.
+
+Then, we should decide where in the Emacs system we should plug our functionality into. Redefining =yank= is probably a bad idea -- we do not want to do all the hard work that command does (it has more than a dozen lines!). We could define our own command, let's call it =smart-yank=, which would do its magic and then call =yank=, but there is no need to. Emacs has a special facility designed exactly to this kind of customizations, called =advice=. We can advise the =yank= command, which means that we provide some Elisp code to be run before or after =yank= (or even instead of it).
+
+One drawback of using advice is that it is global: there is no way to install advice only in a specific mode or buffer. In other words, =text-mode-hook= will be of no use for us. This is not a huge problem, though, since we can make our function check whether we are in a mode derived from =text-mode=, and do nothing if we are not in such a mode.
+
+Now let's think about what exactly our advice should do. This is not easy, especially that we should probably take into consideration the fact that we may have two spaces at the end of the sentence, and that instead of a space we may have a newline between words. My first idea is to check whether the last entry in the kill ring has a whitespace character at the left or right. My assumptions are as follow.\\
+
+- If it has whitespace on both sides, nothing special should happen.
+- If it has whitespace on e.g. left side, and there is whitespace to the left of the point, we should move point before any whitespace.
+- Similarly if the last kill rinf entry has whitespace on the right side.\\
+  If the kill ring entry has no space on either side, it might be difficult to decide what to do. It might be the case that it is not a whole word but only a prefix (though this would be strange). I think I could try to make sure that in this case, space is inserted on whichever side had no space before, and just see what happens during daily usage.
+
+All this is rather simplified, since we do not really care for newlines and filling, but let's do it one step at a time.
+
+#+BEGIN_EXAMPLE
+    (defun has-space-at-boundary-p (string)
+     "Check whether STRING has any whitespace on the boundary.
+    Return 'left, 'right, 'both or nil."
+     (let ((result nil))
+     (when (string-match-p "^[[:space:]]+" string)
+     (setq result 'left))
+     (when (string-match-p "[[:space:]]+$" string)
+     (if (eq result 'left)
+         (setq result 'both)
+        (setq result 'right)))
+     result))
+#+END_EXAMPLE
+
+Notice how I used =string-match-p=, which does not modify match data (which is global state, so I don't like modifying it by my functions).
+
+Let us now write the function checking whether we should do something special when yanking. The criteria are as follows:\\
+
+- If there is no space around point or on both sides of the point, do nothing special.
+- If there is space e.g. to the left of the point, and the yanked text has space on the left, move point left across all the space first.
+- If there is space to the right of the point, do the analogous thing.
+
+First, we want to be able to check whether there is any whitespace around the point.\\
+
+#+BEGIN_EXAMPLE
+    (defun is-there-space-around-point-p ()
+     "Check whether there is whitespace around point.
+    Return 'left, 'right, 'both or nil."
+     (let ((result nil))
+     (when (< (save-excursion
+         (skip-chars-backward "[:space:]"))
+         0)
+     (setq result 'left))
+     (when (> (save-excursion
+         (skip-chars-forward "[:space:]"))
+         0)
+     (if (eq result 'left)
+         (setq result 'both)
+        (setq result 'right)))
+     result))
+#+END_EXAMPLE
+
+We can now write the function combining all we have done so far.
+
+#+BEGIN_EXAMPLE
+    (defun set-point-before-yanking (string)
+     "Put point in the appropriate place before yanking STRING."
+     (let ((space-in-yanked-string (has-space-at-boundary-p string))
+        (space-at-point (is-there-space-around-point-p)))
+     (cond ((and (eq space-in-yanked-string 'left)
+            (eq space-at-point 'left))
+         (skip-chars-backward "[:space:]"))
+         ((and (eq space-in-yanked-string 'right)
+            (eq space-at-point 'right))
+         (skip-chars-forward "[:space:]")))))
+#+END_EXAMPLE
+
+Now there is one problem. We cannot advice =yank=, since we do not know the yanked string before =yank= is actually evaluated. (We could of course look up the source code for =yank=, and see how it uses =current-kill= to get the right string. Copying and pasting code between a function and its advice, however, kind of defeats the purpose of advising it in the first place.) It turns out, however, that =yank= is a pretty complicated mechanism, which calls the =insert-for-yank= command. It allows for some deep magic, manipulating text before yanking (and indeed, this mechanism could be used to solve our initial problem!). We may than advice =insert-for-yank=, which gets exactly what we want (the string) as its sole argument.
+
+One possible drawback of this approach is that =yank= calls =push-mark= before =insert-for-yank=, which may or may not be what we want. We could circumvent that, but I'm not sure whether it's worth the effort, and the code would be even more hacky than it is now.
+
+So let's finally define and install our advice, remembering about checking whether the mode is a text one.\\
+
+#+BEGIN_EXAMPLE
+    (defun set-point-before-yanking-if-in-text-mode (string)
+     "Invoke `set-point-before-yanking' in text modes."
+     (when (derived-mode-p 'text-mode)
+     (set-point-before-yanking string)))
+
+    (advice-add
+     'insert-for-yank
+     :before
+     #'set-point-before-yanking-if-in-text-mode)
+#+END_EXAMPLE
+
+This solution has one drawback. It installs some magic working behind the scenes (such kind of magic is traditionally called “DWIM” -- or “do what I mean” in Emacs world), and does not give the user any convenient way of turning this magic off. I don't like it when computers try to be smarter than they are, so I'd prefer to be able to tell Emacs “just yank this as it is, without paying attention to any spaces whatsoever”. Now the question is: how to tell that to Emacs? A prefix argument (=C-u=) is the first idea, but a prefix argument to =yank= has a well established meaning and I don't want to give up that.
+
+Well, another natural choice is =C-u C-u=. We have one problem, though. The =insert-for-yank= function knows nothing about the prefix argument to =yank=.
+
+We may overcome this problem in a few ways. The first that came to my mind was to advise =yank= instead. This is probably not a bad idea, although there is one problem with it: what about other yanking commands? There aren't many of them in stock Emacs, and I don't care for yanking rectangles a lot (although my advice will break it, since =yank-rectangle= calls =insert-for-yank= repeatedly for each line), but there are at least =yank-pop= and mouse yanking commands. Since I don't yank rectangles very often (although I happen to use =delete-rectangle= every now and again), I am willing to pay the price.
+
+This leaves us with the problem of telling =insert-for-yank= about the prefix argument to the command that invoked it. Luckily for us, we don't have to do anything. There is already the [[http://mbork.pl/2017-07-09_current-prefix-arg][current-prefix-arg]] variable, which is global state, so blah, blah, you shouldn't use it, but really, who cares.
+
+So here again is our advice.\\
+
+#+BEGIN_EXAMPLE
+    (defun set-point-before-yanking (string)
+     "Put point in the appropriate place before yanking STRING."
+     (unless (equal current-prefix-arg '(16))
+     (let ((space-in-yanked-string (has-space-at-boundary-p string))
+         (space-at-point (is-there-space-around-point-p)))
+     (cond ((and (eq space-in-yanked-string 'left)
+             (eq space-at-point 'left))
+         (skip-chars-backward "[:space:]"))
+         ((and (eq space-in-yanked-string 'right)
+             (eq space-at-point 'right))
+         (skip-chars-forward "[:space:]"))))))
+#+END_EXAMPLE
+
+Now =C-u C-u C-y= inserts the last entry in the kill ring as is. This is still not ideal -- we cannot meaningfully pass =C-u C-u= to =yank-pop=, for instance -- but should work well enough. (Remember that in a pinch, you can always manually reinsert the spaces. This is not as bad as it sounds -- yanking puts the point and mark around the yanked stuff, although without activating the mark, so jumping to the other side of the yanked text is as simple as =C-u C-SPC= or =C-x C-x=.) Incidentally, this also fixes the problem with yanking rectangles -- if =yank-rectangle= behaves wrong (i.e., the yanked lines are not aligned because of our machinations), you can just undo it and say =C-u C-u C-x r y= -- it's cumbersome, but possible.
+
+Interestingly, there exists a completely different approach to the whole problem. There is a =yank-handler= property which you can put on a string passed to =insert-for-yank=, and it specifies a function that is called instead of =insert= when yanking text. So, we might just leave the yanking as it is, and make =kill-region= put this property on the text, with a “modified insert”. This approach looks promising, but I envision one problem: it won't support yanking texts from outside Emacs. For now, I'm staying with the above.
