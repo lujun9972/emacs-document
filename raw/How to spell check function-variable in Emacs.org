@@ -1,0 +1,195 @@
+#+TITLE: How to spell check function/variable in Emacs
+#+URL: http://blog.binchen.org/posts/how-to-spell-check-functionvariable-in-emacs.html
+#+AUTHOR: lujun9972
+#+TAGS: raw
+#+DATE: [2018年 07月 05日 星期四 16:46:10 CST]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+[[http://blog.binchen.org/posts/effective-spell-check-in-emacs.html][This article]] explains how developers can check typos of function/variable while programming in Emacs.
+
+It uses the =--run-together= option of [[http://aspell.net/][GNU Aspell]] to check camel cased word.
+
+But this solution is not perfect. It wrongly identifies two character interior word as typo. For example, "onChange" is regards as typo because the interior word "on". Another issue is namespace of function name. For example, "MS" from "MSToggleButton" is alias of "Microsoft". If "MS" is identified as typo, every word containing namespace "MS" is regarded as typo.
+
+In this article,
+
+- I will explain *how Emacs spell checker works*
+- Then we study the *algorithm of aspell*
+- Finally, I will show you *a complete setup*
+
+In Emacs, a built in plugin [[https://www.emacswiki.org/emacs/FlySpell][Fly Spell]] is in charge of spell check. It passes the options and plain text to command line tool aspell. Aspell sends back the typos of text into =Fly Spell=. =Fly Spell= then select certain typos to display. For example, when [[https://www.gnu.org/software/emacs/manual/html_node/emacs/Spelling.html][flyspell-prog-mode]] is on, only typos in comments and strings are visible.
+
+So aspell doesn't understand syntax of any programming language. It scans plain text and report all typos to Fly Spell.
+
+In aspell, there are two extra "run-together" word options:
+
+- =--run-together-limit= is "Maximum number of words can be strung together"
+- =--run-together-min= is "Minimal length of interior words"
+
+Let's study the code of aspell to understand these two options. The "run-together" algorithm in implemented in function =Working::check_word= of file "modules/speller/default/suggest.cpp".
+
+In order to help you understand this function, I documented the code line by line,
+
+#+BEGIN_EXAMPLE
+    class Working : public Score {
+     unsigned check_word(char 0_sync_master.sh 1_add_new_article_manual.sh 1_add_new_article_newspaper.sh 2_start_translating.sh 3_continue_the_work.sh 4_finish.sh 5_pause.sh base.sh parse_url_by_manual.sh parse_url_by_newspaper.py parse_url_by_newspaper.sh project.cfg reformat.sh texput.log urls_checker.sh word, char 0_sync_master.sh 1_add_new_article_manual.sh 1_add_new_article_newspaper.sh 2_start_translating.sh 3_continue_the_work.sh 4_finish.sh 5_pause.sh base.sh parse_url_by_manual.sh parse_url_by_newspaper.py parse_url_by_newspaper.sh project.cfg reformat.sh texput.log urls_checker.sh word_end, CheckInfo 0_sync_master.sh 1_add_new_article_manual.sh 1_add_new_article_newspaper.sh 2_start_translating.sh 3_continue_the_work.sh 4_finish.sh 5_pause.sh base.sh parse_url_by_manual.sh parse_url_by_newspaper.py parse_url_by_newspaper.sh project.cfg reformat.sh texput.log urls_checker.sh ci, unsigned pos = 1);
+    };
+    unsigned Working::check_word(char 0_sync_master.sh 1_add_new_article_manual.sh 1_add_new_article_newspaper.sh 2_start_translating.sh 3_continue_the_work.sh 4_finish.sh 5_pause.sh base.sh parse_url_by_manual.sh parse_url_by_newspaper.py parse_url_by_newspaper.sh project.cfg reformat.sh texput.log urls_checker.sh word, char 0_sync_master.sh 1_add_new_article_manual.sh 1_add_new_article_newspaper.sh 2_start_translating.sh 3_continue_the_work.sh 4_finish.sh 5_pause.sh base.sh parse_url_by_manual.sh parse_url_by_newspaper.py parse_url_by_newspaper.sh project.cfg reformat.sh texput.log urls_checker.sh word_end, CheckInfo 0_sync_master.sh 1_add_new_article_manual.sh 1_add_new_article_newspaper.sh 2_start_translating.sh 3_continue_the_work.sh 4_finish.sh 5_pause.sh base.sh parse_url_by_manual.sh parse_url_by_newspaper.py parse_url_by_newspaper.sh project.cfg reformat.sh texput.log urls_checker.sh ci,
+     /bin /boot /dev /etc /home /lib /lib64 /lost+found /media /mnt /opt /proc /root /run /sbin /srv /sys /tmp /usr /var it WILL modify word */
+     unsigned pos)
+    {
+     // check the whole word before go into run-together mode
+     unsigned res = check_word_s(word, ci);
+     // if `res` is true, it's a valid word, don't bother run-together
+     if (res) return pos + 1;
+     // it's typo because number of interior words is greater than "--run-together-limit"
+     if (pos + 1 >= sp->run_together_limit_) return 0;
+
+     // `i` is the `end` of interior word, the poition AFTER last character of interior word
+     for (char 0_sync_master.sh 1_add_new_article_manual.sh 1_add_new_article_newspaper.sh 2_start_translating.sh 3_continue_the_work.sh 4_finish.sh 5_pause.sh base.sh parse_url_by_manual.sh parse_url_by_newspaper.py parse_url_by_newspaper.sh project.cfg reformat.sh texput.log urls_checker.sh i = word + sp->run_together_min_; 
+     // already checked the whole word; besides, any interior word whose size is less 
+     // than "--run-together-min" is regarded as invalid
+     i <= word_end - sp->run_together_min_;
+     ++i)
+     {
+     char t = *i;
+
+     // read the interior word by set the character at `end` position to '\0'
+     *i = '\0';
+     res = check_word_s(word, ci);
+     // restore original character at `end` position
+     *i = t;
+
+     // Current interior word is invalid, we need append the character at current
+     // `end` position to creata new interior word.
+     // Inncrement `i` because `i` always points to the `end` of interior word
+     if (!res) continue;
+
+     // Current interior word is valid, strip it from the whole word to create a totally
+     // new word for `check_word`, `check_word` is a recursive function
+     res = check_word(i, word_end, ci + 1, pos + 1);
+     if (res) return res;
+     }
+     memset(ci, 0, sizeof(CheckInfo));
+     return 0;
+    }
+#+END_EXAMPLE
+
+Let's use "hisHelle" as demo how =check_word= runs:
+
+- "word" points to string "hisHelle" (in C/C++, string is character array. The last character of array is character '\0')
+- "sp->run\_together\_min\_" is 3, so "i" initially points to the character "H", at the end of interior word "his"
+- "check\_word\_s" return "true" for interior word "his"
+- So we strip "his" from "hisHelle" and recursively call "check\_word" to check new word "Helle"
+- In the new context of "check\_word", we extract "Hel" from "Helle" initially
+- "Hel" is invalid. So we extract "Hell" from "Helle" and get new word "e" and recursively apply "check\_word" on "e"
+- "e" is not valid and at the end of recursion. So "hisHelle" is a typo
+
+Here is our conclusion after studying the code:
+
+- =--run-together-limit= could not be bigger if your computer got enough memory. It's default value is 8. I prefer 16.
+- =--run-together-min= can't be 2 because too many typos are combination of "correct" two character interior words ("hehe", "isme", ...)
+- =--run-together-min= can't be greater than 3, or else, too many "correct" three character interior words are regarded as invalid ("his", "her", "one", "two")
+- =--run-together-min= should always be 3 which is its default value. Actually, it should never be tweak-able by user at the beginning
+
+Since =--run-together-min= is 3. the word "onChange" is always regarded as typo because of two character interior word "on". Since there is nothing we can do at aspell side, we have to turn to Emacs to fix this problem.
+
+When Emacs got potential typo on Emacs side, we can strip out all the two character interior word from original word and spell check new word again.
+
+We can attach a predicate into specific major-mode. The predicate return =t= if current word at cursor is typo,
+
+#+BEGIN_EXAMPLE
+    (defun js-flyspell-verify ()
+     (let* ((font-face (get-text-property (- (point) 1) 'face))
+     (word (thing-at-point 'word)))
+     (message "font-face=%s word=%s" font-face word)
+     t))
+    (put 'js2-mode 'flyspell-mode-predicate 'js-flyspell-verify)
+#+END_EXAMPLE
+
+As you can see from above code, we have full control on what typos should be displayed in =js-flyspell-verify=. So namespace is also easy problem. If namespace is three characters, it will be automatically processed by aspell. All we need to do is add namespace into our personal dictionary =$HOME/.aspell.en.pws=. If namespace is one or two characters, we strip down it from original word. Same way as we deal with two character interior word.
+
+Here is complete setup you can paste into =.emacs= (I setup for =js2-mode= and =rjsx-mode= but code is generic enough),
+
+#+BEGIN_EXAMPLE
+    (defun flyspell-detect-ispell-args (&optional run-together)
+     "If RUN-TOGETHER is true, spell check the CamelCase words.
+    Please note RUN-TOGETHER will make aspell less capable. So it should only be used in prog-mode-hook."
+     ;; force the English dictionary, support Camel Case spelling check (tested with aspell 0.6)
+     (let* ((args (list "--sug-mode=ultra" "--lang=en_US"))args)
+     (if run-together
+     (setq args (append args '("--run-together" "--run-together-limit=16"))))
+     args))
+
+    (setq ispell-program-name "aspell")
+    (setq-default ispell-extra-args (flyspell-detect-ispell-args t))
+
+    (defvar extra-flyspell-predicate '(lambda (word) t)
+     "A callback to check WORD. Return t if WORD is typo.")
+
+    (defun my-flyspell-predicate (word)
+     "Use aspell to check WORD. If it's typo return true."
+     (if (string-match-p (concat "^& " word)
+     (shell-command-to-string (format "echo %s | %s %s pipe"
+     word
+     ispell-program-name
+     (mapconcat 'identity
+     (flyspell-detect-ispell-args t)
+     " "))))
+     t))
+
+    (defmacro my-flyspell-predicate-factory (preffix)
+     `(lambda (word)
+     (let* ((pattern (concat "^\\(" ,preffix "\\)\\([A-Z]\\)"))
+     rlt)
+     (cond
+     ((string-match-p pattern word)
+     (setq word (replace-regexp-in-string pattern "\\2" word))
+     (setq rlt (my-flyspell-predicate word)))
+     (t
+     (setq rlt t)))
+     rlt)))
+
+    (defun js-flyspell-verify ()
+     (let* ((case-fold-search nil)
+     (font-matched (memq (get-text-property (- (point) 1) 'face)
+     '(js2-function-call
+     js2-function-param
+     js2-object-property
+     font-lock-variable-name-face
+     font-lock-string-face
+     font-lock-function-name-face
+     font-lock-builtin-face
+     rjsx-tag
+     rjsx-attr)))
+     word
+     (rlt t))
+     (cond
+     ((not font-matched)
+     (setq rlt nil))
+     ((not (string-match-p "aspell$" ispell-program-name))
+     ;; Only override aspell's result
+     (setq rlt t))
+     ((string-match-p "^[a-zA-Z][a-zA-Z]$"
+     (setq word (thing-at-point 'word)))
+     (setq rlt nil))
+     ((string-match-p "\\([A-Z][a-z]\\|^[a-z][a-z]\\)[A-Z]\\|[a-z][A-Z][a-z]$"
+     word)
+     ;; strip two character interior words
+     (setq word (replace-regexp-in-string "\\([A-Z][a-z]\\|^[a-z][a-z]\\)\\([A-Z]\\)" "\\2" word))
+     (setq word (replace-regexp-in-string "\\([a-z]\\)[A-Z][a-z]$" "\\1" word))
+     ;; check stripped word
+     (setq rlt (my-flyspell-predicate word)))
+     (t
+     (setq rlt (funcall extra-flyspell-predicate word))))
+     rlt))
+    (put 'js2-mode 'flyspell-mode-predicate 'js-flyspell-verify)
+    (put 'rjsx-mode 'flyspell-mode-predicate 'js-flyspell-verify)
+
+    (defun prog-mode-hook-setup ()
+     ;; remove namespace "MS" and "X"
+     (setq-local extra-flyspell-predicate (my-flyspell-predicate-factory "MS\\|X")))
+    (add-hook 'prog-mode-hook 'prog-mode-hook-setup)
+#+END_EXAMPLE
+
+Optionally, you could see [[https://github.com/redguardtoo/emacs.d/blob/master/lisp/init-spelling.el]] for my real world setup.
