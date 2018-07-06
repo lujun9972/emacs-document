@@ -1,0 +1,268 @@
+#+TITLE: Capturing Content for Emacs
+#+URL: http://www.howardism.org/Technical/Emacs/capturing-content.html
+#+AUTHOR: lujun9972
+#+TAGS: raw
+#+DATE: [2018年 07月 06日 星期五 14:20:42 CST]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+Let's suppose you are current investigating a new code base, system or other
+problem, and you are following [[file:literate-devops.html][my advice]] and copying code, storing output, and
+taking notes along the way. All of this gets stored into your engineering
+notebook, aka /primary org mode/ file (for me, this is often my current Sprint page).
+
+Sure, selecting code, switching buffers or windows, pasting the code (maybe even
+jotting down some notes), and then popping back to your original file, may not
+be many keystrokes, but it exacts a bit of mental tax that mounts.
+
+The typical solution to this problem is to use the [[https://orgmode.org/manual/Capture.html][org-capture feature]] (If you
+are not familiar with this Org feature, check out my [[file:capturing-intro.html][gentle introduction]] or see
+[[http://sachachua.com/blog/2015/02/learn-take-notes-efficiently-org-mode/#unnumbered-3][Step 3]] of Sacha Chua's essay, /Learn how to take notes more efficiently in Org
+Mode/). While =org-capture= makes copying content into your org file easy, I am
+trying to improve on it, and here some of my experiments.
+
+* The “Current” Task
+   :PROPERTIES:
+   :CUSTOM_ID: org83a14c0
+   :END:
+
+One mentally taxing aspect of =org-capture= is determining where something
+should go. Do you have a dozen =(file)= reference destinations? I have found the
+=(clock)= reference ideal for altering a /default destination/. Specifically, I
+begin work on /a task/, and designate it the /focus of my attention/ (i.e. the
+/destination/ of my work), by /clocking in/, using =org-clock-in= (=C-c C-x C-i= or =,  I= in Spacemacs).
+
+Now, we can add the following to the org-capture list:
+
+#+BEGIN_EXAMPLE
+    (add-to-list 'org-capture-templates
+     `("c" "Item to Current Clocked Task" item
+     (clock)
+     "%i%?" :empty-lines 1))
+#+END_EXAMPLE
+
+This capture destination allows me to easily specify /any header/ as a special
+destination with a simple clock in. However, we do have the mental
+interruption associated with creating a new buffer. Let's minimize that by
+allowing us to put something on the kill ring, and send it to that clocked-in
+task:
+
+#+BEGIN_EXAMPLE
+    (add-to-list 'org-capture-templates
+     `("K" "Kill-ring to Current Clocked Task" plain
+     (clock)
+     "%c" :immediate-finish t :empty-lines 1))
+#+END_EXAMPLE
+
+The /trick/ here is the use of =:immediate-finish=, where it doesn't even bother
+with a buffer, but just injects the =kill-ring= contents to the clocked in task
+without even a sneeze. Don't want the hassle of sending something to the
+=kill-ring=? With this one, you only have to select the text, then kick off
+the capture:
+
+#+BEGIN_EXAMPLE
+    (add-to-list 'org-capture-templates
+     `("C" "Contents to Current Clocked Task" plain
+     (clock)
+     "%i" :immediate-finish t :empty-lines 1))
+#+END_EXAMPLE
+
+In fact, create the following function and keybinding, and you can select
+text, and immediately copy it to your clocked in task without bothering with
+the org-capture menu:
+
+#+BEGIN_EXAMPLE
+    (defun region-to-clocked-task (start end)
+     "Copies the selected text to the currently clocked in org-mode task."
+     (interactive "r")
+     (org-capture-string (buffer-substring-no-properties start end) "C"))
+
+    (global-set-key (kbd "C-<F17>") 'region-to-clocked-task)
+#+END_EXAMPLE
+
+This is great for /general textual content/, but much of what I want to copy is
+code, which could bring along a bit of /meta data/.
+
+* Code References
+   :PROPERTIES:
+   :CUSTOM_ID: org4090a78
+   :END:
+
+Much of my ideas got started after reading [[http://ul.io/nb/2018/04/30/better-code-snippets-with-org-capture/][this blog entry]] where the idea is
+to have a function gather meta data associated with the currently selected
+text, and help to leave a back trace to the original code file.
+
+I wanted to copy both /code/ and regular text, so I made
+=ha/org-capture-clip-snippet= for wrapping the region in an =EXAMPLE=:
+
+#+BEGIN_EXAMPLE
+    (defun ha/org-capture-clip-snippet (f)
+     "Given a file, F, this captures the currently selected text
+    within an Org EXAMPLE block and a backlink to the file."
+     (with-current-buffer (find-buffer-visiting f)
+     (ha/org-capture-fileref-snippet f "EXAMPLE" "" nil)))
+#+END_EXAMPLE
+
+And =ha/org-capture-code-snippet= for getting function name and the code type:
+
+#+BEGIN_EXAMPLE
+    (defun ha/org-capture-code-snippet (f)
+     "Given a file, F, this captures the currently selected text
+    within an Org SRC block with a language based on the current mode
+    and a backlink to the function and the file."
+     (with-current-buffer (find-buffer-visiting f)
+     (let ((org-src-mode (replace-regexp-in-string "-mode" "" (format "%s" major-mode)))
+     (func-name (which-function)))
+     (ha/org-capture-fileref-snippet f "SRC" org-src-mode func-name))))
+#+END_EXAMPLE
+
+Both of these function do not do much, but given some values to Nick's
+original function (which I've modified the =format= to fit my personal style):
+
+#+BEGIN_EXAMPLE
+    (defun ha/org-capture-fileref-snippet (f type headers func-name)
+     (let* ((code-snippet
+     (buffer-substring-no-properties (mark) (- (point) 1)))
+     (file-name (buffer-file-name))
+     (file-base (file-name-nondirectory file-name))
+     (line-number (line-number-at-pos (region-beginning)))
+     (initial-txt (if (null func-name)
+     (format "From [[file:%s::%s][%s]]:"
+     file-name line-number file-base)
+     (format "From ~%s~ (in [[file:%s::%s][%s]]):"
+     func-name file-name line-number
+     file-base))))
+     (format "
+     %s
+
+     #+BEGIN_%s %s
+    %s
+     #+END_%s" initial-txt type headers code-snippet type)))
+#+END_EXAMPLE
+
+However, content I want to store in an org-mode comes from more than just
+Emacs buffers.
+
+* Output from Terminal Commands
+   :PROPERTIES:
+   :CUSTOM_ID: orgfe6508d
+   :END:
+
+What if the end result of a command sequence on the Terminal was a pipe to a
+program that could use =cat= to gather textual data from standard input, and
+then use =emacsclient= call =org-capture= to store it?
+
+Yeah, and interesting idea when sent to the current clocked in task:
+
+#+BEGIN_EXAMPLE
+    #!/bin/bash
+
+    TITLE="$*"
+    CONTENT="
+     #+BEGIN_EXAMPLE
+    $(cat | sed 's/^/ /g')
+     #+END_EXAMPLE
+    "
+
+    if [[ -n $TITLE ]]
+    then
+     CONTENT=" - ${TITLE}\n${CONTENT}"
+    fi
+
+    /usr/local/bin/emacsclient -c -n \
+     -e "(progn (org-capture-string \"$CONTENT\" \"C\") (delete-frame))"
+#+END_EXAMPLE
+
+Here I'm using our latest =C= capture template to that just takes textual
+context and stores is. Let's try it in action by typing the following in a
+shell:
+
+#+BEGIN_EXAMPLE
+    date | ec
+#+END_EXAMPLE
+
+Works like a charm:
+
+#+BEGIN_EXAMPLE
+    #+BEGIN_EXAMPLE
+    Thu Jun 7 22:45:23 PDT 2018
+    #+END_EXAMPLE
+#+END_EXAMPLE
+
+* Content from Browsers
+   :PROPERTIES:
+   :CUSTOM_ID: org053f8eb
+   :END:
+
+Like many software people, I have a love-hate relationship with browsers.
+I often find myself copying/pasting information from a web site into my
+engineering notebook. Pasting text data into an org-mode file looses all text
+formatting as well as hyperlink references. But operating system clipboards
+can store some of this formatting data, so we just need to tap into it.
+
+I'm currently using a Mac, so the following is very Mac-centric, but perhaps
+the ideas can lend you to build a Linux or Windows version (if so, let me know).
+
+I'm going to use Alfred to start this Workflow, as it will allow me to
+trigger these scripts in succession as shown in this diagram:
+
+[[file:capturing-content-01.png]]
+
+The trigger (in this case, every meta-key on a laptop), will start the first
+script that basically issues the =Command-C= to copy the selected text to the
+clipboard:
+
+#+BEGIN_EXAMPLE
+    tell application "System Events" to keystroke "c" using command down
+#+END_EXAMPLE
+
+Yes, this works with any application, including browsers.
+
+The next script basically takes the contents of the clipboard (as HTML),
+render that to an org-compatible format with [[https://pandoc.org/][pandoc]] (which you'll need to
+install), and then use =emacsclient= to call my org-capture routine with the
+“C” selection, so that the contents go directly to my clocked in task:
+
+#+BEGIN_EXAMPLE
+    query=$(osascript -e 'the clipboard as "HTML"' | \
+     perl -ne 'print chr foreach unpack("C*",pack("H*",substr($_,11,-3)))' | \
+     /usr/local/bin/pandoc -f html -t org | \
+     sed 's/"//g' | sed 's/^/ /' )
+
+    /usr/local/bin/emacsclient -c -n \
+     -e "(progn (org-capture-string \"${query}\" \"C\") (delete-frame))"
+#+END_EXAMPLE
+
+The script is a modified version from [[https://gist.github.com/rolandcrosby/c26571bf4e263f695d2f][Roland Crosby]]. How well does it work?
+I just selected some of the homepage at [[https://orgmode.org/][orgmode.org]], and clocked this header
+as my /current task/, and ended up with this getting pasted:
+
+#+BEGIN_EXAMPLE
+    The stable version of Org is *9.1.13*, as of May 2018. See the
+    [[https://orgmode.org/Changes.html][release notes]].
+
+    Get it with =M-x package-install RET org RET= (see
+    [[https://orgmode.org/elpa.html][Org ELPA]]).
+
+    Or download it as a [[https://orgmode.org/org-9.1.13.tar.gz][tar.gz]] or
+    [[https://orgmode.org/org-9.1.13.zip][zip]] archives.
+#+END_EXAMPLE
+
+In other words, it renders quite well...which is especially good, since this
+pasting business happens completely in the background while I am still surfin'
+the web.
+
+* Summary
+   :PROPERTIES:
+   :CUSTOM_ID: org755594b
+   :END:
+
+My workflow proposal amounts to gathering data from a web browser, shell
+commands, and source code, and be able to fling it into my engineering
+notebook without switching out of that application.
+
+Later, I will return to my notebook in Emacs and clean up and summarize my
+capturing. Once clean, the issues or knowledge I wish to share can then be
+easily exported from org.
+
+The side-benefit, is that I automatically remind myself to clock in to my task.
