@@ -1,0 +1,815 @@
+#+TITLE: Getting productive with selection and navigation in Emacs – Icicles of thought
+#+URL: https://lorefnon.tech/2018/07/14/getting-productive-with-selection-and-navigation-in-emacs/#footnote-2-src
+#+AUTHOR: lujun9972
+#+TAGS: raw
+#+DATE: [2018年 08月 19日 星期日 18:37:37 CST]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+This post is intended to primarily benefit people coming from other, so called “modern” editors to Emacs. Emacs veterans are likely to find most of the tips here very elementary.
+
+I have observed that many programmers habituated to newer editors have many implicit assumptions about editing workflows which simply don't hold true within Emacs environment and this prevents them from being productive to the fullest extent.
+
+This post primarily focusses on how getting familiar with the concept of =marks= and =regions= in Emacs can result in productive workflows. These concepts, coupled with a few extensions can enable much more pleasurable code-editing workflows not easily achievable in more prevalent “modern” editors.
+
+* Marks and the Mark Ring
+   :PROPERTIES:
+   :CUSTOM_ID: marks-and-the-mark-ring
+   :END:
+
+Perhaps among the first things which we learn when dipping toes into Emacs is that =C-spc= is the keybinding used to select region.
+
+We start a selection with =C-spc=, navigate to the the end of what we want to select, and then trigger a command to do something with the selection eg. Cut using =C-w=, Copy using =M-w= etc.
+
+While the above explanation usually suffices to get people started with elementary usage, the [[https://www.gnu.org/software/emacs/manual/html_node/emacs/Setting-Mark.html][concept of marks]] gets lost in the process.
+
+=C-spc= (or more accurately =set-mark-command= which this is key is bound to by default) actually does two things:
+
+- Marks the current position of cursor (called [[https://www.gnu.org/software/emacs/manual/html_node/emacs/Point.html][point]])
+- Activates the region between mark and point
+
+Once point has been marked, moving the point by inserting text, navigating etc. changes the active region. This active region, between the point and the mark, is what we see as highlighted. .
+
+While this is /superficially/ similar to how selections behave in most other GUI applications, there are some important differences:
+
+** Commands can operate on invisible regions
+    :PROPERTIES:
+    :CUSTOM_ID: commands-can-operate-on-invisible-regions
+    :END:
+
+A region is highlighted (visible) when it is active. But commands like kill (cut), kill-ring-save (copy) etc. operate on regions and don't care whether or not the region is active. This can be surprising and may appear to be a bug when a =C-w= copies away a large chunk of text even if there is no visible selection on screen.
+
+While it is [[https://emacs.stackexchange.com/questions/2701/only-allow-kill-ring-save-if-there-is-highlighted-text][possible]] to make Emacs behave like other prevalent editors in this respect, I find the Emacs behavior slightly better.
+
+This is because we can set the mark, continue typing, and then once done use =C-w= to copy the current region. This is useful when we know beforehand that we are going to need what we are typing later, eg. multiple class/interface names which have partially shared names by conventions. We thereby save on the extra navigation that would otherwise be required after typing.
+
+Lets say we want to write the following (typescript) code:
+
+1
+
+2
+
+3
+
+4
+
+5
+
+6
+
+7
+
+ 
+
+class
+
+Foo
+
+extens
+
+React
+
+.
+
+Component
+
+<
+
+FooProps
+
+>
+
+{
+
+}
+
+ 
+
+interface
+
+FooProps
+
+{
+
+}
+
+ 
+
+We see that there is quite a bit of redundancy in the names. We can utilize the above trick when typing to easily having to retype anything.
+
+[[https://lorefnon.tech/wp-content/uploads/2018/07/emacs-1.gif]]
+
+1
+
+2
+
+3
+
+4
+
+5
+
+6
+
+7
+
+8
+
+9
+
+10
+
+11
+
+12
+
+13
+
+14
+
+15
+
+16
+
+17
+
+18
+
+19
+
+20
+
+21
+
+22
+
+23
+
+class
+
+      \^ C-spc => Activate mark
+
+ 
+
+class Foo
+
+          \^ M-w => Foo has now been killed (copied)
+
+ 
+
+class Foo extends React.Component<
+
+                                  \^ C-spc => Activate mark
+
+ 
+
+class Foo extends React.Component<
+
+                                  \^ C-y => Yank (paste) Foo
+
+ 
+
+class Foo extends React.Component<FooProps
+
+                                          \^ M-w => FooProps has now been killed (copied)
+
+ 
+
+class Foo extends React.Component<FooProps>
+
+ 
+
+// Later
+
+ 
+
+interface
+
+           \^ C-y => Yank FooProps
+
+ 
+
+interface FooProps {}
+
+** Marks are useful by themselves: for navigation
+    :PROPERTIES:
+    :CUSTOM_ID: marks-are-useful-by-themselves-for-navigation
+    :END:
+
+This is perhaps the *least intuitive* part. Typing =C-u C-spc= jumps to a mark. So frequently it is useful to set a mark /without/ needing a selection. Emacs keeps a buffer local history of marks in a [[https://www.gnu.org/software/emacs/manual/html_node/emacs/Mark-Ring.html][mark ring]].
+
+We can use =C-spc C-spc= to mark a point without activating a region.
+
+I personally prefer a slightly more old-school approach where I have [[https://www.emacswiki.org/emacs/TransientMarkMode][transient-mark-mode]] disabled by default.
+
+1
+
+2
+
+3
+
+ 
+
+(setq deactivate-mark nil)
+
+ 
+
+In this configuration, the regions are not visible by default, and =C-spc= just sets the mark and does not activate a region.
+
+It is occassionally convenient to highlight the region which will be selected, and for these cases we can can press =C-spc C-spc=. The double invocation temporarily activates the transient mark mode and active regions become visible.
+
+** Helm integration
+    :PROPERTIES:
+    :CUSTOM_ID: helm-integration
+    :END:
+
+Helm is a sophisticated completion system that vastly overhauls the development workflow in Emacs. This tutorial does not focus on helm, an [[https://tuhdo.github.io/helm-intro.html][excellent one]] has already been written by Tuh Do. Helm requires some getting used to, but once habituated, its somewhat unconventional out-of-order matching system gets the job done a lot faster than other prevalent prefix-based or fuzzy-matching completion systems.
+
+Helm provides a command =helm-mark-ring= which shows all active marks in current buffer, and makes it easy to quickly jump to them. There is an analogous command =helm-all-mark-rings= which shows all marks across buffers.
+
+[[https://lorefnon.tech/wp-content/uploads/2018/07/Screenshot-from-2018-07-09-01-56-23-1.png]]
+
+While marks are useful for a small number of recent locations, when we are exploring large projects, it is useful to tag points with a name, which are easy to remember and get back to. This is easily done by [[https://www.gnu.org/software/emacs/manual/html_node/emacs/Bookmarks.html][bookmarks]].
+
+Not surprisingly helm provides a way to browse bookmarks too.
+
+[[https://lorefnon.tech/wp-content/uploads/2018/07/Screenshot-from-2018-07-09-02-00-10-e1531511960485.png]]
+
+The bookmark will by default take the name from current region (useful for bookmarking definition sites of symbols in code), or if a region is not active, the current file name.
+
+It is also possible to save points to [[https://www.gnu.org/software/emacs/manual/html_node/emacs/Position-Registers.html][registers]] and access them later, but I don't find myself using them much. Unlike registers, bookmarks are persistend over sessions, and can have descriptive names -- both of which I find desirable when working with larger projects.
+
+* More on regions
+   :PROPERTIES:
+   :CUSTOM_ID: more-on-regions
+   :END:
+
+Now that we know about marks, let us focus a bit on regions. As we mentioned above, a region is the area between point and a mark.
+
+Regions allow us to perform operations on a selection of text. Like the bookmark-set command described above, many commands have special support for active regions when it makes sense to simplify workflow in the context.
+
+Browsing Emacs documentation every once in a while is guaranteed to be a rewarding experience.
+
+** Expanding selections
+    :PROPERTIES:
+    :CUSTOM_ID: expanding-selections
+    :END:
+
+In modern editors, we usually select a region by mouse or by use shift+arrow keys and if we realize later that the starting of selection was wrong, maybe we left out a character or a word, woops ! We have to start again.
+
+In Emacs this is not the case.
+
+Once we have a region, between a point and mark, we can use =C-x C-x= to exchange the point and the mark. The relevant command is appropriately called exchange-point-and-mark.
+
+1
+
+2
+
+3
+
+4
+
+5
+
+6
+
+7
+
+8
+
+9
+
+10
+
+11
+
+12
+
+13
+
+14
+
+15
+
+16
+
+17
+
+18
+
+19
+
+20
+
+21
+
+22
+
+23
+
+24
+
+25
+
+26
+
+27
+
+28
+
+29
+
+30
+
+31
+
+32
+
+33
+
+34
+
+35
+
+36
+
+37
+
+38
+
+39
+
+ 
+
+Lorem ipsum dolor sit amet
+
+      \^ Cursor
+
+ 
+
+ 
+
+      Point
+
+      |
+
+      Mark
+
+      |
+
+Lorem ipsum dolor sit amet
+
+      \^ C-spc
+
+ 
+
+ 
+
+      Mark          Point
+
+      | ----region--|
+
+      |             |
+
+Lorem ipsum dolor sit amet
+
+         move       \^
+
+         forward ->
+
+ 
+
+ 
+
+ 
+
+      Mark          Point
+
+      | ----region--|
+
+      |             |
+
+Lorem ipsum dolor sit amet
+
+                    \^
+
+                    C-x C-x
+
+ 
+
+ 
+
+ 
+
+      Point         Mark
+
+      | ----region--|
+
+      |             |
+
+Lorem ipsum dolor sit amet
+
+ 
+
+     Point and mark interchanged
+
+ 
+
+ 
+
+Note that we still effectively have the same region. Exchanging point and mark allows us to grow (or shrink) the region from either ends.
+
+* Expanding and narrowing selections
+   :PROPERTIES:
+   :CUSTOM_ID: expanding-and-narrowing-selections
+   :END:
+
+Why navigation and selection usually coupled, navigation is not always the best option to expand selection.
+
+Magnar Sveen has written a very useful package [[https://github.com/magnars/expand-region.el][expand-region]] which allows us to create a region from the point and expand it by semantic units.
+
+So first invocation selects a word, and then the next invocation expands the region to a symbol, further to a string, further to the string wrapped in quotes and so on to encompass the whole line and finally the whole buffer.
+
+* Rectangular selections
+   :PROPERTIES:
+   :CUSTOM_ID: rectangular-selections
+   :END:
+
+Emacs also provides a somewhat unique feature for selecting two dimensional [[https://www.gnu.org/software/emacs/manual/html_node/emacs/Rectangles.html][rectangles]] of code. This is useful when working with tabular data, log files etc. as well as when creating ascii art.
+
+[[https://www.gnu.org/software/emacs/manual/html_node/emacs/CUA-Bindings.html][CUA bindings]] come with an enhanced rectangle mode which I prefer over the above.
+
+[[https://lorefnon.tech/wp-content/uploads/2018/07/Screenshot-from-2018-07-09-02-55-30.png]]
+
+One great feature here, is the ability to cycle through the corners and expand the rectangles in all directions
+
+[[https://lorefnon.tech/wp-content/uploads/2018/07/emacs-2.gif]]
+
+* Other navigation tips
+   :PROPERTIES:
+   :CUSTOM_ID: other-navigation-tips
+   :END:
+
+** Jumping to locations of recent changes
+    :PROPERTIES:
+    :CUSTOM_ID: jumping-to-locations-of-recent-changes
+    :END:
+
+It is often useful to jump to the location where a change was recently made. The appropriately named [[https://www.emacswiki.org/emacs/GotoLastChange][GotoLastChange extension]] is a very useful one that allows us to travel along the locations of edits.
+
+* Incremental search for navigation
+   :PROPERTIES:
+   :CUSTOM_ID: incremental-search-for-navigation
+   :END:
+
+Incremental search (=C-s=) of emacs is really helpful quick navigation. isearch-forward and its regex powered companion isearch-companion-forward quickly become the goto utilities for navigating through large code files.
+
+** ISearch and Marks
+    :PROPERTIES:
+    :CUSTOM_ID: isearch-and-marks
+    :END:
+
+When you start an incremental search, as you type, your cursor will move to the tail end of the next (best) prefix-match.
+
+When you complete the search with enter, the point where the search started is marked. This makes it possible to quickly jump back to the point from where we originally started entering the isearch query.
+
+A common error is to assume that the isearch match is an active region. *It is not.* As should be obvious from the statement above, the region at the point of completion of search, is from the point where started the isearch to the point where the search finished.
+
+It is, however, frequently useful to have the matched content as the region, which can be accomplished by marking the head of the current match. This can be done by using =C-r= to jump to head of current match.
+
+1
+
+2
+
+3
+
+4
+
+5
+
+6
+
+7
+
+8
+
+9
+
+10
+
+11
+
+12
+
+13
+
+14
+
+15
+
+16
+
+17
+
+18
+
+19
+
+20
+
+21
+
+22
+
+23
+
+24
+
+25
+
+26
+
+27
+
+28
+
+29
+
+30
+
+31
+
+32
+
+33
+
+34
+
+35
+
+36
+
+37
+
+38
+
+39
+
+40
+
+41
+
+42
+
+43
+
+44
+
+45
+
+46
+
+47
+
+48
+
+49
+
+50
+
+51
+
+52
+
+53
+
+54
+
+55
+
+56
+
+57
+
+58
+
+59
+
+60
+
+61
+
+62
+
+63
+
+64
+
+65
+
+66
+
+67
+
+68
+
+class SomeClass extends React.Component {
+
+\^
+
+Original cursor position
+
+ 
+
+ 
+
+class SomeClass extends React.Component {
+
+\^
+
+C-s => Initiate isearch
+
+ 
+
+                              Head end of match
+
+                              |  Tail end of match
+
+                              |  |
+
+class SomeClass extends React.Component {
+
+        -- type "comp" -->       \^
+
+ 
+
+ 
+
+class SomeClass extends React.Component {
+
+                                 \^ C-r (Without dismissing the search)
+
+ 
+
+ 
+
+Mark
+
+|
+
+class SomeClass extends React.Component {
+
+                              \^ (point moves to head of match)
+
+ 
+
+ 
+
+class SomeClass extends React.Component {
+
+                              \^ C-spc
+
+ 
+
+ 
+
+Mark                          Mark
+
+|                             |
+
+class SomeClass extends React.Component {
+
+                              \^
+
+ 
+
+ 
+
+Mark                          Mark
+
+|                             |
+
+class SomeClass extends React.Component {
+
+                              \^ C-s C-s
+
+ 
+
+ 
+
+Mark                          Mark
+
+|                             |
+
+class SomeClass extends React.Component {
+
+                                 \^ Point moves to tail end of search
+
+ 
+
+ 
+
+Mark                          Mark
+
+|                             |
+
+class SomeClass extends React.Component {
+
+                                 \^ C-u C-spc
+
+ 
+
+ 
+
+Mark                          
+
+|                            
+
+class SomeClass extends React.Component {
+
+                              \^ (point -> mark)
+
+ 
+
+ 
+
+Mark                          
+
+|                            
+
+class SomeClass extends React.Component {
+
+                              \^ C-u C-spc
+
+ 
+
+ 
+
+class SomeClass extends React.Component {
+
+\^ (point -> mark)
+
+In addition to incremental-search, I have found a few other utilities very helpful for navigating through projects:
+
+** Helm-swoop
+    :PROPERTIES:
+    :CUSTOM_ID: helm-swoop
+    :END:
+
+[[https://github.com/ShingoFukuyama/helm-swoop][Helm swoop]] provides an efficient way to find matches across files. It provides a helm friendly way to rapidly jump to a matching line anywhere in the entire project.
+
+An example from their [[https://github.com/ShingoFukuyama/helm-swoop][home page]]:
+
+[[https://raw.githubusercontent.com/ShingoFukuyama/images/master/helm-swoop.gif]]
+
+** Avy
+    :PROPERTIES:
+    :CUSTOM_ID: avy
+    :END:
+
+[[https://github.com/abo-abo/avy][Avy]] provides a novel approach that requires fewer keystrokes than an isearch for jumping to a specific location that is already visible. Usually within three keystrokes we can jump to any location in the visible area of the buffer.
+
+[[https://lorefnon.tech/wp-content/uploads/2018/07/emacs-3.gif]]
+
+* Navigating to punctuation
+   :PROPERTIES:
+   :CUSTOM_ID: navigating-to-punctuation
+   :END:
+
+In programming contexts it is often useful to navigation to punctuation markers close by. Prolific blogger Xah Lee has shared [[http://ergoemacs.org/emacs/emacs_jump_to_punctuations.html][some snippets]] of elisp for achieving the same.
+
+* Multiple cursors
+   :PROPERTIES:
+   :CUSTOM_ID: multiple-cursors
+   :END:
+
+A feature common now a days in many editors is the support for multiple cursors. It is useful to do things like editing the same text occurring multiple times simultaneously.
+
+[[https://i.stack.imgur.com/TLZpd.gif]]
+
+If you are really fond of multi-cursor style editing, Magnar once again has you covered with [[https://github.com/magnars/multiple-cursors.el][multiple-cursors]].
+
+I usually prefer a more conventional approach, where we can record an edit action as a macro, and then quickly apply in multiple positions.
+
+Emacs Wiki has a [[https://www.emacswiki.org/emacs/KeyboardMacros][good overview]] on usage of macros.
+
+The advantage over the multiple-cursor approach in that it is much more powerful and composable with any of the navigation patterns described above.
+
+For instance, once a macro has been recorded, it is trivial to use =avy= to jump to the end of the third word starting with a, and then apply the macro there.
+
+The disadvantage of course is that it requires slightly more keystrokes, but often the flexibility is worth it.
+
+Another utility I occasionally use is [[https://github.com/wence-/elisp/blob/master/multi-region.el][multi-region]] which makes it very easy to mark multiple regions of text and then run a command scoped to each region.
+
+* Further resources
+   :PROPERTIES:
+   :CUSTOM_ID: further-resources
+   :END:
+
+Of course, Emacs is famously a “self-documenting” editor. So =M-x help-with-tutorial= and =M-x help= are the definitive resources for learning Emacs.
+
+In addition, following are some great resources I have frequently found useful:
+
++ [[http://pragmaticemacs.com/][Pragmatic Emacs]]
++ [[https://www.emacswiki.org/][Emacs Wiki]]
++ [[https://www.masteringemacs.org/][Mastering Emacs]]
+
