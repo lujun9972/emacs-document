@@ -36,8 +36,7 @@ EOF
 
     url="$*"
     clean_url=${url%%\?*}
-    # find $(get-project-path) -type f -name "[0-9]*.md" -print0 |xargs -I{} -0 grep -i "via:" "{}" |cut -d ":" -f2- |grep -i "${clean_url}"
-    (cd $(get-project-path) && git grep "via: *${clean_url}")
+    (cd $(get-project-path) && git grep "#+URL: *${clean_url}")
 }
 
 function command-exist-p()
@@ -182,7 +181,7 @@ function get-author-link()
     (
         cd $(get-project-path)
         # 选择最多的url作为author link
-        git grep -iEc "via: *${domain}|\[${author}\]"|grep ":2$"|cut -d":" -f1|xargs -I{} grep "\[a\]:" '{}' |sort |uniq -c |sort -n |tail -n 1 |cut -d":" -f2-
+        git grep -iEc "#+URL: *${domain}|\[${author}\]"|grep ":2$"|cut -d":" -f1|xargs -I{} grep "\[a\]:" '{}' |sort |uniq -c |sort -n |tail -n 1 |cut -d":" -f2-
         # git grep -il "${domain}"|xargs -I{} grep -il "\[${author}\]" '{}' |tail -n 1 |xargs -I{} grep '\[a\]:' '{}' |cut -d ":" -f2-
      )
 }
