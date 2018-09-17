@@ -1,0 +1,323 @@
+#+TITLE: Splitting an Org block into two
+#+URL: https://scripter.co/splitting-an-org-block-into-two/
+#+AUTHOR: lujun9972
+#+TAGS: raw
+#+DATE: [2018年 09月 17日 星期一 17:02:10 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+* Problem
+If I have a huge Org Src block, I'd like to split it into multiple Org
+Src blocks so that I can write my explanations in-between.
+
+So I'd like to quickly split up:
+
+#+BEGIN_EXAMPLE
+    #+begin_src emacs-lisp
+    (message "one")
+    (message "two")
+    #+end_src
+#+END_EXAMPLE
+
+into:
+
+#+BEGIN_EXAMPLE
+    #+begin_src emacs-lisp
+    (message "one")
+    #+end_src
+
+    #+begin_src emacs-lisp
+    (message "two")
+    #+end_src
+#+END_EXAMPLE
+
+* Action Plan [[#action-plan][#]]
+   :PROPERTIES:
+   :CUSTOM_ID: action-plan
+   :END:
+
+1. Write a function to return non-nil if point is in *any* Org block
+   -- Not just “src”, “example”, “export” or any of the inbuilt Org
+   blocks.. but also any Org Special block like =#+begin_foo .. #+end_foo=.
+2. Write a function that does this imagined block splitting.
+3. Overload the M-return binding so that this block splitting
+   function gets called only when the point is inside an Org block
+   (detected using that first function).
+
+Thanks to the comment by reader *Mankoff*, I learnt
+about the =org-babel-demarcate-block= function (bound by default to
+C-c C-v d and C-c C-v C-d).
+
+This function varies from the solution in this post in at least two
+ways:
+
+1. It works only for Org Src blocks.
+2. It splits the block exactly at where the point is, whereas I would
+   like to always split only at EOL or BOL.
+
+But I can see that =org-babel-demarcate-block= can cover most of the
+block splitting use cases.
+
+* Am I in an Org block? [[#org-in-any-block-p][#]]
+   :PROPERTIES:
+   :CUSTOM_ID: org-in-any-block-p
+   :END:
+
+Before venturing into writing this function, I looked at these
+existing ones, but none did what I exactly wanted:
+
+- =org-in-src-block-p= :: Returns non-nil only if the point is in a
+  =#+begin_src .. #+end_src= block; not when point is in any other
+  Org block.
+- =org-in-block-p= :: Returns non-nil only if the point is in one of
+  the pre-defined block names passed as a list (='("src" "example" "quote" ..)=). So this again won't work as I cannot pre-define all
+  Org Special blocks.
+
+So I define the below =modi/org-in-any-block-p= function that returns
+non-nil if the point is in-between any =#+begin_FOOBAR .. #+end_FOOBAR=. Thankfully, I was able to reuse a lot of logic from
+the =org-between-regexps-p= function (=org-in-block-p= uses that
+function internally).
+
+<<code-snippet-1>>
+
+#+BEGIN_EXAMPLE
+    (defun modi/org-in-any-block-p ()
+     "Return non-nil if the point is in any Org block.
+
+    The Org block can be *any*: src, example, verse, etc., even any
+    Org Special block.
+
+    This function is heavily adapted from `org-between-regexps-p'."
+     (save-match-data
+     (let ((pos (point))
+     (case-fold-search t)
+     (block-begin-re "^[[:blank:]]*#\\+begin_\\(?1:.+?\\)\\(?: .*\\)*$")
+     (limit-up (save-excursion (outline-previous-heading)))
+     (limit-down (save-excursion (outline-next-heading)))
+     beg end)
+     (save-excursion
+     ;; Point is on a block when on BLOCK-BEGIN-RE or if
+     ;; BLOCK-BEGIN-RE can be found before it...
+     (and (or (org-in-regexp block-begin-re)
+     (re-search-backward block-begin-re limit-up :noerror))
+     (setq beg (match-beginning 0))
+     ;; ... and BLOCK-END-RE after it...
+     (let ((block-end-re (concat "^[[:blank:]]*#\\+end_"
+     (match-string-no-properties 1)
+     "\\( .*\\)*$")))
+     (goto-char (match-end 0))
+     (re-search-forward block-end-re limit-down :noerror))
+     (> (setq end (match-end 0)) pos)
+     ;; ... without another BLOCK-BEGIN-RE in-between.
+     (goto-char (match-beginning 0))
+     (not (re-search-backward block-begin-re (1+ beg) :noerror))
+     ;; Return value.
+     (cons beg end))))))
+#+END_EXAMPLE
+
+[[#code-snippet-1][Code Snippet 1]]
+
+: Function to check if point is in any Org block
+
+- =(case-fold-search t)= ensures that either =#+BEGIN_ ..= or =#+begin_ ..= match.
+- The regular expression in =block-begin-re= matches with
+  ="#+begin_src foo"= or =" #+begin_src foo"= or ="#+BEGIN_EXAMPLE"=
+  or ="#+begin_FOOBAR"= or ..
+- The =limit-up= and =limit-down= are set to the buffer locations of
+  the previous and next Org headings. The following regexp searches
+  are limited to happen in those bounds for better performance.
+- The =block-end-re= is dynamically constructed based on the string
+  matched using =block-begin-re=. This is so that if ="#+begin_quote"=
+  is found initially, it matches the block ending with specifically
+  ="#+end_quote"= and not something like ="#+end_src"=.
+- nil is returned if the point is not between =#+begin_FOOBAR .. #+end_FOOBAR=.
+
+- Caveat :: I haven't gone extra lengths to support nested block cases,
+  specifically where the point is outside the inner-most
+  block, but still inside the outer block:
+
+  #+BEGIN_EXAMPLE
+      #+begin_src org
+      ▮
+      #+begin_src emacs-lisp
+      (message "hello!")
+      #+end_src
+      #+end_src
+  #+END_EXAMPLE
+
+* If so, split the block [[#org-block-split][#]]
+   :PROPERTIES:
+   :CUSTOM_ID: org-block-split
+   :END:
+
+With the “point in an Org block” detection working, I now needed the
+split to happen with these rules:
+
+1. If the point is anywhere on the line, but not at the beginning of
+   the line (BOL),
+
+   - Go to the end of the line, and then split the block.
+
+     So if the point is after the first =message= identifier,
+     or at the end of that first =message= line:
+
+     #+BEGIN_EXAMPLE
+         #+begin_src emacs-lisp
+         (message "one")▮
+         (message "two")
+         #+end_src
+     #+END_EXAMPLE
+
+     Split the block at the point *after* =(message "one")= and move
+     the point to between the split blocks:
+
+     #+BEGIN_EXAMPLE
+         #+begin_src emacs-lisp
+         (message "one")
+         #+end_src
+         ▮
+         #+begin_src emacs-lisp
+         (message "two")
+         #+end_src
+     #+END_EXAMPLE
+
+2. Otherwise (if point is at BOL),
+
+   - Split the block exactly at that point.
+
+     So if the point is at the beginning of the second =message= line:
+
+     #+BEGIN_EXAMPLE
+         #+begin_src emacs-lisp
+         (message "one")
+         ▮(message "two")
+         #+end_src
+     #+END_EXAMPLE
+
+     Split the block at the point *before* =(message "two")= and move
+     the point to between the split blocks:
+
+     #+BEGIN_EXAMPLE
+         #+begin_src emacs-lisp
+         (message "one")
+         #+end_src
+         ▮
+         #+begin_src emacs-lisp
+         (message "two")
+         #+end_src
+     #+END_EXAMPLE
+
+So here's the code that follows that spec:
+
+<<code-snippet-2>>
+
+#+BEGIN_EXAMPLE
+    (defun modi/org-split-block ()
+     "Sensibly split the current Org block at point."
+     (interactive)
+     (if (modi/org-in-any-block-p)
+     (save-match-data
+     (save-restriction
+     (widen)
+     (let ((case-fold-search t)
+     (at-bol (bolp))
+     block-start
+     block-end)
+     (save-excursion
+     (re-search-backward "^\\(?1:[[:blank:]]*#\\+begin_.+?\\)\\(?: .*\\)*$" nil nil 1)
+     (setq block-start (match-string-no-properties 0))
+     (setq block-end (replace-regexp-in-string
+     "begin_" "end_" ;Replaces "begin_" with "end_", "BEGIN_" with "END_"
+     (match-string-no-properties 1))))
+     ;; Go to the end of current line, if not at the BOL
+     (unless at-bol
+     (end-of-line 1))
+     (insert (concat (if at-bol "" "\n")
+     block-end
+     "\n\n"
+     block-start
+     (if at-bol "\n" "")))
+     ;; Go to the line before the inserted "#+begin_ .." line
+     (beginning-of-line (if at-bol -1 0)))))
+     (message "Point is not in an Org block")))
+#+END_EXAMPLE
+
+[[#code-snippet-2][Code Snippet 2]]
+
+: Function to split the current Org block in sensible fashion
+
+- The regexp for extracting =block-start= is the same as
+  =block-begin-re= in code snippet [[#code-snippet-1][1]], but
+  with different sub-grouping.
+- The =block-end= string is derived from sub-group 1 of =block-start=
+  string -- just replacing “begin\_” with “end\_”.
+- And then based on if the point was initially at BOL (=at-bol=), the
+  insertion of newlines and movement of point is done accordingly.
+
+* Now make M-return do that [[#M-return-split-block-dwim][#]]
+   :PROPERTIES:
+   :CUSTOM_ID: M-return-split-block-dwim
+   :END:
+
+With these two functions evaluated, =M-x modi/org-split-block= will
+work right away.
+
+    But where's the fun in that‽\\
+
+I needed to have the Org block splitting happen with an intuitive
+binding --- like M-return.
+
+- By default, M-return is used to either create new headings, or do
+  other things like insert an item, wrap a region in table, etc. based
+  on the context. See the doc-string of =org-meta-return= (function
+  bound to this key by default) for more info.
+- But it doesn't have a context for “point in an Org block”. So it
+  tries to create a heading when inside a block too, which doesn't
+  make much sense.
+- So fix that by adding that context.
+
+So I *advise* =org-meta-return= to call =modi/org-split-block= when
+the point is inside an Org block.
+
+The advising function =modi/org-meta-return= is the same as the
+advised function =org-meta-return= (as of ), except
+that a new context =(modi/org-in-any-block-p)= is added.
+
+You can tweak the precedence of this new context by moving the
+=((modi/org-in-any-block-p) #'modi/org-split-block)= form in that
+=cond= form.
+
+<<code-snippet-3>>
+
+#+BEGIN_EXAMPLE
+    (defun modi/org-meta-return (&optional arg)
+     "Insert a new heading or wrap a region in a table.
+
+    Calls `org-insert-heading', `org-insert-item',
+    `org-table-wrap-region', or `modi/org-split-block' depending on
+    context. When called with an argument, unconditionally call
+    `org-insert-heading'."
+     (interactive "P")
+     (org-check-before-invisible-edit 'insert)
+     (or (run-hook-with-args-until-success 'org-metareturn-hook)
+     (call-interactively (cond (arg #'org-insert-heading)
+     ((org-at-table-p) #'org-table-wrap-region)
+     ((org-in-item-p) #'org-insert-item)
+     ((modi/org-in-any-block-p) #'modi/org-split-block)
+     (t #'org-insert-heading)))))
+    (advice-add 'org-meta-return :override #'modi/org-meta-return)
+#+END_EXAMPLE
+
+[[#code-snippet-3][Code Snippet 3]]=org-meta-return= to add context of point being inside any Org block
+
+: Advisingto add context of point being inside any Org block
+
+Now with the point in *any* Org block, M-return away!
+
+* Full code [[#full-code][#]]
+   :PROPERTIES:
+   :CUSTOM_ID: full-code
+   :END:
+
+Look for the source of =modi/org-split-block= (and dependent
+functions) added to [[https://github.com/kaushalmodi/.emacs.d/blob/master/setup-files/setup-org.el][=setup-org.el=]] in my Emacs config.
