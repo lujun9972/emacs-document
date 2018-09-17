@@ -1,0 +1,312 @@
+#+TITLE: Orgmode for GTD
+#+URL: https://emacs.cafe/emacs/orgmode/gtd/2017/06/30/orgmode-gtd.html
+#+AUTHOR: lujun9972
+#+TAGS: raw
+#+DATE: [2018年 09月 17日 星期一 17:16:21 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+* Introduction
+   :PROPERTIES:
+   :CUSTOM_ID: introduction
+   :END:
+
+I've been using [[http://orgmode.org/][Orgmode]] to implement
+the [[https://en.wikipedia.org/wiki/Getting_Things_Done][GTD methodology]] for the
+last 4 years.
+
+Rather than explaining the GTD methodology itself or how Orgmode works, in this
+post I'll detail how I use Orgmode to implement GTD.
+
+If you don't know Orgmode and are curious about it, you should head
+to [[http://orgmode.org/][its website]] first.
+
+#+BEGIN_QUOTE
+  After 4 years of using [[https://twitter.com/hashtag/gtd?src=hash][#gtd]] daily with [[https://twitter.com/hashtag/orgmode?src=hash][#orgmode]], I now have 39,175 lines of orgmode in 4 files + archives. [[https://twitter.com/hashtag/emacs?src=hash][#emacs]]
+
+  --- Nicolas Petton (@NicolasPetton) [[https://twitter.com/NicolasPetton/status/879673555616714752][June 27, 2017]]
+#+END_QUOTE
+
+* The orgmode files
+   :PROPERTIES:
+   :CUSTOM_ID: the-orgmode-files
+   :END:
+
+I split my GTD in four separate files:
+
+- =inbox.org=: where I collect everything;
+- =gtd.org=: where I put all my projects;
+- =someday.org=: All inactive tasks that I might do at some point in the future,
+  but don't want to see all the time;
+- =tickler.org=: I put entries in this file with
+  a [[http://orgmode.org/manual/Timestamps.html][timestamp]] to get reminded at
+  the right moment.
+
+It's important to add these files to the agenda file (more on the agenda later),
+like the following:
+
+#+BEGIN_EXAMPLE
+    (setq org-agenda-files '("~/gtd/inbox.org"
+     "~/gtd/gtd.org"
+     "~/gtd/tickler.org"))
+#+END_EXAMPLE
+
+* 1. The GTD inbox
+   :PROPERTIES:
+   :CUSTOM_ID: 1-the-gtd-inbox
+   :END:
+
+One of the most important aspects of GTD is the inbox. Every thought should be
+collected there, and processed later on.
+
+[[https://upload.wikimedia.org/wikipedia/commons/thumb/1/1b/GTDcanonical.png/1280px-GTDcanonical.png]]
+
+Orgmode has a great feature that fits really well with this
+concept: [[http://orgmode.org/manual/Capture.html][org-capture]].
+
+Capturing a thought is one key press away: simply Press =C-c c=, and a capture
+popup will appear in Emacs. Once you're done capturing, =C-c C-c= and it will
+get stored in the inbox.
+
+[[/img/gtd-capture.png]]
+
+Here's how I set it up:
+
+#+BEGIN_EXAMPLE
+    (setq org-capture-templates '(("t" "Todo [inbox]" entry
+     (file+headline "~/gtd/inbox.org" "Tasks")
+     "* TODO %i%?")
+     ("T" "Tickler" entry
+     (file+headline "~/gtd/tickler.org" "Tickler")
+     "* %i%? \n %U")))
+#+END_EXAMPLE
+
+The syntax of capture templates is
+explained
+[[http://orgmode.org/manual/Capture-templates.html#Capture-templates][here]]. It
+offers lots of customization options.
+
+I press =C-c c t= to add an entry to my inbox, and =C-c c T= to add an entry to
+the tickler (more on that later).
+
+Here's how my inbox looks like:
+
+[[/img/gtd-inbox.png]]
+
+My inbox is then processed and emptied daily. When processing the inbox,
+I [[http://orgmode.org/manual/Refile-and-copy.html#Refile-and-copy][refile]] each
+entry that is actionable and belongs to a project using =C-c C-w=, moving the
+entry to the appropriate place. If need be, I create a new project out of it.
+
+I have set up the refile targets as follows:
+
+#+BEGIN_EXAMPLE
+    (setq org-refile-targets '(("~/gtd/gtd.org" :maxlevel . 3)
+     ("~/gtd/someday.org" :level . 1)
+     ("~/gtd/tickler.org" :maxlevel . 2)))
+#+END_EXAMPLE
+
+So that =C-c C-w= prompts me either for a project, the tickler, or someday/maybe
+list.
+
+* 2. The projects file
+   :PROPERTIES:
+   :CUSTOM_ID: 2-the-projects-file
+   :END:
+
+My main file is =gtd.org=. That's where I keep all my active projects. I usually
+have around 30 active projects at the same time.
+
+Each project contains actions to be performed. The first action of each project
+is called its “next action”, and that's always the one I will do when working on
+a project. Once a task is done, I mark it as such using the =DONE= todo keyword.
+
+Here's an example project:
+
+[[/img/gtd-project-example.png]]
+
+The completion percentage you see on the screenshot
+is [[http://orgmode.org/manual/Checkboxes.html][yet another neat feature]] of
+Orgmode :)
+
+Tagging is done using =C-c C-c= on a headline, whether it's a project or
+action. I use tags for several purposes:
+
+- Regular categories, like =:emacs:= or =:writing:=;
+- Tags that link to people, like =:daniel:=;
+- GTD contexts.
+
+GTD contexts are just regular tags, starting with =@=. I make heavy use of them
+in
+[[http://orgmode.org/worg/org-tutorials/org-custom-agenda-commands.html][custom Org Agenda commands]].
+
+My contexts tend to change over time, but I always have at least =@home=,
+=@office=, =@travelling=, =@phone=, =@email=, =@errands= to filter out next
+actions based on my current location for instance.
+
+** TODO keywords
+    :PROPERTIES:
+    :CUSTOM_ID: todo-keywords
+    :END:
+
+I put a todo keyword in all project entries. I think I use fairly regular todo
+keywords: =TODO=, =WAITING=, =DONE= and =CANCELLED= mostly. The first two for
+are used for incomplete states, and the last two for completed states.
+
+#+BEGIN_EXAMPLE
+    (setq org-todo-keywords '((sequence "TODO(t)" "WAITING(w)" "|" "DONE(d)" "CANCELLED(c)")))
+#+END_EXAMPLE
+
+When on a headline, press =C-c C-t= to set the TODO keyword.
+
+I tend to avoid using timestamps in my projects as much as possible. The reason
+is simple: unless an entry is an appointment (to the dentist for instance) or
+has a fixed deadline (a release scheduled with a customer), I should decide what
+to work on depending on the current context (among other things). This also
+keeps my agenda clean, free of any fake or self-imposed deadline or schedule.
+
+But scheduling sometimes makes sense. To do that, press =C-c C-s= on an entry,
+and enter the date and/or time. To add a deadline, press =C-c C-d=. Note that
+Orgmode is quite smart about how you can enter a date, if you don't know about
+it, refer to
+the [[http://orgmode.org/manual/Deadlines-and-scheduling.html][manual entry]].
+
+** Filtering projects & actions
+    :PROPERTIES:
+    :CUSTOM_ID: filtering-projects--actions
+    :END:
+
+When deciding what to work on, I use
+either [[http://orgmode.org/manual/Sparse-trees.html][sparse trees]] -- which
+makes it easy to filter the content of my GTD projects by tag, search term,
+etc., or I
+use
+[[http://orgmode.org/worg/org-tutorials/org-custom-agenda-commands.html][custom agenda commands]]. When
+discovering Orgmode, most people think that its agenda is just a regular
+agenda. Sure, it does daily/weekly agendas, but it offers much more than
+that. Quoting the manual:
+
+#+BEGIN_QUOTE
+  Org-mode's built-in agenda commands are powerful tools for searching your
+  notes and for gathering, sorting, filtering, and displaying your tasks.
+#+END_QUOTE
+
+I use custom agenda commands mostly to get an overview of actions by context or
+tag. Here's an example custom agenda command that will display all actions for
+the =@office= context:
+
+#+BEGIN_EXAMPLE
+    (setq org-agenda-custom-commands 
+     '(("o" "At the office" tags-todo "@office"
+     ((org-agenda-overriding-header "Office")))))
+#+END_EXAMPLE
+
+Following the GTD principle, what I usually want is to only show the first
+action to be done (or next action) for each project with the =@office= tag.
+
+That can be achieved using a skipping condition:
+
+#+BEGIN_EXAMPLE
+    (setq org-agenda-custom-commands 
+     '(("o" "At the office" tags-todo "@office"
+     ((org-agenda-overriding-header "Office")
+     (org-agenda-skip-function #'my-org-agenda-skip-all-siblings-but-first)))))
+
+    (defun my-org-agenda-skip-all-siblings-but-first ()
+     "Skip all but the first non-done entry."
+     (let (should-skip-entry)
+     (unless (org-current-is-todo)
+     (setq should-skip-entry t))
+     (save-excursion
+     (while (and (not should-skip-entry) (org-goto-sibling t))
+     (when (org-current-is-todo)
+     (setq should-skip-entry t))))
+     (when should-skip-entry
+     (or (outline-next-heading)
+     (goto-char (point-max))))))
+             
+    (defun org-current-is-todo ()
+     (string= "TODO" (org-get-todo-state)))
+#+END_EXAMPLE
+
+Creating custom agenda commands can be a bit tricky at first, one easy way is to
+customize them via =M-x customize-variable RET org-agenda-custom-commands=.
+
+To select an agenda command to execute, press =C-c a=.
+
+* 3. The “Someday/Maybe” list
+   :PROPERTIES:
+   :CUSTOM_ID: 3-the-somedaymaybe-list
+   :END:
+
+Did you notice that =someday.org= is not part of the agenda files set in
+=org-agenda-files=?
+
+That's because I do not want to see any entry from this file appearing in my
+agenda buffers, unless I'm doing my weekly review. That's exactly the purpose of
+the “Someday/Maybe” list.
+
+This file should be reviewed once a week as part of the weekly review (which I
+do this on Sunday evenings).
+
+During each weekly review, I move projects back and forth between the “active”
+state (in =gtd.org=) and “later” state (in =someday.org=).
+
+For instance, if a project has moved forward to a certain point, but I know that
+it will stall for a few weeks for some reason, I move it to
+=someday.org=. During a later weekly review, I'll move it back to =gtd.org= when
+it will become active again.
+
+To move projects around, I also use refiling.
+
+* 4. The tickler
+   :PROPERTIES:
+   :CUSTOM_ID: 4-the-tickler
+   :END:
+
+The tickler is one of the best concepts of GTD in my opinion.
+
+Let's say you will have to pay a bill in a month. You need to write it down in
+your GTD if you don't want to miss the deadline. But you also don't want to be
+reminded of that each and every time you browse through your GTD projects: now
+is not the time to pay it.
+
+That's where the tickler kicks in: Add an entry to your tickler file with a
+timestamp, and forget about it!
+
+When time will come, the action will appear in your Org Agenda, reminding you of
+the bill you have to pay, and all you will have to do is moving it to your
+inbox. Until then, you can just focus on something else and free your mind from
+this task.
+
+* References
+   :PROPERTIES:
+   :CUSTOM_ID: references
+   :END:
+
+All reference documents are put in a =references= folder next to my Orgmode
+files. They are then linked (using =org-store-link=) from Dired buffers into my
+projects for quick access.
+
+I also link emails (which I happen to read within Emacs) using =org-store-link=.
+
+* Archiving
+   :PROPERTIES:
+   :CUSTOM_ID: archiving
+   :END:
+
+During my weekly reviews, I archive done projects using =C-c C-x C-a=
+(=org-archive-subtree-default=), which moved the entry at point to an archive
+file.
+
+This way my GTD files remain uncluttered and I never delete any data.
+
+* Conclusion
+   :PROPERTIES:
+   :CUSTOM_ID: conclusion
+   :END:
+
+This is a very wide topic, so obviously I haven't covered everything, but I hope
+that explains the basics of how I use Orgmode to implement GTD.
+
+This is really only my way of doing it. Orgmode is such a moldable tool that I
+don't think that there are 2 exactly identical setups.
