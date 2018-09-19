@@ -1,0 +1,471 @@
+#+TITLE: An Agenda for Life With Org Mode
+#+URL: https://blog.aaronbieber.com/2016/09/24/an-agenda-for-life-with-org-mode.html
+#+AUTHOR: lujun9972
+#+TAGS: raw
+#+DATE: [2018年 09月 19日 星期三 19:00:12 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+I've been promising the Twitterverse that I would write more about how I use Org
+Mode to get stuff done and how I use it to be a better manager. Upon careful
+reflection, there is too much to cover in just one post, so this is the first of
+what will likely be several posts on these topics.
+
+Today I would like to focus on the “agenda view” and how I've configured it to
+give me a window into what I need to do now, what is on the horizon, and manage
+which things I should do first.
+
+This is what we'll build:
+
+[[/images/uploads/an-agenda-for-life-with-org-mode/composite-agenda-view.png]]
+
+I classify all of my activities into one of four buckets:
+
+1. Things I need to do, eventually;
+2. Things I need to complete by a specific date;
+3. Things I cannot (or won't) start until a specific date; and
+4. Things I should do with some loose frequency.
+
+Each of these use cases aligns with an Org Mode feature, and those features are,
+respectively:
+
+1. A plain TODO entry,
+2. An entry with a SCHEDULED time stamp,
+3. An entry with a DEADLINE time stamp, and
+4. An entry with a STYLE property of “habit.”
+
+* Building the Agenda
+   :PROPERTIES:
+   :CUSTOM_ID: building-the-agenda
+   :END:
+
+I very briefly introduced the agenda in my previous post,
+[[/2016/01/30/dig-into-org-mode.html][Dig into Org Mode]]. The “agenda” is a time-aware, filtered view of all
+of the entries in some set of Org files, which you can specify. To make proper
+use of the agenda, you must first tell Org which files to read by configuring
+the =org-agenda-files= variable.
+
+As I noted in [[/2016/01/30/dig-into-org-mode.html][Dig into Org Mode]], I build my agenda from all of the Org
+files in my “org” directory in Dropbox. Specifying a single directory is the
+easiest thing you can do:
+
+#+BEGIN_EXAMPLE
+    (setq org-agenda-files '("~/Dropbox/org/"))
+#+END_EXAMPLE
+
+You can also select individual files or specify a file that contains a list of
+files to read. See the variable's documentation for specifics.
+
+Once Org knows where to look to build up the agenda view, you can populate it
+with your tasks. I'm assuming that you already use Org for note-taking or task
+management in some way, but if you don't, here is the bare minimum you should
+place into a file to see how this works:
+
+#+BEGIN_EXAMPLE
+    #+TODO: TODO IN-PROGRESS | DONE
+
+    * TODO Complete this task eventually
+
+    * TODO Complete this task by September 30th
+     DEADLINE: <2016-09-30 Fri>
+
+    * TODO Start this task on September 30th.
+     SCHEDULED: <2016-09-30 Fri>
+#+END_EXAMPLE
+
+With a file like this saved as something like =todo.org= in the directory
+specified in =org-agenda-files=, you can now press =M-x org-agenda RET= to
+display the “agenda dispatch” menu. The first option, “a,” is the most common as
+it will display a weekly view with entries sorted into their respective dates.
+
+You may have noticed that the “agenda dispatch” menu contains options for
+displaying views based on dates, views of pure TODO items, and even views
+filtered by search criteria. These are extremely useful features that I use all
+the time, but it's hard to face a busy day with all of your activities sorted
+into separate lists with separate commands, so let's combine them.
+
+To do this, we will use an “agenda custom command.”
+
+* Agenda Custom Commands
+   :PROPERTIES:
+   :CUSTOM_ID: agenda-custom-commands
+   :END:
+
+An “agenda custom command” allows you to add your own entries to the dispatch
+menu and, in effect, define your own agenda view that you can trigger easily. To
+define custom agenda commands, you customize the variable
+=org-agenda-custom-commands=.
+
+In its simplest form, an agenda command looks like this:
+
+#+BEGIN_EXAMPLE
+    (setq org-agenda-custom-commands
+     '(("c" "Simple agenda view" agenda ""))
+#+END_EXAMPLE
+
+Note that =org-agenda-custom-commands= is itself a list, so its value here is a
+list with one element, which is also a list. That inner list is our custom
+command; it has a single letter key that will appear in the menu (“c”), a
+description that will also appear, and then a type.
+
+There are many types available and some can accept arguments. Types and their
+arguments are given one after another. In this case, the “agenda” type takes no
+arguments and the documentation specifies that the empty string must be given.
+
+OK, so this is great and all, but all we've actually done is recreate the “a”
+option with the letter “c” instead. That isn't very helpful.
+
+The goal is to be able to see our scheduled items *and* our unscheduled items
+in the same view. Fortunately, there is a feature for this (of course), and it
+is called a “composite agenda” or “agenda block view.”
+
+Essentially, by supplying a list of types, the agenda view will generate each
+one in turn and display them in the same buffer together! This is one of the
+greatest things I've ever discovered. I lived for months scheduling things to
+start “today” just so they would show up in the agenda, even though dates were
+irrelevant. Since discovering this view, I now have a much more nuanced
+perspective on my priorities.
+
+** Building the Composite Agenda View
+    :PROPERTIES:
+    :CUSTOM_ID: building-the-composite-agenda-view
+    :END:
+
+As I mentioned above, all you need to do is build a list of types within your
+custom agenda command. Here is a simple one that will display your scheduled
+items followed by all of your TODO items:
+
+#+BEGIN_EXAMPLE
+    (setq org-agenda-custom-commands
+     '(("c" "Simple agenda view"
+     ((agenda "")
+     (alltodo "")))))
+#+END_EXAMPLE
+
+A couple of things are going on here that deserve some explanation:
+
+- When you build a composite agenda, the types are a list and each type becomes
+  its own list, so you will note that =(agenda "")= and =(alltodo "")= now have
+  parentheses around them. That is a requirement and will not work otherwise.
+- =alltodo= is a type that is only available in a composite agenda; it will not
+  work in a single custom agenda command, instead you should use =todo=.
+
+When you run this, you will see your scheduled items at the top, a divider line
+made up of equal signs, and all of your other TODO items at the bottom, like this:
+
+[[/images/uploads/an-agenda-for-life-with-org-mode/composite-1.png]]
+
+We are already much closer now to our goal of visualizing all of our activities
+in one place. This covers scheduled items, deadline items, and “eventually”
+items, but it doesn't help us to see what we should do next. For that, I use
+prioritization.
+
+** Priorities, and Focusing Your Day
+    :PROPERTIES:
+    :CUSTOM_ID: priorities-and-focusing-your-day
+    :END:
+
+Org Mode already has a notion of “priority,” and you can mark each item with a
+priority “cookie” by calling =org-priority=, =org-priority-up=, or
+=org-priority-down=. It is possible to sort TODO lists by priority, so it may be
+enough for you to see the higher priority items at the top of your “eventually”
+list, and to pick away at those, perhaps re-prioritizing other things as you go
+along.
+
+I do continuously re-prioritize, but I also subscribe to a GTD approach that
+Netscape co-founder Marc Andreessen wrote about, which is to take some time at
+the end of the day to pick the three things you will do the following day. I
+really liked that idea, so I wanted to make it more formal in my agenda view.
+
+I decided to use priority “A” items as “things I must do today,” and let the
+other priorities act as simple differentiators for the remaining “eventually”
+items so that I can at least pay closer attention to things I determined to care
+more about (and ignore things that are not as important, which is what I use
+priority “C” for).
+
+To achieve this, I did two things:
+
+1. I placed a TODO section at the top of my composite agenda view that displays
+   *only* priority “A” items, and
+2. I filtered priority “A” items out of the “eventually” list so that I see them
+   only once.
+
+There is occasionally duplication across the scheduled section of the view, but
+I haven't come up with the best way to handle that yet. My goal is to keep the
+scheduled section as short as possible, and very few of my activities are
+actually time-sensitive in a formal sense, but when I tell someone I will get
+back to them by X date, I use that function to ensure that I will remember to do
+so.
+
+The first part of the solution is easy, the second part was not so easy.
+
+*** The Top Priority Section
+     :PROPERTIES:
+     :CUSTOM_ID: the-top-priority-section
+     :END:
+
+As it turns out, certain properties of Org entries can be treated as special
+“tags” and filtered using the tags filtering options in the agenda custom
+commands and composite view types. In this case, we want to see only items with
+a priority of “A”, and so we can use the tag =PRIORITY="A"= to achieve that.
+
+Here is what that configuration looks like:
+
+#+BEGIN_EXAMPLE
+    (setq org-agenda-custom-commands
+     '(("c" "Simple agenda view"
+     ((tags "PRIORITY=\"A\""
+     ((org-agenda-skip-function '(org-agenda-skip-entry-if 'todo 'done))
+     (org-agenda-overriding-header "High-priority unfinished tasks:")))
+     (agenda "")
+     (alltodo "")))))
+#+END_EXAMPLE
+
+A few things to note here:
+
+1. You actually have to quote the value of the priority tag, but the tag
+   selector is quoted itself so you wind up with some yucky escaping
+   backslashes. Such is life. It won't work if you don't quote the value.
+2. This example introduces the local settings list, which is a =let=-style
+   list of Org configuration variables and their values that will be applied
+   only during the generation of that section of the composite view. In this
+   case, I am setting the value of =org-agenda-skip-function= and
+   =org-agenda-overriding-header=.
+
+The =org-agenda-skip-function= is one of the coolest ideas; it allows you to
+specify a function that will be called on each entry and the function can either
+return =nil= to display that entry, or return a character location to skip
+to. This allows you to skip a single entry or even an entire subtree if some
+criteria applies.
+
+I am using it here to skip all entries that are already marked DONE, because
+once something is DONE, I don't need to work on it anymore and I don't want to
+see it in my list. =org-agenda-skip-entry-if= is a function provided for use in
+these kinds of cases and I recommend reading its documentation for more details.
+
+The =org-agenda-overriding-header= does what it sounds like: it changes the
+header line of this agenda section to the string specified. Here's what it all
+looks like together:
+
+[[/images/uploads/an-agenda-for-life-with-org-mode/composite-2.png]]
+
+*** Filtering the “Eventually” List
+     :PROPERTIES:
+     :CUSTOM_ID: filtering-the-eventually-list
+     :END:
+
+Great, so now you have a section at the top for the stuff you want to do
+immediately, a section showing a time-based view of what you need to accomplish
+soon, and a list of all the other items on your TODO list (your “eventually”
+items).
+
+Unfortunately, your “eventually” list now also contains the high-priority items
+shown at the top, which is redundant and distracting. Let's filter priority “A”
+items out of this list.
+
+I was optimistic that Org shipped with some skip function to skip over
+priorities, but it doesn't. Oh well, time to write some elisp. Here's what I
+came up with:
+
+#+BEGIN_EXAMPLE
+    (defun air-org-skip-subtree-if-priority (priority)
+     "Skip an agenda subtree if it has a priority of PRIORITY.
+
+    PRIORITY may be one of the characters ?A, ?B, or ?C."
+     (let ((subtree-end (save-excursion (org-end-of-subtree t)))
+     (pri-value (* 1000 (- org-lowest-priority priority)))
+     (pri-current (org-get-priority (thing-at-point 'line t))))
+     (if (= pri-value pri-current)
+     subtree-end
+     nil)))
+#+END_EXAMPLE
+
+As always, note that =air= is simply a “namespace prefix” to ensure uniqueness
+of the function name.
+
+The way priorities work internally is clever; the “lowest priority” is the upper
+bounding ASCII value of the letters used, such that the difference of that value
+and the entry's priority letter value multiplied by 1,000 is the numeric
+priority.
+
+The default “lowest priority” value is 67, and the ASCII value of “A” is 65, so
+the numeric value of priority “A” is 2,000, “B” (ASCII value 66) is 1,000, and
+“C” (ASCII value 67) is 0.
+
+For whatever reason, there are no internal Org functions to easily extract just
+the priority letter, but I wanted my function to accept the letter rather than
+the numeric value so I just convert that to its corresponding number and use
+=org-get-priority= to compare the entry's value to the given one.
+
+For this one, I always skip the whole subtree. It hasn't bitten me yet, but it
+is pretty easy to pivot it to skip only the current entry, or even provide an
+option, so I might do that if I find out I'm missing something.
+
+Let's apply this to our configuration:
+
+#+BEGIN_EXAMPLE
+    (setq org-agenda-custom-commands
+     '(("c" "Simple agenda view"
+     ((tags "PRIORITY=\"A\""
+     ((org-agenda-skip-function '(org-agenda-skip-entry-if 'todo 'done))
+     (org-agenda-overriding-header "High-priority unfinished tasks:")))
+     (agenda "")
+     (alltodo ""
+     ((org-agenda-skip-function
+     '(or (air-org-skip-subtree-if-priority ?A)
+     (org-agenda-skip-if nil '(scheduled deadline))))))))))
+#+END_EXAMPLE
+
+There are two changes here. First, I'm calling my new function to skip priority
+“A” items. I also noticed that the “eventually” list contained items with
+scheduled or deadline dates, which should appear in the middle section when
+appropriate, so I filtered those out as well. Here's what it looks like:
+
+[[/images/uploads/an-agenda-for-life-with-org-mode/composite-3.png]]
+
+Note here that the skip function is a whole quoted lisp form that is evaluated
+for each entry; it is not limited to a single function name. For this reason, it
+is straightforward to create more complex logical rules without having to write
+a function to encapsulate them. Here, I am using an =or= to check both criteria.
+
+** Finally, Habits
+    :PROPERTIES:
+    :CUSTOM_ID: finally-habits
+    :END:
+
+You may already know that Org Mode supports TODO items that repeat. There are a
+few ways that repeating schedules can be specified, so I recommend
+[[http://orgmode.org/manual/Repeated-tasks.html][reading the full documentation]].
+
+One of the most powerful ways of tracking repeated tasks is by using
+*habits*. A habit is something that you want to do on a regular basis, but
+where you have flexibility in how regular the schedule is.
+
+Here, again, you may want to review the
+[[http://orgmode.org/manual/Tracking-your-habits.html][full habits documentation]]. The example used in the documentation
+is remembering to shave. It is not critical that you shave on any single, exact
+day, but it may be important to you to shave within a loose cadence with a
+couple of days of leeway.
+
+I use habits to track scheduling appointments like one-on-ones with my direct
+reports. While it is very important that one-on-ones happen regularly, it is not
+critical that they take place at exactly X days apart, and this gives me
+flexibility to schedule more frequently with people who need more attention and
+to work around my other appointments.
+
+To create a habit, you need two things:
+
+1. A =SCHEDULED= tag with a repeat specification (like =.+= or =++=), and
+2. A =STYLE= property set to the value =habit=.
+
+Here is the example from the documentation:
+
+#+BEGIN_EXAMPLE
+    ** TODO Shave
+     SCHEDULED: <2009-10-17 Sat .+2d/4d>
+     :PROPERTIES:
+     :STYLE: habit
+     :LAST_REPEAT: [2009-10-19 Mon 00:36]
+     :END:
+#+END_EXAMPLE
+
+The repeat specification, =.+2d/4d= means:
+
+- Repeat as frequently as every two days, but
+- Never less frequently than every four days, and
+- When completed, start counting again from *today*.
+
+If you use =++= instead of =.+= it means “from the last date completed, count as
+many 2-day intervals as necessary to find a date in the future.” This is useful
+if you want something to always fall on the same days of the week, for example.
+
+You can use a plain =+= repeat, which is unusual for a habit, because if you
+fall quite behind you will need to complete the task as many times as it takes
+for the next occurrence to get into the future. This would be useful for
+something like paying your rent where you cannot skip any instances, but that
+isn't really a habit, now is it?
+
+I love habits, but now we have another problem... Habits appear with the
+blue/green/red bar as shown in the screenshot at the top of this post when they
+are listed in a daily or weekly agenda view, but because they are also regular
+scheduled items, they appear in our “eventually” list with a lot less useful
+detail.
+
+You know what time it is. Filtering time.
+
+*** Filtering Habits
+     :PROPERTIES:
+     :CUSTOM_ID: filtering-habits
+     :END:
+
+Again I was really optimistic that Org provided some built-in function for
+filtering by style or property... But it doesn't. So here's my implementation of
+a habit-skipping function:
+
+#+BEGIN_EXAMPLE
+    (defun air-org-skip-subtree-if-habit ()
+     "Skip an agenda entry if it has a STYLE property equal to \"habit\"."
+     (let ((subtree-end (save-excursion (org-end-of-subtree t))))
+     (if (string= (org-entry-get nil "STYLE") "habit")
+     subtree-end
+     nil)))
+#+END_EXAMPLE
+
+Org does provide helper functions for extracting property values and finding
+locations relative to entries, so it was straightforward to write this. It would
+be easy enough to parameterize the property value if you wanted to skip
+different types of properties, but I don't have that use case (yet).
+
+* The Final Agenda
+   :PROPERTIES:
+   :CUSTOM_ID: the-final-agenda
+   :END:
+
+I've covered almost everything, so finally here is the complete agenda composite
+view command:
+
+#+BEGIN_EXAMPLE
+    (setq org-agenda-custom-commands
+     '(("d" "Daily agenda and all TODOs"
+     ((tags "PRIORITY=\"A\""
+     ((org-agenda-skip-function '(org-agenda-skip-entry-if 'todo 'done))
+     (org-agenda-overriding-header "High-priority unfinished tasks:")))
+     (agenda "" ((org-agenda-ndays 1)))
+     (alltodo ""
+     ((org-agenda-skip-function '(or (air-org-skip-subtree-if-habit)
+     (air-org-skip-subtree-if-priority ?A)
+     (org-agenda-skip-if nil '(scheduled deadline))))
+     (org-agenda-overriding-header "ALL normal priority tasks:"))))
+     ((org-agenda-compact-blocks t)))))
+#+END_EXAMPLE
+
+There are just a couple of things in here that I haven't mentioned specifically,
+so let me do that.
+
+1. Both TODO sections use =org-agenda-overriding-header=, which I previously
+   described.
+2. The “agenda” section in the middle also specifies =org-agenda-ndays= with a
+   value of 1, because I only want to see one day at a time. If you have been
+   coding along with this you might have wondered how to get rid of all the
+   other days of the week... This is how.
+3. There is a final settings list at the end containing
+   =org-agenda-compact-blocks=. Settings in this list apply to the entire
+   composite view, and this setting removes the equal sign dividers between the
+   sections, because I think they're a waste of space.
+
+Congratulations, you now probably know more about building Org Mode agenda
+commands and composite views than most people. I hope that these tools give you
+the ability to confidently tackle the tasks in your life and give you a sense of
+peace.
+
+* Navigating Your Agenda
+   :PROPERTIES:
+   :CUSTOM_ID: navigating-your-agenda
+   :END:
+
+The agenda view is pretty amazing, and it's very useful as a read-only overview
+of what you need to get done, but the journey doesn't stop there because the
+agenda is also completely interactive.
+
+I've tweaked my configuration to make the agenda view easy to navigate and
+interact with, optimized for my common use cases, and I'm going to get into that
+in depth in my next post, so stay tuned!
