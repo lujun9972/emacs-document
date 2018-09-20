@@ -1,0 +1,169 @@
+#+TITLE: Robust Notes with Embedded Code
+#+URL: https://www.arcadianvisions.com/blog/2018/org-nix-direnv.html
+#+AUTHOR: lujun9972
+#+TAGS: raw
+#+DATE: [2018年 09月 20日 星期四 22:28:47 CST]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+Emacs's org-mode has great [[https://orgmode.org/manual/Working-with-source-code.html#Working-with-source-code][facilities for working with source code]], often referred to by the name *Org Babel*. A simple use is having source code from various languages embedded in a single text file that is otherwise occupied with talking about that code.
+
+There are myriad ways one can use this functionality, but here let's focus on just one: short code demonstrations. While working on a large project, you encounter a technique or library whose usage is not obvious to you today. This means that even as you figure out how to solve your problem today, when you come back to your code a year from now, your solution may again not be obvious to future-you who has forgotten the hard-won lessons of today-you. What we want to record in our notes is a set of example programs we wish we found when writing today's code.
+
+Now, the tricky part in finding the perfect example for whatever problem you're facing is that the author of the perfect example must be using the /exact same/ tools that you are. It's hardly a perfect example if the author uses a different version of some software library at the center of what you're trying to do! We want the example to exactly reproduce the environment in which we are building our larger project. No surprises, please.
+
+Reproducible development environments just happen to be the forte of the [[https://nixos.org/nix/][nix package manager]]. Here we can pin down precise versions of the source code of each of our tools, that of their dependencies, that of their dependencies' dependencies, and so on all the way up stream.
+
+Coming back to where we started: we want to record in our =org-mode= notes example programs that clearly demonstrate a technique or API exactly as it is used in our larger project. We thus want Emacs to know how to evaluate source code blocks in the context of the project the notes are related to.
+
+* direnv as glue
+   :PROPERTIES:
+   :CUSTOM_ID: org235c01d
+   :END:
+
+[[https://github.com/direnv/direnv][direnv]] is a shell tool that swaps out a shell environment (in particular, the =PATH= variable) based on the current directory. When your working directory is that of your project, all your project specific tools are in scope (i.e. on =PATH=). When you switch to the directory of another project, all of that project's tools are in scope. Some =nix= users recognized an opportunity, and worked out fairly magical [[https://github.com/direnv/direnv/wiki/Nix][integration between nix and direnv]]. This lets you specify your project with =nix='s flair for pedantry, then drop into it entirely implicitly based on a working directory. There is yet another group of prodigious developers who like to tie into every other system who have a role to play in our story: emacs users. There is [[https://github.com/wbolster/emacs-direnv][emacs integration with direnv]] that uses the directory of any file you are looking at to trigger =direnv='s =PATH= manipulation behind the scenes. Let's recap: we specify our project with =nix=, we edit files with =emacs=, and =direnv= tells emacs what nix knows.
+
+* C++
+   :PROPERTIES:
+   :CUSTOM_ID: org57d7047
+   :END:
+
+Something missing from most C++ development setups is a REPL suitable for experimentation. Something missing from most development setups with a REPL is a good way of saving REPL sessions for future reference. We'll solve both of those here.
+
+Let's figure out how to load an image and show it in a window using =OpenCV=. This is just one component of our project, but it's something we want to write down. Here is an example =shell.nix= if you want to follow along at home. /(Note: it involves a slow build of a customized OpenCV to make the point that your project's needs are usually special.)/
+
+#+BEGIN_EXAMPLE
+    with (import <nixpkgs> {});
+    let opencv3gtk = opencv3.override { enableGtk3 = true; }; in
+    mkShell {
+     buildInputs = [ opencv3gtk ];
+    }
+#+END_EXAMPLE
+
+We then create an =.envrc= file in our shell so that =direnv= will kick into action.
+
+#+BEGIN_EXAMPLE
+    echo 'use nix' > .envrc
+    direnv allow
+#+END_EXAMPLE
+
+And now we can write a note about using OpenCV. I put mine in a =notes.org= file in each project directory.
+
+#+BEGIN_EXAMPLE
+    I always forget how to display images with OpenCV (useful for
+    debugging intermediate image processing steps). Remember to wait for
+    keyboard input so the window doesn't close immediately!
+
+    #+BEGIN_SRC C++ :libs -lopencv_core -lopencv_highgui :results silent
+    #include <opencv2/opencv.hpp>
+
+    int main(void) {
+     const auto img = cv::imread("hello.jpg");
+     cv::imshow("Window Title", img);
+     cv::waitKey();
+     return 0;
+    }
+    #+END_SRC
+#+END_EXAMPLE
+
+With our cursor in that source block, we can hit =C-c C-c= to execute it, and a window with our image pops up!
+
+* Haskell
+   :PROPERTIES:
+   :CUSTOM_ID: org93133ce
+   :END:
+
+Sometimes we want to do something a little tricky in Haskell that will be embedded within a larger piece of code. Extracting the tricky bit so that we can poke it to see how it reacts is hugely useful. Something I had to do recently involved the =lens= and =aeson= libraries for working with JSON data.
+
+The main Haskell compiler, GHC, does provide a REPL, but it has a few drawbacks:
+
+- It uses slightly different syntax (e.g. multi-line input, pragmas)
+- It does not immediately support use as a playground
+
+Here I mean /playground/ as a programming environment that makes it easy to see the effects of small changes. A screenshot of a REPL session can be a useful artifact, but you can not re-run it (perhaps with upgraded software), and you can not easily tweak it to see how it responds.
+
+Here is our =shell.nix=,
+
+#+BEGIN_EXAMPLE
+    with (import <nixpkgs> {});
+    mkShell {
+     buildInputs = [ (ghc.withPackages (p: [
+     p.lens p.aeson p.lens-aeson p.text p.vector
+     ]))];
+    }
+#+END_EXAMPLE
+
+Again we create an =.envrc= file to enable =direnv=.
+
+#+BEGIN_EXAMPLE
+    echo 'use nix' > .envrc
+    direnv allow
+#+END_EXAMPLE
+
+For our notes file, we jump through a small hoop because =org-babel='s support of Haskell is not very robust. For this example, we do not need to support any of =babel='s interesting features like setting parameters for a source block, or persistent sessions. With this in mind, we define our own =runhaskell= language support for =org-babel= in an =elisp= source block. Evaluate that block (with =C-c C-c=) to teach emacs how to use =runhaskell=, and then the subsequent =runhaskell= block can be evaluated.
+
+#+BEGIN_EXAMPLE
+    * Preamble
+    Teach emacs how to use =runhaskell=
+
+    #+BEGIN_SRC elisp :results silent
+    (defun org-babel-execute:runhaskell (body params)
+     (org-babel-eval "runhaskell"
+     (org-babel-expand-body:generic body params)))
+    (add-to-list 'org-src-lang-modes '("runhaskell" . haskell))
+    #+END_SRC
+
+    * Deep JSON Traversal
+
+    I have a JSON document that is a nested list of single-field objects
+    instead of a top-level object with multiple fields, and I want to
+    flatten the list. I am using
+    [[https://hackage.haskell.org/package/lens-4.17/docs/Control-Lens-Plated.html#v:deep][deep]]=lens= package to do this. Its type doesn't make it obvious
+    what it does, so here is a example of how we are using it.
+
+    #+BEGIN_SRC runhaskell :results output
+    {-# LANGUAGE OverloadedStrings #-}
+    import Control.Lens (view, deep)
+    import Data.Aeson
+    import Data.Aeson.Lens (_Object)
+    import Data.Text (Text)
+    import Data.Vector (fromList)
+
+    array :: [Value] -> Value
+    array = Array . fromList
+
+    main :: IO ()
+    main = print (view (deep _Object) x)
+     where x = array [ object [ "name" .= ("Bob" :: Text) ]
+     , array [ object ["age" .= (64 :: Int) ]
+     , array [] ] ]
+    #+END_SRC
+
+    #+RESULTS:
+    : fromList [("age",Number 64.0),("name",String "Bob")]
+#+END_EXAMPLE
+
+* Not Perfect
+   :PROPERTIES:
+   :CUSTOM_ID: org0b4e715
+   :END:
+
+When doing any substantial programming, I use [[https://github.com/MaskRay/ccls/][ccls]] or [[https://github.com/cquery-project/cquery][cquery]] for C++, and [[https://github.com/commercialhaskell/intero][intero]] for Haskell. I have not worked out how to directly wire such tools in to writing notes as shown above. The main challenge is that external tooling really wants to work with files on disk, while we're trying to move beyond that here.
+
+If you have your tooling setup to work for any files in your project directory, I recommend investigating =org-babel-tangle=. Making this work requires only that you add =:tangle my-example.hs :comments link= to your =runhaskell= source block header. Then you can use =org-babel-tangle= (=C-c C-v t=) to write your source block to the named file. That file will let you use a tool like =intero= to help you write more of your example program, and, when you're ready, you can run =org-babel-detangle= in the buffer where you edited the =my-example.hs= file to sync your changes back to the org file.
+
+Alternately, you can manually include a separate source file into your org notes like this:
+
+#+BEGIN_EXAMPLE
+    I wrote this example code with fancy tooling, but I'd like to talk
+    about it here and see its output.
+
+    #+INCLUDE: "test.hs" src runhaskell
+
+    #+BEGIN_SRC runhaskell :exports results :prologue (with-temp-buffer (insert-file-contents "test.hs") (buffer-string))
+    #+END_SRC
+
+    #+RESULTS:
+    : fromList [("age",Number 64.0),("name",String "Bob")]
+#+END_EXAMPLE
+
+When you export your org notes, the file's source will show up thanks to the =#+INCLUDE:= directive, and the output will show up thanks to the source block with the =:prologue= header. If you're doing this often, you will probably want to define a helper to make that =:prologue= a bit more terse, or define a snippet to generate the whole blob of boilerplate. That said, I find this option less appealing since you no longer see your source code and its output in the same file.
