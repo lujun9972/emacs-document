@@ -1,0 +1,89 @@
+#+TITLE: Record Org-mode Recent Activity
+#+URL: http://yqrashawn.com/2018/09/17/record-org-mode-recent-activity/
+#+AUTHOR: lujun9972
+#+TAGS: raw
+#+DATE: [2018年 09月 28日 星期五 10:34:56 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+So I checked the [[https://www.notion.so/][notion]] tool recently. It's pretty good if everyone around use it. But as an emacs user, I still prefer org-mode.
+
+It's just there's one functionality I never thought about when I was using org-mode, the ability to record your activity. Like when you reschedule somthing or change the state of tasks.
+
+I did some search online and came up with a solution. I'm pretty sure there's better ways to do so. I'll just put the codes here. It leverages the =org-agenda-custom-commands= and the =:LOGBOOK:= feature. And the code is mainly from [[https://stackoverflow.com/questions/8039416/custom-searches-using-timestamps-in-logbook-in-org-mode][here]] with some modification.
+
+#+BEGIN_EXAMPLE
+     ;; enable the log feature
+    (setq org-log-into-drawer t)
+    (setq org-log-reschedule 'time)
+    (setq org-log-redeadline 'note)
+    (setq org-log-note-clock-out t)
+
+    ;; add T: before timestamp for easy regex search
+    (setq org-log-note-headings '((done . "CLOSING NOTE T:%t")
+     (state . "State %-12s from %-12S T:%t")
+     (note . "Note taken on T:%t")
+     (reschedule . "Rescheduled from %S on T:%t")
+     (delschedule . "Not scheduled, was %S on T:%t")
+     (redeadline . "New deadline from %S on T:%t")
+     (deldeadline . "Removed deadline, was %S on T:%t")
+     (refile . "Refiled on T:%t")
+     (clock-out . "Clocked out on T:%t")))
+
+    (defun +org/find-state (&optional end)
+     "Used to search through the logbook of subtrees.
+
+     Looking for T:[2018-09-14 Fri 10:50] kind of time stamp in logbook."
+     (let* ((closed (re-search-forward "^CLOSED: \\[" end t))
+     (created (if (not closed) (re-search-forward "^:CREATED: \\[" end t)))
+     (logbook (if (not closed) (re-search-forward ".*T:\\[" end t)))
+     (result (or closed logbook created)))
+     result))
+
+    (defun +org/date-diff (start end &optional compare)
+     "Calculate difference between selected timestamp to current date.
+
+     The difference between the dates is calculated in days.
+     START and END define the region within which the timestamp is found.
+     Optional argument COMPARE allows for comparison to a specific date rather than to current date."
+     (let* ((start-date (if compare compare (calendar-current-date))))
+     (- (calendar-absolute-from-gregorian start-date) (org-time-string-to-absolute (buffer-substring-no-properties start end)))))
+
+    (defun +org/last-update-before (since)
+     "List Agenda items that updated before SINCE day."
+     (let ((next-headline (save-excursion (or (outline-next-heading) (point-max)))))
+     (let* ((subtree-end (save-excursion (org-end-of-subtree t)))
+     (subtree-valid (save-excursion
+     (forward-line 1)
+     (if (and (< (point) subtree-end)
+     ;; Find the timestamp to test
+     (+org/find-state subtree-end))
+     (let ((startpoint (point)))
+     (forward-word 3)
+     ;; Convert timestamp into days difference from today
+     (+org/date-diff startpoint (point)))
+     (point-max)))))
+     (if (and subtree-valid (>= subtree-valid since))
+     next-headline
+     nil))))
+
+    (defun +org/has-child-and-last-update-before (day)
+     (if (+org/has-child-p) (point)
+     (+org/last-update-before day))) 
+         
+#+END_EXAMPLE
+
+So now we can use the =+org/last-update-before= or =+org/has-child-and-last-update-before= function in =org-agenda-custom-commands= to filter activities updated since =SINCE= days ago. Like this.
+
+#+BEGIN_EXAMPLE
+     (setq org-agenda-custom-commands
+     '(("R" "Recent activity"
+     ((tags "*"
+     ((org-agenda-overriding-header "Recent Activity")
+     (org-agenda-skip-function '(+org/has-child-and-last-update-before 7)))))
+     nil nil))) 
+         
+#+END_EXAMPLE
+
+The code will only search for timestamps in ":LOGBOOK:" prefexd with =T:= or =:CREATED:= or =:CLOSED= timestamps. It works fine and helps me sometimes. Maybe I should write a agenda sort function to let them ordered by changed time. Fine for me right now.
+
+UPDATE: 2018-09-24 If anyone intrested in automatically recoding changes of headings, you may want check [[https://emacs.stackexchange.com/questions/39348/org-auto-add-update-date-of-last-modification-of-heading-and-or-its-body-to#][this]] stackoverflow question. The answer gives a method using hash to record last modification time of any changes in headings or even bodys.
