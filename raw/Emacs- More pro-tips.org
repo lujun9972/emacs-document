@@ -1,0 +1,361 @@
+#+TITLE: Emacs: More pro-tips
+#+URL: https://ambrevar.xyz/emacs2/
+#+AUTHOR: lujun9972
+#+TAGS: raw
+#+DATE: [2018年 10月 23日 星期二 10:14:06 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+
+This is a follow-up to my first [[../emacs/index.html][Emacs pro-tips]].
+
+** Speed up initialization
+   :PROPERTIES:
+   :CUSTOM_ID: org9520fb1
+   :END:
+
+If you don't use Emacs daemon or if you develop Emacs, you might find yourself
+re-starting it a lot. In which case it may be useful to keep startup time to a
+minimum.
+
+#+BEGIN_EXAMPLE
+    ;;; Temporarily reduce garbage collection during startup. Inspect `gcs-done'.
+    (defun ambrevar/reset-gc-cons-threshold ()
+     (setq gc-cons-threshold (car (get 'gc-cons-threshold 'standard-value))))
+    (setq gc-cons-threshold (* 64 1024 1024))
+    (add-hook 'after-init-hook #'ambrevar/reset-gc-cons-threshold)
+
+    ;;; Temporarily disable the file name handler.
+    (setq default-file-name-handler-alist file-name-handler-alist)
+    (setq file-name-handler-alist nil)
+    (defun ambrevar/reset-file-name-handler-alist ()
+     (setq file-name-handler-alist
+        (append default-file-name-handler-alist
+            file-name-handler-alist))
+     (cl-delete-duplicates file-name-handler-alist :test 'equal))
+    (add-hook 'after-init-hook #'ambrevar/reset-file-name-handler-alist)
+#+END_EXAMPLE
+
+** Avoid the pitfall of “loading old bytecode instead of newer source”
+   :PROPERTIES:
+   :CUSTOM_ID: org66b55d4
+   :END:
+
+#+BEGIN_EXAMPLE
+    (setq load-prefer-newer t)
+#+END_EXAMPLE
+
+** Site Lisp folder for local packages and development
+   :PROPERTIES:
+   :CUSTOM_ID: org718f681
+   :END:
+
+We need to roll out our own function since we want the local site folder first
+in the =load-path=, while =normal-top-level-add-subdirs-to-load-path= appends it
+to the very end.
+
+#+BEGIN_EXAMPLE
+    (defun ambrevar/package-refresh-load-path (path)
+     "Add every non-hidden sub-folder of PATH to `load-path'."
+     (when (file-directory-p path)
+     (dolist (dir (directory-files path t "^[^\\.]"))
+     (when (file-directory-p dir)
+        (setq load-path (add-to-list 'load-path dir))
+        (dolist (subdir (directory-files dir t "^[^\\.]"))
+         (when (file-directory-p subdir)
+         (setq load-path (add-to-list 'load-path subdir))))))))
+    (let ((site-lisp (expand-file-name "site-lisp/" "~/.local/share/emacs/")))
+     (add-to-list 'load-path site-lisp)
+     (ambrevar/package-refresh-load-path site-lisp))
+#+END_EXAMPLE
+
+** Flyspell and whitespace-mode
+   :PROPERTIES:
+   :CUSTOM_ID: orgba21dae
+   :END:
+
+#+BEGIN_EXAMPLE
+    (defun ambrevar/flyspell-and-whitespace-mode ()
+     "Toggle `flyspell-mode' and `whitespace-mode'."
+     (interactive)
+     (if (derived-mode-p 'prog-mode)
+     (flyspell-prog-mode)
+     (flyspell-mode)
+     (when flyspell-mode
+     (flyspell-buffer)))
+     (whitespace-mode 'toggle))
+
+    (global-set-key (kbd "<f9>") #'ambrevar/flyspell-and-whitespace-mode)
+#+END_EXAMPLE
+
+** Download video URL at point
+   :PROPERTIES:
+   :CUSTOM_ID: org04d4d10
+   :END:
+
+The following requires the =youtube-dl= program.
+
+#+BEGIN_EXAMPLE
+    (defun ambrevar/youtube-dl-at-point (&optional url)
+     "Run 'youtube-dl' over the URL at point.
+    If URL is non-nil, use that instead."
+     (interactive)
+     (setq url (or url (thing-at-point-url-at-point)))
+     (let ((eshell-buffer-name "*youtube-dl*"))
+     (eshell)
+     (when (eshell-interactive-process)
+     (eshell t))
+     (eshell-interrupt-process)
+     (insert "cd ~/temp && youtube-dl " url)
+     (eshell-send-input)))
+#+END_EXAMPLE
+
+See also [[https://github.com/skeeto/youtube-dl-emacs][youtube-dl-emacs]].
+
+** List current minor modes
+   :PROPERTIES:
+   :CUSTOM_ID: org2f30f14
+   :END:
+
+#+BEGIN_EXAMPLE
+    (defun ambrevar/current-minor-modes ()
+     "Return the list of minor modes enabled in the current buffer."
+     (interactive)
+     (delq nil
+        (mapcar (lambda (mode)
+             (if (and (boundp mode) (symbol-value mode))
+             mode))
+            minor-mode-list)))
+#+END_EXAMPLE
+
+** Window management
+   :PROPERTIES:
+   :CUSTOM_ID: org9e799e0
+   :END:
+
+Since I use [[../emacs-everywhere/index.html][EXWM]] as a window manager, I can dedicate the =super= key to window
+management.
+
+Some simple, yet efficient rules:
+
+- =s-TAB=: Switch to last buffer.
+- =s-<arrows>= (or =s-<hjkl>= with Evil): select window in the chosen direction.
+- =S-s-<arrows>= (or =S-s-<hjkl>= with Evil): swap current window with window in
+  the chosen direction.
+- =s-\=: Toggle between horizontal and vertical splitting.
+- =s-o=: Toggle-hide all other windows.
+
+With Helm, I use =C-c o= (or my custom binding =S-RET=) to find a file or a
+buffer in a new split window.
+
+I need some extra functions to implement the above workflow:
+
+#+BEGIN_EXAMPLE
+    (defun ambrevar/swap-windows (&optional w1 w2)
+     "If 2 windows are up, swap them.
+    Else if W1 is a window, swap it with current window.
+    If W2 is a window too, swap both."
+     (interactive)
+     (unless (or (= 2 (count-windows))
+         (windowp w1)
+         (windowp w2))
+     (error "Ambiguous window selection"))
+     (let* ((w1 (or w1 (car (window-list))))
+         (w2 (or w2
+             (if (eq w1 (car (window-list)))
+             (nth 1 (window-list))
+             (car (window-list)))))
+         (b1 (window-buffer w1))
+         (b2 (window-buffer w2))
+         (s1 (window-start w1))
+         (s2 (window-start w2)))
+     (with-temp-buffer
+     ;; Some buffers like EXWM buffers can only be in one live buffer at once.
+     ;; Switch to a dummy buffer in w2 so that we don't display any buffer twice.
+     (set-window-buffer w2 (current-buffer))
+     (set-window-buffer w1 b2)
+     (set-window-buffer w2 b1))
+     (set-window-start w1 s2)
+     (set-window-start w2 s1))
+     (select-window w1))
+    (global-set-key (kbd "C-x \\") 'swap-windows)
+
+    (defun ambrevar/swap-windows-left ()
+     "Swap current window with the window to the left."
+     (interactive)
+     (ambrevar/swap-windows (window-in-direction 'left)))
+    (defun ambrevar/swap-windows-below ()
+     "Swap current window with the window below."
+     (interactive)
+     (ambrevar/swap-windows (window-in-direction 'below)))
+    (defun ambrevar/swap-windows-above ()
+     "Swap current window with the window above."
+     (interactive)
+     (ambrevar/swap-windows (window-in-direction 'above)))
+    (defun ambrevar/swap-windows-right ()
+     "Swap current window with the window to the right."
+     (interactive)
+     (ambrevar/swap-windows (window-in-direction 'right)))
+
+    (defun ambrevar/switch-to-last-buffer ()
+     "Switch to last open buffer in current window."
+     (interactive)
+     (switch-to-buffer (other-buffer (current-buffer) 1)))
+
+    (defun ambrevar/toggle-single-window ()
+     "Un-maximize current window.
+    If multiple windows are active, save window configuration and
+    delete other windows. If only one window is active and a window
+    configuration was previously save, restore that configuration."
+     (interactive)
+     (if (= (count-windows) 1)
+     (when single-window--last-configuration
+        (set-window-configuration single-window--last-configuration))
+     (setq single-window--last-configuration (current-window-configuration))
+     (delete-other-windows)))
+
+    (defun ambrevar/toggle-window-split ()
+     "Switch between vertical and horizontal split.
+    It only works for frames with exactly two windows."
+     (interactive)
+     (if (= (count-windows) 2)
+     (let* ((this-win-buffer (window-buffer))
+         (next-win-buffer (window-buffer (next-window)))
+         (this-win-edges (window-edges (selected-window)))
+         (next-win-edges (window-edges (next-window)))
+         (this-win-2nd (not (and (<= (car this-win-edges)
+                         (car next-win-edges))
+                     (<= (cadr this-win-edges)
+                         (cadr next-win-edges)))))
+         (splitter
+         (if (= (car this-win-edges)
+             (car (window-edges (next-window))))
+             'split-window-horizontally
+            'split-window-vertically)))
+        (delete-other-windows)
+        (let ((first-win (selected-window)))
+         (funcall splitter)
+         (if this-win-2nd (other-window 1))
+         (set-window-buffer (selected-window) this-win-buffer)
+         (set-window-buffer (next-window) next-win-buffer)
+         (select-window first-win)
+         (if this-win-2nd (other-window 1))))))
+#+END_EXAMPLE
+
+** Use FreeDesktop.org's trash
+   :PROPERTIES:
+   :CUSTOM_ID: orgc93c4c3
+   :END:
+
+Whenever Emacs “delete” a file (from =dired=, Helm Find-Files or Elisp
+primitives), tell Emacs to move it to the trash instead:
+
+#+BEGIN_EXAMPLE
+    (setq delete-by-moving-to-trash t)
+#+END_EXAMPLE
+
+** Lisp parentheses editing
+   :PROPERTIES:
+   :CUSTOM_ID: org23b1d66
+   :END:
+
+A recurring complaint with Lisp is the need for balancing parentheses.
+
+That is to say, on a blackboard... Since such a task should pose no difficulty to
+a computer and Emacs can obviously help here!
+
+First, let's enable parenthesis highlighting. I like to remove the delay so
+that Emacs highlights the matching parenthesis instantly:
+
+#+BEGIN_EXAMPLE
+    ;;; Show matching parenthesis
+    (show-paren-mode 1)
+    ;;; By default, there’s a small delay before showing a matching parenthesis. Set
+    ;;; it to 0 to deactivate.
+    (setq show-paren-delay 0)
+    (setq show-paren-when-point-inside-paren t)
+
+    (with-eval-after-load 'paren
+     (set-face-background 'show-paren-match "#555555")
+     (set-face-foreground 'show-paren-match "#def")
+     (set-face-attribute 'show-paren-match nil :weight 'extra-bold))
+#+END_EXAMPLE
+
+Next, we can install the [[https://github.com/Fanael/rainbow-delimiters][=rainbow-delimiters=]] third-party package which colors
+parentheses according to their depth. This is no more than the moral equivalent
+of indenting in C or other members of the Algol family.
+
+** Goodbye Paredit, hello Lispy
+   :PROPERTIES:
+   :CUSTOM_ID: org38303e5
+   :END:
+
+Consider using [[https://github.com/abo-abo/lispy][Lispy]] which brings Lisp syntactic editing to a whole new level:
+beside parenthesis balancing (which makes the previous section superfluous
+altogether), it offers advanced expression navigation, code transforms, style
+prettification and more.
+
+Have a looks at the demos for some concrete examples.
+
+If you think about it, Lispy is the obvious evolution of editor support for Lisp
+editing: it truly exploits the fact that the language syntax is an abstract
+syntax tree. It would be a shame not to make use of this property.
+
+** Image manipulation and thumbnail gallery
+   :PROPERTIES:
+   :CUSTOM_ID: org07699e3
+   :END:
+
+A maybe not-so-well-known command is =image-dired=: when run in a directory of
+pictures, it displays a gallery of thumbnails with previews. =SPC= displays the
+next picture in another window while =C-RET= opens the picture in the
+=image-dired-external-viewer=. It's possible to rotate files, tag them in dired
+or add comments.
+
+The [[https://github.com/mhayashi1120/Emacs-imagex][=image+=]] third-party package adds extra picture capabilities to Emacs, like
+stiky transforms and file modifications.
+
+** Don't use terminal-Emacs
+   :PROPERTIES:
+   :CUSTOM_ID: org6dc7ac7
+   :END:
+
+[[https://blog.aaronbieber.com/2016/12/29/don-t-use-terminal-emacs.html]]
+
+** Making music in Emacs
+   :PROPERTIES:
+   :CUSTOM_ID: org71b36ce
+   :END:
+
+[[https://vimeo.com/22798433][Quick Intro to Live Programming with Overtone]]
+
+** Emacs chart library
+   :PROPERTIES:
+   :CUSTOM_ID: org1135ce5
+   :END:
+
+[[http://francismurillo.github.io/2017-04-15-Exploring-Emacs-chart-Library/]]
+
+** Odd nconc behaviour
+   :PROPERTIES:
+   :CUSTOM_ID: org426780b
+   :END:
+
+One of the few oddities in the Elisp language:
+[[https://stackoverflow.com/questions/25157349/odd-behaviour-with-nconc-in-emacs-lisp]]
+
+** References
+   :PROPERTIES:
+   :CUSTOM_ID: org2cc2711
+   :END:
+
+- [[http://emacs.sexy/]]
+- [[https://writequit.org/org/]]
+- [[http://doc.rix.si/cce/cce.html][Emacs as a Complete Computing Environment]]
+- [[https://github.com/bbatsov/emacs-lisp-style-guide/][The Emacs Lisp Style Guide]]
+- [[https://two-wrongs.com/why-you-should-buy-into-the-emacs-platform][Why You Should Buy Into the Emacs Platform]]
+
+Environment bootstraps:
+
+- [[http://emacs-bootstrap.com/]] (generic)
+- [[https://portacle.github.io/]] (Common Lisp)
