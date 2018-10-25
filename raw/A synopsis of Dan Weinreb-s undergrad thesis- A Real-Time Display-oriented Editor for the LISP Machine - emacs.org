@@ -1,0 +1,174 @@
+#+TITLE: A synopsis of Dan Weinreb's undergrad thesis: A Real-Time Display-oriented Editor for the LISP Machine : emacs
+#+URL: https://www.reddit.com/r/emacs/comments/9pvpxh/a_synopsis_of_dan_weinrebs_undergrad_thesis_a/
+#+AUTHOR: lujun9972
+#+TAGS: raw
+#+DATE: [2018年 10月 25日 星期四 11:41:38 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+I have managed to procure a copy of Dan Weinreb's thesis: A Real-Time Display-Oriented Editor for the Lisp Machine. It has less information of the type I had hoped for, but I still found it worth reading. Given the expense, I can't recommend it to any others than to people especially interested in the history of Emacs and Lisp Machines. Below are some of my notes on parts I found interesting. I've provided some manually transcribed quotations, and have used ellipses and such to indicate omissions of bits I thought unnecessary for my purposes, and paraphrased a few omitted bits indicated with square brackets. I could easily have made typos though.
+
+First, a few general words about the paper. I procured it from MIT Document Services. It is unlisted in their catalogue, but you can still request it by writing to them and specifically requesting it. I believe the delay in their cataloguing of it is due to questions of the legality of listing it without the (now unobtainable) permission of the author (deceased), though that is just my speculation. It is 34 pages long, including all front and back matter. It is missing a diagram, which I believe was lost in the microfilming process. Each page bears the date 31-JAN-79.
+
+To forestall requests for me to provide copies to people: I am not going to do that, in part because MIT Document Services really exerted themselves to get this for me. Multiple people on their staff searched for it after I pestered them, and it was eventually found in an uncatalogued reel of microfilm. I certainly cannot justify denying them the paltry income that their existence must be in part justified by to distribute it in that way. However, if someone has a question they think might be answered by the thesis but which I have not talked about here, comment or send me a message and I will answer as best I can.
+
+Here's the abstract:
+
+#+BEGIN_QUOTE
+  ZWEI is a real-time display-oriented editor, written for the Lisp Machine. It is display-oriented in that the text being edited is displayed on the screen at all times; it is real-time in that commands are executed as soon as they are given. The result is an extremely interactive and efficient kind of editing. This kind of editor has become very popular in widespread parts of the MIT computer community, and has been found to be easy to use yet extremely powerful. This thesis describes the user interface presented by ZWEI, and explains how ZWEI was implemented. An emphasis is placed on the way the nature of the Lisp Machine system affected ZWEI's design.
+#+END_QUOTE
+
+The thesis consists of four chapters:
+
+1. Introduction, Explanation of what the Lisp Machine System is
+
+2. Description of ZWEI's user interface, rationale, how the nature of the Lisp Machine affects the interface
+
+3. Explanation of the implementation strategies used, emphasis on engineering trade-offs
+
+4. Discussion of the future of the system
+
+Here are my notes on the thesis. Some familiarity with the Emacs of today, and of Lisp, is presumed:
+
+*1) Introduction*
+
+Note that when the Lisp Machine software was being built, they had written a similar editor called EINE (a recursive acronym: EINE Is Not Emacs), and that they were in the middle of writing a new version called ZWEI (ZWEI Was EINE Initially).
+
+#+BEGIN_QUOTE
+  This thesis is written in anticipation of the completion of the conversion effort, and describes ZWEI as it will be when the rest of EINE is converted over.
+#+END_QUOTE
+
+Some paragraphs are devoted to what must have been a novel concept at the time for such a system: that the Lisp Machine was a personal system, not time-shared, and this gave rise to features not viable on time-sharing systems, due to the fact that the user was not contending with other users for resources.
+
+#+BEGIN_QUOTE
+  The Lisp Machine terminal consists of two input devices, called the keyboard and the mouse, and one output device called the TV.
+#+END_QUOTE
+
+It was noted that the keyboard had control and meta keys, and that those two as well as shift could be used in conjunction with regular keys to form chords. The mouse got a whole paragraph, since mice were relatively new at the time. The mouse had three buttons. The TV was a raster-scan device of approximately one million black/white pixels. Emphasis was made of the (for the time) particularly good resolution, so many more characters could be displayed, compared to other contemporary terminals.
+
+*2) The User Interface*
+
+The users of the system at the time were researchers at the MIT AI Lab. They had two principal uses for a text editor: 1) producing and debugging Lisp code, and 2) writing English text in the form of academic papers, email, and such. It was predicted that most users would spend half their time working with the editor.
+
+One of the most important considerations of ZWEI's user interface were compatibility with the PDP-10's interactive editors, so with ITS EMACS.
+
+ZWEI is display-oriented: the text the user is editing is actually displayed (this is relevant because many editors of the time often showed out-of-date text due to efficiency and bandwidth restrictions, putting the burden on the user to imagine what their text looks like currently). ZWEI is real-time: each command takes effect immediately, and the displayed text is updated immediately. The update is called redisplay.
+
+As with modern Emacs, ZWEI had a point and a cursor.
+
+Some explanation is given of self-insertion for typing ASCII characters, control commands being given via control characters, and notes that numeric arguments can be provided to modify commands. He specifically calls out the feature of self-documentation, and that Control-? can be used to access describe-key, and alludes to the existence of other commands like C-h a. There are some other features and modes he describes, but they are commonplace things any current Emacs user will either know of or find easily.
+
+#+BEGIN_QUOTE
+  Since ZWEI is written in Lisp and lives in the Lisp environment of the Lisp machine, it is in a very good position to interface closely with other elements of that environment.
+#+END_QUOTE
+
+He does not specifically mention this, but this would not be elisp, it would be the native Lisp which would be MacLisp, and later generations would be Zetalisp and even Common Lisp.
+
+He also mentions that the graphical capabilities of the display allowed the use of different typefaces or fonts, specifically italic and bold, as well as varying sizes and styles, and that these can all be mixed in a buffer.
+
+Regions could be marked with the mouse, as well as through the keyboard-based methods, by holding the left mouse button down whilst moving from one end of the region to the other. The middle mouse button could mark words or lists at a time, and the right button was reserved for the system.
+
+#+BEGIN_QUOTE
+  The use of the mouse is still considered experimental. We know of several editors which depend highly on the use of a mouse for input, but we are not convinced that it is better than a keyboard; after more people start using ZWEI, it will be interesting to see how many of them make heavy use of the mouse and how many hardly use it at all.
+#+END_QUOTE
+
+*3) The Implementation*
+
+#+BEGIN_QUOTE
+  The Lisp Machine's unusual nature played a pervasive role in the design of ZWEI. The first question, in what language should ZWEI be written, was instantly answered: Lisp. Since everything in the Lisp Machine is written in the Lisp language, the choice was clear. The only question was whether some intermediate language should be written in Lisp, and ZWEI written in the intermediate language.
+
+  However, it seemed that Lisp Machine Lisp was a sufficiently powerful and comfortable environment for writing a text editor that no intermediate language would be needed.
+#+END_QUOTE
+
+A pervasive theme throughout this section was that because the Lisp Machine was a dedicated single-user machine, many constraints that influenced the design of previous editors running on terminals connected to time-sharing machines were not an issue.
+
+A lot of this section is devoted to the nuts-and-bolts of the representation and handling of text, but not much about the relations between the various conceptual objects like buffers and modes.
+
+#+BEGIN_QUOTE
+  Text in ZWEI is represented as a doubly-linked list of lines. The structure that represents a line has the text itself, its length, a list of buffer pointers, a tick representing the last time the line was modified, and of course previous and next line. An associated structure is a buffer-pointer (bp), which is associated with a line, an index of a character within the line, and a status which is one of {normal, moves, temp} (more on this later). The point and mark, for example, are represented as bps, though they are by no means the only bps.
+#+END_QUOTE
+
+#+BEGIN_QUOTE
+  ZWEI provides a large number of functions for the manipulation of text, and the arguments used to designate positions in text are buffer pointers.
+
+  There are also a wide variety of positioning commands, which take a bp pointing to some text and return a new bp that points some number of characters ahead of the given pointer, or words or lines or Lisp lists or sentences ahead of the given pointer. The ZWEI user commands are all built out of these functions.
+
+  Every time an insertion or deletion takes place, all buffer pointers are adjusted, or relocated, so that they continue to point at the same point relative to the text.
+#+END_QUOTE
+
+The status attribute of bps mentioned above is used to indicate how a bp should be updated if the insertion or deletion happens right where the bp was pointing. The normal status means the index is unchanged by insertions before it, the moves status means that the bp is moved to the end of the inserted text. The temporary bp is used for intermediate bps that don't live long enough to be affected by insertions or deletions. These bps do not get put in the data structure that is searched for updatable bps upon insertions or deletions.
+
+A third data structure is the interval, which has two components: first-bp and last-bp. Its content is the text between the two. The first-bp is normal, so it does not move, and the last-bp is a moves bp, so insertions and deletions in the interval cause the last-bp to move to accommodate.
+
+Some discussion was made of the redisplay algorithm, and how it is different from those generally in use at the time, due to the Lisp Machine being a single-user machine:
+
+#+BEGIN_QUOTE
+  In the Lisp Machine, there tends to be lots of spare computation power lying around for interactive problems. ... Sacrifices were made ... in exchange for simplicity and elegance in the redisplay routines.
+#+END_QUOTE
+
+*3.5) Organization of the Code*
+
+This section contains some of the most worthwhile bits of the whole paper, to me. It talks more of generalities, lessons learned, design principles, and such.
+
+#+BEGIN_QUOTE
+  A great deal of programming experience in the past few years has pointed out a peril in the writing of large programs: complexity. When a program gets very large, and the job done by the program is elaborate and takes some time to explain, the program can get so complex that nobody could possibly keep all of it in his head at once. When a program is very large and complex, it becomes hard to maintain, modify, improve, or debug.
+#+END_QUOTE
+
+#+BEGIN_QUOTE
+  ... we used several interesting techniques in the coding to keep ZWEI clear and simple. Some of these techniques were only possible because of the powerful features of the Lisp macro facility.
+#+END_QUOTE
+
+ZWEI predates things like Flavors and LOOPS, not to mention CLOS, so structures were used, and macros and macro-defining-macros were used to decouple the instantiation and access to those structures from their representation.
+
+#+BEGIN_QUOTE
+  Lisp macros were also useful for the definition of new control structures, as well as new data structures. In ZWEI, we created a new iterative control structure called *charmap*, which iterates over characters in an interval. Intervals are stored as doubly-linked lists of arrays, and the starting point might be in the middle of one array and the ending point might be in the middle of another array. The code to perform this iteration was not trivial, and someone reading it might easily not understand the function it was performing, even though that function was the conceptually simple one of iterating over characters. So we created a macro called *charmap* that expands into the double-loop code to iterate over the characters. It is simple and obvious, and is used in many places, greatly reducing the size of the code and making the functionality obvious at a glance.
+#+END_QUOTE
+
+#+BEGIN_QUOTE
+  A good deal of time was devoted to considering the right way to modularize various functions, providing smooth functional interfaces that worked out well for many different tasks. This was often difficult, and several times large pieces of code were re-written as better ways of organizing and modularizing became clear.
+#+END_QUOTE
+
+They thought a lot about the naming of things, when fighting the problems brought about by the proliferation of incompatible abbreviations:
+
+#+BEGIN_QUOTE
+  It became policy to avoid abbreviations in most cases. In ZWEI, we made a list of several words that were used extremely often, and established 'official' abbreviations for them, and always used only those abbreviations. ... Words not on this list were always spelled out in full.
+#+END_QUOTE
+
+#+BEGIN_QUOTE
+  [They were] very careful with function names in general, and to establish naming conventions and calling conventions. For example, all functions that take some action on an interval of text end in '-interval' ... All such functions take the interval as their last required argument, and then accept an optional argument after that. If the optional argument is not given, then the first argument is an interval. If the optional argument is given, then the first of the two is the starting bp of the interval, and the second is the ending bp of the interval.
+#+END_QUOTE
+
+This allowed them to avoid the construction of intermediate aggregate values just to satisfy calling conventions.
+
+#+BEGIN_QUOTE
+  There are several conventions of this type used throughout ZWEI.
+#+END_QUOTE
+
+*4) The Future*
+
+This section is a couple of pages, and talks about the graphics capabilities and how they allow the use of different typefaces, and also about structured text.
+
+*4.2) Structured Text*
+
+They describe the text editor NLS, which was a structure editor, and talked about how it was an appealing idea, but that ZWEI does not currently do this kind of thing.
+
+*References*
+
+[Anderson] Anderson, Owen T. "The Design of an Editor-Writing System", S. B. thesis, Dept of Physics, MIT, Feb. 1979
+
+[Ciccarelli] Ciccarelli, Eugene E., "An Introduction to the EMACS Editor", MIT Artificial Intelligence Lab Memo 447, January 1978
+
+[English et al] English, W. K., Engelbart, D. C., and Berman, M. L., "Display Selection Techniques for Text Manipulation," IEEE Transactions on Human Factors in Electronics, Vol. HFE-8, No.. 1, March 1967
+
+[Greenberg 1] Greenberg, Bernard S., "Real-Time Editing on Multics" Multics Technical Bulletin 373, April 1978, Honeywell, Inc., Cambridge Mass.
+
+[Greenberg 2] Greenberg, Bernard S., "The Multics MACLISP Compiler--The Basic Hackery.," Unpublished paper, December 1977. Available from author, Honeywell Inc., Cambridge, Mass.
+
+[Reed and Kanodia] Reed, David P. and Kanodia, R., "Synchronization with Eventcounts and Sequencers," CSR Request for Comments #138, Laboratory for Computer Science, MIT.
+
+[Stallman] Stallman, Richard M., online EMACS documentation, MIT Artificial Intelligence Laboratory.
+
+[Weinreb and Moon] Weinreb, Daniel L. and Moon, David A. "The Lisp Machine Manual", MIT Artificial Intelligence Laboratory, 1978.
+
+*Edit*: fixed a few formatting problems and typos, made very minor phrasing and grammar changes.
+
+*Edit 2*: have added the complete References section
