@@ -1,0 +1,1055 @@
+#+TITLE: From Vim to Emacs+Evil chaotic migration guide
+#+URL: https://juanjoalvarez.net/es/detail/2014/sep/19/vim-emacsevil-chaotic-migration-guide/
+#+AUTHOR: lujun9972
+#+TAGS: raw
+#+DATE: [2018年 10月 25日 星期四 12:02:17 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+I've been using Vim for 18 years, and for me it was the only option for serious
+text work (like programming or writing) because I'm totally addicted to modal text
+editing to the point that I feel crippled when I've to edit text in a non-modal
+editor. You may argue that programming is not about how fast you write and you
+would be right, but if you can imagine somebody programming on an on screen
+keyboard on a tablet, you know how modal editor users feel about non modal
+edition.
+
+But as many Vimmers, I was always curious about Emacs (the enemy in the editor
+flamewars!), it's operating-system-in-a-window and the Lisp virtual machines
+concepts but the non-modal editing and the low quality of the existing modal
+editing modes compared with Vim made me keep a sane distance from it.
+
+But then, Evil-mode happened. Evil mode is being developed as a perfect Vim
+emulation for Emacs. Some of its developers have publicly stated that Vim is the
+model and if something works differently than in Vim it should be marked as a bug.
+I've been hearing very good things about Evil-mode, and when some of my old
+Vimmers contacts made the switch I knew the mode should be very good.
+
+So two weeks ago I installed Emacs and Evil and started to configure everything to
+my liking. My first objective was to have an editing environment as efficient as
+the one I've in Vim, with the same plugins and shortcuts. I didn't expected to
+really reach that point in a long time, because I heard than Emacs has less
+plugins than Vim and I expected to have a hard time creating my dotfiles using
+Elisp. After two weeks of intense investigation, googling, Elisp accelerated
+learning, reading of other people's dotfiles and tinkering I can say that I was
+very wrong. Not only I've an environment where I didn't lost almost anything to my
+highly-tuned Vim, but I also got gains in some other areas (and I still haven't
+started to play with the famous Org mode or Gnus).
+
+This article is a pretty chaotic recollection of bits about how I turned Emacs into
+my Vim, and then how I improved over it. Most of the items will be bits of Elisp
+code for the config file or info about plugins. My hope is that this article will
+be useful to other Vim power users trying Emacs+Evil because I would have loved to
+find an article like this when I was starting.
+
+This article has been written with the help of lot of random people whose configs,
+articles an answers I had the luck to land after some internet search, mostly from
+StackOverflow, GitHub, and random forums. To keep the article clean, I don't
+always cite the source of the snippets but you could easily find most of them just
+googling the code.
+
+You can also check my [[http://github.com/juanjux/emacs-dotfiles][Emacs' dotfiles]] if you're interested, but remember that
+these are newbie dotfiles so I'm probably doing something stupid on them. As
+you'll see, my config is split between several files. I advise you to don't do
+this from the start, but to dump everything into your .emacs file because it is
+easier to experiment and change a lot when you're starting (and if you're a little
+like me you'll be playing a lot with your config) and once you've more or less
+settled on a config, split it into categories. Oh, and keep Vim at hand to fix
+your Emacs config the several times you'll broke it.
+
+* A good Windows version
+    :PROPERTIES:
+    :CUSTOM_ID: a-good-windows-version
+    :END:
+
+I've to use Windows at work and I was having a lot of problems with the official
+version of Emacs for Windows (slowness, unstability, huge memory usage spikes...).
+Reddit's user tuhdo read about my woes and suggested two versions of third party
+packages of Windows Emacs. I've tested both and I can say that [[http://emacsbinw64.sourceforge.net/][this one]] is
+definitively the best and solves all my problems.
+
+* Basic Emacs survival keys
+    :PROPERTIES:
+    :CUSTOM_ID: basic-emacs-survival-keys
+    :END:
+
+If you're a Vim user after installing Evil you'll be using Vim-style commands most
+of the time, but to install Evil first and for some modes where Evil doesn't work
+(like the package manager) you'll need some basic cheatsheet of Emacs commands.
+
+- C-g (that is Control and g at the same time) to cancel prompts. Later we'll
+  remap the escape key to do the same which anyone coming from Vim will need to
+  retain its sanity.
+- C-x k to kill (close) a buffer. Automatically opened windows are
+  usually closeable with “q”.
+- C-x o (that's an “o” not a zero) to rotate between window
+- C-x 2 to create an horizontal split (window)
+- C-x 3 to create a vertical split
+- M-x (M = Alt on PC) shows the “minibuffer” where you can call Emacs functions.
+  Later I'll show how to improve it a lot.
+- To toggle long lines wrapping (like set wrap/nowrap in Vim), do M-x
+  visual-line-mode RET.
+- C-y: yank/paste. The only way to paste on the modeline even when you're using
+  Evil.
+
+* Package management
+    :PROPERTIES:
+    :CUSTOM_ID: package-management
+    :END:
+
+The integrated plugin (package in emacspeak) manager is pretty good. It lists,
+downloads, updates and install the packages in a breeze. I've tested almost all of
+Vim's plugin managers and neither of them is close to this. You start it with =M-x list-packages= (enter to install, d to delete, x to execute deletions).
+
+To add more sources to the package managers and to have a function that will load
+packages and install them if missing (useful if you move your config between
+computers) put this on your config file:
+
+#+BEGIN_EXAMPLE
+    ;; packages
+    (setq package-archives '(("gnu" . "http://elpa.gnu.org/packages/")
+     ("org" . "http://orgmode.org/elpa/")
+     ("marmalade" . "http://marmalade-repo.org/packages/")
+     ("melpa-stable" . "http://melpa-stable.milkbox.net/packages/")))
+    (package-initialize)
+
+    (defun require-package (package)
+     (setq-default highlight-tabs t)
+     "Install given PACKAGE."
+     (unless (package-installed-p package)
+     (unless (assoc package package-archive-contents)
+     (package-refresh-contents))
+     (package-install package)))
+#+END_EXAMPLE
+
+Note: as Phil suggested in the comments, the non-stable Melpa repository is risky
+to have for newbies since it pulls directly from git master, I've used
+melpa-stable in the config example, if you want to use Melpa just remove the
+“-stable” from both the name and URL in the config.
+
+* Evil (Vim emulation)
+    :PROPERTIES:
+    :CUSTOM_ID: evil-vim-emulation
+    :END:
+
+It's fucking impressive. I don't miss any text command, operator, motion or
+work flow from Vim. Marks, paragraph reformatting, visual mode, visual block,
+macros, registers, text objects, splits (vertical, horizontal, :normal, folding,
+etc)... it has almost everything.
+
+Of course Vim plugins doesn't work, but there are Emacs or Evil alternatives for
+most of them.
+
+* Themes
+    :PROPERTIES:
+    :CUSTOM_ID: themes
+    :END:
+
+You can use M-x load-theme RET to check the available themes (you can install more
+with the package manager). Once you have chosen one theme, put in .emacs:
+=(load-theme 'misterioso t)=.
+
+* Terminal Colors
+    :PROPERTIES:
+    :CUSTOM_ID: terminal-colors
+    :END:
+
+By default, most themes look like shit on terminal Emacs (emacs -nw if you don't
+want the window to open). On Vim some themes too, but in Emacs this happens with
+almost all of them. This can improve a lot installing the color-theme-approximate
+package with makes the same thing as CSApprox in Vim: translate colors to their
+console equivalents. Once installed add this to your .emacs:
+=(color-theme-approximate-on)=. If it doesn't work try to put the line lower in
+the .emacs file (it happened to me). If everything still look like shit check that
+you have the correct TERM environment variable set (hint: is different inside
+screen or tmux).
+
+* Change cursor color depending on mode
+    :PROPERTIES:
+    :CUSTOM_ID: change-cursor-color-depending-on-mode
+    :END:
+
+This is something that I liked to have in Vim. Fortunately, you can also have it
+in Emacs. Unfortunately, I've been unable to get in working on non-GUI emacs:
+
+#+BEGIN_EXAMPLE
+    (setq evil-emacs-state-cursor '("red" box))
+    (setq evil-normal-state-cursor '("green" box))
+    (setq evil-visual-state-cursor '("orange" box))
+    (setq evil-insert-state-cursor '("red" bar))
+    (setq evil-replace-state-cursor '("red" bar))
+    (setq evil-operator-state-cursor '("red" hollow))
+#+END_EXAMPLE
+
+* Tabs
+    :PROPERTIES:
+    :CUSTOM_ID: tabs
+    :END:
+
+If you install the evil-tabs package and enable it with =(global-evil-tabs-mode t)= you'll have =:tabnew=, =gt= and friends with numbered tabs by default. Showing
+the tab number is a very useful feature when you can change to a tab with =#gt=
+like in Vim (with =#= being a number from 0 to 9), but unfortunately this package
+doesn't support =#gt= but I worked it around with my awesome Elisp skills (close
+to zero):
+
+#+BEGIN_EXAMPLE
+    (define-key evil-normal-state-map (kbd "C-0") (lambda() (interactive) (elscreen-goto 0)))
+    (define-key evil-normal-state-map (kbd "C- ") (lambda() (interactive) (elscreen-goto 0)))
+    (define-key evil-normal-state-map (kbd "C-1") (lambda() (interactive) (elscreen-goto 1)))
+    (define-key evil-normal-state-map (kbd "C-2") (lambda() (interactive) (elscreen-goto 2)))
+    (define-key evil-normal-state-map (kbd "C-3") (lambda() (interactive) (elscreen-goto 3)))
+    (define-key evil-normal-state-map (kbd "C-4") (lambda() (interactive) (elscreen-goto 4)))
+    (define-key evil-normal-state-map (kbd "C-5") (lambda() (interactive) (elscreen-goto 5)))
+    (define-key evil-normal-state-map (kbd "C-6") (lambda() (interactive) (elscreen-goto 6)))
+    (define-key evil-normal-state-map (kbd "C-7") (lambda() (interactive) (elscreen-goto 7)))
+    (define-key evil-normal-state-map (kbd "C-8") (lambda() (interactive) (elscreen-goto 8)))
+    (define-key evil-normal-state-map (kbd "C-9") (lambda() (interactive) (elscreen-goto 9)))
+    (define-key evil-insert-state-map (kbd "C-0") (lambda() (interactive) (elscreen-goto 0)))
+    (define-key evil-insert-state-map (kbd "C- ") (lambda() (interactive) (elscreen-goto 0)))
+    (define-key evil-insert-state-map (kbd "C-1") (lambda() (interactive) (elscreen-goto 1)))
+    (define-key evil-insert-state-map (kbd "C-2") (lambda() (interactive) (elscreen-goto 2)))
+    (define-key evil-insert-state-map (kbd "C-3") (lambda() (interactive) (elscreen-goto 3)))
+    (define-key evil-insert-state-map (kbd "C-4") (lambda() (interactive) (elscreen-goto 4)))
+    (define-key evil-insert-state-map (kbd "C-5") (lambda() (interactive) (elscreen-goto 5)))
+    (define-key evil-insert-state-map (kbd "C-6") (lambda() (interactive) (elscreen-goto 6)))
+    (define-key evil-insert-state-map (kbd "C-7") (lambda() (interactive) (elscreen-goto 7)))
+    (define-key evil-insert-state-map (kbd "C-8") (lambda() (interactive) (elscreen-goto 8)))
+    (define-key evil-insert-state-map (kbd "C-9") (lambda() (interactive) (elscreen-goto 9)))
+#+END_EXAMPLE
+
+Somebody with better Elisp skills please help me with a less kludgy solution, but
+this works (and it's in fact one key press less than =#gt=).
+
+* Leader key
+    :PROPERTIES:
+    :CUSTOM_ID: leader-key
+    :END:
+
+In order to define an use a =<leader>= prefix for your personal shortcuts you have
+to install the package evil-leader and put lines like these on your .emacs (I use
+comma as a leader key):
+
+#+BEGIN_EXAMPLE
+    (global-evil-leader-mode)
+    (evil-leader/set-leader ",")
+#+END_EXAMPLE
+
+Later, I found that the key didn't work on some modes (like when editing
+the .emacs file in emacs-lisp-mode), but the package FAQ solved the problem, you
+have to add this before the =global-evil-leader-mode= setting:
+
+#+BEGIN_EXAMPLE
+    (setq evil-leader/in-all-states 1)
+#+END_EXAMPLE
+
+* Sessions (:mksession in Vim)
+    :PROPERTIES:
+    :CUSTOM_ID: sessions-mksession-in-vim
+    :END:
+
+Emacs have the commands =M-x desktop-save= and =desktop-read=. To have it
+automatically saved/restored put into the .emacs: =(desktop-save-mode 1)=. If you
+want to start emacs without auto loading the session (if you configured it), the
+command is =emacs --no-desktop=. But Emacs sessions doesn't know about elscreens
+(which evil-tabs use for creating Vim-like tabs) so if you want to save and
+restore full sessions including tabs copy these functions into your config file
+and assign them some shortcut:
+
+#+BEGIN_EXAMPLE
+    ;; Save session including tabs
+    ;; http://stackoverflow.com/questions/22445670/save-and-restore-elscreen-tabs-and-split-frames
+    (defun session-save ()
+     "Store the elscreen tab configuration."
+     (interactive)
+     (if (desktop-save emacs-configuration-directory)
+     (with-temp-file elscreen-tab-configuration-store-filename
+     (insert (prin1-to-string (elscreen-get-screen-to-name-alist))))))
+
+    ;; Load session including tabs
+    (defun session-load ()
+     "Restore the elscreen tab configuration."
+     (interactive)
+     (if (desktop-read)
+     (let ((screens (reverse
+     (read
+     (with-temp-buffer
+     (insert-file-contents elscreen-tab-configuration-store-filename)
+     (buffer-string))))))
+     (while screens
+     (setq screen (car (car screens)))
+     (setq buffers (split-string (cdr (car screens)) ":"))
+     (if (eq screen 0)
+     (switch-to-buffer (car buffers))
+     (elscreen-find-and-goto-by-buffer (car buffers) t t))
+     (while (cdr buffers)
+     (switch-to-buffer-other-window (car (cdr buffers)))
+     (setq buffers (cdr buffers)))
+     (setq screens (cdr screens))))))
+#+END_EXAMPLE
+
+* Accents
+    :PROPERTIES:
+    :CUSTOM_ID: accents
+    :END:
+
+Accents didn't work for me on GUI mode, only in text mode. That was fixed adding
+=(require 'iso-transl)= to my .emacs.
+
+* “After” macro definition
+    :PROPERTIES:
+    :CUSTOM_ID: after-macro-definition
+    :END:
+
+I have an “after” macro defined that I copied from someone config file (can't remember who - sorry). This is
+useful to specifiy code to be executed after some plugin has loaded.
+
+The definition is on my config file as:
+
+#+BEGIN_EXAMPLE
+    ;; "after" macro definition
+    (if (fboundp 'with-eval-after-load)
+     (defmacro after (feature &rest body)
+     "After FEATURE is loaded, evaluate BODY."
+     (declare (indent defun))
+     `(with-eval-after-load ,feature ,@body))
+     (defmacro after (feature &rest body)
+     "After FEATURE is loaded, evaluate BODY."
+     (declare (indent defun))
+     `(eval-after-load ,feature
+     '(progn ,@body))))))
+#+END_EXAMPLE
+
+* Vim-like search highlighting
+    :PROPERTIES:
+    :CUSTOM_ID: vim-like-search-highlighting
+    :END:
+
+I prefer how Vim's highlight search and left the highlighted terms until you make
+another search or clean the highlighted terms. I tough this would be easy to get
+but it turned it wasn't so easy (for me). At the end I made my first Emacs
+extension (and the first time I've programmed in Lisp since the university a long
+time ago...) so all turned well. [[https://github.com/juanjux/evil-search-highlight-persist][The extension]] is already on Melpa has the
+very brief name of =evil-search-highlight-persist=. You can enable it with:
+
+#+BEGIN_EXAMPLE
+    (require 'evil-search-highlight-persist)
+    (global-evil-search-highlight-persist t)
+#+END_EXAMPLE
+
+To map a shortcut (leader-space) to clear the highlights I have:
+
+#+BEGIN_EXAMPLE
+    (evil-leader/set-key "SPC" 'evil-search-highlight-persist-remove-all)
+#+END_EXAMPLE
+
+I must note that another good way to search in Emacs is to use =occur= or
+=helm-occur=. This will show the search results on a list (on a split window with
+occur) and you'll be able to jump easily to any match.
+
+* Helm: Unite/CtrlP style fuzzy file/buffer/anything searcher on steroids
+    :PROPERTIES:
+    :CUSTOM_ID: helm-unitectrlp-style-fuzzy-filebufferanything-searcher-on-steroids
+    :END:
+
+Helm does the same thing as Unite/CtrlP on Vim and does it really well. You can
+also enable Helm to manage the command buffer, which is pretty awesome with:
+=(helm-mode 1)= in the .emacs file. I also configured a shortcut in normal mode,
+=SPACE SPACE= which is the same I was using with Vim. This can be done with:
+=(define-key evil-normal-state-map " " 'helm-mini)=.
+
+But Helm can be really configurable and you can include or exclude modules in the
+helm interface show with the shortcut associated to your config, for example I've:
+
+#+BEGIN_EXAMPLE
+    ;; helm settings (TAB in helm window for actions over selected items,
+    ;; C-SPC to select items)
+    (require 'helm-config)
+    (require 'helm-misc)
+    (require 'helm-projectile)
+    (require 'helm-locate)
+    (setq helm-quick-update t)
+    (setq helm-bookmark-show-location t)
+    (setq helm-buffers-fuzzy-matching t)
+
+    (after 'projectile
+     (package 'helm-projectile))
+    (global-set-key (kbd "M-x") 'helm-M-x)
+
+    (defun helm-my-buffers ()
+     (interactive)
+     (let ((helm-ff-transformer-show-only-basename nil))
+     (helm-other-buffer '(helm-c-source-buffers-list
+     helm-c-source-elscreen
+     helm-c-source-projectile-files-list
+     helm-c-source-ctags
+     helm-c-source-recentf
+     helm-c-source-locate)
+     "*helm-my-buffers*")))
+#+END_EXAMPLE
+
+Here, I define a “helm-my-buffers” function that when called (assign a shortcut to
+it!) will show Helm interface but searching (fuzzy, real time as you write,
+unordered) in open buffers, recent files, project files (see below for more on
+that), tags inside the files, tabs and results from the Linux command =locate=
+that searches quickly from a database of all the files in the file system. How
+awesome is that?
+
+But this is only the tip of the iceberg of Helm power. There are =sources= for
+searching the symbols (functions, classes, globals, etc) in the current buffer
+(=helm-imenu=), bookmarks (including Chrome/Firefox bookmarks), HTML colors
+(showing the color, name, and hexadecimal code), apt packages and more.
+
+If you check the sources of the =helm-my-buffers= function above you can see that
+I'm also using =helm-c-source-projectile-files-list=. This will use another
+installable third party package called Projectile that will search for a
+git/hg/svn file in the current directory and its parents and extract the current
+project files. Linking it will Helm makes it super easy to open any file in your
+current project (providing you've it under version control) without having the
+browse the filesystem, even for files that you have never opened (and thus are not
+in Emacs' recent files list).
+
+Another good combination of Helm with a nice Emacs feature (this time included by
+default) is helm-imenu. iMenu is a pretty smart minor mode that extract
+“locations” inside a buffer. For code in a programming language this will be
+typically the classes, methods and other symbols. Calling helm-imenu instead of
+the default imenu will make it very easy to jump quickly to a location inside the
+buffer just writing a couple of letters.
+
+Another great feature of Helm is the chance to replace the default “M-x” menu
+interface. M-x is what you use to issue Emacs commands, a little like “:” in Vim
+(but only a little, ex mode in Vim or Evil is another kind of animal). One great
+thing about Emacs is that it has commands and modes for a lot of things, and with
+Helm M-x you don't have to learn them all. For example if I don't remember how to
+show white space characters I just press M-x and start to write =whitesp=... and
+Helm will show me as first result =whitespace-mode= which is exactly what I want
+(it also showed =whitespace-cleanup= that clears all the trailing whitespace and
+that is how I discovered it). Want to check the commands related to spelling? =M-x spell=. How to list errors in the code with flycheck? =M-x fly errors=. How to
+sort the lines of a selection? =M-x sort=. This is really convenient and as an
+Emacs newbie I get a lot of things done just searching in Helm-M-x without having
+to search on Google. You can map Helm-M-x to M-x with:
+
+#+BEGIN_EXAMPLE
+    (global-set-key (kbd "M-x") 'helm-M-x)
+#+END_EXAMPLE
+
+There is another package that also helps when learning to use a specific mode,
+it's called “Discover My Major” (=discover-my-major= in Melpa). Invoking the
+command with the same name will show all the functions enabled by the current
+major mode. It's great to discover what every mode can do.
+
+There is another package that also helps when learning to use a specific mode,
+it's called “Discover My Major” (=discover-my-major= in Melpa). Invoking the
+command with the same name will show all the functions enabled by the current
+major mode. It's great to discover what every mode can do.
+
+Edit: thanks to tuhdo in the comments who told me how to show the full path of
+the files in the helm-recentf sources).
+
+* Vim's Marks => Evil's Marks + Emacs' Bookmarks
+    :PROPERTIES:
+    :CUSTOM_ID: vims-marks-gt-evils-marks-emacs-bookmarks
+    :END:
+
+Evil has marks just like Vim: =m= to jump to a mark, =m-letter= to set a mark,
+=m-uppercase_letter= to set a mark that works between buffers. But while marks are
+pretty useful for example to quickly jump between two or three positions inside
+some files when you're coding, Emacs also has the concept of “bookmarks” that are
+like inter-file marks that you can set with a name (instead of a letter) and that
+with the elisp bit below in your config file can be saved between sessions. I'm
+using =helm-bookmarks= to see and set them, which I've mapped to =SPC-b=. To delete
+bookmarks, press =TAB= inside the helm sub-window to see the list of actions and
+choose “Delete Bookmark(s)”.
+
+#+BEGIN_EXAMPLE
+    ;; save bookmarks
+    (setq bookmark-default-file "~/.emacs.d/bookmarks"
+     bookmark-save-flag 1) ;; save after every change
+#+END_EXAMPLE
+
+* Folding... and narrowing!
+    :PROPERTIES:
+    :CUSTOM_ID: folding-and-narrowing
+    :END:
+
+Folding with Evil works as expected, using the same operators that in Vim (with
+the added benefit that if you're using Helm-M-x you can do =M-x RET fold= to
+search the folding commands in case you forgot the Vim-style operator). Emacs also
+support an interesting feature called “narrowing”. Narrowing will hide everything else
+in the file except the narrowed function or region. This is pretty useful when you
+want to make global replaces or run some macro but don't want to affect the other
+parts of the buffer. I don't use it much so I haven't assigned any shortcut, I
+just use the commands =narrow-to-region= and =narrow-to-defun=. Once you have
+finished working on the narrowed region, you can display the rest of the buffer
+again with the =widen= command.
+
+* Project Management
+    :PROPERTIES:
+    :CUSTOM_ID: project-management
+    :END:
+
+I've already mentioned Projectile that combined with Helm makes searching for
+project files very convenient, but there are other options. One of them is
+project-explorer, which is pretty much like Vim “project” script: when you enable
+it it will show a side split (sorry, window) with your project files. With Helm +
+Helm-Projectile + the file explorer it's rarely needed but from time to time it's
+nice to have a tree view of a source code project (more if the code isn't yours).
+The Windows can be opened with the command “project-explorer-open” (I didn't
+assign any shortcut to it). One thing to note if you're using Evil is that the
+shortcuts like TAB to toggle a folder subtree only work if you're in insert mode.
+
+#+BEGIN_EXAMPLE
+    (package 'project-explorer)
+    (after 'project-explorer
+     (setq pe/cache-directory "~/.emacs.d/cache/project_explorer")
+     (setq pe/omit-regex (concat pe/omit-regex "\\|single_emails")))
+#+END_EXAMPLE
+
+Emacs use a tags file format with a syntax that is different from the “default”
+ctags called “etags”. Generating etags is easy since Exuberant-Ctags already know
+how to generate them (just add a =-e= switch). Emacs distributions usually came
+with an etags binary (I'm using ctags because there is a patched version with
+support for the [[http://dlang.org][D language]] but Emacs's etag binary doesn't support it).
+Once generated Emacs will ask you where the tags file is the first time you use
+any tag command (like =find-tag= or =evil-jump-to-tag= to jump to the specified
+tag) and once loaded it will remember it (at least for the current session, I
+still need to find how to make it remember the path between sessions).
+
+I've defined this =create-tags= function on my .emacs to regenerate the tags files
+(it will ask for a directory and then use that directory as root from where to
+scan and place to store the =tags= file):
+
+#+BEGIN_EXAMPLE
+    ;; etags
+    (cond ((eq system-type 'windows-nt)
+     (setq path-to-ctags "C:/installs/gnuglobal/bin/ctags.exe")))
+     (cond ((eq system-type 'gnu/linux)
+     (setq path-to-ctags "/usr/local/bin/ctags")))
+
+    (defun create-tags (dir-name)
+     "Create tags file."
+     (interactive "DDirectory: ")
+     ;; (message
+     ;; (format "%s -f %s/tags -eR %s"
+     path-to-ctags (directory-file-name dir-name) (directory-file-name
+     dir-name)))
+     (shell-command
+     (format "%s -f %s/tags -eR %s" path-to-ctags
+     (directory-file-name dir-name) (directory-file-name dir-name)))
+     )
+#+END_EXAMPLE
+
+With third party packages there is also support for normal ctags files and GNU
+Global, but I find the etags support more than convenient for my needs
+
+* Spell checking
+    :PROPERTIES:
+    :CUSTOM_ID: spell-checking
+    :END:
+
+No need to install anything if you have ispell on your system, just do:
+=:ispell-buffer= to start a spell check of the current buffer (alternatives are
+show above and shortcuts below) and =:ispell-change-dictionary= to use another
+dictionary (to check another language). If you prefer spell checking on the fly
+with underlines under misspelled words use =:flyspell-mode= and to see
+alternatives to a misspelled word press =M-$= (=Alt-$= on most PCs) with the
+cursor over the word.
+
+* Relative line numbers
+    :PROPERTIES:
+    :CUSTOM_ID: relative-line-numbers
+    :END:
+
+Install the package “relative-line-numbers” and enable it globally on
+your config file with:
+
+#+BEGIN_EXAMPLE
+    (add-hook 'prog-mode-hook 'relative-line-numbers-mode t)
+    (add-hook 'prog-mode-hook 'line-number-mode t)
+    (add-hook 'prog-mode-hook 'column-number-mode t)
+#+END_EXAMPLE
+
+* Easymotion => Evil Ace Jump
+    :PROPERTIES:
+    :CUSTOM_ID: easymotion-gt-evil-ace-jump
+    :END:
+
+The functionality provided by the awesome Easymotion plugin on Vim is actually
+integrated by default on Evil since it incorporates a package called Ace Jump
+that does mostly the same. It's less powerful than Easymotion (some jumps like
+backwards-only / forward-only / end-of-word and others are missing) and I prefer
+how Easymotion shows directly two chars when a jump is going to require them
+(instead of showing one and after pressing it, the other which is what Ace-Jump
+does) but the important modes (bidirectional jump to word and to char) that were
+the ones I was mostly using are provided.
+
+Unlike Easymotion, jump to word asks for a letter, but that can be easily disabled
+with: =(setq ace-jump-word-mode-use-query-char nil)=. The author makes the case
+that without asking for a char you're probably entering more key presses most of
+the time. This is probably true, but when I want to jump to a random word inside
+the buffer my brain-eye connection has already identified the word but I've to
+stop and look/think for the first char, so in the end for me is actually faster to
+get jump shortcuts to all the words without having to provide the leading
+character.
+
+I mapped the word/line/char to e/l/x with:
+
+#+BEGIN_EXAMPLE
+    (evil-leader/set-key "e" 'evil-ace-jump-word-mode) ; ,e for Ace Jump (word)
+    (evil-leader/set-key "l" 'evil-ace-jump-line-mode) ; ,l for Ace Jump (line)
+    (evil-leader/set-key "x" 'evil-ace-jump-char-mode) ; ,x for Ace Jump (char)
+#+END_EXAMPLE
+
+* Smooth scrolling
+    :PROPERTIES:
+    :CUSTOM_ID: smooth-scrolling
+    :END:
+
+One annoying thing that most Vim users will find in Emacs is the jumpy
+scrolling. To have Emacs scroll like Vim (that is, line by line and leaving some
+lines before starting to scroll) the solution is to install the package
+=smooth-scrolling= and add this to your config:
+
+#+BEGIN_EXAMPLE
+    (setq scroll-margin 5
+    scroll-conservatively 9999
+    scroll-step 1)
+#+END_EXAMPLE
+
+It's not perfect because sometimes when you're close to the start of end of the
+file it still jumps.
+
+* Powerline
+    :PROPERTIES:
+    :CUSTOM_ID: powerline
+    :END:
+
+Super-easy, just install the powerline-evil package and put this in your config:
+
+#+BEGIN_EXAMPLE
+    (require 'powerline)
+    (powerline-evil-vim-color-theme)
+    (display-time-mode t)
+#+END_EXAMPLE
+
+* Syntactic checking on the fly with Flycheck
+    :PROPERTIES:
+    :CUSTOM_ID: syntactic-checking-on-the-fly-with-flycheck
+    :END:
+
+One of the best Vim plugins if you're a programmer is Syntastic that runs a
+syntactic check auto detecting a huge variety of linters every time you
+save. Emacs also have a similar package called “Flycheck”. It is even better
+because it runs in parallel while you work so you don't have to wait for it to
+finish its checks like happens with Vim. Another related package is
+=flycheck-pos-tip= that shows errors on a tooltip (if you're on GUI Emacs,
+obviously) instead of the minibuffer. My full flycheck config is:
+
+#+BEGIN_EXAMPLE
+    ;; flycheck
+    (package 'flycheck)
+    (add-hook 'after-init-hook #'global-flycheck-mode)
+
+    (after 'flycheck
+     (setq flycheck-check-syntax-automatically '(save mode-enabled))
+     (setq flycheck-checkers (delq 'emacs-lisp-checkdoc flycheck-checkers))
+     (setq flycheck-checkers (delq 'html-tidy flycheck-checkers))
+     (setq flycheck-standard-error-navigation nil))
+
+    (global-flycheck-mode t)
+
+    ;; flycheck errors on a tooltip (doesnt work on console)
+    (when (display-graphic-p (selected-frame))
+     (eval-after-load 'flycheck
+     '(custom-set-variables
+     '(flycheck-display-errors-function #'flycheck-pos-tip-error-messages))))
+#+END_EXAMPLE
+
+* j/k for browsing wrapped lines
+    :PROPERTIES:
+    :CUSTOM_ID: jk-for-browsing-wrapped-lines
+    :END:
+
+Evil has the same problem as Vim when browsing with j/k long wrapped lines; it
+jumps the entire “real” line instead of the visual line. The solution is also
+easy:
+
+#+BEGIN_EXAMPLE
+    (define-key evil-normal-state-map (kbd "j") 'evil-next-visual-line)
+    (define-key evil-normal-state-map (kbd "k") 'evil-previous-visual-line)
+#+END_EXAMPLE
+
+* escape... escapes things
+    :PROPERTIES:
+    :CUSTOM_ID: escape-escapes-things
+    :END:
+
+One very annoying thing with Emacs is that when you are in the =M-x= buffer (the
+one were you call Emacs functions) you've to use =C-g= to exit it. If you use
+=escape= as most Vim users would tend to do by default you need to hit the key
+like a million times (it's more like 3, but it's extremely frustrating
+anyway). This code on my .emacs that I copied from [[https://github.com/davvil/.emacs.d/blob/master/init.el][davvil init.el on Github]]
+fixed it:
+
+#+BEGIN_EXAMPLE
+    ;; esc quits
+    (defun minibuffer-keyboard-quit ()
+     "Abort recursive edit.
+    In Delete Selection mode, if the mark is active, just deactivate it;
+    then it takes a second \\[keyboard-quit] to abort the minibuffer."
+     (interactive)
+     (if (and delete-selection-mode transient-mark-mode mark-active)
+     (setq deactivate-mark t)
+     (when (get-buffer "*Completions*") (delete-windows-on "*Completions*"))
+     (abort-recursive-edit)))
+    (define-key evil-normal-state-map [escape] 'keyboard-quit)
+    (define-key evil-visual-state-map [escape] 'keyboard-quit)
+    (define-key minibuffer-local-map [escape] 'minibuffer-keyboard-quit)
+    (define-key minibuffer-local-ns-map [escape] 'minibuffer-keyboard-quit)
+    (define-key minibuffer-local-completion-map [escape] 'minibuffer-keyboard-quit)
+    (define-key minibuffer-local-must-match-map [escape] 'minibuffer-keyboard-quit)
+    (define-key minibuffer-local-isearch-map [escape] 'minibuffer-keyboard-quit)
+    (global-set-key [escape] 'evil-exit-emacs-state)
+#+END_EXAMPLE
+
+* Start maximized, please
+    :PROPERTIES:
+    :CUSTOM_ID: start-maximized-please
+    :END:
+
+Another minor annoyance was that Emacs (GUI) didn't start maximized by default, but
+this is easy to fix:
+
+#+BEGIN_EXAMPLE
+    (custom-set-variables
+     '(initial-frame-alist (quote ((fullscreen . maximized))))) ;; start maximized
+#+END_EXAMPLE
+
+* c-k/c-j for page down/up
+    :PROPERTIES:
+    :CUSTOM_ID: c-kc-j-for-page-downup
+    :END:
+
+One thing that surprised me considering how complete Evil is, is the lack of Vim's
+Control-d/Control-u for page down/up. Probably because C-u is pretty important in
+Emacs (it's the shortcut to give a numeric parameter to other commands, I think).
+I've in fact these mapped on my .vimrc to c-k/c-j (because I think they're more
+consistent with Vim's j/k movement keys) so that's how I mapped them in Emacs:
+
+#+BEGIN_EXAMPLE
+    (define-key evil-normal-state-map (kbd "C-k") (lambda ()
+     (interactive)
+     (evil-scroll-up nil)))
+    (define-key evil-normal-state-map (kbd "C-j") (lambda ()
+     (interactive)
+     (evil-scroll-down nil)))
+#+END_EXAMPLE
+
+* Coding Style and spaces instead of tabs
+    :PROPERTIES:
+    :CUSTOM_ID: coding-style-and-spaces-instead-of-tabs
+    :END:
+
+Emacs by default do the really evil thing of using tab characters for
+indentation. To do the right thing and use spaces with 4 spaces per tab:
+=(setq-default tab-width 4 indent-tabs-mode nil)=. Also, I prefer the “bsd” style
+on my code on C-like languages (C, C++, Java, D...) but with 4 spaces tabs
+instead of 8 so I also added: =(setq-default c-basic-offset 4 c-default-style "bsd")=.
+
+There is also a nice package called “dtrt-indent” that can automatically determine
+the indentation settings used on the file that you're currently editting and adapt
+Emacs's settings to them. It's great when you're editing external files not
+created by you or that for some reason follow different indentation rules that the
+ones you've in your config file.
+
+#+BEGIN_EXAMPLE
+    (package 'dtrt-indent)
+    (dtrt-indent-mode 1)
+#+END_EXAMPLE
+
+* Auto-indent with the Return key
+    :PROPERTIES:
+    :CUSTOM_ID: auto-indent-with-the-return-key
+    :END:
+
+By default Emacs doesn't indent new lines until you press the TAB key. That is not
+good. But it can be changed easily enough to do the Vim thing, adjusting
+indentation on every new line automatically with:
+
+#+BEGIN_EXAMPLE
+    (define-key global-map (kbd "RET") 'newline-and-indent)
+#+END_EXAMPLE
+
+* Show matching paren
+    :PROPERTIES:
+    :CUSTOM_ID: show-matching-paren
+    :END:
+
+If you want to show the matching parenthesis, brace or bracket automatically, add
+this option: =(show-paren-mode t)=. You can also install the Autopairs package to
+automatically add the matching parens/braces/etc after adding the opening one.
+I've mixed feelings about it because while very convenient (specially with Lisp!)
+it can be also very annoying when you want to surround something with parents and
+it adds a useless “)” after the opening one, I should use “Surround” on these
+cases, but half of the time I forget it. To enable autopairs put this on your
+config file after installing the package:
+
+#+BEGIN_EXAMPLE
+    (require 'autopair)
+    (autopair-global-mode)
+#+END_EXAMPLE
+
+* Fill column, auto line breaking and column limit mark
+    :PROPERTIES:
+    :CUSTOM_ID: fill-column-auto-line-breaking-and-column-limit-mark
+    :END:
+
+To visually mark the configured fill-column for the mode (like the =colorcolumn=
+option in Vim) install the package =fill-column-indicator=, then you'll enable it
+on every mode where you want to display it with =fci-mode= (see below).
+
+To configure auto line breaking when the line exceed 82 chars for text and
+markdown files, with fill indicator line:
+
+#+BEGIN_EXAMPLE
+    (add-hook 'text-mode-hook (lambda ()
+     (turn-on-auto-fill)
+     (fci-mode)
+     (set-fill-column 82)))
+    (add-hook 'markdown-mode-hook (lambda ()
+     (turn-on-auto-fill)
+     (fci-mode)
+     (set-fill-column 82)))
+#+END_EXAMPLE
+
+To set the non-auto-line limit for Python a C-mode (and D) to 94:
+
+#+BEGIN_EXAMPLE
+    (add-hook 'python-mode-hook (lambda ()
+     (fci-mode)
+     (set-fill-column 94)))
+    (add-hook 'c-mode-hook (lambda ()
+     (fci-mode)
+     (set-fill-column 94)))
+
+    (add-hook 'd-mode-hook (lambda ()
+     (fci-mode)
+     (set-fill-column 94)))
+#+END_EXAMPLE
+
+* Silver Searcher (ag)
+    :PROPERTIES:
+    :CUSTOM_ID: silver-searcher-ag
+    :END:
+
+If you don't know it, the Silver Searcher is like Ack but a lot faster. The “ag”
+package will allow you to make searches with it without leaving Emacs and show
+the results in a quickfix-style windows where you can select results and jump to
+them: M-x ag RET [search] RET [directory] RET.
+
+* Spanish keyboard remaps
+    :PROPERTIES:
+    :CUSTOM_ID: spanish-keyboard-remaps
+    :END:
+
+I use Spanish keyboards. Yes, I know, Vim is much better with an English keyboard,
+but I'm 36 and have been using the Spanish layouts since I was 8, which means that
+my brain is too hardwired to it. But with a few remaps I made my Vim experience
+much better. These were =-= (minus sign) in normal mode as =/= (to search), == as
+=escape= in insert mode (I want to try the kj thing) and == as =:=. When you
+remap keys in Emacs you have to know the name of the function that the shortcut
+key will point to. Fortunately using =C-h k= (Control-h, release, k) will tell you
+the name of the function associated with the next key you press, so getting the
+name of the functions for these remaps is easy. The =/= and =:= remaps were easy:
+
+#+BEGIN_EXAMPLE
+    (define-key evil-normal-state-map "-" 'evil-search-forward)
+    (define-key evil-normal-state-map " " 'evil-ex)
+    (define-key evil-insert-state-map " " 'evil-normal-state)
+#+END_EXAMPLE
+
+* Don't create backup files
+    :PROPERTIES:
+    :CUSTOM_ID: dont-create-backup-files
+    :END:
+
+I use version control and I'm a compulsive saver, so I don't need backup
+files. I've these disabled on Vim and I've also disabled them on Emacs:
+
+#+BEGIN_EXAMPLE
+    (setq make-backup-files nil)
+#+END_EXAMPLE
+
+* Don't move back the cursor one position when exiting insert mode
+    :PROPERTIES:
+    :CUSTOM_ID: dont-move-back-the-cursor-one-position-when-exiting-insert-mode
+    :END:
+
+This is something that I hated in Vim so I had it disabled with the following
+lines on my .vimrc:
+
+#+BEGIN_EXAMPLE
+    autocmd InsertEnter * let CursorColumnI = col('.')
+    autocmd CursorMovedI * let CursorColumnI = col('.')
+    autocmd InsertLeave * if col('.') != CursorColumnI | call cursor(0, col('.')+1) | endif
+#+END_EXAMPLE
+
+To get the same behaviour in Evil you just have to set one option:
+
+#+BEGIN_EXAMPLE
+    (setq evil-move-cursor-back nil)
+#+END_EXAMPLE
+
+* Remember the cursor position of files when reopening them
+    :PROPERTIES:
+    :CUSTOM_ID: remember-the-cursor-position-of-files-when-reopening-them
+    :END:
+
+Pretty easy:
+
+#+BEGIN_EXAMPLE
+    (setq save-place-file "~/.emacs.d/saveplace")
+    (setq-default save-place t)
+    (require 'saveplace)
+#+END_EXAMPLE
+
+* Disable scroll bars
+    :PROPERTIES:
+    :CUSTOM_ID: disable-scroll-bars
+    :END:
+
+By default Emacs put a scroll bar on every window (split) which IMO is incredibly
+ugly. I already have the % of my position on the file in Powerline so I don't need
+any scroll bars: =(scroll-bar-mode -1)=.
+
+* “Graphical” GDB
+    :PROPERTIES:
+    :CUSTOM_ID: graphical-gdb
+    :END:
+
+Emacs GDB mode (enabled with M-x gdb RET binary_path) is pretty cool because it
+create several windows in the style of typical IDE debuggers, but that's not
+enabled by default, to enable it: =(setq gdb-many-windows t)=.
+
+Once you're in GDB mode with the binary loaded you can change to the source code
+windows (use =C-x o= to switch between splits or just mouse clicks, Vim-style
+=C-w= key bindings doesn't work in gdb mode), load the source code file you want
+to set breakpoints on and set a break point with M-x gud-break. Then you can run
+the program with “run” (r) on the gdb window and once in the break point advance with
+next (n) or step (s). Local vars and registers are show in one window, breakpoints
+and the stack frame in another one.
+
+* Color Identifiers Mode and Color Delimiters
+    :PROPERTIES:
+    :CUSTOM_ID: color-identifiers-mode-and-color-delimiters
+    :END:
+
+The plugin =colors-identifiers-mode= colorize every variable in a different color.
+I've mixed feelings about it because the code looks like a fruit salad, but it
+makes really easy to visually identify where variables are used. I'm using it for
+now. Setup is:
+
+#+BEGIN_EXAMPLE
+    (package 'color-identifiers-mode)
+    (global-color-identifiers-mode)
+#+END_EXAMPLE
+
+Another firm step into the total fruitsalarization of your Emacs is the Rainbow
+Delimiters package that will color nested delimiters on a different color so you
+can check easily which of them are pairs without having to move the cursor over
+them. When you have lots of nested parenthesis this helps a lot to see the pairs
+without having to move the cursor over them.
+
+#+BEGIN_EXAMPLE
+    (package 'rainbow-delimiters)
+    (add-hook 'prog-mode-hook 'rainbow-delimiters-mode)
+#+END_EXAMPLE
+
+* Diminish to clean clutter from the modeline
+    :PROPERTIES:
+    :CUSTOM_ID: diminish-to-clean-clutter-from-the-modeline
+    :END:
+
+Diminish will remove the minor mode indicators from the mode line (or powerline).
+Example config:
+
+#+BEGIN_EXAMPLE
+    (require 'diminish)
+    (diminish 'visual-line-mode)
+    (after 'autopair (diminish 'autopair-mode))
+    (after 'undo-tree (diminish 'undo-tree-mode))
+    (after 'auto-complete (diminish 'auto-complete-mode))
+    (after 'projectile (diminish 'projectile-mode))
+    (after 'yasnippet (diminish 'yas-minor-mode))
+    (after 'guide-key (diminish 'guide-key-mode))
+    (after 'eldoc (diminish 'eldoc-mode))
+    (after 'smartparens (diminish 'smartparens-mode))
+    (after 'company (diminish 'company-mode))
+    (after 'elisp-slime-nav (diminish 'elisp-slime-nav-mode))
+    (after 'git-gutter+ (diminish 'git-gutter+-mode))
+    (after 'magit (diminish 'magit-auto-revert-mode))
+    (after 'hs-minor-mode (diminish 'hs-minor-mode))
+    (after 'color-identifiers-mode (diminish 'color-identifiers-mode))
+#+END_EXAMPLE
+
+* Select last yanked text
+    :PROPERTIES:
+    :CUSTOM_ID: select-last-yanked-text
+    :END:
+
+This is a pretty useful shotcut I've on my .vimrc that selects the last pasted (yanked) text:
+
+#+BEGIN_EXAMPLE
+    nnoremap <leader>V `[v`]
+#+END_EXAMPLE
+
+Thanks to the comment by delexi I know that the function in Emacs is called
+=exchange-point-and-mark=which defaults to =C-x C-x= but I've remapped to
+leader-V with:
+
+#+BEGIN_EXAMPLE
+    (evil-leader/set-key "V" 'exchange-point-and-mark)
+#+END_EXAMPLE
+
+* Other Emacs alternatives for popular Vim plugins
+    :PROPERTIES:
+    :CUSTOM_ID: other-emacs-alternatives-for-popular-vim-plugins
+    :END:
+
+- Powerline => Powerline-Evil
+- Emmet => emmet-mode. I mapped “m” to “emmet-expand-line” because the
+  default C-j shortcut is already defined in Evil.
+- Surround => evil-surround (same operators)
+- Tabular.vim => M-x align-regexp RET regexp RET (with a visual selection)
+- Rename => M-x dired-jump, R to rename the file, RET to reopen.
+- jDaddy => I only really used it to prettify json objects, this can be done with
+  the functions defined [[http://irreal.org/blog/?p=354#comment-79015][by James P.]].
+- Autocomplete and company mode works much like YouCompleteMe on Vim: they give an
+  improved completion when you're programming. I don't know the difference between
+  both, Company is newer, I think, but the ac-dcd package for completing the D
+  language is for Autocomplete so that's what I'm using.
+- Vimdiff => M-x ediff-files or ediff-buffers. Pretty similar. Press =?= for help.
+  If you use Helm (just use it) when you're in a helm file list you can press TAB
+  and in the actions list you can select one to marking the file for ediff; much
+  quicker than browsing by hand to the files to compare.
+- netrw/nerdtree => M-x dired (included) or M-x dired+ (installable).
+
+* Other random thoughts about Emacs, Evil and Vim
+    :PROPERTIES:
+    :CUSTOM_ID: other-random-thoughts-about-emacs-evil-and-vim
+    :END:
+
+- Copy and paste with the system clipboard works without having to paste from the
+  ="+= or ="*= register. It's still saved on those registers, but also in the
+  default register so if you paste after copying from any other desktop program
+  and then paste without specifying any register it will pull that register. Nice.
+- Evil doesn't have =:pu=/=:put= (paste below current line).
+- Some windows with Evil (like =:registers=) use Emacs key binding of
+  =q= to exit instead of Vim =esc=.
+- The toolbar is actually useful for a newbie like me. Check it. To use the
+  toolbar without the mouse you've the =F10= key binding.
+- Paralellization is very nice to have. I love to have my syntax checked without
+  pauses, but...
+- Not everything is perfectly paralellized. For example, when the package
+  manager is loading the information from a package on a split (and sometimes it
+  takes its time), all the interface hangs. One nice feature of Emacs is that you
+  can almost always cancel any long running process with Control-G.
