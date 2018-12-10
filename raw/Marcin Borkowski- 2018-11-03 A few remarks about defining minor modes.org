@@ -1,0 +1,103 @@
+#+TITLE: Marcin Borkowski: 2018-11-03 A few remarks about defining minor modes
+#+URL: http://mbork.pl/2018-11-03_A_few_remarks_about_defining_minor_modes
+#+AUTHOR: lujun9972
+#+TAGS: raw
+#+DATE: [2018年 12月 10日 星期一 14:23:32 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+Today's post is extremely technical and niche, but I just wanted to share an interesting story I had a few days ago.
+
+So I have this minor mode I defined, using the classical construction:\\
+
+#+BEGIN_EXAMPLE
+    (defun cool-start ()
+     "Start the cool-mode.")
+
+    (defun cool-stop ()
+     "Stop the cool-mode.")
+
+    (define-minor-mode my-cool-minor-mode
+     "Toggle a mode for doing cool stuff."
+     :init-value nil
+     :lighter " 8-)"
+     (if my-cool-minor-mode
+     (cool-start)
+     (cool-stop)))
+#+END_EXAMPLE
+
+What I wanted to know is whether I could use the prefix argument to decide what to do when starting the mode. This seems a bit risky, since the prefix argument is already used to turn the mode on or off.
+
+Actually, the documentation is a bit misleading on the treatment of the argument to =my-cool-minor-mode= command. Here an excerpt from what the Emacs manual says:
+
+- If you invoke the mode command directly with no prefix argument (either via ‘M-x', or by binding it to a key and typing that key [...]), that “toggles” the minor mode. The minor mode is turned on if it was off, and turned off if it was on.
+- If you invoke the mode command with a prefix argument, the minor mode is unconditionally turned off if that argument is zero or negative; otherwise, it is unconditionally turned on.
+- If the mode command is called via Lisp, the minor mode is unconditionally turned on if the argument is omitted or ‘nil'. This makes it easy to turn on a minor mode from a major mode's mode hook [...]. A non-‘nil' argument is handled like an interactive prefix argument, as described above.
+
+And here is a quote from the Elisp manual:
+
+The toggle command takes one optional (prefix) argument. If called interactively with no argument it toggles the mode on or off. A positive prefix argument enables the mode, any other prefix argument disables it. From Lisp, an argument of ‘toggle' toggles the mode, whereas an omitted or ‘nil' argument enables the mode. This makes it easy to enable the minor mode in a major mode hook, for example. If DOC is ‘nil', the macro supplies a default documentation string explaining the above.
+
+As you can see, from the Elisp manual it is not entirely clear whether you can supply numeric arguments from your code (obviously, you can't supply a ='toggle= argument interactively).
+
+It turns out that the =define-minor-mode= macro defines the function responsible for turning the mode on and off, and does it in a pretty complicated way.
+
+First of all, the macro contains this snippet:\\
+
+#+BEGIN_EXAMPLE
+    (interactive (list (or current-prefix-arg 'toggle)))
+#+END_EXAMPLE
+
+which means that no argument (when called interactively) is precisely equivalent to an argument of ='toggle=.
+
+One of the next things that follow is this trick:\\
+
+#+BEGIN_EXAMPLE
+    (,@setter
+     (if (eq arg 'toggle)
+     (not ,getter)
+     ;; A nil argument also means ON now.
+     (> (prefix-numeric-value arg) 0)))
+#+END_EXAMPLE
+
+Earlier, =define-minor-mode= sets =setter= to =(setq <mode-name>)= and =getter= to just =<mode-name>=. This is quite clever: =getter= is just the variable named after the mode, and =setter= is the beginning of the Elisp form setting that variable to some value. (In case you think this is too much abstraction, let me tell you that my account is a bit simplified: for global modes, for instance, both =setter= and =getter= are a bit different.)
+
+As you can see from the trick above, my initial problem has an easy answer: yes, we can supply numerical arguments in Elisp code, in fact, supplying a negative argument is the only way to turn the mode off programmatically.
+
+Knowing this, we may now tackle the initial question. Since any positive prefix argument means “turn the mode on”, can we use its actual value to do various stuff?
+
+The answer is (of course) yes. We may do one of two things. First of all, our mode's body may inspect =current-prefix-arg=. We also have another option, which is using =arg=. (This is what =define-minor-mode= macro calls the argument to the newly defined toggling function.) The latter is obviously much less clean (especially since it depends on an implementation detail that might be changed in another Emacs version), so let's forget about it. (Actually, instead of using the =arg= symbol, it would probably be better to use something like Common Lisp's =gensym=. Elisp does not have such a function. The =cl= package has =cl-gensym=, but understandably built-in features do not rely on =cl=.)
+
+But this is not the end of the story. There are quite a few keyword arguments of =define-minor-mode= not mentioned in the docstring nor in the manual, and one of them is =:extra-args=. (Funny sidenote: this =:extra-args= keyword is only mentioned three times in the whole Emacs sources. One is the definition, which (according to =git blame=) is last touched by Stefan Monnier on 2012-06-10. The second one is in the =use-hard-newlines= minor mode, last touched by Stefan Monnier on 2001-10-30. The third one is commented out in =global-font-lock-mode=, with a commentary saying\\
+What was this :extra-args thingy for? --Stef\\
+last touched on 2009-09-13, by guess who.)
+
+Here is how you can use it. The value after the =:extra-args= keyword should be an (unqouted) list which is just appended to the first argument of the function turning the mode on (i.e., the one which is the prefix argument when the mode command is called interactively). All these arguments (including the first one) are optional, and you can't supply the =:extra-args= on an interactive call. You can, however, supply them from Elisp code. Here is an example.
+
+#+BEGIN_EXAMPLE
+    (define-minor-mode my-cool-minor-mode
+     "Toggle a mode for doing cool stuff."
+     :init-value nil
+     :lighter " 8-)"
+     :extra-args (cool-arg-1 cool-arg-2)
+     (if my-cool-minor-mode
+     (progn
+        (cool-start)
+        (message "cool-arg-1: %s, cool-arg-2: %s" cool-arg-1 cool-arg-2))
+     (cool-stop)))
+#+END_EXAMPLE
+
+Try saying e.g. =M-: (my-cool-minor-mode 1 "this")= to see how =cool-arg-1= becomes ="this"= and =cool-arg-2= becomes nil.
+
+The last interesting tidbit I have about =define-minor-mode= is the default message of =My-Cool minor mode enabled in current buffer=. I noticed that when I put the =message= function in the mode starting code, this message stopped appearing. To understand why, at first I grepped the Emacs sources for the words “enabled” (2774 hits) and “disabled” (1324 hits). Hmmm. Then, I [[http://mbork.pl/2016-05-15_debug-on-whatever][recalled]] the =debug-on-message= variable, and it turned out that my grepping was useless anyway. Here's the thing (simplified a bit):\\
+
+#+BEGIN_EXAMPLE
+    (message
+     "Some-mode %sabled"
+     (if mode-variable "en" "dis"))
+#+END_EXAMPLE
+
+Well, that made me cringe (especially that I have to deal a bit with i18n of software), but I admit that it is sweet in a way.
+
+What's more interesting is that the “enabled/disabled” message is indeed turned off if the code responsible for initializing (or shutting down) the mode provides its own =message=. This is done with the help of the =current-message= function, which returns whatever is currently shown in the echo area.
+
+All in all, I only touched the surface. It you head to the file =easy-mmode.el= where all this code resides, you will find quite a few niceties (like about a dozen lines of code of the function =easy-mmode-pretty-mode-name= devoted only to the task of converting the symbol for the mode to a human-friendly version, using the mode lighter to infer capitalization!). This is yet another example of Emacs developers paying immense attention to details, even if there are a few questionable practices along the way. [[http://mbork.pl/smileys/24/mb-wink.gif]]
