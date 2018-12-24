@@ -1,0 +1,190 @@
+#+TITLE: An Emacs Library for frictionless Blogging
+#+URL: https://write.as/dani/an-emacs-library-for-frictionless-blogging
+#+AUTHOR: lujun9972
+#+TAGS: raw
+#+DATE: [2018年 12月 24日 星期一 17:31:58 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+*TLDR: Blog post you are about to read was written in Org Mode and instantly published to this website with one function call. Code [[https://github.com/dangom/writefreely.el][on GitHub]].*
+
+* Library idea
+  :PROPERTIES:
+  :CUSTOM_ID: library-idea
+  :END:
+
+There is this thing called the Fediverse. [[https://en.wikipedia.org/wiki/Fediverse][According to Wikipedia]], Fediverse (a portmanteau of “federation” and “universe”) is the ensemble of federated servers that are used for web publishing (i.e. social networking, microblogging or websites) and file hosting. I came across one of such federated microblogging platforms not long ago, [[https://writefreely.org][writefreely]], and it's flagship instance [[https://write.as][write.as]] . It offers a distraction-free experience, no adds, privacy by default, and users can even write using markdown. I guess the time has finally come to start a blog. Being an Emacs user, though, I figured that before actually starting a blog or doing any meaningful writing, I should write an Elisp library that allows posting to said blogging platform. My goal is to write posts in Org Mode, have them exported to markdown using =ox-md.el=, and directly pushed to the Fediverse. Luckily, [[https://write.as][write.as]] offers an easy to use API. Users can write anonymous blogposts by simply submitting POST requests with a “title” and a “body” to their RESTful API endpoint. With an authorization token in the request header, the blogpost is automatically associated to an user account.
+
+After some minutes of thinking I figured my library would have to support the following functionality:
+
+1. Extract “title” and “body” from an Org document (exported to markdown)
+2. Submit a POST request to the write.as API endpoint
+3. Get the post id and access token from the request response.
+4. Store this information somewhere meaningful for later use.
+
+I never did anything like that with Elisp. In fact, I never did much at all with Elisp, so this library would be the perfect opportunity to start learning.
+
+** Extracting information from Org document
+   :PROPERTIES:
+   :CUSTOM_ID: extracting-information-from-org-document
+   :END:
+
+The first one is easy. The title of an Org document is specified in =#+TITLE=, so I just need a programatic way to read the property. The body is all the content in the Org-to-markdown export.
+
+To get the title, I found the following function in the Emacs devel [[http://lists.gnu.org/archive/html/emacs-orgmode/2018-11/msg00133.html][mailing list]]. Coincidently, it was posted about a week ago.
+
+#+BEGIN_EXAMPLE
+    (defun get-orgmode-keyword (key)
+     (org-element-map (org-element-parse-buffer) 'keyword
+     (lambda (k)
+     (when (string= key (org-element-property :key k))
+     (org-element-property :value k))) 
+     nil t))
+#+END_EXAMPLE
+
+And so to get the title all we have to do is:
+
+#+BEGIN_EXAMPLE
+    (get-orgmode-keyword "TITLE")
+#+END_EXAMPLE
+
+Getting the md export is also trivial. All we need to do is export the file to a temporary buffer as mardown, then get a string between =point-min= and =point-max= and save it to a body variable.
+
+#+BEGIN_EXAMPLE
+    (defun writefreely-org-to-md-string ()
+     (let ((org-buffer (current-buffer))
+     (md-buffer (org-md-export-as-markdown)))
+     (let ((md-string
+     (with-current-buffer md-buffer
+     (buffer-substring (point-min) (point-max)))))
+     (set-buffer org-buffer)
+     (kill-buffer md-buffer)
+     md-string)))
+#+END_EXAMPLE
+
+** Submitting a POST request
+   :PROPERTIES:
+   :CUSTOM_ID: submitting-a-post-request
+   :END:
+
+This one is also simple. I know nothing about RESTful APIs and asynchronous requests, yet the examples in the [[https://github.com/tkf/emacs-request][request.el]] library are enough to come up with the following:
+
+#+BEGIN_EXAMPLE
+    (defvar writefreely-api-endpoint "https://write.as/api/posts"
+     "URL of the writefreely instance API endpoint")
+
+    (defun writefreely-post-publish-request (title body)
+     "post title and body. Return parsed JSON response"
+     (request-response-data
+     (request
+     writefreely-api-endpoint
+     :type "POST"
+     :parser #'json-read
+     :data (json-encode
+     `(("title" . ,title)
+     ("body" . ,body)))
+     :headers '(("Content-Type" . "application/json"))
+     :sync t
+     :error (function* (lambda (&key error-thrown &allow-other-keys&rest _)
+     (message "Got error: %S" error-thrown))))))
+#+END_EXAMPLE
+
+What this function is doing is simple: it's submitting a request using =request=, waiting for the response (see the =sync= keyword set to =t=) and then reading and returning it with =request-response-data=. Note that I'm using =:sync t= because I haven't learned yet how to deal with async, and the request takes less than a second anyway (and I'll probably only submit a blogpost every now and then). For now, what we have is enough for us to submit anonymous posts.
+
+** Getting the ID and Token from the response
+   :PROPERTIES:
+   :CUSTOM_ID: getting-the-id-and-token-from-the-response
+   :END:
+
+A response, after parsed, will look like the following:
+
+((code . 201)
+(data
+(id . “1234567890123”)
+(slug)
+(token . “uffVIr18ygX2kR7e3vISjVv9o8ukLlmi”)
+(appearance . “norm”)
+(language . “”)
+(rtl . :json-false)
+(created . “2018-11-16T21:51:58Z”)
+(updated . “2018-11-16T21:51:58Z”)
+(title . “title”)
+(body . “body”)
+(tags .
+[])
+(views . 0)))
+
+The 13-digit post id is what tells us where to find the post in the web. If id is the one in the example above, then the url of a post is given by =https://write.as/1234567890123=, or =https://write.as/1234567890123.md= (note the .md extension) for displaying it with markdown syntax. The 32-character token is only required if we want to either update or claim an anonymous post.
+
+To get the =id= and =token= from the response, the following is sufficient.
+
+#+BEGIN_EXAMPLE
+    (assoc-default 'id (assoc 'data writefreely-response))
+    (assoc-default 'token (assoc 'data writefreely-response))
+#+END_EXAMPLE
+
+** Storing writefreely data somewhere meaningful
+   :PROPERTIES:
+   :CUSTOM_ID: storing-writefreely-data-somewhere-meaningful
+   :END:
+
+We could have a directory where we save all posts. Or alternatively a cache file that stores information about all posts we submit. But I figured the simplest thing to do is to store the ID and token information in the Org document itself. The advantages of this approach is that we can then update posts later, by checking if the document already has an ID and token, and we don't have to clutter our filesystem with extra stuff. Additionally, we can get an URL in the Org document to visit the post online.
+
+I decided to store the id and token, and the url in file-local variables. That's also easy to accomplish using one of two Emacs built-in functions: =add-file-local-variable= or =add-file-local-variable-prop-line=.
+
+#+BEGIN_EXAMPLE
+    (add-file-local-variable 'writefreely-id "1234567890123")
+    (add-file-local-variable 'writefreely-token "uffVIr18ygX2kR7e3vISjVv9o8ukLlmi")
+#+END_EXAMPLE
+
+** Putting it all together
+   :PROPERTIES:
+   :CUSTOM_ID: putting-it-all-together
+   :END:
+
+Now we write an interactive function that gets the title and the body of a document, sends them to write.as using a POST request, and stores the post-id and post-token in the current file.
+
+#+BEGIN_EXAMPLE
+    (defun writefreely-publish-buffer ()
+     "Publish the current Org buffer to a writefreely instance."
+     (let* ((title (writefreely-get-orgmode-keyword "TITLE"))
+     (body (writefreely-org-to-md-string))
+     ;; POST the blogpost with title and body
+     (response (writefreely-post-publish-request title body))
+     ;; Get the id and token from the response
+     (post-id (assoc-default 'id (assoc 'data response)))
+     (post-token (assoc-default 'token (assoc 'data response))))
+     ;; Use setq-local as well because otherwise the local variables won't be
+     ;; evaluated until we reopen the file.
+     (setq-local writefreely-post-id post-id)
+     (add-file-local-variable 'writefreely-post-id post-id)
+     (setq-local writefreely-post-token post-token)
+     (add-file-local-variable 'writefreely-post-token post-token)))
+#+END_EXAMPLE
+
+* Next steps
+  :PROPERTIES:
+  :CUSTOM_ID: next-steps
+  :END:
+
+[[https://github.com/dangom/writefreely.el][WriteFreely.el]] is available on GitHub. You can find install instructions on the README file. For now, what I'd like to add are the following features:
+
+- Get a confirmation from the user before publishing.
+- Update a post, if the Org file already contains writefreely local variables.
+- A function to open the post online.
+- Allow posting as authenticated user.
+
+This is done by setting the variable =writefreely-auth-token= to an authentication token. In order to not keep it hanging around in the open, you can encrypt and load it on startup as described [[https://www.masteringemacs.org/article/keeping-secrets-in-emacs-gnupg-auth-sources][in this post]] from Mastering Emacs.
+
+- [ ] Delete a post.
+- [ ] Automatically upload images from the filesystem.
+- [ ] Retrieve post into an Org file.
+- Figure out how to make Ox-md export code as code, not text.
+
+Now depend on ox-gfm instead of ox-md.
+
+* Things I wish to see in write.as
+  :PROPERTIES:
+  :CUSTOM_ID: things-i-wish-to-see-in-write-as
+  :END:
+
+Proper syntax highlighting for different languages would be awesome.
