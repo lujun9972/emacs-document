@@ -1,0 +1,393 @@
+#+TITLE: Writing a PhD thesis with Org Mode
+#+URL: https://write.as/dani/writing-a-phd-thesis-with-org-mode
+#+AUTHOR: lujun9972
+#+TAGS: raw
+#+DATE: [2018年 12月 24日 星期一 17:32:39 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+*TLDR: I started using Emacs about 3 years ago. I couldn't be more grateful to have seen the light, and to have been rescued from the darkness of Windoze, Goggle and/or friends. After enlightenment, I've taken upon myself the task of customising an environment to write my PhD thesis with Org Mode.*
+
+* Why
+  :PROPERTIES:
+  :CUSTOM_ID: why
+  :END:
+
+Post created in response to the [[https://www.reddit.com/r/emacs/comments/9ynsvc/write_a_thesis_using_emacs_and_orgmode/][current thread]] in r/emacs on thesis writing with Org Mode.\\
+I see most people's reason to avoid Org mode for scientific writing is the fact that supervisors or co-authors use Mic. Word. I'll try to argue that that's not enough reason to accept subpar tools.
+
+* What I'll talk about
+  :PROPERTIES:
+  :CUSTOM_ID: what-i-ll-talk-about
+  :END:
+
+I'll mention a bit of my motivations, and then I'll discuss how to make use of (mostly) built in Org functionality such as tagging, export, [[https://orgmode.org/manual/In_002dbuffer-settings.html][setupfiles]] and includes, reference management, keyboard shortcuts and advanced searching; all with the purpose of building a useful thesis writing environment. Readers should have a minimum knowledge of Org mode, the Org export system and LaTeX.
+
+* My requirements
+  :PROPERTIES:
+  :CUSTOM_ID: my-requirements
+  :END:
+
+Here in the Netherlands, most PhD thesis consist of an introduction, 3 to 4 research chapters (as submitted for publication), a summary, bibliography and appendices. What this means for me is that my writing environment has to necessarily satisfy the following *minimum requirements*:
+
+- Inclusion of (parts of) external files
+- Keeping track of references
+- Include and reference figures
+- Version control documents
+- Support for sharing with my supervisor in whatever format he wants
+
+Failure to comply with any of these means the editor is unfit for purpose .1”>1. Unfortunately, this set of requirements are not seamlessly satisfied by likes of Mic. Word or G. Docs. I reckon they can probably be configured to satisfy them, but why bother.
+
+Additionally, a PhD thesis writing environment should also provide the following features:
+
+- Extended searching facilities for both text and references
+- Simple syntax for tables and equations
+- Support within a proper text editor
+- Shortcuts to reach my files and build the thesis
+
+To the best of my knowledge, only Emacs with Org Mode + ox-latex provide all of these out of the box.
+
+* Moulding Org Mode for thesis writing
+  :PROPERTIES:
+  :CUSTOM_ID: moulding-org-mode-for-thesis-writing
+  :END:
+
+Most of my inspiration comes from reading Kitchin's blogs and code, and reading the Org Mode documentation, mailing list and Emacs Stack Exchange. Here' I'll go one by one through all of the requirements listed above, and how to deal with them.
+
+** Prelude: File structure
+   :PROPERTIES:
+   :CUSTOM_ID: prelude-file-structure
+   :END:
+
+I have a main thesis.org document, with latex heading declarations and a commented setup file. I also have research.org files, in different directories, with their own latex heading declarations and commented setup files.
+
+The first lines of thesis.org look like the following:
+
+#+BEGIN_EXAMPLE
+    # -*- mode: org; org-latex-title-command: ""; org-latex-toc-command: "" -*-
+    #+TITLE: Thesis Title
+    #+LATEX_CLASS: mimosis
+    # Setupfile with #+LATEX_HEADER, #+OPTIONS and explanations
+    #+SETUPFILE: thesis.setup
+    #+LATEX_HEADER: \KOMAoptions{fontsize=12pt,headings=small}
+    #+LATEX_HEADER: \bibliography{~/Papers/bibtex/Publications}
+    #+EXCLUDE_TAGS: journal noexport
+
+    * Frontmatter :ignore:
+    #+LATEX: \frontmatter
+    #+INCLUDE: ./Title.org
+    #+LATEX: \tableofcontents
+
+    * Mainmatter :ignore:
+    #+LATEX: \mainmatter
+
+    * Introduction
+    * Research 1
+    #+INCLUDE: "../research1/research.org::*Abstract" :only-contents t
+    Some stuff.
+    #+INCLUDE: "../research1/research.org" :lines "5-"
+
+    * Research 2
+    ...
+#+END_EXAMPLE
+
+And the first lines and structure overview of the multiple research.org files:
+
+#+BEGIN_EXAMPLE
+    #+TITLE: Research
+    #+LATEX_CLASS: elsarticle
+    #+LATEX_CLASS_OPTIONS: [authoryear,preprint,11pt]
+    #+SETUPFILE: paper.setup
+    #+LATEX_HEADER:\bibliography{./ref/Publications-research}
+    #+EXCLUDE_TAGS: thesis noexport
+
+    * Frontmatter :ignore:journal:
+    #+LATEX: \begin{frontmatter}
+    ** Author List :ignore:
+    ** Abstract :ignore:
+    ** Keywords :ignore:
+    #+LATEX: \end{frontmatter}
+    * Introduction
+    ...
+#+END_EXAMPLE
+
+** Inserting (parts of) external files
+   :PROPERTIES:
+   :CUSTOM_ID: inserting-parts-of-external-files
+   :END:
+
+I write my research chapters with LaTeX classes targeting the journal's format. That means that a research chapter may be written with the =elsarticle= class, whereas the thesis as a whole is written with the =mimosis= [[https://github.com/Submanifold/latex-mimosis][class]], a derivative of KOMA =scrbook=. Here's the class configuration for both:
+
+#+BEGIN_EXAMPLE
+    (add-to-list 'org-latex-classes
+     '("elsarticle"
+     "\\documentclass{elsarticle}
+     [NO-DEFAULT-PACKAGES]
+     [PACKAGES]
+     [EXTRA]"
+     ("\\section{%s}" . "\\section*{%s}")
+     ("\\subsection{%s}" . "\\subsection*{%s}")
+     ("\\subsubsection{%s}" . "\\subsubsection*{%s}")
+     ("\\paragraph{%s}" . "\\paragraph*{%s}")
+     ("\\subparagraph{%s}" . "\\subparagraph*{%s}")))
+    (add-to-list 'org-latex-classes
+     '("mimosis"
+     "\\documentclass{mimosis}
+     [NO-DEFAULT-PACKAGES]
+     [PACKAGES]
+     [EXTRA]
+    \\newcommand{\\mboxparagraph}[1]{\\paragraph{#1}\\mbox{}\\\\}
+    \\newcommand{\\mboxsubparagraph}[1]{\\subparagraph{#1}\\mbox{}\\\\}"
+     ("\\chapter{%s}" . "\\chapter*{%s}")
+     ("\\section{%s}" . "\\section*{%s}")
+     ("\\subsection{%s}" . "\\subsection*{%s}")
+     ("\\subsubsection{%s}" . "\\subsubsection*{%s}")
+     ("\\mboxparagraph{%s}" . "\\mboxparagraph*{%s}")
+     ("\\mboxsubparagraph{%s}" . "\\mboxsubparagraph*{%s}")))
+#+END_EXAMPLE
+
+Research chapters print the bibliography on their own, and they may contain acknowledgements that shouldn't be present in the middle of the thesis, so they should be excluded. In other to insert research chapters into my thesis, I use Org's =#+INCLUDE= derivative:
+
+#+BEGIN_EXAMPLE
+    #+INCLUDE: file.org
+#+END_EXAMPLE
+
+In order to not include the some parts of the file, i.e., to exclude the title, setupfile and headers, I narrow down the lines:
+
+#+BEGIN_EXAMPLE
+    # Include line 5 until the end of the file
+    #+INCLUDE: file.org :lines 5-
+#+END_EXAMPLE
+
+In order to exclude parts of the file, I tag research chapter headings that are only meant for publication with a =:journal:= tag (such as the bibliography or acknowledgements). This way they are automatically excluded from the thesis (see the =#+EXCLUDE_TAGS:= derivative in the thesis.org file). Also, I could have thesis specific content in the research.org document tagged with =:thesis:=, and it would be excluded in the research.org export, but I currently don't have any.
+
+Now, the most important piece of advice I can give anyone is to *learn how to use tags*, =EXCLUDE_TAGS= and the org-plus-contributions =ignore= tag. With the =ignore= tag we separate the structuring of the text as a physical document from the structuring of the text as a semantic unity. This allows an extremely fine control over pieces of text to include into another document. For example, in a research chapter written with the =elsarticle= class, the abstract has to be included in the Frontmatter. By tagging a headline as follows:
+
+#+BEGIN_EXAMPLE
+    ** Abstract :ignore:
+#+END_EXAMPLE
+
+I can write the research abstract in it's own heading, pretend that the heading itself does not exist (so it does not trigger =/begin{document}=) .2”>2, only its contents, and then include the contents in the thesis in an arbitrary location:
+
+#+BEGIN_EXAMPLE
+    # in thesis.org
+    #+INCLUDE: "research.org::*Abstract" :only-contents t
+#+END_EXAMPLE
+
+The =:ignore:= tag is one of the best Org mode features, in my opinion. It's key to my workflow, and a shame to see it's not a part of Org core, but rather a contribution to be found in ox-extra.el. To activate it, add the following to your init:
+
+#+BEGIN_EXAMPLE
+    (require 'ox-extra)
+    (ox-extras-activate '(ignore-headlines))
+#+END_EXAMPLE
+
+The realisation that it's possible to have such fine control over where to include or exclude pieces of text opens the door to all sort of interesting experiments: putting figures and captions directly into beamer or org-reveal presentations, creating conference posters, writing blog posts, etc.
+
+** Keep track of references
+   :PROPERTIES:
+   :CUSTOM_ID: keep-track-of-references
+   :END:
+
+For backwards compatibility I still use Mendeley to track literature. I export bibtex files for each research project individually, and also a master bibtex for use in the thesis. These documents are saved to =~/Papers/bibtex/=, but for the research chapters, I keep local copies under =./ref/Publications-research.bib=.\\
+To insert citations, I use [[https://github.com/jkitchin/org-ref][org-ref.]] It's documentation says it all. After setting up local bibliography files with the derivative =#+BIBLIOGRAPHY=, press =C-c ]= to see a list of publications and insert them in place. I also prefer to have =parencite= citations instead of =cite=, because they work nicely with BibLaTeX. My setup for org-ref:
+
+#+BEGIN_EXAMPLE
+    (with-eval-after-load 'org-ref
+     ;; see org-ref for use of these variables
+     (setq org-ref-default-bibliography '("~/Papers/bibtex/Publications.bib")
+     org-ref-pdf-directory "~/Papers/MendeleyDesktop/"
+     org-ref-get-pdf-filename-function 'org-ref-get-mendeley-filename
+     bibtex-completion-pdf-field "file"
+     org-latex-prefer-user-labels t
+     org-ref-default-citation-link "parencite"
+     ;; bibtex-dialect 'biblatex
+     )
+
+     (defun org-ref-open-pdf-at-point-in-emacs ()
+     "Open the pdf for bibtex key under point if it exists."
+     (interactive)
+     (let* ((results (org-ref-get-bibtex-key-and-file))
+     (key (car results))
+     (pdf-file (funcall org-ref-get-pdf-filename-function key)))
+     (if (file-exists-p pdf-file)
+     (find-file-other-window pdf-file)
+     (message "no pdf found for %s" key))))
+
+     ;; https://github.com/jkitchin/org-ref/issues/597
+     (defun org-ref-grep-pdf (&optional _candidate)
+     "Search pdf files of marked CANDIDATEs."
+     (interactive)
+     (let ((keys (helm-marked-candidates))
+     (get-pdf-function org-ref-get-pdf-filename-function))
+     (helm-do-pdfgrep-1
+     (-remove (lambda (pdf)
+     (string= pdf ""))
+     (mapcar (lambda (key)
+     (funcall get-pdf-function key))
+     keys)))))
+
+     (helm-add-action-to-source "Grep PDF" 'org-ref-grep-pdf helm-source-bibtex 1)
+
+     (setq helm-bibtex-map
+     (let ((map (make-sparse-keymap)))
+     (set-keymap-parent map helm-map)
+     (define-key map (kbd "C-s") (lambda () (interactive)
+     (helm-run-after-exit 'org-ref-grep-pdf)))
+     map))
+     (push `(keymap . ,helm-bibtex-map) helm-source-bibtex)
+
+     (setq org-ref-helm-user-candidates
+     '(("Open in Emacs" . org-ref-open-pdf-at-point-in-emacs))))
+#+END_EXAMPLE
+
+** Include and reference figures
+   :PROPERTIES:
+   :CUSTOM_ID: include-and-reference-figures
+   :END:
+
+For each research project I keep a =./media= directory, where all my figures live. You can include figures in Org mode by using the following syntax:
+
+#+BEGIN_EXAMPLE
+    #+NAME: figurename
+    #+CAPTION: This is a figure caption
+    [[path_to_figure][link_description]]
+#+END_EXAMPLE
+
+Currently there is a bug in the ELPA version of Org mode, such that relative paths to figures in =#+INCLUDE= 'd files aren't adapted with respect to the including file, so the latex export cannot find them. I've [[https://code.orgmode.org/bzg/org-mode/commit/d81a1d088c74e605c99e90a2835c55df5144f43e][submitted a fix]] which should land in the next release of Org.
+
+** Version control documents
+   :PROPERTIES:
+   :CUSTOM_ID: version-control-documents
+   :END:
+
+[[https://magit.vc/][Magit]]. I thought about having the research chapters as git submodules in a thesis git project directory, but I currently don't. This would allow me to always have the thesis code in a saved state, even if I further work on my research chapters to answer to reviewers questions.
+
+** Support for sharing with my supervisor
+   :PROPERTIES:
+   :CUSTOM_ID: support-for-sharing-with-my-supervisor
+   :END:
+
+Unfortunately, my supervisor likes to write comments in Mic. Word. I give in that sharing your writing with colleagues is a fundamental part of research.\\
+Fortunately, [[https://github.com/jkitchin/scimax/blob/master/ox-word.el][ox-word]] export via Pandoc & LaTeX is capable of creating nice looking, structured Word files which I send to my supervisor. I then manually work through each comment step by step, though I'm looking for a way to improve this part of my workflow. I think the Emacs community is missing a minor mode to track Word document changes from within Org Mode. There are some ideas laying around on how to implement it [[https://lists.gnu.org/archive/html/emacs-orgmode/2015-06/msg00246.html][hidden deep in the mailing list]], or in [[https://emacs.stackexchange.com/questions/34923/merging-changes-to-from-docx-files-into-org-files][this Emacs Exchange thread]].
+
+I may update this post with more information later.
+
+** Extended search facilities
+   :PROPERTIES:
+   :CUSTOM_ID: extended-search-facilities
+   :END:
+
+By extended search facilities I mean the ability to quickly search for information in references, and to keep notes linked to the literature. For searching I make use of [[https://github.com/jkitchin/org-ref/issues/597][org-ref + pdfgrep]], as shown in my org-ref setup. For notes linked to documents I've recently started to use [[https://github.com/weirdNox/org-noter][Org-noter.]]
+
+** Simple syntax for tables and equations
+   :PROPERTIES:
+   :CUSTOM_ID: simple-syntax-for-tables-and-equations
+   :END:
+
+Org tables are a pleasure to work with. The following:
+
+#+BEGIN_EXAMPLE
+    | a | b | c |
+    |---+---+---|
+    | 1 | 2 | 3 |
+#+END_EXAMPLE
+
+Turns into:
+
+a
+b
+c
+1
+2
+3
+
+Equations can be written in LaTeX:
+
+#+BEGIN_EXAMPLE
+    \frac{d \vec{M} (t)}{dt} = \vec{M} (t) \times \gamma \vec{B} (t)
+#+END_EXAMPLE
+
+will become:
+
+$ \frac{d \vec{M} (t)}{dt} = \vec{M} (t) × γ \vec{B} (t) $
+
+** Support within a proper text editor
+   :PROPERTIES:
+   :CUSTOM_ID: support-within-a-proper-text-editor
+   :END:
+
+No need to talk about the synergy of using Emacs to edit text. I personally started using Spacemacs without Evil mode, because I find it aesthetically pleasing and because it offers great support for the languages I use the most, and excellent integration with Helm and Org.\\
+The following configurations make the Org editing experience a bit nicer, in my opinion:
+
+#+BEGIN_EXAMPLE
+    ;; Writegood https://github.com/bnbeckwith/writegood-mode
+    (add-hook 'org-mode-hook 'writegood-mode)
+
+    ;; https://github.com/cadadr/elisp/blob/master/org-variable-pitch.el
+    (use-package org-variable-pitch
+     :load-path "~/Elisp")
+    (add-hook 'org-mode-hook 'org-variable-pitch-minor-mode)
+
+    (setq visual-fill-column-width 120
+     visual-fill-column-center-text t)
+    (add-hook 'org-mode-hook 'visual-line-mode)
+
+    ;; https://github.com/joostkremers/visual-fill-column
+    (add-hook 'org-mode-hook 'visual-fill-column-mode)
+    (add-hook 'org-mode-hook 'org-display-inline-images)
+
+    ;; I have a modified version of the following:
+    ;; https://github.com/lepisma/rogue/blob/master/config.el
+    (load-file "~/Projects/rogue/config.el")
+    (add-hook 'org-mode-hook '(lambda () (setq-local line-spacing 5)))
+
+    ;; Aesthetical enhancements.
+    (setq org-fontify-quote-and-verse-blocks t
+     org-hide-macro-markers t
+     org-fontify-whole-heading-line t
+     org-fontify-done-headline t
+     org-hide-emphasis-markers t)
+#+END_EXAMPLE
+
+** Shortcuts to reach my files and build the thesis
+   :PROPERTIES:
+   :CUSTOM_ID: shortcuts-to-reach-my-files-and-build-the-thesis
+   :END:
+
+I have a hydra (defined in Spacemacs as a transient-state) to move between my Thesis files:
+
+#+BEGIN_EXAMPLE
+     ;; Spacemacs hydra.
+     (spacemacs|define-transient-state thesis-menu
+     :title "Ph.D. Thesis Menu"
+     :doc
+     "
+    ^Main Files^ ^Chapters^ ^Actions^
+    ^^^^^^^^-------------------------------------------
+    _m_: Thesis _1_: Research 1 _o_: Open Thesis.pdf externally
+    _t_: Title page _2_: Research 2 _c_: Async compile file
+    _i_: Introduction _3_: Research 3 _a_: things
+    _s_: thesis.setup _4_: Research 4 ^ ^
+    "
+     :bindings
+     ("a" things :exit t)
+     ("m" (find-file "~/thesis/thesis.org") :exit t)
+     ("t" (find-file "~/thesis/titlepage.org") :exit t)
+     ("s" (find-file "~/thesis/thesis.setup") :exit t)
+     ("i" (find-file "~/thesis/intro/intro.org") :exit t)
+     ("1" (find-file "~/thesis/ch1/research.org") :exit t)
+     ("2" (find-file "~/thesis/ch2/research.org") :exit t)
+     ("3" (find-file "~/thesis/ch3/research.org") :exit t)
+     ("4" (find-file "~/thesis/ch4/research.org") :exit t)
+     ("o" (shell-command "open ~/thesis/thesis.pdf" :exit t))
+     ("c" (org-latex-export-to-pdf :async t) :exit t))
+
+     (global-set-key (kbd "H-t") 'spacemacs/thesis-menu-transient-state/body)
+#+END_EXAMPLE
+
+I'm considering writing a thesis template repository. I might do it when I finish my Ph.D.
+
+This post was generated with a library I've talked about in a [[https://write.as/dani/an-emacs-library-for-frictionless-blogging][previous post]].
+
+.1”>1 See item 9 [[https://www.joelonsoftware.com/2000/08/09/the-joel-test-12-steps-to-better-code/][from this blogpost.]]
+
+.2”>2 Headlines will tell ox-latex to start the document sectioning, and therefore trigger the beginning of the document environment
