@@ -20,4 +20,4 @@ git commit -m "translating by ${git_user}"
 git push -u origin "${new_branch}"
 
 # 打开要翻译的文章
-eval "$(get-editor) '${filename}'"
+eval "$(get-editor) '../processing/${filename}'"
