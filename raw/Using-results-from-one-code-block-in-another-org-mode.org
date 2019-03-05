@@ -1,0 +1,302 @@
+#+TITLE: Using results from one code block in another org-mode
+#+URL: http://kitchingroup.cheme.cmu.edu/org/2019/02/12/Using-results-from-one-code-block-in-another-org-mode.org
+#+AUTHOR: lujun9972
+#+TAGS: raw
+#+DATE: [2019年 03月 05日 星期二 18:15:29 CST]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+* DONE Using results from one code block in another org-mode
+  CLOSED: [2019-02-12 Tue 09:20]
+  :PROPERTIES:
+  :categories: emacs,elisp,orgmode
+  :date:     2019/02/12 09:20:58
+  :updated:  2019/02/25 14:17:16
+  :org-url:  http://kitchingroup.cheme.cmu.edu/org/2019/02/12/Using-results-from-one-code-block-in-another-org-mode.org
+  :permalink: http://kitchingroup.cheme.cmu.edu/blog/2019/02/12/Using-results-from-one-code-block-in-another-org-mode/index.html
+  :END:
+
+One really great feature in org-mode is you have many options to pass data between code-blocks. In this post we look at some of these options using emacs-lisp as the language. This runs in a /session/ where you can keep variables in memory between blocks, and use them in subsequent blocks.
+
+Here we set a variable to a value.
+
+#+BEGIN_SRC emacs-lisp
+(setq some-variable 42)
+#+END_SRC
+
+#+RESULTS:
+: 42
+
+Then later in another block we can use that variable:
+
+#+BEGIN_SRC emacs-lisp
+(+ some-variable 1)
+#+END_SRC
+
+#+RESULTS:
+: 43
+
+While you are in the session, =some-variable= can be used. If you want some mind-bending trouble, the emacs-lisp session is global, and you can access =some-variable= even in another buffer! Don't do that. When you close emacs this variable will disappear, and all that is left are the results from above.
+
+There is another way to pass information from one block to another using named src blocks and variables in the block header. This allows you to pass data between blocks by name, and you will see later you can even access the results by name from other files.
+
+** :var
+
+First, we give our src block a name like this:
+
+#+BEGIN_EXAMPLE
+#+name: block-1
+#+BEGIN_SRC emacs-lisp
+(current-time-string)
+#+END_SRC
+#+END_EXAMPLE
+
+When we run this, the results will have a name too.
+
+#+name: block-1
+#+BEGIN_SRC emacs-lisp
+(current-time-string)
+#+END_SRC
+
+#+RESULTS: block-1
+: Tue Feb 12 08:19:23 2019
+
+Now, we can use the named result as /input/ to a new block using the :var header.
+
+#+BEGIN_EXAMPLE
+#+BEGIN_SRC emacs-lisp :var input=block-1
+(format "We got %S in block-1" input)
+#+END_SRC
+#+END_EXAMPLE
+
+When we run this block, emacs will run block-1 and put the output in to the variable =input= which we use inside the code block.
+
+#+BEGIN_SRC emacs-lisp :var input=block-1
+(format "We got %S in block-1" input)
+#+END_SRC
+
+#+RESULTS:
+: We got "Tue Feb 12 08:20:44 2019" in block-1
+
+Some things to note:
+1. Every time you run this, block-1 gets rerun.
+2. The results in this block are not the same as in block-1
+3. The results in block-1 are not changed when you run the second block.
+
+You may not want to rerun block-1 each time; maybe it is an expensive calculation, or maybe it should not be changed. You can prevent this behavior by using the :cache header.
+
+** :cache
+
+If you specify =:cache yes= then org-mode /should/ store a hash of the code block with the results, and if the code block hasn't changed then it should not run again.
+
+#+BEGIN_EXAMPLE
+#+name: block-2
+#+BEGIN_SRC emacs-lisp :cache yes
+(current-time-string)
+#+END_SRC
+#+END_EXAMPLE
+
+#+name: block-2
+#+BEGIN_SRC emacs-lisp :cache yes
+(current-time-string)
+#+END_SRC
+
+#+RESULTS[16a95c8b6a2ad5f5f5ed18b60f13c5b8904ba8d6]: block-2
+: Tue Feb 12 08:06:22 2019
+
+Now, we use block-2 as input to a block, we see the output is the same as the output from block-2.
+
+#+BEGIN_SRC emacs-lisp :var input=block-2
+(format "We got %S in block-2" input)
+#+END_SRC
+
+#+RESULTS:
+: We got "Tue Feb 12 08:06:22 2019" in block-2
+
+Ok, but what if my results are too large to put in the buffer, or too complex for text? You still have some options.
+
+** :wrap
+
+Suppose we generate some json in one block, and we want to use it in another block. We still want to see the json in the buffer as an intermediate result. We can wrap the output in a json block like this.
+
+#+name: json
+#+BEGIN_SRC emacs-lisp :wrap json :cache yes
+(require 'json)
+(json-encode `(("date" . ,(current-time-string))))
+#+END_SRC
+
+#+RESULTS[2daea688af88cfac7bd5862c0b42c69351d516dd]: json
+#+begin_json
+{"date":"Tue Feb 12 08:30:20 2019"}
+#+end_json
+
+Then, we can simply input that output into a new block.
+
+#+BEGIN_SRC emacs-lisp :var input=json
+(format "We got %S in json" input)
+#+END_SRC
+
+#+RESULTS:
+: We got "{\"date\":\"Tue Feb 12 08:30:20 2019\"}
+: " in json
+
+This admittedly still pretty simple, text-based data. It is probably not a good idea to do this with binary data.
+
+Note you can refer to this result even in another org-file:
+
+#+BEGIN_EXAMPLE
+#+BEGIN_SRC emacs-lisp :var input=./2019-02-12.org:json
+input
+#+END_SRC
+
+#+RESULTS:
+: {"date":"Tue Feb 12 08:30:20 2019"}
+#+END_EXAMPLE
+
+
+** :file
+
+It may be that your data is too large to conveniently put into your org-file, or maybe it is binary data. No problem, just put it into an external file using the :file header. It looks like this:
+
+#+BEGIN_EXAMPLE
+#+name: block-3
+#+BEGIN_SRC emacs-lisp :cache yes :file block-3
+(require 'json)
+(json-encode `(("date" . ,(current-time-string))))
+#+END_SRC
+
+#+RESULTS[a14d376653bd8c40a0961ca95f21d8837dddec66]: block-3
+[[file:block-3]]
+#+END_EXAMPLE
+
+
+Note that you have to provide a file name for this. Sometimes that is nice if you want a human recognizable file to send to someone, but it would also be nice if there was an automatic naming scheme, e.g. based on an sha-1 hash of the src block.
+
+#+name: block-3
+#+BEGIN_SRC emacs-lisp :cache yes :file block-3
+(require 'json)
+(json-encode `(("date" . ,(current-time-string))))
+#+END_SRC
+
+#+RESULTS[a14d376653bd8c40a0961ca95f21d8837dddec66]: block-3
+[[file:block-3]]
+
+Now you can use other tools to check out the file. Here we can still use simple shell tools.
+
+#+BEGIN_SRC sh :results code
+cat block-3
+#+END_SRC
+
+#+RESULTS:
+#+begin_src sh
+{"date":"Tue Feb 12 08:46:55 2019"}
+#+end_src
+
+
+The output of block-3 is a file name:
+
+#+BEGIN_SRC emacs-lisp :var input=block-3
+input
+#+END_SRC
+
+#+RESULTS:
+: /Users/jkitchin/Box Sync/kitchingroup/jkitchin/journal/2019/02/12/block-3
+
+So you can use it in a new block to read the data in, and then do something new with it.
+
+#+BEGIN_SRC emacs-lisp :var input=block-3
+(with-temp-buffer
+  (insert-file-contents input)
+  (format "We got %S in block-3" (json-read-from-string (buffer-string))))
+#+END_SRC
+
+#+RESULTS:
+: We got ((date . "Tue Feb 12 08:46:55 2019")) in block-3
+
+** "remote" data
+
+The blocks do not have to be in order. If you want, you can put your blocks in an [[id:0452775B-D200-4B9B-BC09-C6935D9183A4][appendix]], and then just have analysis blocks here that use them. That way, you can have short blocks here that are more readable, but longer, more complex blocks elsewhere that do not clutter your document.
+
+#+BEGIN_SRC emacs-lisp :var input=appendix-data
+(with-temp-buffer
+  (insert-file-contents input)
+  (format "We got %S in the appendix data" (json-read-from-string (buffer-string))))
+#+END_SRC
+
+#+RESULTS:
+: We got "{\"date\":\"Tue Feb 12 09:11:12 2019\"}" in the appendix data
+
+
+** Manually saving data in files
+
+Note you can also manually save data in a file, for example:
+
+#+name: block-4
+#+BEGIN_SRC emacs-lisp
+(require 'json)
+(let ((f "block-4.json"))
+  (with-temp-file f
+    (prin1
+     (json-encode `(("date" . ,(current-time-string))))
+     (current-buffer)))
+  f)
+#+END_SRC
+
+#+RESULTS: block-4
+: block-4.json
+
+We put the filename as the last variable which is returned by the block, so that we don't have to manually type it later in the next block. You know, try not to repeat yourself...
+
+This just shows we did write out to our file:
+
+#+BEGIN_SRC sh
+cat block-4.json
+#+END_SRC
+
+#+RESULTS:
+: :\"Tue Feb 12 08:50:00 2019\"}
+
+And we read the file in here, using the filename from block-4 as an input variable.
+
+#+BEGIN_SRC emacs-lisp :var input=block-4
+(with-temp-buffer
+  (insert-file-contents input)
+  (format "We got %S in block-4" (json-read-from-string (buffer-string))))
+#+END_SRC
+
+#+RESULTS:
+: We got "{\"date\":\"Tue Feb 12 08:51:25 2019\"}" in block-4
+
+** An appendix for data
+   :PROPERTIES:
+   :ID:       0452775B-D200-4B9B-BC09-C6935D9183A4
+   :END:
+
+#+name: appendix-data
+#+BEGIN_SRC emacs-lisp
+(require 'json)
+(let ((f "appendix.json"))
+  (with-temp-file f
+    (prin1
+     (json-encode `(("date" . ,(current-time-string))))
+     (current-buffer)))
+  f)
+#+END_SRC
+
+#+RESULTS: appendix-data
+: appendix.json
+
+
+** Caveats
+
+Using org-mode like this is almost always finding the right tradeoffs in what is persistent, and where is it stored. Not all of the intermediate data/calculations are stored; if they are really cheap you can just run the code blocks again. If they are really small, i.e. easy for your to read in a few lines, you can store them in the document. If they are really large, you can store them in a file.
+
+The beauty of having everything in an org-file is you have a single file that is easy to transport. When the files get too large though, it can become impractical, e.g. emacs may slow down if you try to put thousands of lines of xml data into the buffer. Then, you have to make some decisions about what to keep, where to keep it, and in what form to keep it.
+
+For short projects where you only need a single compute session, having everything in memory may be fine. For longer projects, say one that is long enough you will close all the buffers, and possibly restart emacs in between working on it, then you have to make some decisions about what to save from each block so you can continue the work in the next session. Again, you have to decide what to save, where to save, and in what form.
+
+Once you start saving data outside the org-file, it becomes less portable, or more tricky to move the file because you need to also move all the data files to keep it intact. I have explored a concept of making an org-archive in the past, where you get a list of all files linked in the org-file, but this so far has just been worked out for some small proof of concept ideas.
+
+Not all languages are the same in org-mode. They do not all support sessions for example, and they may not all work like the examples here. The scimax iPython modifications do not behave like the examples above. That is probably due to bugs I have inadvertently introduced, and in the future I will try to make it work like emacs-lisp does above.
+
+Overall, org-mode has one of the most flexible and powerful systems for passing and reusing data in documents I have ever seen. It is not perfect, and in such a powerful system there are many unexplored or lightly traveled corners that may have hazards in them. It still seems pretty promising though.
