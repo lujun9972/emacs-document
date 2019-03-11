@@ -1,49 +1,48 @@
-#+TITLE: Asynchronous rsync with Emacs, dired and tramp.
+#+TITLE: 在Emacs的dired和tramp中异步运行rsync
 #+URL: https://vxlabs.com/2018/03/30/asynchronous-rsync-with-emacs-dired-and-tramp/
 #+AUTHOR: lujun9972
 #+TAGS: raw
 #+DATE: [2018年 04月 28日 星期六 15:58:44 CST]
 #+LANGUAGE:  zh-CN
 #+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+[[https://truongtx.me/about.html][Trần Xuân Trường]] 写的 [[https://truongtx.me/tmtxt-dired-async.html][tmtxt-dired-async]]  是一个不为人知的Emacs包, 它可以扩展 dired(Emacs内置的文件管理器), 使之可以异步地运行 rsync 等其他命令 (例如zip, unzip, downloading).
 
-[[https://truongtx.me/tmtxt-dired-async.html][tmtxt-dired-async]] by [[https://truongtx.me/about.html][Trần Xuân Trường]] is an unfortunately lesser known Emacs package which extends dired, the Emacs file manager, to be able to run rsync and other commands (zip, unzip, downloading) asynchronously.
+这意味着你可以拷贝成G的目录而不影响Emacs的其他任务.
 
-This means you can copy gigabytes of directories around whilst still happily continuing with all of your other tasks in the Emacs operating system.
+它的一个功能时让你可以通过 =C-c C-a= 从不同位置添加任意多的文件到一个等待列表中, 然后按下 =C-c C-v= 异步地使用rsync将整个等待列表中的文件同步到目标目录中 . 光这个功能就值得一试了.
 
-It has a feature where you can add any number of files from different locations into a wait list with =C-c C-a=, and then asynchronously rsync the whole wait list into a final destination directory with =C-c C-v=. This alone is worth the price of admission.
+例如这里将 arduino 1.9 beta 存档同步到另一个目录中:
 
-For example here it is pointlessly rsyncing the arduino 1.9 beta archive to another directory:
+[[https://i0.wp.com/vxlabs.com/wp-content/uploads/2018/03/rsync-arduino-zip.png&ssl=1]]
 
-[[https://i0.wp.com/vxlabs.com/wp-content/uploads/2018/03/rsync-arduino-zip.png?ssl=1][[[https://i0.wp.com/vxlabs.com/wp-content/uploads/2018/03/rsync-arduino-zip.png?resize=660%2C340&ssl=1]]]]
+整个进度完成后, 底部的窗口会在5秒后自动退出. 下面时异步解压上面的arduino存档后出现的另一个会话:
 
-When the process is complete, the window at the bottom will automatically be killed after 5 seconds. Here is a separate session right after the asynchronous unzipping of the above-mentioned arduino archive:
+[[https://i1.wp.com/vxlabs.com/wp-content/uploads/2018/03/progress-window-5s.pngssl=1]]
 
-[[https://i1.wp.com/vxlabs.com/wp-content/uploads/2018/03/progress-window-5s.png?ssl=1][[[https://i1.wp.com/vxlabs.com/wp-content/uploads/2018/03/progress-window-5s.png?resize=660%2C310&ssl=1]]]]
+这个包进一步增加了我dired配置的实用性.
 
-This package has further increased the utility of my dired configuration.
+我刚刚贡献了 [[https://github.com/tmtxt/tmtxt-dired-async/pull/6][一个 pull request 来允许 tmtxt-dired-async 同步到远程tramp目录中]], 而且我立即使用该功能来将成G的新照片传输到 Linux 服务器上.
 
-I just contributed [[https://github.com/tmtxt/tmtxt-dired-async/pull/6][a pull request that enables tmtxt-dired-async to rsync to remote tramp-based directories]], and I immediately used this new functionality to sort a few gigabytes of new photos onto the Linux server.
+若你想配置 tmtxt-dired-async, 下载 [[https://github.com/tmtxt/tmtxt-async-tasks][tmtxt-async-tasks.el]] (被依赖的库) 以及 [[https://github.com/tmtxt/tmtxt-dired-async][tmtxt-dired-async.el]] (若你想让它支持tramp，请确保我的PR以及被合并) 到 =~/.emacs.d/= 目录中，然后添加下面配置:
 
-To add tmtxt-dired-async to your config, download [[https://github.com/tmtxt/tmtxt-async-tasks][tmtxt-async-tasks.el]] (a required library) and [[https://github.com/tmtxt/tmtxt-dired-async][tmtxt-dired-async.el]] (check that my PR is in there if you plan to use this with tramp) into your =~/.emacs.d/= and add the following to your config:
+#+begin_src emacs-lisp
+  ;; no MELPA packages of this, so we have to do a simple check here
+  (setq dired-async-el (expand-file-name "~/.emacs.d/tmtxt-dired-async.el"))
+  (when (file-exists-p dired-async-el)
+   (load (expand-file-name "~/.emacs.d/tmtxt-async-tasks.el"))
+   (load dired-async-el)
+   (define-key dired-mode-map (kbd "C-c C-r") 'tda/rsync)
+   (define-key dired-mode-map (kbd "C-c C-z") 'tda/zip)
+   (define-key dired-mode-map (kbd "C-c C-u") 'tda/unzip)
 
-#+BEGIN_EXAMPLE
-    ;; no MELPA packages of this, so we have to do a simple check here
-    (setq dired-async-el (expand-file-name "~/.emacs.d/tmtxt-dired-async.el"))
-    (when (file-exists-p dired-async-el)
-     (load (expand-file-name "~/.emacs.d/tmtxt-async-tasks.el"))
-     (load dired-async-el)
-     (define-key dired-mode-map (kbd "C-c C-r") 'tda/rsync)
-     (define-key dired-mode-map (kbd "C-c C-z") 'tda/zip)
-     (define-key dired-mode-map (kbd "C-c C-u") 'tda/unzip)
+   (define-key dired-mode-map (kbd "C-c C-a") 'tda/rsync-multiple-mark-file)
+   (define-key dired-mode-map (kbd "C-c C-e") 'tda/rsync-multiple-empty-list)
+   (define-key dired-mode-map (kbd "C-c C-d") 'tda/rsync-multiple-remove-item)
+   (define-key dired-mode-map (kbd "C-c C-v") 'tda/rsync-multiple)
 
-     (define-key dired-mode-map (kbd "C-c C-a") 'tda/rsync-multiple-mark-file)
-     (define-key dired-mode-map (kbd "C-c C-e") 'tda/rsync-multiple-empty-list)
-     (define-key dired-mode-map (kbd "C-c C-d") 'tda/rsync-multiple-remove-item)
-     (define-key dired-mode-map (kbd "C-c C-v") 'tda/rsync-multiple)
+   (define-key dired-mode-map (kbd "C-c C-s") 'tda/get-files-size)
 
-     (define-key dired-mode-map (kbd "C-c C-s") 'tda/get-files-size)
+   (define-key dired-mode-map (kbd "C-c C-q") 'tda/download-to-current-dir))
+#+end_src
 
-     (define-key dired-mode-map (kbd "C-c C-q") 'tda/download-to-current-dir))
-#+END_EXAMPLE
-
-Enjoy!
+祝你开心!
