@@ -1,0 +1,114 @@
+#+TITLE: A style-check.rb flycheck checker in Emacs
+#+URL: https://www.macs.hw.ac.uk/~rs46/posts/2018-12-29-stylecheck-flycheck.html
+#+AUTHOR: lujun9972
+#+TAGS: raw
+#+DATE: [2019年 02月 11日 星期一 15:38:49 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+This post shows how to integrate [[https://www.cs.umd.edu/~nspring/software/style-check-readme.html][style-check.rb]] with [[https://www.flycheck.org][flycheck]] in the Emacs text editor.
+
+style-check.rb checks:
+
+- Syntax
+- Correct capitalisation
+- Phrases e.g. “few in number” → “few”
+- Spellings
+- Ignored latex commands
+- Latex source checks e.g. a
+  tag should precede (not follow) a period
+
+* Example screenshot
+    :PROPERTIES:
+    :CUSTOM_ID: example-screenshot
+    :END:
+
+When the style-check.rb flychecker checker is functional, an example Flycheck Errors buffer is:
+
+[[https://www.macs.hw.ac.uk/~rs46/images/site/style-check-flycheck.jpg]]
+
+* style-check.rb installation
+    :PROPERTIES:
+    :CUSTOM_ID: style-check.rb-installation
+    :END:
+
+Download from [[https://www.cs.umd.edu/~nspring/software/style-check-readme.html]].
+
+To test =style-check.rb=, create a =test.tex= file containing:
+
+#+BEGIN_EXAMPLE
+    \documentclass{article}
+    \begin{document}
+    \section{Heading}
+    The way in which.
+    \end{document}
+#+END_EXAMPLE
+
+Then test =style-check.rb= (use the correct filepath):
+
+#+BEGIN_EXAMPLE
+    /path/to/style-check.rb test.tex
+#+END_EXAMPLE
+
+It should output:
+
+#+BEGIN_EXAMPLE
+    test.tex:4:1: The way in which. (The way in which)
+#+END_EXAMPLE
+
+* flycheck integration
+    :PROPERTIES:
+    :CUSTOM_ID: flycheck-integration
+    :END:
+
+Put the following in your =~/.emacs=, =~/.emacs.el=, or =~/.emacs.d/init.el= (or whatever) file.
+
+Edit the path to =style-check.rb=.
+
+#+BEGIN_EXAMPLE
+    (require 'flycheck)
+    (flycheck-define-checker style-check
+     "A linter for style-check.rb"
+     :command ("/path/to/style-check.rb"
+     source-inplace)
+     :error-patterns
+     ((warning line-start (file-name) ":" line ":" column ": "
+     (message (one-or-more not-newline)
+     (zero-or-more "\n" (any " ") (one-or-more not-newline)))
+     line-end))
+     :modes latex-mode
+     )
+    (add-to-list 'flycheck-checkers 'style-check)
+#+END_EXAMPLE
+
+Enable flycheck for latex-mode:
+
+#+BEGIN_EXAMPLE
+    (add-hook 'latex-mode-hook 'flycheck-mode)
+#+END_EXAMPLE
+
+=style-check.rb= will be executed against the latex content when you open a =.tex= file. Each time you save changes, =style-check.rb= will be executed.
+
+Display the textlint warnings for =file.txt= in a Flycheck errors buffer with: =C-c ! l= .
+
+*Debugging* If flycheck errors buffer shows no warnings, debug =style-check.rb= by running =C-c ! C-c= which will run =style-check.rb= in a new buffer, showing the raw output from =style-check.rb=.
+
+* Chaining other latex checkers
+    :PROPERTIES:
+    :CUSTOM_ID: chaining-other-latex-checkers
+    :END:
+
+Flycheck can execute multiple checkers on a single file. For example, using the [[./2018-12-25-textlint-flycheck.html][textlint flycheck check]] in conjunction with this style-check.rb checker. To do this in your Emacs init file (e.g. =~/.init.el=), define the textlint checker then modify the style-check.rb checker to include:
+
+#+BEGIN_EXAMPLE
+    :next-checkers ((warning . textlint))
+#+END_EXAMPLE
+
+
+Flycheck will now list warnings from both checkers.
+
+A potential drawback of chaining checkers is multiple warnings about the same error from different checkers, e.g. spelling, phrasing or capitalisation.
+
+*Acknowledgement*
+
+Thanks to Blair Archibald for feedback on a draft of this post.
