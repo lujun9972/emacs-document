@@ -6,152 +6,117 @@
 #+LANGUAGE:  zh-CN
 #+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
 
-Six techniques to reduce Emacs startup time by the author of the [[https://github.com/jschaf/esup][Emacs
-Start Up Profiler]].
 
-tl;dr: Do these steps:
+[[https://github.com/jschaf/esup][Emacs Start Up Profiler]] 的作者教你六项技术减少Emacs启动时间.
 
-1. Profile with Esup.
-2. Adjust the garbage collection threshold.
-3. Autoload *everything* with use-package.
-4. Avoid helper functions which cause eager loads.
-5. See my Emacs [[https://github.com/jschaf/dotfiles/blob/master/emacs/start.el][config]] for an example.
+简而言之: 做下面几个步骤:
 
-* From .emacs.d Bankruptcy to Now
-   :PROPERTIES:
-   :CUSTOM_ID: org427ea2a
-   :END:
+1. 使用Esup进行性能检测.
+2. 调整垃圾回收的阀值.
+3. 使用 usge-page 来自动(延迟)加载所有东西.
+4. 不要使用会引起立即加载的辅助函数.
+5. 参考我的 [[https://github.com/jschaf/dotfiles/blob/master/emacs/start.el][配置]].
 
-I recently declared my third .emacs.d bankruptcy and finished the
-fourth iteration of my Emacs configuration. The evolution was:
+* 从 .emacs.d 破产到现在
 
-1. Copy and paste elisp snippets into =~/.emacs= and hope it works.
-2. Adopt a more structured approach with =el-get= to manage
-   dependencies.
-3. Give up and outsource to Spacemacs.
-4. Get tired of Spacemacs intricacies and rewrite with =use-package=.
+我最近宣布了第三次 .emacs.d 破产并完成了第四次Emacs配置的迭代. 演化过程为:
 
-This article is a collection of tips collected during the 3 rewrites
-and from creating the Emacs Start Up Profiler. Many thanks to the
-teams behind Spacemacs, use-package and general. Without these
-dedicated voluteers, this task would be vastly more difficult.
+1. 拷贝并粘贴elisp片段到 =~/.emacs= 中，希望它能工作.
+2. 借助 =el-get= 来以更结构化的方式来管理依赖关系.
+3. 放弃自己从零配置，以Spacemacs为基础.
+4. 厌倦了Spacemacs的复杂性，基于 =use-package= 重写配置.
 
-* But What About Daemon Mode
-   :PROPERTIES:
-   :CUSTOM_ID: org59da114
-   :END:
+本文汇聚了三次重写和创建 =Emacs Start Up Profiler= 过程中的技巧. 
+非常感谢Spacemacs，use-package等背后的团队.
+没有这些无私的志愿者,这项任务将会困难得多.
 
-Before we get started, let me acknowledge the common retort when
-optimizing Emacs: “Emacs is meant to run as a daemon so you'll only
-start it once.” That's all well and good except:
+* 不过守护进程模式又如何呢
 
-- Fast things feel nicer.
-- When customizing Emacs, you sometimes get into weird states that can
-  be hard to recover from without restarting. For example, if you add
-  a slow =lambda= function to your =post-command-hook=, it's tough to
-  remove it.
-- Restarting Emacs helps verify that customization will persist
-  between sessions.
+在我们开始之前, 让我声明一下常见的反对优化Emacs的观念: “Emacs 旨在作为守护进程来运行的，因此你只需要运行一次而已.”
+这个观点很好，只不过:
 
-* 1. Establish the Current and Best Possible Start Up Time
-   :PROPERTIES:
-   :CUSTOM_ID: org771752b
-   :END:
+- 速度总是越快越好
+- 配置Emacs时，可能会有不得不通过重启Emacs的情况. 例如,你可能为 =post-command-hook= 添加了一个运行缓慢的 =lambda= 函数, 很难删掉它.
+- 重启Emacs能帮你验证不同会话之间是否还能保留配置
 
-The first step is to measure the current start up time. The easy way
-is to display the information at startup which will show progress
-through the next steps.
+* 1. 估算当前以及最佳的启动时间
 
-#+BEGIN_EXAMPLE
-     
-    (add-hook 'emacs-startup-hook
-     (lambda ()
-     (message "Emacs ready in %s with %d garbage collections."
-     (format "%.2f seconds"
-     (float-time
-     (time-subtract after-init-time before-init-time)))
-     gcs-done)))
-#+END_EXAMPLE
+第一步是衡量当前的启动时间. 最简单的方法就是在启动时显示后续步骤进度的信息.
 
-Second, measure the best possible startup speed so you know what's
-possible. Mine is 0.3 seconds.
+#+begin_src emacs-lisp
+  ;; Use a hook so the message doesn't get clobbered by other messages.
+  (add-hook 'emacs-startup-hook
+            (lambda ()
+              (message "Emacs ready in %s with %d garbage collections."
+                       (format "%.2f seconds"
+                               (float-time
+                                (time-subtract after-init-time before-init-time)))
+                       gcs-done)))
+#+end_src
 
-#+BEGIN_EXAMPLE
-     
-    emacs -q --eval='(message "%s" (emacs-init-time))' 
+第二部, 衡量最佳的启动速度,以便了解可能的情况. 我的时0.3秒.3 seconds.
 
-    ;; For macOS users:
-    open -n /Applications/Emacs.app --args -q --eval='(message "%s" (emacs-init-time))' 
-#+END_EXAMPLE
+#+begin_src shell
+  # -q ignores personal Emacs files but loads the site files.
+  emacs -q --eval='(message "%s" (emacs-init-time))' 
 
-* 2. Profile Emacs Startup for Easy Wins
-   :PROPERTIES:
-   :CUSTOM_ID: orga2036b6
-   :END:
+  ;; For macOS users:
+  open -n /Applications/Emacs.app --args -q --eval='(message "%s" (emacs-init-time))' 
+#+end_src
 
-The [[https://github.com/jschaf/esup][Emacs StartUp Profiler]] (ESUP) will give you detailed metrics for
-top-level expressions.
+* 2. 检测Emacs启动指标对你大有帮助
 
-[[../images/esup.png]]
+[[https://github.com/jschaf/esup][Emacs StartUp Profiler]] (ESUP) 将会给你顶层语句执行的详细指标.
 
-Figure 1:
+[[https://blog.d46.us/images/esup.png]]
 
-Emacs Start Up Profiler Screenshot
+图 1: Emacs Start Up Profiler 截图
 
-WARNING: Spacemacs users, ESUP currently chokes on the Spacemacs
-init.el file. Follow [[https://github.com/jschaf/esup/issues/48]] for
-updates.
+警告: Spacemacs 用户需要注意, ESUP 目前与 Spacemacs 的 init.el 文件有冲突. 遵照 [[https://github.com/jschaf/esup/issues/48]] 上说的进行升级.
 
-* 3. Set the Garbage Collection Threshold Higher during Startup
-   :PROPERTIES:
-   :CUSTOM_ID: org37ca53c
-   :END:
+* 3. 启动时调高垃圾回收的阀值
 
-This saves about **0.3 seconds** on my configuration.
+这为我节省了 **0.3 秒**.
 
-The default value for Emacs is 760kB which is extremely conservative on
-a modern machine. The real trick is to lower it back to something
-reasonable after initialization. This saves about 0.3 seconds on my
-init files.
+Emacs默认值是 760kB，这在现代机器看来及其的保守.
+真正的诀窍在于初始化完成后再把它降到合理的水平.
+这为了节省了0.3秒
 
-#+BEGIN_EXAMPLE
-     
-     
-    (setq gc-cons-threshold (* 50 1000 1000))
+#+begin_src emacs-lisp
+  ;; Make startup faster by reducing the frequency of garbage
+  ;; collection.  The default is 800 kilobytes.  Measured in bytes.
+  (setq gc-cons-threshold (* 50 1000 1000))
 
-     
+  ;; The rest of the init file.
 
-     
-    (setq gc-cons-threshold (* 2 1000 1000))
-#+END_EXAMPLE
+  ;; Make gc pauses faster by decreasing the threshold.
+  (setq gc-cons-threshold (* 2 1000 1000))
+#+end_src
 
-* 4. Never require anything; autoload with use-package instead
-   :PROPERTIES:
-   :CUSTOM_ID: orgdf956cf
-   :END:
 
-The best way to make Emacs faster is to do less. Running =require=
-eagerly loads the underlying source file. It's rare the you'll need
-functionality immediately at startup time.
+* 4. 不要require任何东西,转而使用use-package来自动加载
 
-With [[https://github.com/jwiegley/use-package][=use-package=]], you declare which features you need from a package
-and =use-package= does the right thing. Here's what it looks like:
+让Emacs变坏的最好方法就是减少要做的事情. =require= 会立即加载源文件. 
+但是很少会出现需要在启动阶段就立即需要这些功能的。
 
-#+BEGIN_EXAMPLE
-    (use-package evil-lisp-state 
+在 [[https://github.com/jwiegley/use-package][=use-package=]] 中你只需要声明好需要哪个包中的哪个功能, =use-package= 就会帮你完成正确的事情.
+它看起来是这样的:
 
-     :defer t 
+#+begin_src emacs-lisp
+  (use-package evil-lisp-state ; the Melpa package name
 
-     :init 
-     (setq evil-lisp-state-global nil)
+    :defer t ; autoload this package
 
-     :config 
-     (abn/define-leader-keys "k" evil-lisp-state-map))
-#+END_EXAMPLE
+    :init ; Code to run immediately.
+    (setq evil-lisp-state-global nil)
 
-To see what packages Emacs currently has loaded, examine the
-=features= variable. For nice output see [[https://gist.github.com/RockyRoad29/bd4ca6fdb41196a71662986f809e2b1c][lpkg explorer]] or my variant
-in [[https://github.com/jschaf/dotfiles/blob/master/emacs/funcs/abn-funcs-benchmark.el][abn-funcs-benchmark.el]]. The output looks like:
+    :config ; Code to run after the package is loaded.
+    (abn/define-leader-keys "k" evil-lisp-state-map))
+#+end_src
+
+可以通过查看 =features= 变量来查看Emacs现在加载了那些包. 
+想要更好看的输出可以使用 [[https://gist.github.com/RockyRoad29/bd4ca6fdb41196a71662986f809e2b1c][lpkg explorer]] 或者我在 [[https://github.com/jschaf/dotfiles/blob/master/emacs/funcs/abn-funcs-benchmark.el][abn-funcs-benchmark.el]] 中的变体.
+输出看起来类似这样的:
 
 #+BEGIN_EXAMPLE
     479 features currently loaded
@@ -162,132 +127,103 @@ in [[https://github.com/jschaf/dotfiles/blob/master/emacs/funcs/abn-funcs-benchm
      - <many more>
 #+END_EXAMPLE
 
-* 5. Avoid Helper Functions to Set Up Modes
-   :PROPERTIES:
-   :CUSTOM_ID: org142995b
-   :END:
+* 5. 不要使用辅助函数来设置模式
 
-Often, Emacs packages will suggest running a helper function to set up
-keybindings. Here's a few examples:
+通常, Emacs packages 会建议通过运行一个辅助函数来设置键绑定. 下面是一些例子:
 
 - =(evil-escape-mode)=
 - =(windmove-default-keybindings) ; Sets up keybindings.=
 - =(yas-global-mode 1) ; Complex snippet setup.=
 
-Rewrite these with use-package to improve startup speed. These helper
-functions are really just sneaky ways to trick you into eagerly
-loading packages before you need them.
+可以通过use-package来对此进行重构以提高启动速度. 这些辅助函数只会让你立即加载那些尚用不到的package.
 
-As an example, here's how to autoload =evil-escape-mode=.
+下面这个例子告诉你如何自动加载 =evil-escape-mode=.
 
-#+BEGIN_EXAMPLE
-     
-    (define-minor-mode evil-escape-mode
-     (if evil-escape-mode
-     (add-hook 'pre-command-hook 'evil-escape-pre-command-hook)
-     (remove-hook 'pre-command-hook 'evil-escape-pre-command-hook)))
+#+begin_src emacs-lisp
+  ;; The definition of evil-escape-mode.
+  (define-minor-mode evil-escape-mode
+    (if evil-escape-mode
+        (add-hook 'pre-command-hook 'evil-escape-pre-command-hook)
+      (remove-hook 'pre-command-hook 'evil-escape-pre-command-hook)))
 
-     
-    (evil-escape-mode)
+  ;; Before:
+  (evil-escape-mode)
 
-     
-    (use-package evil-escape
-     :defer t
-     
-     :commands (evil-escape-pre-command-hook) 
+  ;; After:
+  (use-package evil-escape
+    :defer t
+    ;; Only needed for functions without an autoload comment (;;;###autoload).
+    :commands (evil-escape-pre-command-hook) 
 
-     
-     
-     
-     :init (add-hook 'pre-command-hook 'evil-escape-pre-command-hook))
-#+END_EXAMPLE
+    ;; Adding to a hook won't load the function until we invoke it.
+    ;; With pre-command-hook, that means the first command we run will
+    ;; load evil-escape.
+    :init (add-hook 'pre-command-hook 'evil-escape-pre-command-hook))
+#+end_src
 
-For a much trickier example, consider =org-babel=. The common recipe is:
-
-#+BEGIN_EXAMPLE
-    (org-babel-do-load-languages
-     'org-babel-load-languages
-     '((shell . t)
+下面来看一个关于 =org-babel= 的例子,这个例子更为复杂. 我们通常的配置时这样的:
+#+begin_src emacs-lisp
+  (org-babel-do-load-languages
+   'org-babel-load-languages
+   '((shell . t)
      (emacs-lisp . nil)))
-#+END_EXAMPLE
+#+end_src
 
-This is bad because =org-babel-do-load-languages= is defined in
-=org.el=, which is over 24k lines of code and takes about 0.2 seconds
-to load. After examining the source code,
-=org-babel-do-load-languages= is simply requiring the =ob-<lang>=
-package like so:
+这种不是个好的配置，因为 =org-babel-do-load-languages= 定义在 =org.el= 中, 而该文件有超过2万4千行的代码，需要花 0.2 秒来加载. 
+通过查看源代码可以看到 =org-babel-do-load-languages= 仅仅只是加载 =ob-<lang>= 包而已，像这样:
+#+begin_src emacs-lisp
+  ;; From org.el in the org-babel-do-load-languages function.
+  (require (intern (concat "ob-" lang)))
+#+end_src
 
-#+BEGIN_EXAMPLE
-     
-    (require (intern (concat "ob-" lang)))
-#+END_EXAMPLE
+而在 =ob-<lang>.el= 文件中, 我们只关心其中的两个方法 =org-babel-execute:<lang>= 和 =org-babel-expand-body:<lang>=. 
+我们可以延时加载 org-babel 相关功能而无需调用 =org-babel-do-load-languages=,像这样:
 
-In the =ob-<lang>.el=, there's only two methods we care about,
-=org-babel-execute:<lang>= and =org-babel-expand-body:<lang>=. We can
-autoload the org-babel functionality instead of
-=org-babel-do-load-languages= like so:
+#+begin_src emacs-lisp
+  ;; Avoid `org-babel-do-load-languages' since it does an eager require.
+  (use-package ob-python
+    :defer t
+    :ensure org-plus-contrib
+    :commands (org-babel-execute:python))
 
-#+BEGIN_EXAMPLE
-     
-    (use-package ob-python
-     :defer t
-     :ensure org-plus-contrib
-     :commands (org-babel-execute:python))
-
-    (use-package ob-shell
-     :defer t
-     :ensure org-plus-contrib
-     :commands
-     (org-babel-execute:sh
+  (use-package ob-shell
+    :defer t
+    :ensure org-plus-contrib
+    :commands
+    (org-babel-execute:sh
      org-babel-expand-body:sh
 
      org-babel-execute:bash
      org-babel-expand-body:bash))
-#+END_EXAMPLE
+#+end_src
 
-* 6. Defer Packages you don't need Immediately with Idle Timers
-   :PROPERTIES:
-   :CUSTOM_ID: org3d73f8c
-   :END:
+* 6. 使用惰性定时器(idle timer)来推迟加载非立即需要的包
 
-This saves about **0.4 seconds** for the 9 packages I defer.
+我推迟加载了9个包，这帮我节省了 **0.4 秒**.
 
-Some packages are useful and you want them available soon, but are not
-essential for immediate editing. These modes include:
+有些包特别有用，你希望可以很快就能使用它们，但是它们本身在Emacs启动过程中又不是必须的. 这些mode包括:
 
-- =recentf=: Saves recent files.
-- =saveplace=: Saves point of visited files.
-- =server=: Starts Emacs daemon.
-- =autorevert=: Automatically reloads files that changed on disk.
-- =paren=: Highlight matching parenthesis.
-- =projectile=: Project management tools.
-- =whitespace=: Highlight trailing whitespace.
+- =recentf=: 保存最近的编辑过的那些文件.
+- =saveplace=: 保存访问过文件的光标位置.
+- =server=: 开启Emacs守护进程.
+- =autorevert=: 自动重载被修改过的文件.
+- =paren=: 高亮匹配的括号.
+- =projectile=: 项目管理工具.
+- =whitespace=: 高亮行尾的空格.
 
-Instead of requiring these modes, **load them after N seconds of idle
-time**. I use 1 second for the more important packages and 2 seconds
-for everything else.
+不要require这些mode, **而是等到空闲N秒后再加载它们**. 
+我在1秒后加载那些比较重要的包，在2秒后加载其他所有的包.
+#+begin_src emacs-lisp
+  (use-package recentf
+    ;; Loads after 1 second of idle time.
+    :defer 1)
 
-#+BEGIN_EXAMPLE
-    (use-package recentf
-     
-     :defer 1)
+  (use-package uniquify
+    ;; Less important than recentf.
+    :defer 2)
+#+end_src
 
-    (use-package uniquify
-     
-     :defer 2)
-#+END_EXAMPLE
+* 不值得的优化
 
-* Optimizations that aren't Worth It
-   :PROPERTIES:
-   :CUSTOM_ID: orgc7c3ed4
-   :END:
-
-Don't bother byte-compiling your personal Emacs files. It saved
-about 0.05 seconds. Byte compiling causes difficult to debug errors when the
-source file gets out of sync with compiled file.
-
-Published on 19 November 2017 by
-
-Joe Schafer
-
-.
+不要费力把你的Emacs配置文件编译成字节码了. 这只节省了大约 0.05 秒.
+把配置文件编译成字节码可能导致源文件与编译后的文件不匹配从而导致难以出现错误调试.
