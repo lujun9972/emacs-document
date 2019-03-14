@@ -1,0 +1,987 @@
+#+AUTHOR: Fox Kiester
+#+LINK: evil-collection https://github.com/emacs-evil/evil-collection
+
+# NOTE: If you are viewing this in org-mode, it is recommended that you install and enable [[https://github.com/snosov1/toc-org][toc-org]], so that all internal links open correctly
+
+* Table of Contents                                                     :TOC:
+- [[#emacsevil-for-vim-users][Emacs/Evil for Vim Users]]
+- [[#bare-minimum-emacs-knowledge][Bare Minimum Emacs Knowledge]]
+  - [[#terminology][Terminology]]
+    - [[#cutting-and-pasting][Cutting and Pasting]]
+    - [[#buffer-window-frame-etc][Buffer, Window, Frame, etc.]]
+    - [[#point-and-mark][Point and Mark]]
+    - [[#minibuffer][Minibuffer]]
+    - [[#modes][Modes]]
+    - [[#hooks][Hooks]]
+    - [[#commands-and-functions][Commands and Functions]]
+  - [[#key-notation][Key Notation]]
+  - [[#default-keybindings-and-getting-help][Default Keybindings and Getting Help]]
+  - [[#quoting][Quoting]]
+- [[#other-resources][Other Resources]]
+- [[#settings-and-hooks][Settings and Hooks]]
+- [[#keybindings-and-states][Keybindings and States]]
+  - [[#keybindings-in-emacs][Keybindings in Emacs]]
+  - [[#keymap-precedence][Keymap Precedence]]
+  - [[#global-keybindings-and-evil-states][Global Keybindings and Evil States]]
+  - [[#unbinding-a-key][Unbinding a Key]]
+  - [[#leader-key][Leader Key]]
+  - [[#mode-specific-keybindings][Mode Specific Keybindings]]
+  - [[#buffer-local-keybindings][Buffer Local Keybindings]]
+  - [[#binding-keys-to-keys-keyboard-macros][Binding Keys to Keys (Keyboard Macros)]]
+  - [[#mapping-under-keys-that-arent-prefix-keys][Mapping Under Keys That Aren't Prefix Keys]]
+- [[#advice][Advice]]
+- [[#further-integrating-evil-and-emacs][Further Integrating Evil and Emacs]]
+  - [[#what-overrides-evil][What Overrides Evil?]]
+  - [[#evils-tools][Evil's Tools]]
+  - [[#preventing-certain-keys-from-being-overridden][Preventing Certain Keys From Being Overridden]]
+    - [[#prevent-text-property-maps-from-overriding-evil][Prevent Text Property Maps from Overriding Evil]]
+  - [[#use-some-emacs-keybindings][Use Some Emacs Keybindings]]
+    - [[#switching-between-evil-and-emacs][Switching Between Evil and Emacs]]
+    - [[#using-emacs-keybindings-in-normal-state][Using Emacs Keybindings in Normal State]]
+  - [[#use-evil-everywhere][Use Evil Everywhere]]
+    - [[#make-evil-normal-state-the-initial-state-always][Make Evil Normal State the Initial State Always]]
+    - [[#undoprevent-overridingintercept-maps][Undo/Prevent Overriding/Intercept Maps]]
+    - [[#modal-minibuffer][Modal Minibuffer]]
+    - [[#example-integration-with-pdf-tools][Example: Integration with Pdf Tools]]
+  - [[#command-properties][Command Properties]]
+    - [[#repeat][:repeat]]
+    - [[#jump][:jump]]
+    - [[#type][:type]]
+    - [[#move-point][:move-point]]
+    - [[#keep-visual][:keep-visual]]
+    - [[#suppress-operator][:suppress-operator]]
+    - [[#motion][:motion]]
+    - [[#declaring-a-motion][Declaring a Motion]]
+- [[#other-evil-tips][Other Evil Tips]]
+  - [[#state-indicator][State Indicator]]
+  - [[#user-created-states][User Created States]]
+  - [[#using-escape-to-exit-the-minibuffer][Using Escape to Exit the Minibuffer]]
+  - [[#ex-command-definition][Ex Command Definition]]
+- [[#autocommand-equivalents-unfinished][Autocommand Equivalents (unfinished)]]
+- [[#other-emacs-tips][Other Emacs Tips]]
+  - [[#packagesplugins][Packages/Plugins]]
+  - [[#debugging-your-init-file][Debugging Your Init File]]
+- [[#faq][FAQ]]
+  - [[#is-emacs-slow-to-start][Is emacs slow to start?]]
+  - [[#how-do-i-improve-emacs-performance][How do I improve emacs' performance?]]
+  - [[#does-emacs-have-vim-like-tabs-distinct-window-configurations][Does emacs have vim-like tabs (distinct window configurations)?]]
+  - [[#whats-the-equivalent-of-nnoremap-y-y][What's the equivalent of ~nnoremap Y y$~?]]
+  - [[#whats-the-equivalent-of-nnoremap-n-nzz][What's the equivalent of ~nnoremap n nzz~?]]
+  - [[#whats-the-equivalent-of-inoremap-jk-escape][What's the equivalent of ~inoremap jk <escape>~?]]
+  - [[#whats-the-equivalent-of-nnoremap-cw-ciw][What's the equivalent of ~nnoremap cw ciw~?]]
+  - [[#whats-the-equivalent-of-vim-unimpaireds-cow][What's the equivalent of vim-unimpaired's =cow=?]]
+  - [[#how-do-i-copy-and-paste-tofrom-the-clipboard-in-terminal-emacs][How do I copy and paste to/from the clipboard in terminal emacs?]]
+  - [[#can-i-have-better-completion-in-the-ex-command-line][Can I have better completion in the ex command line?]]
+  - [[#how-do-i-prevent-parentheses-becoming-unbalanced-in-my-init-file][How do I prevent parentheses becoming unbalanced in my init file?]]
+  - [[#how-can-i-have-relative-line-numbers][How can I have relative line numbers?]]
+  - [[#does-emacs-have-support-for-folding][Does emacs have support for folding?]]
+  - [[#why-dont-keys-defined-with-evil-define-key-work-immediately][Why don't keys defined with ~evil-define-key~ work (immediately)?]]
+- [[#plan-to-add][Plan to Add]]
+
+* Emacs/Evil for Vim Users
+This is not meant to be a comprehensive introductory guide to emacs or a comparison between vim and emacs. It is meant to focus specifically on evil and address questions vim users might have when first using emacs with evil. Where there are already detailed, informative resources on other related topics, I will include references instead of re-explaining things myself. This aims to be a general guide to teach the reader about how to use and configure evil as opposed to a collection of configuration snippets.
+
+If you have any suggestions for questions or problems it would be useful to discuss, feel free to make an issue or pull request.
+
+* Bare Minimum Emacs Knowledge
+** Terminology
+For a more complete list of terminology, see the emacs manual's [[https://www.gnu.org/software/emacs/manual/html_node/emacs/Glossary.html][glossary]]
+
+*** Cutting and Pasting
+In emacs, cutting is called "killing." Pasting is called "yanking." This is probably the most confusing terminology difference between vim and emacs. Just remember that emacs packages that talk about "yanking" are talking about pasting, whereas evil-related packages will use "yanking" to mean the same thing as in vim (copying).
+
+*** Buffer, Window, Frame, etc.
+Buffers and windows basically mean the same thing in emacs as they do in vim. A window in emacs displays a buffer, and a "frame" can hold multiple windows (some people refer to them as "splits"). An emacs frame is basically a system-level window. Emacs does not have vim-like tabs builtin, but there are various plugins for storing multiple window configurations in the same frame (see [[#does-emacs-have-vim-like-tabs-distinct-window-configurations][this part of the faq]]). Also [[http://www.braveclojure.com/basic-emacs/][this]] excellent article has some screenshots to give you visual explanation.
+
+*** Point and Mark
+The point refers to the cursor. The mark refers to the other side of a selected region (the "active region").
+
+*** Minibuffer
+The minibuffer is located at the bottom of emacs. It is used for the evil ex command line among other things. This is also the location of the "echo area" where non-popup messages are be displayed (e.g. ~(message "message")~).
+
+For more information on the minibuffer, see the [[https://www.gnu.org/software/emacs/manual/html_node/emacs/Minibuffer.html][corresponding section]] in the emacs manual.
+
+*** Modes
+In emacs, the word "mode" is already taken, so evil refers to vim's modes as "states" (e.g. "normal state"). In emacs, there are major modes and minor modes. Each buffer usually only has one major mode, which is comparable to the filetype in vim. A buffer can have multiple minor modes that can be toggled on and off. An example is =flyspell-mode=, which enables spell checking. Modes have their own keymaps that apply only when the mode is active.
+
+*** Hooks
+A hook is similar to =autocmd= in vim.
+
+*** Commands and Functions
+In emacs, commands are functions that can be bound to a key (interactive) or run with =M-x= (=<a-x>=). Most commands can also be run from evil's ex command line with =:command-name<cr>=. An exception is commands that have numbers in them such as ~w3m~ or ~mu4e~. I will be referring to commands as ~command-name~.
+
+If you want to evaluate a function, you can use =M-:= (=<a-:>=) to evaluate an expression in the minibuffer. You can also run elisp by using the ~eval-...~ functions (e.g. ~eval-defun~) in an emacs lisp mode buffer or by using ~ielm~ or ~eshell~.
+
+** Key Notation
+In vim, Space followed by Control+a would be written as =<space><c+a>=. In emacs, it would be written as =SPC C-a=. See the Emacs Wiki [[https://www.emacswiki.org/emacs/EmacsKeyNotation][entry on key notation]] for more information.
+
+** Default Keybindings and Getting Help
+Some people prefer to learn emacs' keybindings first without using evil. I never did, but Sacha Chua's [[http://sachachua.com/blog/2013/05/how-to-learn-emacs-a-hand-drawn-one-pager-for-beginners/][visual guide]] for emacs beginners might be a good resource for those who want to. [[https://tuhdo.github.io/][Tuhdo's guides]] are also very good.
+
+I've been able to get by without almost ever using emacs' default keybindings. The exceptions for me are =C-g= and =C-h=. Even if you don't plan on learning emacs' keybindings in full, I recommend learning these when starting out.
+
+=C-g= is bound to ~keyboard-quit~ (or an equivalent) by default. You use it, for example, to exit the minibuffer (e.g. if you type =M-:= which is bound to ~eval-expression~ and want to exit). You can replace =C-g= with =<escape>= for most cases (see [[#using-escape-to-exit-the-minibuffer][Using Escape to Exit the Minibuffer]]), but it is still useful to know about it. If emacs freezes from a long-running command or infinite loop, you can use =C-g= to cancel it.
+
+=C-h= is a prefix key for getting help. Since emacs has a different help system, =:help= will not work the same as in vim. If you want to find out about a variable, you can use =C-h v= (~describe-variable~). To find out what a key is bound to, you can use =C-h k= to pop open a help buffer with information about the command. For example, you can find out that =C-h k= is bound to ~describe-key~ by pressing =C-h k C-h k=. Knowing about =C-h k= can be useful, for example, if you want to find out what a nested key is bound to. By "nested key", I mean that you can type =d C-h k i w= (=d<c-h>kiw=) to find out that =iw= here is bound to ~evil-inner-word~.
+
+To make things more friendly, you can use something like ~ivy-mode~ from [[https://github.com/abo-abo/swiper][ivy]] or ~helm-mode~ from [[https://github.com/emacs-helm/helm][helm]] to allow you to quickly narrow your selection. Helm also provides a ~helm-apropos~ command that will allow you to search commands, functions, and variables all at once (as well as faces).
+
+Another useful package is [[https://github.com/purcell/elisp-slime-nav][elisp-slime-nav]] which provides commands that allow you to jump to the definition or corresponding help page for emacs lisp symbols.
+
+For more information on getting help, see the [[https://www.gnu.org/software/emacs/manual/html_node/emacs/Help.html][corresponding section from the emacs manual]].
+
+** Quoting
+Quoting is used to prevent evaluation of a symbol or a list. Quoting is done with ~(quote ...)~ or by prefixing the symbol or list with a single quote/apostrophe. When using a function as an argument, you use a sharp quote (equivalent to ~(function ...)~). For example:
+#+begin_src emacs-lisp
+(+ 1 3 1)
+;; => 5
+(apply #'+ '(1 3 1))
+;; => 5
+#+end_src
+
+In this example, the ~+~ function is sharp quoted so that it is not treated as a variable. The list of arguments to pass to the ~+~ function is quoted so that it is treated as a literal list. Otherwise, =(1 3 1)= would be treated as a function call to ~1~. Note that ~(quote (1 3 1))~ is not the same as ~(list 1 3 1)~. Either works in this case, but the latter creates a fresh list.
+
+Here is what will happen if you did not quote the arguments:
+#+begin_src emacs-lisp
+(apply + '(1 3 1))
+;; => Symbol's value as a variable is void: +
+;; if you actually want to store a function name in a variable:
+(setq my-plus-func #'+)
+(apply my-plus-func '(1 3 1))
+;; => 5
+(apply #'+ (1 3 1))
+;; => Invalid function: 1
+;; if you wanted to store the argument list in a variable:
+(setq my-arg-list '(1 3 1))
+(apply #'+ my-arg-list)
+;; => 5
+#+end_src
+
+This can be confusing to a beginner when setting options or using functions. To simplify things, if you don't want a function argument to be treated as a variable, you must quote it since functions evaluate their arguments. Note that this applies to /symbols/ and not /literals/ (i.e. you do not need to quote strings, numbers, etc).
+
+There are some exceptions to this rule. For example, =nil= and =t= do not need to be quoted since they evaluate to themselves. Some macros do not require symbols to be quoted; the most common examples would probably be ~defun~ and ~setq~. For convenience, the name of the function being defined or variable being set does not need to be quoted:
+#+begin_src emacs-lisp
+(defun hello-world ()
+  (message "Hello world"))
+
+(setq my-var t)
+#+end_src
+
+For more information, see the [[https://www.gnu.org/software/emacs/manual/html_node/elisp/Quoting.html][corresponding section]] in the emacs manual.
+
+* Other Resources
+In addition to the [[https://www.gnu.org/software/emacs/manual/][emacs manual]] and [[https://tuhdo.github.io/][Tuhdo's emacs mini manual]] for general emacs information, there is also the evil manual for specific evil information. It's very short, and this guide goes into more depth about a lot of things mentioned (e.g. ~evil-define-key~). It might be useful for reading about some of the basic settings (though it leaves most settings out). It can be read from emacs with =M-x info RET= or simply =C-h i=, searching for evil, and following the link. If you plan on writing motions, operators, and text objects, you may want to read those sections under "Macros."
+
+Emacs is configured and extended in emacs lisp, so if you want to learn more about emacs lisp at some point, you may want to read [[https://www.gnu.org/software/emacs/manual/html_node/eintr/][An Introduction to Programming in Emacs Lisp]]. This (and the emacs manual of course) can be read from emacs in info mode as well.
+
+For asking questions, there is the [[https://emacs.stackexchange.com/][emacs stack exchange]] and the [[https://www.reddit.com/r/emacs/][emacs subreddit]].
+
+* Settings and Hooks
+The basic syntax for emacs settings is ~(setq <variable> <value> ...)~. Note that ~setq~ can be used to set multiple options at once:
+#+begin_src emacs-lisp
+(setq evil-search-wrap t
+      evil-regexp-search t)
+#+end_src
+
+For settings that have buffer local values by default (the help for the variable will tell you if this is the case), you'll want to use ~setq-default~ to set the default value instead:
+#+begin_src emacs-lisp
+(setq-default indent-tabs-mode nil
+              tab-width 4)
+#+end_src
+
+You can use ~setq-local~ set the local value of a variable. If the variable is not already buffer local, it will be made buffer local. You could use this with a mode hook, for example, to determine whether indentation is done with tabs or spaces for a specific programming language. Note that the hook should be quoted:
+#+begin_src emacs-lisp
+(add-hook 'c-mode-hook
+          (lambda () (setq-local indent-tabs-mode t)))
+#+end_src
+
+This would be the vim equivalent:
+#+begin_src vimrc
+au c_settings
+	au!
+	au FileType c setlocal noexpandtab
+augroup END
+#+end_src
+
+Functions will only be added to hooks once, even if they are anonymous functions (lambdas).
+
+Also note that for variables created by packages, you can set them before the package is loaded without issues. In some cases, you /need/ to set them before a package is loaded (e.g. the evil manual gives some of the =evil-want-...= variables as an example). You can also use ~add-hook~ with a hook that does not yet exist.
+
+Emacs also provides a [[https://www.gnu.org/software/emacs/manual/html_node/emacs/Easy-Customization.html][GUI for customization]], but this probably won't be all that interesting to most vim users.
+
+* Keybindings and States
+** Keybindings in Emacs
+Unlike in vim where keybindings are often made in terms of other keys, in emacs you usually bind keys to named commands. You /can/ bind keys to act as other keys, but there is no concept of "default" keybindings, so there is no exact equivalent of vim's ~noremap~ (though the key translation functions provided by general.el and evil-collection are similar). When possible, you should prefer to bind to named commands and keymaps, but there are some cases where it may be simpler to use keyboard macros (see [[#binding-keys-to-keys-keyboard-macros][Binding Keys to Keys (Keyboard Macros)]]).
+
+The main function you'll use as an evil user for binding keys is ~evil-define-key~. Here are some of the other ones provided to you:
+
+- ~global-set-key~
+- ~evil-global-set-key~
+- ~evil-local-set-key~
+- ~evil-define-minor-mode-key~
+
+~evil-define-key~ can be used instead of any of these. All of these, including ~evil-define-key~, are just wrappers around ~define-key~, but they all serve different purposes. I will elaborate on how these functions work and what they can be used for in the upcoming sections. I'd highly recommend looking at [[https://github.com/noctuid/general.el][general.el]] for a unified wrapper for all keybinding functions that reduces the verbosity of key definition and provides functions that are more similar to vim's (such as ~general-nmap~) among other things.
+
+As a quick disclaimer, I'm going to be quoting (instead of sharp quoting) commands in example key definitions. Sharp quoting commands (since they are functions) is perfectly valid and, if anything, is more correct. You generally want to sharp quote functions, but for keybindings, you'll hardly ever see people do it (including in the emacs manual). I think this is mainly for historical reasons, but it may also be a stylistic preference for some.
+
+** Keymap Precedence
+In emacs, there is a [[https://www.gnu.org/software/emacs/manual/html_node/elisp/Searching-Keymaps.html][hierarchy of keymaps]] that are searched one by one until a definition for a key is found. Evil keymaps are found in =emulation-mode-map-alists= which puts them close to the top in terms of precedence. Here is the order of precedence of evil's keymaps as explained in =evil-core.el=:
+
+- Intercept keymaps   - ~evil-make-intercept-map~
+- Local state keymap  - ~evil-local-set-key~
+- Minor-mode keymaps  - ~evil-define-minor-mode-key~
+- Auxiliary keymaps   - ~evil-define-key~
+- Overriding keymaps  - ~evil-make-overriding-map~
+- Global state keymap - ~evil-global-set-key~
+
+I will be bringing up precedence later on when it is relevant. For more information, see [[https://github.com/syl20bnr/spacemacs/wiki/Keymaps-guide][spacemacs' keymap guide]] (though it is missing minor-mode keymaps) and the commentary in =evil-core.el=.
+
+** Global Keybindings and Evil States
+To make global keybindings in emacs without evil, one would normally use ~global-set-key~. ~global-set-key~ is just a small wrapper function around ~define-key~ that defines a key in the current global map and signals a error when the key isn't a string or vector. As an evil user, you won't often use this function since evil provides several of its own global keymaps corresponding to vim modes. They are as follows:
+
+- =evil-insert-state-map=
+- =evil-emacs-state-map=
+- =evil-normal-state-map=
+- =evil-visual-state-map=
+- =evil-motion-state-map=
+- =evil-operator-state-map=
+- =evil-outer-text-objects-map=
+- =evil-inner-text-objects-map=
+- =evil-replace-state-map=
+
+There are also buffer local versions of these (e.g. ~evil-normal-state-local-map~).
+
+Most of these should be self-explanatory coming from vim. Emacs state is similar to insert state but uses emacs keybindings (e.g. =C-n= is bound to ~next-line~ instead of to ~evil-complete-next~). For the most part, the keys are the same as if you weren't using evil at all in emacs state (apart from =evil-toggle-key= which enters/exits emacs state, =C-z= by default).
+
+Motion state is a bit strange. Keys bound in motion state are inherited in the normal, visual, and operator state keymaps if they are not shadowed. The same inheritance rules apply to normal state, and the main reason motion state exists is for use with read-only modes where insertion keybindings aren't useful. For example, motion state is the default state for =help-mode=. This means that, by default, only keys bound in motion state will work in =help-mode=.
+
+I personally think that the existence of motion state is a bad idea since it often confuses beginners as there is no vim equivalent and its purpose may not be immediately clear, has a misleading name (it isn't only used for motions), addresses what I consider a non-issue (e.g. accidentally pressing =i= in a read-only buffer), and addresses this issue poorly. For example, motion state isn't suitable for all read-only modes (e.g. motions don't make sense in =ediff-mode=), and remapping insertion commands to be ignored (which is what [[https://github.com/emacs-evil/evil-collection][evil-collection]] now does) is a more foolproof and unobtrusive alternative to creating new states. That said, as long as you remember that evil binds motions and some other commands in motion state by default and are aware of =evil-motion-state-modes= and ~evil-set-initial-state~ (see [[#make-evil-normal-state-the-initial-state-always][Make Evil Normal State the Initial State Always]] for information on using normal state instead of motion state in all modes), you shouldn't encounter any issues.
+
+If you are ever want to know what state a key is bound in, you can check =evil-maps.el= or use ~lookup-key~. For example, ~evil-next-visual-line~ is bound to =gj= in motion state instead of in the normal state keymap (you can check this with ~(lookup-key evil-normal-state-map "gj")~ which will return =nil=). Similarly, if you look up the operator keys such as =d=, you will find that they are only explicitly bound in normal state and not in visual state. Generally, keys are only bound directly in visual state when they have a different behavior from the normal state keys (e.g. =u= and =U= for altering case).
+
+Also note that defining a key in =evil-visual-state-map= is more like =xmap= in vim since there is no "select" state in evil.
+
+These are the other evil keymaps that might be useful:
+
+- =evil-ex-search-keymap= (=/= and =?=)
+- =evil-ex-completion-map= (=:=)
+- =evil-command-window-mode-map= (=q:=; you'd use =evil-define-key= for this)
+- =evil-window-map= (a prefix map for the =C-w= keys)
+
+Since =define-key= is the basis for key definition in emacs, I will begin by explaining it. The basic format of ~define-key~ is ~(define-key <keymap> <key> <definition>)~. The specified key can be a string (or something that evaluates to a string) or a vector. You probably won't want to use a vector of characters instead of a string, but you can use a vector to [[https://www.gnu.org/software/emacs/manual/html_node/elisp/Remapping-Commands.html][remap a command]], for example. The definition will normally be a command (or something that evaluates to one), but it can also be a keymap or a string. A key bound to a keymap is a prefix key. Binding a key to a string will cause emacs to execute that string as a keyboard macro (see [[#binding-keys-to-keys-keyboard-macros][Binding Keys to Keys (Keyboard Macros)]] for examples). See the help text for ~define-key~ (e.g. =C-h f define-key RET=) for more information on valid definitions.
+
+Here is what a basic =nmap= command equivalent would look like in emacs:
+#+begin_src emacs-lisp
+(define-key evil-normal-state-map "j" 'evil-next-visual-line)
+(define-key evil-normal-state-map "k" 'evil-previous-visual-line)
+
+;; with `evil-define-key'
+(evil-define-key nil evil-normal-state-map
+  "j" 'evil-next-visual-line
+  "k" 'evil-previous-visual-line)
+
+;; with general.el
+(general-nmap
+  "j" 'evil-next-visual-line
+  "k" 'evil-previous-visual-line)
+#+end_src
+
+Evil also provides a convenience function called ~evil-global-set-key~ that allows you to simply specify the name of the state as opposed to the full keymap name:
+#+begin_src emacs-lisp
+(evil-global-set-key 'motion "j" 'evil-next-visual-line)
+(evil-global-set-key 'motion "k" 'evil-previous-visual-line)
+
+;; `evil-define-key' can also used with "global"
+(evil-define-key 'motion 'global
+  "j" 'evil-next-visual-line
+  "k" 'evil-previous-visual-line)
+#+end_src
+Remember that binding a key in motion state is like binding a key in the normal, visual, and operator states all at once (unless that key is already bound in one of those states).
+
+You can write the key portion as just a string, but often people will use ~kbd~ to conveniently write keys that have special characters in them like control and space. This follows the format mentioned in [[#key-notation][Key Notation]]. These are equivalent:
+#+begin_src emacs-lisp
+(define-key evil-normal-state-map "\C-j" 'evil-next-visual-line)
+(define-key evil-normal-state-map (kbd "C-j") 'evil-next-visual-line)
+;; general.el implicitily adds a kbd by default
+(general-nmap "C-j" 'evil-next-visual-line)
+#+end_src
+
+** Unbinding a Key
+There is no dedicated alternative to ~define-key~ for unbinding a key in emacs (though there are wrappers around ~define-key~ like ~global-unset-key~). To unbind a key, you simply bind it to =nil=.
+
+** Leader Key
+There is no exact equivalent of a "leader" key in evil. You can have named prefix keys with a package like [[https://github.com/noctuid/general.el][general.el]] or bind a prefix key to a named keymap. This will allow you to easily change your "leader"/prefix key later. Here's an example that doesn't use any extra packages:
+#+begin_src emacs-lisp
+(defvar my-leader-map (make-sparse-keymap)
+  "Keymap for \"leader key\" shortcuts.")
+
+;; binding "," to the keymap
+(define-key evil-normal-state-map "," my-leader-map)
+
+;; binding ",b"
+(define-key my-leader-map "b" 'list-buffers)
+
+;; change the "leader" key to space
+(define-key evil-normal-state-map "," 'evil-repeat-find-char-reverse)
+(define-key evil-normal-state-map (kbd "SPC") my-leader-map)
+
+;; general.el can automate the process of prefix map/command creation
+(general-nmap
+  :prefix "SPC"
+  :prefix-map 'my-leader-map
+  "," 'list-buffers)
+#+end_src
+
+This isn't quite the same as the leader key in vim. In vim, =<leader>= is builtin and sometimes used by plugins to bind keys (despite being considered bad practice). This could potentially be convenient since it gives you some control over what you would like to use as a "main" prefix key without having to manually make keybindings for it with every plugin. In emacs, evil packages generally do not force the use of some extra package that provides "leader" functionality onto the user, and there is no standard, generic "leader" prefix map provided by evil. This means that "leader" keybindings in emacs will be your personal ones. Note that some packages do provide prefix keymaps that you can then choose a prefix key for though (e.g. =projectile-command-map=).
+
+In terms of functionality, it might be said that named prefixes are actually slightly more convenient in emacs than =<leader>=. You can use as many prefix keymaps as you would like and can bind as many keys to the same prefix keymap as you would like (which may be useful if you want to use a different key to access a prefix keymap in insert state). Note that you can essentially achieve the same functionality (multiple named prefixes) in vim using =<Plug>= mappings.
+
+For an example of a prefix keymap used by evil, see =evil-window-map= which is used for =C-w= commands. From =evil-maps.el=:
+#+begin_src emacs-lisp
+(define-prefix-command 'evil-window-map)
+(define-key evil-window-map "b" 'evil-window-bottom-right)
+(define-key evil-window-map "c" 'evil-window-delete)
+...
+(define-key evil-motion-state-map "\C-w" 'evil-window-map)
+#+end_src
+
+Note the use of ~define-prefix-command~ instead of ~defvar~. Either way works, but ~define-prefix-command~ is specifically intended for this purpose (see its documentation for more information).
+
+You can check out another alternative for emulating the leader key in the [[https://github.com/noctuid/evil-guide/wiki#using-hydra-for-leader-key][wiki]]
+
+** Mode Specific Keybindings
+~evil-define-key~ can be used to define keys in specific states for specific modes. The basic format is ~(evil-define-key <state> <keymap> <key> <definition> ...)~. Unlike with ~define-key~, ~evil-define-key~ can be used to define multiple keys at once. The state argument can be a single state or a list of states. ~evil-define-key~ will also defer keybindings if the specified keymap does not exist. This means that you can use it without putting it in an ~eval-after-load~ for packages that haven't been loaded yet.
+
+Here is an example:
+#+begin_src emacs-lisp
+(evil-define-key 'normal org-mode-map
+  (kbd "TAB") 'org-cycle
+  ">" 'org-shiftmetaright
+  "<" 'org-shiftmetaleft)
+#+end_src
+
+Coming from vim, this is a lot nicer than using buffer local keybindings with autocommands or ftplugin files in my opinion.
+
+The state can also be nil, so you could also use it like ~define-key~ except to define multiple keys at once, for example, in ~evil-normal-state-map~. I'd recommend using general.el instead if you want this functionality.
+
+If you don't need keybindings to be deferred and would rather use a function (~evil-define-key~ is a macro), ~evil-define-key*~ was recently added. Also note that ~evil-declare-key~ is an alias for ~evil-define-key~.
+
+There is also a function called ~evil-define-minor-mode-key~ that is similar to ~evil-define-key~. Some differences are that ~evil-define-minor-mode-key~ only works with minor modes, only allows specifying a single state that cannot be nil, and keys defined with it have a higher precedence than those defined with ~evil-define-key~. You probably won't need to use this function often, but it has a main practical difference that allows it to be used as a workaround for some shortcomings of ~evil-define-key~ (see [[#why-dont-keys-defined-with-evil-define-key-work-immediately][Why don't keys defined with ~evil-define-key~ work (immediately)?]]).
+
+** Buffer Local Keybindings
+Emacs does not have a builtin function for creating buffer local keybindings (that's not to say there is no such thing as local keymaps; any variable in emacs can be made buffer-local). There is ~local-set-key~, but it will bind a key for a mode instead of for a buffer. General.el provides a way to locally bind keys for both evil and non-evil keybindings. Evil also provides ~evil-local-set-key~ which will work as expected. It is similar to ~evil-global-set-key~ in that it is a simple wrapper around ~define-key~ and can only take a single key and definition. For example:
+#+begin_src emacs-lisp
+(evil-local-set-key 'normal key def)
+;; is the same as
+(define-key evil-normal-state-local-map key def)
+
+;; alternatively with `evil-define-key'
+(evil-define-key 'normal 'local key def)
+#+end_src
+
+There are good use cases for local keybindings (e.g. maybe you want to bind keys to jump to particular headings in a specific org file), but most are specific to the person and not generally useful. Here's an example that is a workaround to a deficiency with ~evil-define-key~ (again, [[[[#why-dont-keys-defined-with-evil-define-key-work-immediately][see here]] for a preferable solution). Maybe you want to bind =SPC '= to toggle editing an org source block. Keys bound with ~evil-define-key~ in =org-src-mode-map= won't take effect immediately, so you can use a hook and local keybindings as one possible workaround:
+#+begin_src emacs-lisp
+(evil-define-key 'normal org-mode-map
+  (kbd "SPC '") 'org-edit-special)
+
+;; you can do this, but the key won't work immediately
+;; (evil-define-key 'normal org-src-mode-map
+;;   (kbd "SPC '") 'org-edit-src-exit)
+
+;; this is a potential workaround
+(defun my-setup-org-edit-src-exit ()
+  (evil-local-set-key 'normal (kbd "SPC '") 'org-edit-src-exit))
+
+(add-hook 'org-src-mode-hook #'my-setup-org-edit-src-exit)
+#+end_src
+
+This is closer to how you might define local keybindings in vim (with an autocommand and buffer local keybindings). Note that you can replace the =#'my-setup...= with the actual =(defun...)= without problems, but =defun='s return value is technically undefined, so this may not work in future versions of Emacs.
+
+** Binding Keys to Keys (Keyboard Macros)
+While you should generally avoid binding keys to keyboard macros when you can bind directly to a command or keymap, binding to a sequence of keys can be simpler than creating new commands:
+#+begin_src emacs-lisp
+(evil-define-key 'normal 'global
+  ;; select the previously pasted text
+  "gp" "`[v`]"
+  ;; run the macro in the q register
+  "Q" "@q")
+
+(evil-define-key 'visual 'global
+  ;; run macro in the q register on all selected lines
+  "Q" (kbd ":norm @q RET")
+  ;; repeat on all selected lines
+  "." (kbd ":norm . RET"))
+
+;; alternative command version
+(defun my-norm@q ()
+  "Apply macro in q register on selected lines."
+  (interactive)
+  (evil-ex-normal (region-beginning) (region-end) "@q"))
+
+(evil-define-key 'visual 'global "Q" #'my-norm@q)
+#+end_src
+
+These examples are similar to how you might do things in vim. Keyboard macros are fine for simple cases, but note that they do have some limitations. For example:
+- The prefix argument/count will apply to the macro (i.e. it will run that many times), not to the next command that runs
+- Macro are not suitable for incomplete sequences (e.g. =C-c= or another key bound to a keymap)
+- Using =C-h k=, the help buffer will just show the keyboard macro, not the help text for the actual command that will run
+
+For a potentially better approach for simulating keys see [[#using-emacs-keybindings-in-normal-state][Using Emacs Keybindings in Normal State]].
+
+** Mapping Under Keys That Aren't Prefix Keys
+In vim, it is somewhat common to bind non-operator functionality under operators (e.g. =co<keys>= to toggling options). It's is also somewhat common for people to do something like remap =cw= to =ciw=. With evil, it is not possible to bind something like =cow= directly since =c= is not a prefix key (it is already bound to ~evil-change~). For this specific case, you can bind under ~evil-operator-state-map~. If you want to have different things executed based on the specific operator (=d= vs. =c=) you can check =evil-this-operator=. [[https://github.com/emacs-evil/evil-collection/blob/6ddfc3f7ffc09ae8fcee05e044d3a35aaddacf94/evil-collection-vdiff.el#L40][This]] is how evil-collection defines =dp= and =do= for vdiff mode and how I would recommend other packages implement this functionality when possible.
+
+This method won't work, however, if you wanted to rebind something like =ct<key>= or =cw= (you'd have to redefine ~evil-find-char-to~ and ~evil-forward-word-begin~). For a more general solution that will work for both cases, there is general.el's ~general-key-dispatch~ macro. For more information and specific examples see [[https://github.com/noctuid/general.el#mapping-under-non-prefix-keys][here]].
+
+* Advice
+Since this functionality is used in the next section, I'll go ahead and mention it now. Emacs allows "advising" a function. This means that you can have certain code execute before, after, or even instead of a function. The examples in this guide are fairly simple, but you can see the [[https://www.gnu.org/software/emacs/manual/html_node/elisp/Advising-Functions.html][corresponding section]] of the emacs manual for more information.
+
+* Further Integrating Evil and Emacs
+There is a common misconception that evil is unable integrate well with certain parts of emacs. What is true is that evil has some default configuration that may be annoying and does not provide default keybindings for all emacs packages. That said, once you know about the tools evil gives you, the process of integration becomes much easier. In the following sections, I will present various techniques for reconciling emacs and evil keybindings.
+
+Some people prefer to use evil only for text editing and use the default emacs keybindings for applications such as dired and mail clients. Evil makes this easy to do by altering initial states or using overriding keymaps for these modes. I personally prefer to use evil everywhere. Some people argue that the lack of default keybindings for applications like dired means that far too much work is required to use evil with them. Some argue that the lack of consistency makes evil not worth using at all. In my experience, making your own keybindings for some application like mu4e takes significantly less time than reading the documentation and can be done simultaneously. Even if you disagree, it's no longer the case that most modes have no evil support. In many cases there are packages for specific modes that will make evil keybindings for you, such as [[https://github.com/justbur/evil-magit][evil-magit]]. I don't personally use these unless they provide new functionality too, but some people find these packages indispensable. On the other hand, I'd highly recommend looking at [[evil-collection][evil-collection]]. The main difference between this package and others is that it attempts to cover everything as opposed to a single mode. The main benefit of this approach is that =evil-collection= uses a consistent set of rules for what keys are bound to what types of actions. Because of this, I will likely switch my personal configuration for all relevant modes to use =evil-collection= as a base in the future. Even if you don't agree with the specific key choices, it is easy enough to swap them for your own. On the other hand, most emacs applications use inconsistent keybindings for common actions such as filtering, sorting, marking, etc., so one might even argue that with evil-collection, using evil for such applications is actually easier and more consistent than using them normally.
+
+** What Overrides Evil?
+If you've ever entered some buffer and noticed that your normal state keybindings weren't working, it was probably because of some configuration done by evil (see =evil-integration.el=). There are very few cases where another keymap takes precedence over an evil one.
+
+Referring back to the fact that evil's keymaps are located in =emulation-mode-map-alists= and the [[https://www.gnu.org/software/emacs/manual/html_node/elisp/Searching-Keymaps.html][Searching Keymaps]] section of the emacs manual, you'll notice that emacs will check in the keymap char property before reaching evil's keymaps. An example of where this would override evil keybindings is when the point is in a magit diff section in the magit status buffer. See [[#prevent-text-property-maps-from-overriding-evil][here]] for information on how to deal with this.
+
+The other main case where evil keybindings will be overridden is by keybindings in =overriding-terminal-local-map=, which has the highest precedence in emacs. Normally it is used by ~set-transient-map~ to temporarily to elevate a keymap to the highest precedence. Note that generally this will not get in the way of evil keybindings (e.g. this is the mechanism used by =hydra=) For an example of packages that use ~set-transient-map~, see [[http://oremacs.com/2014/12/31/keymap-arms-race/][this article]].
+
+Finally, it may be possible for other keymaps in =emulation-mode-map-alists= to override evil. For example, when the company popup is active, keys in ~company-active-map~ will have precedence. If this causes any annoyances, you can unbind the offending key in ~company-active-map~.
+
+** Evil's Tools
+Evil provides a way to set the initial state for a mode as well as to allow keybindings in a keymap to override global keybindings for some/all states. I will be referencing these variables/functions in later sections, so I will briefly explain them now.
+
+*Initial States*
+
+Evil has "initial state" lists containing modes. For example, if you wanted =org-mode= buffers to start in emacs state, you could add =org-mode= to =evil-emacs-state-modes= and remove it from the list it was previously in or just use ~(evil-set-initial-state 'org-mode 'emacs)~.
+
+*Overriding/Intercept Keymaps*
+
+Evil has two variables called =evil-overriding-maps= and =evil-intercept-maps=. They both have a similar effect. Keybindings made in keymaps listed in =evil-override-maps= will override global evil keybindings. For example, =(Info-mode-map . motion)= is in this list by default, meaning that keys bound in =Info-mode-map= (when it is active) will override keys bound in =evil-motion-state-map=. If no state is specified (e.g. =(compilation-mode-map)=, another default), keybindings in all global keymaps will be overridden. The difference between intercept and overriding keymaps has to do with precedence (refer back to [[#keymap-precedence][Keymap Precedence]]). Keys bound in a overriding keymap will not override keys bound with ~evil-local-set-key~, ~evil-define-minor-mode-key~, or ~evil-define-key~, but keys bound in an intercept keymap will.
+
+Note that changing these variables after evil is loaded using ~setq~ will have no effect. You can use customize, but I recommend using the corresponding functions instead: ~evil-make-overriding-map~ and ~evil-make-intercept-map~.
+
+Evil also has a function called ~evil-add-hjkl-bindings~ that can be used to add back =hjkl= movement keybindings for a mode after making its keymap an overriding keymap.
+
+*Evil Command Properties*
+
+Evil has a concept of "command properties" that can be added with ~evil-add-command-properties~, ~evil-set-command-property~, or ~evil-set-command-properties~ and gotten with ~evil-get-command-property~ or ~evil-get-command-properties~. These can be used to, for example, customize whether or not and how a command will be repeated later with =.= (~evil-repeat~).
+
+** Preventing Certain Keys From Being Overridden
+Regardless of whether you want to sometimes have emacs keys override keys in normal/motion state, you may want to have certain keys universally available (e.g. prefix keys used for window/workgroup/buffer/file navigation). The suggested method for doing this is to use evil intercept keymaps since they have the highest precedence. This means that no standard method a package could use to define an evil key (~evil-define-key~, ~evil-define-minor-mode-key~, ~evil-local-set-key~, etc.) can override keys you've bound in an intercept keymap. Here's an example of how to create such a mode/keymap yourself:
+#+begin_src emacs-lisp
+(defvar my-intercept-mode-map (make-sparse-keymap)
+  "High precedence keymap.")
+
+(define-minor-mode my-intercept-mode
+  "Global minor mode for higher precedence evil keybindings."
+  :global t)
+
+(my-intercept-mode)
+
+(dolist (state '(normal visual insert))
+  (evil-make-intercept-map
+   ;; NOTE: This requires an evil version from 2018-03-20 or later
+   (evil-get-auxiliary-keymap my-intercept-mode-map state t t)
+   state))
+
+(evil-define-key 'normal my-intercept-mode-map
+  (kbd "SPC f") 'find-file)
+;; ...
+#+end_src
+
+If you are using [[https://github.com/noctuid/general.el][https://github.com/noctuid/general.el]], this configuration is done automatically, so you can just use the ='override= keymap:
+#+begin_src emacs-lisp
+(general-override-mode)
+
+(general-def 'normal 'override
+  "SPC f" 'find-file)
+#+end_src
+
+*** Prevent Text Property Maps from Overriding Evil
+Locations in a buffer can have their own keymaps. As these keymaps have a higher precedence than evil, you will have to clear them to prevent them from overriding your keys. As of emacs 25, help pages will tell you where a key is bound, so to find the keymap you could press =C-h k <key that is being overriden>=. A good example of when you might encounter these keymaps is for links (enter and mouse clicks are often remapped) and for magit-status diff sections. To control the keybindings in these locations, you need to clear the keymap (or at least unbind the keys you don't want) and then define the keys as you like. Note that you should use ~define-key~ and not ~evil-define-key~ for this.
+
+#+begin_src emacs-lisp
+(setq magit-hunk-section-map (make-sparse-keymap))
+(define-key magit-hunk-section-map "s" 'magit-stage)
+#+end_src
+
+** Use Some Emacs Keybindings
+*** Switching Between Evil and Emacs
+Some people prefer to just use evil for editing and stick to emacs keybindings elsewhere. This method just involves altering the initial state for certain modes or using ~evil-make-overriding-map~. For example, if you just wanted to use dired's keybindings as they are without touching your normal state keybindings in dired-mode, you could do the following:
+#+begin_src emacs-lisp
+(evil-set-initial-state 'dired-mode 'emacs)
+#+end_src
+
+If you wanted to override normal state with dired's keybindings, you could do this:
+#+begin_src emacs-lisp
+(evil-make-overriding-map dired-mode-map 'normal)
+#+end_src
+The latter is what evil does by default (followed by an ~evil-add-hjkl-bindings~).
+
+Note that at any time you can use =C-z= (bound to ~evil-emacs-state~) to enter emacs state or =\= (bound to ~evil-execute-in-emacs-state~) to execute the next command in emacs state. In emacs state, =C-z= and =ESC= are bound to switch to the previous state. This may not be what you want if you've entered emacs state from insert state, so you may want to rebind =ESC= to always enter normal state instead:
+#+begin_src emacs-lisp
+(define-key evil-emacs-state-map [escape] 'evil-normal-state)
+#+end_src
+Note that in this case, attempting to rebind =(kbd "ESC")= will not work.
+
+If you want to use emacs keybindings instead of the ones that evil makes in insert state, you can change the =evil-insert-state-bindings= variable to your liking or set =evil-disable-insert-state-bindings= to =t= before loading evil (or use customize to set it afterwards). I recommend doing this instead of aliasing or overriding ~evil-insert-state~ to ~evil-emacs-state~ because the result is pretty much the same and evil intentionally does not record repeat information in emacs state.
+
+These are the keybindings evil makes in insert state by default:
+
+| key       | command                        | emacs default            |
+|-----------+--------------------------------+--------------------------|
+| =C-v=     | ~quoted-insert~                | ~scroll-up-command~      |
+| =C-k=     | ~evil-insert-digraph~          | ~kill-line~              |
+| =C-o=     | ~evil-execute-in-normal-state~ | ~open-line~              |
+| =C-r=     | ~evil-paste-from-register~     | ~isearch-backward~       |
+| =C-y=     | ~evil-copy-from-above~         | ~yank~                   |
+| =C-e=     | ~evil-copy-from-below~         | ~move-end-of-line~       |
+| =C-n=     | ~evil-complete-next~           | ~next-line~              |
+| =C-p=     | ~evil-complete-previous~       | ~previous-line~          |
+| =C-x C-n= | ~evil-complete-next-line~      | ~set-goal-column~        |
+| =C-x C-p= | ~evil-complete-previous-line~  | ~mark-page~              |
+| =C-t=     | ~evil-shift-right-line~        | ~transpose-chars~        |
+| =C-d=     | ~evil-shift-left-line~         | ~delete-char~            |
+| =C-a=     | ~evil-paste-last-insertion~    | ~move-beginning-of-line~ |
+| =C-w=     | ~evil-delete-backward-word~    | ~kill-region~            |
+|           | or ~evil-window-map~           |                          |
+|           | (see =evil-want-C-w-delete=)   |                          |
+
+In =evil-insert-state-bindings=, evil also replaces ~delete-backward-char~ with ~evil-delete-backward-char-and-join~ and binds =<mouse-2>= to ~mouse-yank-primary~ (same as the default). Regardless of the value of =evil-insert-state-bindings= or =evil-disable-insert-state-bindings=, evil will bind the following in insert state:
+
+| key               | command                        | emacs default         |
+|-------------------+--------------------------------+-----------------------|
+| =<delete>=        | ~delete-char~                  | ~delete-forward-char~ |
+| =<escape>=        | ~evil-normal-state~            | acts like meta/alt    |
+| =evil-toggle-key= | ~evil-execute-in-normal-state~ | depends               |
+
+If you don't like these, you can always unbind or rebind them. =evil-toggle-key= defaults to =C-z= (bound to ~suspend-frame~ by default).
+
+*** Using Emacs Keybindings in Normal State
+For modes that still involve editing text but add extra keybindings, you don't always have to rely on a package to make keybindings for you in normal state or rebind everything yourself. =C-c= is used as a mode-specific prefix in emacs, and if you are okay with the keys under it for a mode, you can simply change the prefix to something else in normal state. While this won't always cover all the keybindings made by a mode (e.g. org-mode), it can be helpful.
+
+For example, using [[https://github.com/noctuid/general.el#simulating-keypresses][~general-simulate-key~ or ~general-key~]]:
+#+begin_src emacs-lisp
+(define-key evil-normal-state-map (kbd "SPC") (general-simulate-key "C-c"))
+;; act as whatever C-n is currently bound to in emacs state (eg. `next-line' or
+;; `dired-next-line')
+(define-key evil-normal-state-map (kbd "j") (general-key "C-n" :state 'emacs))
+#+end_src
+
+With the above configuration, you could, for example, press =SPC C-e= in normal state in org mode to bring up the export dispatcher. Emacs allows you to bind keys to keymaps, so the following is also possible:
+#+begin_src emacs-lisp
+(define-key evil-normal-state-map (kbd "SPC h") help-map)
+(define-key evil-normal-state-map (kbd "SPC x") ctl-x-map)
+#+end_src
+
+There are other ways to simulate keys of course, but the way listed here is well-suited for keybindings. This method allows prefix arguments to work properly for the command that ends up running, whereas a keyboard macro would eat the prefix argument. I personally also prefer this method to the key translation methods mentioned [[https://www.emacswiki.org/emacs/Evil#toc13][here]].
+
+** Use Evil Everywhere
+*** Make Evil Normal State the Initial State Always
+You can use the following configuration to have all modes start in normal state:
+#+begin_src emacs-lisp
+(setq evil-emacs-state-modes nil)
+(setq evil-insert-state-modes nil)
+(setq evil-motion-state-modes nil)
+#+end_src
+
+Since =evil-default-state= defaults to =normal=, you can simply clear the other mode lists. If you want to be more explicit, you can do this before clearing them.
+#+begin_src emacs-lisp
+(setq evil-normal-state-modes
+      (append evil-emacs-state-modes
+              evil-insert-state-modes
+              evil-normal-state-modes
+              evil-motion-state-modes))
+#+end_src
+
+If you'd rather have REPLs start in insert state, you may want to keep =evil-insert-state-modes= as it is.
+
+Later if you want to change the state a mode starts in, you should use ~evil-set-initial-state~ as it will automatically remove the mode from any other state list.
+
+*** Undo/Prevent Overriding/Intercept Maps
+As a disclaimer, overriding keymaps will not interfere with keys [[#preventing-certain-keys-from-being-overridden][defined in intercept keymaps]], and the default =evil-intercept-maps= (which contains =edebug-mode-map= at the time of writing) is something you might want to leave as is. If you just never want emacs keys overriding any evil keys (e.g. there are some keys that you don't want the same everywhere but don't want overridden by emacs keys either, you want to make all your keybindings for used modes, or you are using [[evil-collection][evil-collection]] which already provides evil keybindings for used modes), the following information may be useful.
+
+Undoing an override or intercept involves unbinding either =[override-state]= or =[intercept-state]= like so:
+#+begin_src emacs-lisp
+(define-key keymap [override-state] nil)
+(define-key keymap [intercept-state] nil)
+#+end_src
+
+As an example, to undo evil's default overriding of =Info-mode-map=:
+#+begin_src emacs-lisp
+(define-key Info-mode-map [override-state] nil)
+#+end_src
+
+Instead of specifically undoing all the overrides that evil makes, you may want to instead prevent evil from ever overriding anything using a more generic method. Evil provides variables containing keymaps to elevate. They must be set to nil /before/ evil is loaded:
+#+begin_src emacs-lisp
+(setq evil-overriding-maps nil
+      evil-intercept-maps nil)
+;; ...
+(require 'evil)
+#+end_src
+
+If you don't want anything to be overriden, this is not enough. In =evil-integration.el=, ~evil-make-overriding-map~ is used for dired and ibuffer. If you want to prevent =evil-integration.el= from being loaded, you can set =evil-want-integration= to nil /before/ loading evil. If you use [[evil-collection][evil-collection]], which provides the useful functionality from =evil-integration.el= without creating overriding keymaps, you should set this variable to nil.
+
+If you really want to prevent overriding maps from ever being created (e.g. some other evil package could do it), you can advise ~evil-overiding-map~ to prevent it from ever doing anything:
+#+begin_src emacs-lisp
+(advice-add 'evil-make-overriding-map :override #'ignore)
+#+end_src
+
+You can always remove this advice later:
+#+begin_src emacs-lisp
+(advice-remove 'evil-make-overriding-map #'ignore)
+#+end_src
+
+*** Modal Minibuffer
+Normal state does /kind of/ work in the minibuffer if you bind a key to ~evil-normal-state~. Evil collection  For the ex command line specifically, it's worth noting that evil provides =q:=.
+
+Missing using normal mode with Unite, I wrote
+[[https://noctuid.github.io/blog/2015/02/03/a-more-evil-helm/][a blog post]] a while back with the idea of using a hydra to implement modality for helm. Since then, people have created improved versions of my hydra [[https://github.com/abo-abo/hydra/wiki/Helm][for helm]], and ivy has such a hydra builtin.
+
+*** Example: Integration with Pdf Tools
+Configuring a package for evil is not all that different from configuring a package for vanilla emacs. Often the main difference is that you'll be using ~evil-define-key~ instead of ~define-key~ to change keybindings. You start off by reading the documentation for the package to learn how it works and what keybindings it provides.
+
+Pdf-tools has a [[https://github.com/politza/pdf-tools#some-keybindings][section in the readme]] that lists its keybindings. If you are happy with them, you could simply let pdf-tool's keymap override normal state (excluding your "special" non-overridable keys). The readme doesn't tell you the mode's keymap name specifically, but it is not hard to figure out. After setting up the basics for pdf-tools, you can open a pdf and evaluate =major-mode= to find out that you are in =pdf-view-mode=. You can get a lot more information with =C-h m= (~describe-mode~). Mode's keymaps generally match their mode's name, and in this case the main keymap is =pdf-view-mode-map=.
+#+begin_src emacs-lisp
+(evil-make-overriding-map pdf-view-mode-map 'normal)
+#+end_src
+Alternatively, you can find out what keymaps pdf-tools provides by typing =pdf map= after running ~helm-apropos~.
+
+Pdf-tools has some other modes, the other main one being the outline mode (=pdf-outline-buffer-mode-map=). For packages that have 2+ main modes for different contexts, you can just repeat this process as necessary and be done with things if you are content with the default keybindings.
+
+If you're like me though, you'll prefer to use vim-like keybindings everywhere. You can either change a few keybindings and use the previous configuration (keys bound with ~evil-define-key~ here won't be overriden) or bind all the keys you use yourself. You can either look at the keys mentioned in the readme and check what they are bound to with =C-h k= or use =C-h m= to look at all the keys bound. Here are some basic =hjkl= keybindings:
+#+begin_src emacs-lisp
+(evil-define-key 'normal pdf-view-mode-map
+  "h" 'pdf-view-previous-page-command
+  "j" (lambda () (interactive) (pdf-view-next-line-or-next-page 5))
+  "k" (lambda () (interactive) (pdf-view-previous-line-or-previous-page 5))
+  "l" 'pdf-view-next-page-command)
+#+end_src
+
+You could even bind things in terms of =general-simulate-keys= without even looking up the keys if you preferred to:
+#+begin_src emacs-lisp
+(general-evil-define-key 'normal pdf-view-mode-map
+  "h" (general-simulate-keys "p" t)
+  "j" (general-simulate-keys "C-n" t)
+  "k" (general-simulate-keys "C-p" t)
+  ;; alternatively to scroll more
+  "j" (general-simulate-keys "SPC" t)
+  "k" (general-simulate-keys "DEL" t)
+  "l" (general-simulate-keys "n" t))
+#+end_src
+
+We can go further if we want:
+#+begin_src emacs-lisp
+(evil-define-key 'normal pdf-view-mode-map
+  "g" 'pdf-view-first-page
+  "G" 'pdf-view-last-page
+  ;; alternatively
+  "g" 'image-bob
+  "G" 'image-eob
+  (kbd "C-o") 'pdf-history-backward
+  (kbd "C-i") 'pdf-history-forward
+  "m" 'pdf-view-position-to-register
+  "'" 'pdf-view-jump-to-register
+  "/" 'pdf-occur
+  "o" 'pdf-outline
+  "f" 'pdf-links-action-perform
+  "b" 'pdf-view-midnight-minor-mode
+  ...)
+#+end_src
+
+Using the tools mentioned in this section, none of this is difficult. It may be time consuming, but I think reading the documentation for a new mode takes the majority of the time when compared to making 10-20 basic keybindings for it.
+
+As a bonus, here are some functions I wrote to make pdf-tools even more vimmy. Want to have =G= double as a way for jumping to a specific page number? No problem:
+#+begin_src emacs-lisp
+(defun noct:pdf-view-goto-page (count)
+  "Goto page COUNT.
+If COUNT is not supplied, go to the last page."
+  (interactive "P")
+  (if count
+      (pdf-view-goto-page count)
+    (pdf-view-last-page)))
+
+(evil-define-key 'normal pdf-view-mode-map
+  "G" 'noct:pdf-view-goto-page)
+#+end_src
+
+Want to copy text using vim keys? Pdf-tools displays pdfs using images, but you can open the current page in a text buffer and use vim keys for selection/copying there:
+#+begin_src emacs-lisp
+(defun noct:pdf-view-page-as-text ()
+  "Inserts current pdf page into a buffer for keyboard selection."
+  (interactive)
+  (pdf-view-mark-whole-page)
+  (pdf-view-kill-ring-save)
+  (switch-to-buffer (make-temp-name "pdf-page"))
+  (save-excursion
+    (yank)))
+
+(evil-define-key 'normal pdf-view-mode-map
+  "y" 'noct:pdf-view-page-as-text)
+#+end_src
+
+Once you're done, you can delete the buffer (~kill-this-buffer~) and continue reading where you left off.
+
+** Command Properties
+Evil provides the following functions for customizing how it deals with commands:
+- ~evil-set-command-property~: Set one property of a command
+- ~evil-put-command-property~: Alias for ~evil-set-command-property~
+- ~evil-set-command-properties~: Set all the properties of a command
+- ~evil-add-command-properties~: Set one or more command properties of a command
+
+Unless you want to remove command properties entirely from a command, you can just use ~evil-add-command-properties~.
+
+When creating motions, text-objects, and commands, you can set command properties with keywords (e.g. to control whether an operator will move the point or exit visual state; see the =evil/Macros= info node). For example:
+#+begin_src emacs-lisp
+(evil-define-operator some-operator (args)
+  "Docstring."
+  ;; command properties go after the docstring and before the interactive codes
+  :repeat nil
+  (interactive "...")
+  ;; ...
+  )
+#+end_src
+
+Note that operators, commands, motions, and text objects all have default non-nil properties. Not all properties are applicable to all macros (again, see the =Macros= section of the evil info manual).
+
+The default properties for operators are =:repeat t :move-point t keep-visual t :supress-operator t=.
+
+The default properties for commands are =:repeat t=.
+
+The default properties for motions are =:repeat 'motion :keep-visual t=.
+
+The default properties for text objects are =:repeat 'motion :extend-selection t :keep-visual t=.
+
+*** :repeat
+The =:repeat= property is used to determine how evil records information for repeating later with ~evil-repeat~. These symbols are the possible values by default:
+- =t=: record by keystrokes
+- =motion=: record by keystrokes only in insert state
+- =change=: record by changes to the buffer
+- =ignore= or =nil=: don't record the command
+- =abort=: immediately abort recording
+
+There is also =insert-at-point= which has a less common use case. If a command does not have a =:repeat= property, evil will treat it as if the repeat property was =t=. You can also create your own recording functions and use them by setting the repeat property to that function's name. You could also use a custom symbol by adding something like =(my-repeat-type . my-repeat-function)= to =evil-repeat-types=.
+
+Evil also provides some wrappers around ~evil-add-command-properties~ to set the repeat property for a command:
+- ~evil-declare-repeat~: set to =t=
+- ~evil-declare-not-repeat~: set to =nil=
+- ~evil-declare-change-repeat~: set to =change=
+- ~evil-declare-ignore-repeat~: set to =ignore=
+- ~evil-delare-abort-repeat~: set to =abort=
+
+~evil-declare-repeat~ and ~evil-declare-not-repeat~ are the most commonly useful ones. You'll use them for configuring whether a command should be repeatable. See the help text and functions in =evil-repeat.el= for more information. For examples of these being used, I'd recommend looking at =evil-integration.el=.
+
+*** :jump
+The =:jump= property takes a boolean value. If a command has a non-nil jump property value, the location prior to running the command will be recorded in the jump list to later be navigated to with =C-o= (~evil-jump-backward~) and =C-i= (~evil-jump-forward~). Commands without this command property will not add a position to the jump list. For example, you could use this to have git-gutter's commands for navigating hunks save the current location before jumping:
+#+begin_src emacs-lisp
+(evil-add-command-properties #'git-gutter:next-hunk :jump t)
+(evil-add-command-properties #'git-gutter:previous-hunk :jump t)
+#+end_src
+
+*** :type
+The =:type= command property determines how commands, motions, and text objects act with operators (e.g. see ~evil-delete~ as an example of how an operator can be defined to handle different types). The possible values by default are as follows:
+- =:line=
+- =:inclusive=
+- =:exclusive=
+- =:block=
+
+This property is mainly useful for evil text objects and motions, but it can also be used for non-evil commands. For example, if you bound =j= ~next-line~ in operator state and set its type to =:inclusive=, =dj= would no longer delete both lines entirely (~next-line~ has a type of =line= by default). Evil allows adding new types using ~evil-define-type~ (see the =Macros= section of the evil manual for more information).
+
+*** :move-point
+The =:move-point= property applies when defining operators and determines whether evil will move the point to the beginning of the operator range before running the operator code. Note that it defaults to =t=.
+
+*** :keep-visual
+TODO
+
+*** :suppress-operator
+Commands with a non-nil =:suppress-operator= property (e.g. ~keyboard-quit~, ~evil-force-normal-state~, and operators) will cause the operator (and repeat recording) to be aborted. For example, if you press =d ESC= or =d C-g=, ~evil-delete~ will quit and not delete anything.
+
+*** :motion
+The =:motion= command property is used for operators to automatically use the range given by some motion. This means that the defined operator will not be usable with motions/text objects, so it is generally not useful. For example, this is how =s= / ~evil-substitute~ is defined:
+#+begin_src emacs-lisp
+(evil-define-operator evil-substitute (beg end type register)
+  "Change a character."
+  :motion evil-forward-char
+  (interactive "<R><x>")
+  (evil-change beg end type register))
+#+end_src
+
+*** Declaring a Motion
+As an example, you don't always need use ~evil-define-motion~ to create new motions. If all you want is to do is control the repeating behavior or the behavior in visual state, you can simply change the command properties of a command. To have an emacs command act like a motion, evil provides ~evil-declare-motion~, which will set the =:repeat= property to =motion= and the =:keep-visual= property to =t=. Usually the =:keep-visual= property doesn't matter for emacs commands (they already won't exit visual state). Setting the =repeat= property will cause a command to only be part of a recorded repeat in insert state (for example, after a =C-o=).
+
+* Other Evil Tips
+** State Indicator
+I prefer not to have a state indicator on my mode line and instead to just rely on the color and shape of the cursor to determine what state I'm in. For example:
+#+begin_src emacs-lisp
+(setq evil-mode-line-format nil
+      evil-insert-state-cursor '(bar "White")
+      evil-visual-state-cursor '(box "#F86155"))
+#+end_src
+
+See the =Settings/The cursor= section of the evil info node for more information.
+
+** User Created States
+Evil lets you create new states with ~evil-define-state~ (see =Macros/States= under the evil info node). You may never need to use this, and if you're looking for something like [[https://github.com/kana/vim-submode][vim-submode]], I'd highly recommend looking at [[https://github.com/abo-abo/hydra][hydra]] instead.
+
+** Using Escape to Exit the Minibuffer
+Escape is used as a prefix key in some parts of emacs, so you need to rebind it to =keyboard-escape-quit= in certain minibuffer-related keymaps for it to always act as expected. You could, for example, use [[https://github.com/emacs-evil/evil-collection/blob/master/evil-collection-minibuffer.el][evil-collection-minibuffer.el]] to do this.
+
+** Ex Command Definition
+You can define your own ex commands using ~evil-ex-define-cmd~. For example, this is how =copy= is defined:
+#+begin_src emacs-lisp
+(evil-ex-define-cmd "co[py]" 'evil-copy)
+(evil-ex-define-cmd "t" "copy")
+#+end_src
+
+You could, for example, use this to get some emacs commands with numbers in them to work from the command line (this won't work with "w3m" because of the write command):
+#+begin_src emacs-lisp
+(evil-ex-define-cmd "mu[4e]" 'mu4e)
+#+end_src
+
+* Autocommand Equivalents (unfinished)
+Here the hooks that are closest to common vim autocommands are listed. This is fairly incomplete, and in many cases there are not direct/exact equivalents, or common use cases of the vim hooks are unnecessary (e.g. you don't need to use hooks in emacs to make keybindings for specific filetypes). See [[https://www.gnu.org/software/emacs/manual/html_node/elisp/Standard-Hooks.html][here]] for the standard hooks that are part of emacs.
+
+| vim               | emacs                                    |
+|-------------------+------------------------------------------|
+| =InsertLeave=     | =evil-insert-state-exit-hook=            |
+| =FileType python= | =python-mode-hook=                       |
+| =BufReadPost=     | =find-file-hook=                         |
+| =BufWrite(Pre)=   | =before-save-hook= or =write-file-hooks= |
+| =BufWritePost=    | =after-save-hook=                        |
+| =FocusGained=     | =focus-in-hook=                          |
+| =FocusLost=       | =focus-out-hook=                         |
+| =VimLeave(Pre)=   | =kill-emacs-hook=                        |
+
+* Other Emacs Tips
+** Packages/Plugins
+Unlike vim, emacs has a standard way to install plugins (=package.el=). This has some upsides such as allowing a package author to specify dependencies. There are also some differences vim users might consider to be downsides. For example, you normally install packages through a package repository such as [[https://melpa.org/#/][MELPA]]. If you want to install a package that is not in a package repository immediately (without having to add it yourself), you can use [[https://github.com/raxod502/straight.el][straight.el]] or [[https://github.com/dimitri/el-get][elget]] or [[https://github.com/quelpa/quelpa][quelpa]] to grab it from the source repository like you would with a vim plugin manager. Quelpa and straight.el are also useful if you want the latest version of a package from MELPA (or with your own recipe). MELPA builds packages daily, but sometimes you may want the latest commit for testing a bug fix. You can, of course, always manually clone a repo and put it in your =load-path=. For comparison, =package.el= and other emacs package managers additionally compile all elisp files and generate autoloads from autoload cookies. I personally use and recommend [[https://github.com/raxod502/straight.el][straight.el]] which can use MELPA's recipes but also allows you to specify your own and is trivial to switch to if you are using [[https://github.com/jwiegley/use-package][use-package]].
+
+For basic functionality, you can use ~package-list-packages~ (or just ~list-packages~) to view and install available packages or just  ~package-install~.
+
+** Debugging Your Init File
+You can start emacs with the =--debug-init= flag when there is some problem in your init to put you in the debugger with a backtrace. You can use [[https://emacs.stackexchange.com/questions/7852/show-line-number-on-error?lq=1][wasamasa's hack]] to have the line number where the error was encountered displayed as well.
+
+[[https://github.com/flycheck/flycheck][Flycheck]] can help to prevent some errors. If you don't have flycheck installed, you can also byte-compile your init file to get information about detectable errors and jump to them using ~byte-compile-file~; byte-compiling your init file will also give you other nice information such as telling you when you're using obsolete functions/variables. The emacs manual [[https://www.gnu.org/software/emacs/manual/html_node/emacs/Init-File.html][does not recommend]] using a byte-compiled init file, so you may want to remove the corresponding "elc" file afterwards if you do this.
+
+* FAQ
+** Is emacs slow to start?
+No, people's init files are usually the problem. To test emacs' startup speed, you can start it without loading your init file using ~emacs -Q~. Even with hundreds of packages, the startup time shouldn't be increased very much if you properly defer the loading of your packages when possible.
+
+Deferring a package from loading often just involves not putting a ~(require 'package)~ in your config. When you install a package through =package.el= (and most alternative package managers), autoloads are automatically generated for functions that have autoload cookies (=;;;###autoload=). This means that if you bind a key to one of these autoloaded commands, the corresponding package will be loaded when you first press that key. Major modes should normally only be loaded when a file of the corresponding type is first loaded. Minor mode activation commands also should be autoloaded. A common way of activating minor modes is by using hooks (e.g. ~(add-hook 'emacs-lisp-mode #'lispy-mode)~).
+
+Even if your init is not too optimized, you can you can use emacs' server functionality so that you only need to start emacs once. You can start the server either putting ~(server-start)~ in your init file or by using ~emacsclient~ or ~emacs~ (with the =--daemon= flag) to create it. You can connect to a server using ~emacsclient~. I personally use ~emacsclient~ as my EDITOR and have a key bound to ~emacsclient -a "" -c~, which will open a new graphical emacs frame and start the server if it isn't already running. See the ~emacsclient~ manpage and the [[https://www.gnu.org/software/emacs/manual/html_node/emacs/Emacs-Server.html][corresponding emacs manual section]] for more information.
+
+For a convenient way to control package loading, see [[https://github.com/jwiegley/use-package][use-package]]. For a way to profile your init file(s), see [[https://github.com/dholm/benchmark-init-el][benchmark-init]] and [[https://github.com/jschaf/esup][esup]].
+
+** How do I improve emacs' performance?
+If you're encountering lag while using emacs, it's likely due to part of your configuration. A common culprit for slowdown is =linum-mode=. =nlinum= is a faster alternative, and emacs now has line numbers builtin which should be preferred (see the =display-line-numbers= variable).
+
+I've also found that =git-gutter=, for example, can cause major slowdowns in large buffers with a lot of changes. I've heard that =fic-mode= can also cause problems. In really large files, you may need to disable some of your minor modes, switch to fundamental mode, or use [[https://github.com/m00natic/vlfi][vlf]]. If you're having trouble quickly finding the culprit of slowdowns, you should try profiling with ~profiler-start~.
+
+** Does emacs have vim-like tabs (distinct window configurations)?
+No, but there are plenty of packages that add this feature. Elscreen is often recommended, but it is limited to 10 tabs/screens, old, and not as good as the alternatives in my opinion. I personally use [[https://github.com/pashinin/workgroups2][workgroups2]]. It probably has the most features compared with alternatives, but it is unmaintained, so I'd probably recommend using [[https://github.com/wasamasa/eyebrowse][eyebrowse]] instead. There are other alternatives listed in the eyebrowse readme as well.
+
+** What's the equivalent of ~nnoremap Y y$~?
+You can of course bind =Y= to simulate =y$= or redefine the operator, but evil has an option for this builtin. You can set =evil-want-Y-yank-to-eol= to a non-nil value before loading emacs to make this change.
+
+You might also want to look at the other ~evil-want~ variables in =evil-vars.el= such as =evil-want-change-word-to-end=.
+
+** What's the equivalent of ~nnoremap n nzz~?
+You can advise ~evil-search-next~ to have the command =zz= is bound to run afterwards.
+#+begin_src emacs-lisp
+(defun my-center-line (&rest _)
+  (evil-scroll-line-to-center nil))
+
+(advice-add 'evil-search-next :after #'my-center-line)
+#+end_src
+
+You could advise several commands at once like this using ~dolist~.
+
+** What's the equivalent of ~inoremap jk <escape>~?
+As this is not possible by default with emacs' keybinding system, you have to use one of a few [[https://github.com/noctuid/general.el#mapping-under-non-prefix-keys][workarounds]].
+
+** What's the equivalent of ~nnoremap cw ciw~?
+This is also not possible by default. See the previous link.
+
+** What's the equivalent of vim-unimpaired's =cow=?
+This is also not possible by default. See the previous link.
+
+** How do I copy and paste to/from the clipboard in terminal emacs?
+For osx (with pbcopy) and linux (with xclip), you can install =xclip.el= for this functionality. I have this in my configuration to turn it on when I open emacs in a terminal:
+#+begin_src emacs-lisp
+(defun noct:conditionally-toggle-xclip-mode ()
+  (if (display-graphic-p)
+      (if (bound-and-true-p xclip-mode)
+          (xclip-mode -1))
+    (xclip-mode)))
+
+(noct:conditionally-toggle-xclip-mode)
+
+(add-hook 'focus-in-hook
+          #'noct:conditionally-toggle-xclip-mode)
+#+end_src
+
+If you don't use emacsclient for terminal instances, you don't need to use a hook at all. If you do use emacsclient for both graphical and terminal instances, then this should work in theory if your terminal supports =focus-in-hook= (e.g. st and kitty). That said, even though the mode is correctly toggled for me, it doesn't work in an emacsclient terminal frame unfortunately.
+
+** Can I have better completion in the ex command line?
+~ivy-mode~, for example, does work in the ex command line, but it must be manually triggered. Because of how completion in the command line works, there is no way as far as I'm aware to have automatic completion popups. Company does work with =q:=, but by default, the completions it suggests may not be too useful.
+
+** How do I prevent parentheses becoming unbalanced in my init file?
+The simplest way is to install and use a package like [[https://github.com/luxbock/evil-cleverparens][evil-cleverparens]] or [[https://github.com/noctuid/lispyville][lispyville]] that will prevent evil's operators from unbalancing parentheses. Lispyville only remaps evil's operators by default, so you can ignore its other functionality (and lispy too) if you want.
+
+** How can I have relative line numbers?
+Using builtin line numbers is now the best solution. Here's my configuration that mimics [[https://github.com/myusuf3/numbers.vim][numbers.vim]]:
+#+begin_src emacs-lisp
+(setq-default display-line-numbers 'visual
+              display-line-numbers-widen t
+              ;; this is the default
+              display-line-numbers-current-absolute t)
+
+(defun noct:relative ()
+  (setq-local display-line-numbers 'visual))
+
+(defun noct:absolute ()
+  (setq-local display-line-numbers t))
+
+(add-hook 'evil-insert-state-entry-hook #'noct:absolute)
+(add-hook 'evil-insert-state-exit-hook #'noct:relative)
+
+;; example of customizing colors
+(custom-set-faces '(line-number-current-line ((t :weight bold
+                                                 :foreground "goldenrod"
+                                                 :background "slate gray"))))
+#+end_src
+
+** Does emacs have support for folding?
+Yes, evil has integration with various emacs "folding" mechanisms builtin (such as origami, hideshow, and outline-mode/org-mode/markdown-mode; see =evil-fold-list=). Not all of vim's =z= keys will work though.
+
+For manual creation of folds from selected regions, there are the [[https://github.com/mrkkrp/vimish-fold][vimish-fold]] and [[https://github.com/alexmurray/evil-vimish-fold][evil-vimish-fold]] packages.
+
+** Why don't keys defined with ~evil-define-key~ work (immediately)?
+This has been a known problem for a while (see [[https://github.com/emacs-evil/evil/issues/130][issue 130]] and especially [[https://github.com/emacs-evil/evil/issues/301][issue 301]], which explains some of the issues with ~evil-define-key~). This doesn't happen for most modes, but when it does happen, it's annoying.
+
+There are several possible workarounds. You can use the mode's hook to either bind the keys locally with ~evil-local-set-key~ as shown in the [[#buffer-local-keybindings][Buffer Local Keybindings]] section. A more direct solution would be to continue to use ~evil-define-key~ and to use the hook to call ~evil-normalize-keymaps~:
+#+begin_src emacs-lisp
+(add-hook 'org-src-mode-hook #'evil-normalize-keymaps)
+#+end_src
+
+The other way would be to use ~evil-define-minor-mode-key~ which was introduced specifically as a result of this issue:
+#+begin_src emacs-lisp
+(evil-define-minor-mode-key 'normal 'org-src-mode
+  (kbd "SPC '") 'org-edit-src-exit)
+
+;; `evil-define-key' with a quoted symbol instead of a keymap works the same
+(evil-define-key 'normal 'org-src-mode
+  (kbd "SPC '") 'org-edit-src-exit)
+#+end_src
+
+* Plan to Add
+- Add a section on configuring undo (e.g. =evil-want-fine-undo=, =evil-with-undo=, =evil-with-single-undo=, etc.)
+- Add section explaining evil interactive codes
+- Explain all command properties
+- Add section on evil's supported/missing functionality (e.g. numerical prefixes before operators aren't repeated and =:put=, =:next=, =:rewind=, etc. are missing)
+- Mention =evil-ex-map=
+- Mention =evil-without-repeat=
