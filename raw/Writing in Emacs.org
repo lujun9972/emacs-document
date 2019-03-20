@@ -1,0 +1,140 @@
+#+TITLE: Writing in Emacs
+#+URL: http://www.johnborwick.com/2019/02/24/emacs-writing.html
+#+AUTHOR: lujun9972
+#+TAGS: raw
+#+DATE: [2019年 03月 20日 星期三 11:17:39 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+The excellent YouTube video called "[[https://www.youtube.com/watch?v=FtieBc3KptU][Emacs for Writers]]" tells the story of how a writer learned about Emacs because he wanted a simple writing tool that helped him focus on what he was writing.
+
+I have (barely) used Scrivener and other tools (including just a set of LaTeX files) to write larger texts. However, I wanted to set something up more along the lines of what the Jay Dixit in the above video has set up.
+
+Here's what I've got so far.
+
+** Background
+   :PROPERTIES:
+   :CUSTOM_ID: org5944504
+   :END:
+
+All of this is designed for writing in .org files using org-mode. Org-mode is great for writing because you can show/hide your text vs. the headers/outline of your text. There are lots of other things that org-mode /could/ do, such as tracking to-do's, but at its most basic you're writing text inside headings.
+
+Some quick things that you get "for free" with org-mode include:
+
+- export options built in for HTML, PDF, text, or other formats
+- comments that aren't rendered in your final version, e.g. you can have notes to yourself that people don't see when you export your writing
+- contents are all text so it's easy to make large-scale changes with tools as simple as find and replace
+
+** org-panes
+   :PROPERTIES:
+   :CUSTOM_ID: org248a0a5
+   :END:
+
+#+BEGIN_EXAMPLE
+    (use-package org-panes
+     :ensure nil
+     :config (setq org-panes-split-overview-horizontally t)
+     (setq org-panes-main-size 70))
+#+END_EXAMPLE
+
+[[https://github.com/knupfer/org-panes][org-panes]] is a module to give you a three-pane view:
+
+1. The top-level headings of your document
+2. All headings of your document
+3. The actual text of your document (the main pane)
+
+If you select a different heading in the summary panes, you're taken to the relevant section in the main pane.
+
+** Olivetti
+   :PROPERTIES:
+   :CUSTOM_ID: org0c2a98c
+   :END:
+
+[[https://github.com/rnkn/olivetti][Olivetti]] will narrow the window so that you have larger margins rather than writing right up to the edges of the window. I like how this helps me focus on what I'm writing.
+
+** Word count goal mode
+   :PROPERTIES:
+   :CUSTOM_ID: orgb364e84
+   :END:
+
+#+BEGIN_EXAMPLE
+    (use-package wc-goal-mode)
+#+END_EXAMPLE
+
+This minor mode shows you how many words are in the buffer vs. when you first opened the buffer, in the form =3500+120=3750=.
+
+I am therefore looking at the mode line more. So, I also learned about =diminish=, which is a tool to hide things from your mode line. This tool is supported by use-package. For example, I know I'm using Helm so I don't need to see it in my mode line anymore:
+
+#+BEGIN_EXAMPLE
+    (use-package helm
+     :diminish
+     ; ...
+    )
+#+END_EXAMPLE
+
+** keybindings
+   :PROPERTIES:
+   :CUSTOM_ID: orga171d6b
+   :END:
+
+#+BEGIN_EXAMPLE
+    ; "C-c f" turns olivetti on/off, globally.
+    (use-package olivetti-mode
+     :ensure nil
+     :bind ("C-c f" . olivetti-mode))
+
+    ; org-panes and olivetti don't play well together
+    ; because they both change window sizes. this function
+    ; turns olivetti-mode off first if it's on, so that
+    ; org-panes doesn't get confused about the window size
+    (defun org-panes-check-olivetti ()
+     (interactive)
+     (if (bound-and-true-p olivetti-mode)
+     (progn (olivetti-mode -1)
+     (org-panes)
+     (olivetti-mode))
+     (org-panes)))
+
+    (use-package org
+     ; bunch of other stuff goes here
+     :bind (; other bindings go here
+     :map org-mode-map
+     ("C-c p" . org-panes-check-olivetti)
+     ; etc
+#+END_EXAMPLE
+
+I wanted two key bindings:
+
+1. =C-c f=, set globally, for "focus." This turns Olivetti on and off.
+2. =C-c p=, set within org-mode buffers, for "panes." This turns org-panes on and off.
+
+** file mode lines
+   :PROPERTIES:
+   :CUSTOM_ID: org8525ab2
+   :END:
+
+#+BEGIN_EXAMPLE
+    # -*- mode: org; eval: (wc-goal-mode); -*-
+#+END_EXAMPLE
+
+I am still experimenting with file-specific mode lines. For the one larger file I am writing in, I turn on wc-goal-mode by default using the above "eval" line.
+
+** Lessons learned and next steps
+   :PROPERTIES:
+   :CUSTOM_ID: org571f252
+   :END:
+
+I am weighing whether it's a good idea to create a specific frame layout for writing--one that not only has org-panes but specifies specific fonts/sizes for each window.
+
+I'm also potentially interested in capturing word count by day, maybe with an external script. Right now I'm doing this manually via a Makefile (of course):
+
+#+BEGIN_EXAMPLE
+    word-count:
+        (/bin/echo -n $$(date); pandoc file.org -w plain | wc -w ) >> file-word-count.txt
+#+END_EXAMPLE
+
+This adds a line to the file =file-word-count.txt= whenever you run it, showing the date, time, and current word count according to [[https://pandoc.org/][pandoc]]'s conversion of the file into plaintext.
+
+#+BEGIN_EXAMPLE
+    Sun Feb 24 13:05:25 PST 2019 2152
+    Sun Feb 24 17:02:08 PST 2019 3245
+#+END_EXAMPLE
