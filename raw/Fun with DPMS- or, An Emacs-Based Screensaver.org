@@ -1,0 +1,120 @@
+#+TITLE: Fun with DPMS; or, An Emacs-Based Screensaver
+#+URL: https://lars.ingebrigtsen.no/2019/02/28/fun-with-dpms-or-an-emacs-based-screensaver/
+#+AUTHOR: lujun9972
+#+TAGS: raw
+#+DATE: [2019年 03月 20日 星期三 11:18:28 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+[[https://larsmagne23.files.wordpress.com/2019/02/2019-02-28-2.png][[[https://larsmagne23.files.wordpress.com/2019/02/2019-02-28-2.png?w=840]]]]
+
+I've got a bunch of monitors, large and small, that (in general) are always on. Because I'm too lazy to switch stuff off and or.
+
+They display some useful information, but are largely decorative (i.e, some of them display temperature data, and some use xscreensaver to show what albums are playing).
+
+But I've got the [[https://lars.ingebrigtsen.no/2011/01/09/emacs-home-automation/][rest of the lights]] and stuff in the apt to switch off when I push the “I'm going to bed” button on the wall. I thought it might be nice to have all the monitors also switch off at the same time? And then I could link the “I'm awake now” button on the wall to switching all the monitors on again.
+
+So cyber.
+
+I thought this was going to be really easy, but... you know... computers.
+
+First of all: Switching a screen off is easy:
+
+#+BEGIN_EXAMPLE
+    $ xset dpms force off
+#+END_EXAMPLE
+
+And then it's off.
+
+#+BEGIN_EXAMPLE
+    $ xset dpms force on; xset -dpms
+#+END_EXAMPLE
+
+to switch it on again and disable power management again (to avoid the monitors switching themselves off again on their own volition).
+
+So far so good!
+
+However, there's like a dozen things that feel free to wake monitors up.
+
+* mpv
+   :PROPERTIES:
+   :CUSTOM_ID: mpv
+   :END:
+
+[[https://larsmagne23.files.wordpress.com/2019/02/n-p1390339.jpg][[[https://larsmagne23.files.wordpress.com/2019/02/n-p1390339.jpg?w=840]]]]
+
+Easiest first: I've got a [[https://lars.ingebrigtsen.no/2018/08/14/twiddling-youtube-or-i-mean-innovations-in-machine-learning/][little monitor]] that plays Youtube 24/7 (and displays weather data).
+
+It would switch itself on immediately, because it uses mpv to display the youtube vids. To switch that off, just say --no-stop-screensaver.
+
+* Stereo Computer
+   :PROPERTIES:
+   :CUSTOM_ID: stereo-computer
+   :END:
+
+[[https://larsmagne23.files.wordpress.com/2019/02/n-p1390335.jpg][[[https://larsmagne23.files.wordpress.com/2019/02/n-p1390335.jpg?w=840]]]]
+
+The screen on the computer I use to control the stereo would switch it self on whenever the song changed, and after a bit of trial and error and more code reading, I found this:
+
+#+BEGIN_EXAMPLE
+    (set-mouse-pixel-position (selected-frame) 2000 0)
+#+END_EXAMPLE
+
+It's code designed to just move the mouse pointer off the screen. And it turns out that that makes X wake the monitor up!
+
+I guess that... makes sense? I mean, moving the mouse is supposed to wake the screen up, so...
+
+I added the following guard:
+
+#+BEGIN_EXAMPLE
+    (defun jukebox-monitor-on-p ()
+     (with-temp-buffer
+     (call-process "xset" nil t nil "q")
+     (goto-char (point-min))
+     (search-forward "Monitor is On" nil t)))
+#+END_EXAMPLE
+
+* xscreensaver
+   :PROPERTIES:
+   :CUSTOM_ID: xscreensaver
+   :END:
+
+[[https://larsmagne23.files.wordpress.com/2019/02/n-p1390336.jpg][[[https://larsmagne23.files.wordpress.com/2019/02/n-p1390336.jpg?w=840]]]]
+
+Many of the larger screens use xscreensaver to display the sleeve of whatever album is playing, and xscreensaver wakes the monitor up after just a few seconds. Isn't that ironic!
+
+Don't you think?
+
+It's like a screensaver that switches on a screen that's already saved, it's like
+
+Oh, where was I...
+
+xscreensaver has a bunch of DPMS-related options:
+
+#+BEGIN_EXAMPLE
+    dpmsEnabled:   False
+    dpmsQuickOff:   False
+    dpmsStandby:    24:00:00
+    dpmsSuspend:    24:00:00
+    dpmsOff:    24:00:00
+#+END_EXAMPLE
+
+But none of them seem to help with this problem. xscreensaver stubbornly wakes shit up. What's up with that, jwz?
+
+So.
+
+The only solution for this problem is to write an [[https://github.com/larsmagne/screensaver.el][Emacs-based screensaver]].
+
+Obviously.
+
+It uses the [[https://github.com/ch11ng/xelb][xelb]] library to query the idleness (to schedule when to start saving the screen) and to query/restore focus after closing the screensaver window.
+
+Man. It'd be great if somebody could write a manual for xelb. Working with it is kinda frustrating because you just have to poke around, looking at examples, until you suddenly get something that works. I spent, like, seven thousand hours (approx.) trying to get the idleness out of it until I guessed (by looking at what exwm did with randr extensions) that you had to say
+
+#+BEGIN_EXAMPLE
+    (xcb:get-extension-data x 'xcb:screensaver)
+#+END_EXAMPLE
+
+before trying to call the xcb:screensaver:QueryInfo function.
+
+[Edit: Emacs give me almost all events that's given to the frame (mouse and keystrokes), but not when the user presses shift, etc. Is there a way to get something like xcb_wait_for_event out of the xelb library?]
+
