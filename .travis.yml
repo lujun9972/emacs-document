@@ -1,18 +1,30 @@
-
+dist: xenial
 language: generic
-sudo: false
 
 branches:
   only:
     - master
 
+git:
+  depth: false
+  quiet: true
+
 before_install:
+ - git config --global core.quotepath false
  - git clone https://github.com/nasfarley88/habash
  - git config --global user.email "lujun9972@gmail.com"
  - git config --global user.name "darksun"
+ - sudo add-apt-repository ppa:ubuntu-elisp/ppa -y
+ - sudo apt-get update
+ - sudo apt-get install emacs-snapshot -y
+ - emacs-snapshot --version
  
 script:
 - ./habash/habash up "翻译Emacs文档"
+- export REPO=$(git remote -v |grep fetch |head -n 1|awk '{print $2}')
+- git clone -b master ${REPO} ~/source
+- git clone -b gh-pages ${REPO} ~/web
+- emacs-snapshot --batch -l ./auto_publish.el 
 - echo -e $TRAVIS_PRIVATE1 >~/.ssh/id_rsa && chmod 600 ~/.ssh/id_rsa
 - wc -l ~/.ssh/id_rsa
 - echo "Host github.com" >> ~/.ssh/config
@@ -24,3 +36,14 @@ script:
 - cd emacs-document && ./generate_index.sh >README.org
 - git commit -a -m "update README" || exit 0
 - git push origin master
+
+deploy:
+  provider: pages
+  skip_cleanup: true
+  keep_history: true
+  github_token: $GITHUB_TOKEN
+  local_dir: /home/travis/web
+  target_branch: gh-pages
+  on:
+    branch:
+      - master
