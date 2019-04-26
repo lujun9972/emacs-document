@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Using results from one code block in another org-mode - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="raw" />
+  <style>
+   #ds-thread #ds-reset .ds-comment-body p {color: #ffffff;}
+   #ds-thread #ds-reset .ds-comment-body p a {color: #ff0;}
+   #ds-thread #ds-reset .ds-comment-body p a:hover {color: #0ff;}
+   #disqus_thread a {color: #00ffff;}
+  </style>
+  <link rel="stylesheet" href="/media/css/main.css" type="text/css"/>
+  <link rel="stylesheet" href="/media/css/comment.css" type="text/css"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="/">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <div class="menu-icon">
+        <svg viewBox="0 0 18 15">
+          <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.031C17.335,0,18,0.665,18,1.484L18,1.484z" fill="#ffff00"/>
+          <path d="M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0c0-0.82,0.665-1.484,1.484-1.484 h15.031C17.335,6.031,18,6.696,18,7.516L18,7.516z" fill="#ffff00"/>
+          <path d="M18,13.516C18,14.335,17.335,15,16.516,15H1.484C0.665,15,0,14.335,0,13.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.031C17.335,12.031,18,12.696,18,13.516L18,13.516z" fill="#ffff00"/>
+        </svg>
+      </div>
+      <ul class="trigger">
+        <li><a href="/years/">Years</a></li>
+        <li><a href="/authors/">Authors</a></li>
+        <li><a href="/tags/">Tags</a></li>
+        <li><a href="/about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="/rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="http://www.google.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">Using results from one code block in another org-mode</h1>
+<div id="table-of-contents">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#org28f462e"><span class="done DONE">DONE</span> Using results from one code block in another org-mode</a>
+<ul>
+<li><a href="#orgdf70667">:var</a></li>
+<li><a href="#org0990fa1">:cache</a></li>
+<li><a href="#org42448b8">:wrap</a></li>
+<li><a href="#org7178b97">:file</a></li>
+<li><a href="#orgfc03965">"remote" data</a></li>
+<li><a href="#org0e83eb1">Manually saving data in files</a></li>
+<li><a href="#orge9d6867">An appendix for data</a></li>
+<li><a href="#org7a91d54">Caveats</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-org28f462e" class="outline-2">
+<h2 id="org28f462e"><span class="done DONE">DONE</span> Using results from one code block in another org-mode</h2>
+<div class="outline-text-2" id="text-org28f462e">
+<p>
+One really great feature in org-mode is you have many options to pass data between code-blocks. In this post we look at some of these options using emacs-lisp as the language. This runs in a <i>session</i> where you can keep variables in memory between blocks, and use them in subsequent blocks.
+</p>
+
+<p>
+Here we set a variable to a value.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">setq</span> some-variable 42)
+</pre>
+</div>
+
+<pre class="example">
+42
+
+</pre>
+
+<p>
+Then later in another block we can use that variable:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(+ some-variable 1)
+</pre>
+</div>
+
+<pre class="example">
+43
+
+</pre>
+
+<p>
+While you are in the session, <code>some-variable</code> can be used. If you want some mind-bending trouble, the emacs-lisp session is global, and you can access <code>some-variable</code> even in another buffer! Don't do that. When you close emacs this variable will disappear, and all that is left are the results from above.
+</p>
+
+<p>
+There is another way to pass information from one block to another using named src blocks and variables in the block header. This allows you to pass data between blocks by name, and you will see later you can even access the results by name from other files.
+</p>
+</div>
+
+<div id="outline-container-orgdf70667" class="outline-3">
+<h3 id="orgdf70667">:var</h3>
+<div class="outline-text-3" id="text-orgdf70667">
+<p>
+First, we give our src block a name like this:
+</p>
+
+<pre class="example">
+#+name: block-1
+#+BEGIN_SRC emacs-lisp
+(current-time-string)
+#+END_SRC
+</pre>
+
+<p>
+When we run this, the results will have a name too.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp" id="org31c502f">(current-time-string)
+</pre>
+</div>
+
+<pre class="example">
+Tue Feb 12 08:19:23 2019
+
+</pre>
+
+<p>
+Now, we can use the named result as <i>input</i> to a new block using the :var header.
+</p>
+
+<pre class="example">
+#+BEGIN_SRC emacs-lisp :var input=block-1
+(format "We got %S in block-1" input)
+#+END_SRC
+</pre>
+
+<p>
+When we run this block, emacs will run block-1 and put the output in to the variable <code>input</code> which we use inside the code block.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(format <span style="font-style: italic;">"We got %S in block-1"</span> input)
+</pre>
+</div>
+
+<pre class="example">
+We got "Tue Feb 12 08:20:44 2019" in block-1
+
+</pre>
+
+<p>
+Some things to note:
+</p>
+<ol class="org-ol">
+<li>Every time you run this, block-1 gets rerun.</li>
+<li>The results in this block are not the same as in block-1</li>
+<li>The results in block-1 are not changed when you run the second block.</li>
+</ol>
+
+<p>
+You may not want to rerun block-1 each time; maybe it is an expensive calculation, or maybe it should not be changed. You can prevent this behavior by using the :cache header.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org0990fa1" class="outline-3">
+<h3 id="org0990fa1">:cache</h3>
+<div class="outline-text-3" id="text-org0990fa1">
+<p>
+If you specify <code>:cache yes</code> then org-mode <i>should</i> store a hash of the code block with the results, and if the code block hasn't changed then it should not run again.
+</p>
+
+<pre class="example">
+#+name: block-2
+#+BEGIN_SRC emacs-lisp :cache yes
+(current-time-string)
+#+END_SRC
+</pre>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp" id="org82f1668">(current-time-string)
+</pre>
+</div>
+
+<pre class="example">
+Tue Feb 12 08:06:22 2019
+
+</pre>
+
+<p>
+Now, we use block-2 as input to a block, we see the output is the same as the output from block-2.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(format <span style="font-style: italic;">"We got %S in block-2"</span> input)
+</pre>
+</div>
+
+<pre class="example">
+We got "Tue Feb 12 08:06:22 2019" in block-2
+
+</pre>
+
+<p>
+Ok, but what if my results are too large to put in the buffer, or too complex for text? You still have some options.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org42448b8" class="outline-3">
+<h3 id="org42448b8">:wrap</h3>
+<div class="outline-text-3" id="text-org42448b8">
+<p>
+Suppose we generate some json in one block, and we want to use it in another block. We still want to see the json in the buffer as an intermediate result. We can wrap the output in a json block like this.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp" id="orgc6df1c4">(<span style="font-weight: bold;">require</span> '<span style="font-weight: bold; text-decoration: underline;">json</span>)
+(json-encode `((<span style="font-style: italic;">"date"</span> . ,(current-time-string))))
+</pre>
+</div>
+
+<div class="json">
+<p>
+{"date":"Tue Feb 12 08:30:20 2019"}
+</p>
+
+</div>
+
+<p>
+Then, we can simply input that output into a new block.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(format <span style="font-style: italic;">"We got %S in json"</span> input)
+</pre>
+</div>
+
+<pre class="example">
+We got "{\"date\":\"Tue Feb 12 08:30:20 2019\"}
+" in json
+
+</pre>
+
+<p>
+This admittedly still pretty simple, text-based data. It is probably not a good idea to do this with binary data.
+</p>
+
+<p>
+Note you can refer to this result even in another org-file:
+</p>
+
+<pre class="example">
+#+BEGIN_SRC emacs-lisp :var input=./2019-02-12.org:json
+input
+#+END_SRC
+
+#+RESULTS:
+: {"date":"Tue Feb 12 08:30:20 2019"}
+</pre>
+</div>
+</div>
+
+
+<div id="outline-container-org7178b97" class="outline-3">
+<h3 id="org7178b97">:file</h3>
+<div class="outline-text-3" id="text-org7178b97">
+<p>
+It may be that your data is too large to conveniently put into your org-file, or maybe it is binary data. No problem, just put it into an external file using the :file header. It looks like this:
+</p>
+
+<pre class="example">
+#+name: block-3
+#+BEGIN_SRC emacs-lisp :cache yes :file block-3
+(require 'json)
+(json-encode `(("date" . ,(current-time-string))))
+#+END_SRC
+
+#+RESULTS[a14d376653bd8c40a0961ca95f21d8837dddec66]: block-3
+[[file:block-3]]
+</pre>
+
+
+<p>
+Note that you have to provide a file name for this. Sometimes that is nice if you want a human recognizable file to send to someone, but it would also be nice if there was an automatic naming scheme, e.g. based on an sha-1 hash of the src block.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp" id="orgdfe9814">(<span style="font-weight: bold;">require</span> '<span style="font-weight: bold; text-decoration: underline;">json</span>)
+(json-encode `((<span style="font-style: italic;">"date"</span> . ,(current-time-string))))
+</pre>
+</div>
+
+<p>
+<a href="block-3">block-3</a>
+</p>
+
+<p>
+Now you can use other tools to check out the file. Here we can still use simple shell tools.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">cat block-3
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-sh">{<span style="font-style: italic;">"date"</span>:<span style="font-style: italic;">"Tue Feb 12 08:46:55 2019"</span>}
+</pre>
+</div>
+
+
+<p>
+The output of block-3 is a file name:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">input
+</pre>
+</div>
+
+<pre class="example">
+/Users/jkitchin/Box Sync/kitchingroup/jkitchin/journal/2019/02/12/block-3
+
+</pre>
+
+<p>
+So you can use it in a new block to read the data in, and then do something new with it.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">with-temp-buffer</span>
+  (insert-file-contents input)
+  (format <span style="font-style: italic;">"We got %S in block-3"</span> (json-read-from-string (buffer-string))))
+</pre>
+</div>
+
+<pre class="example">
+We got ((date . "Tue Feb 12 08:46:55 2019")) in block-3
+
+</pre>
+</div>
+</div>
+
+<div id="outline-container-orgfc03965" class="outline-3">
+<h3 id="orgfc03965">"remote" data</h3>
+<div class="outline-text-3" id="text-orgfc03965">
+<p>
+The blocks do not have to be in order. If you want, you can put your blocks in an appendix, and then just have analysis blocks here that use them. That way, you can have short blocks here that are more readable, but longer, more complex blocks elsewhere that do not clutter your document.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">with-temp-buffer</span>
+  (insert-file-contents input)
+  (format <span style="font-style: italic;">"We got %S in the appendix data"</span> (json-read-from-string (buffer-string))))
+</pre>
+</div>
+
+<pre class="example">
+We got "{\"date\":\"Tue Feb 12 09:11:12 2019\"}" in the appendix data
+
+</pre>
+</div>
+</div>
+
+
+<div id="outline-container-org0e83eb1" class="outline-3">
+<h3 id="org0e83eb1">Manually saving data in files</h3>
+<div class="outline-text-3" id="text-org0e83eb1">
+<p>
+Note you can also manually save data in a file, for example:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp" id="org8d715d5">(<span style="font-weight: bold;">require</span> '<span style="font-weight: bold; text-decoration: underline;">json</span>)
+(<span style="font-weight: bold;">let</span> ((f <span style="font-style: italic;">"block-4.json"</span>))
+  (<span style="font-weight: bold;">with-temp-file</span> f
+    (prin1
+     (json-encode `((<span style="font-style: italic;">"date"</span> . ,(current-time-string))))
+     (current-buffer)))
+  f)
+</pre>
+</div>
+
+<pre class="example">
+block-4.json
+
+</pre>
+
+<p>
+We put the filename as the last variable which is returned by the block, so that we don't have to manually type it later in the next block. You know, try not to repeat yourself...
+</p>
+
+<p>
+This just shows we did write out to our file:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">cat block-4.json
+</pre>
+</div>
+
+<pre class="example">
+:\"Tue Feb 12 08:50:00 2019\"}
+
+</pre>
+
+<p>
+And we read the file in here, using the filename from block-4 as an input variable.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">with-temp-buffer</span>
+  (insert-file-contents input)
+  (format <span style="font-style: italic;">"We got %S in block-4"</span> (json-read-from-string (buffer-string))))
+</pre>
+</div>
+
+<pre class="example">
+We got "{\"date\":\"Tue Feb 12 08:51:25 2019\"}" in block-4
+
+</pre>
+</div>
+</div>
+
+<div id="outline-container-orge9d6867" class="outline-3">
+<h3 id="orge9d6867"><a id="ID-0452775B-D200-4B9B-BC09-C6935D9183A4"></a>An appendix for data</h3>
+<div class="outline-text-3" id="text-orge9d6867">
+<div class="org-src-container">
+<pre class="src src-emacs-lisp" id="orgebb2d1c">(<span style="font-weight: bold;">require</span> '<span style="font-weight: bold; text-decoration: underline;">json</span>)
+(<span style="font-weight: bold;">let</span> ((f <span style="font-style: italic;">"appendix.json"</span>))
+  (<span style="font-weight: bold;">with-temp-file</span> f
+    (prin1
+     (json-encode `((<span style="font-style: italic;">"date"</span> . ,(current-time-string))))
+     (current-buffer)))
+  f)
+</pre>
+</div>
+
+<pre class="example">
+appendix.json
+
+</pre>
+</div>
+</div>
+
+
+<div id="outline-container-org7a91d54" class="outline-3">
+<h3 id="org7a91d54">Caveats</h3>
+<div class="outline-text-3" id="text-org7a91d54">
+<p>
+Using org-mode like this is almost always finding the right tradeoffs in what is persistent, and where is it stored. Not all of the intermediate data/calculations are stored; if they are really cheap you can just run the code blocks again. If they are really small, i.e. easy for your to read in a few lines, you can store them in the document. If they are really large, you can store them in a file.
+</p>
+
+<p>
+The beauty of having everything in an org-file is you have a single file that is easy to transport. When the files get too large though, it can become impractical, e.g. emacs may slow down if you try to put thousands of lines of xml data into the buffer. Then, you have to make some decisions about what to keep, where to keep it, and in what form to keep it.
+</p>
+
+<p>
+For short projects where you only need a single compute session, having everything in memory may be fine. For longer projects, say one that is long enough you will close all the buffers, and possibly restart emacs in between working on it, then you have to make some decisions about what to save from each block so you can continue the work in the next session. Again, you have to decide what to save, where to save, and in what form.
+</p>
+
+<p>
+Once you start saving data outside the org-file, it becomes less portable, or more tricky to move the file because you need to also move all the data files to keep it intact. I have explored a concept of making an org-archive in the past, where you get a list of all files linked in the org-file, but this so far has just been worked out for some small proof of concept ideas.
+</p>
+
+<p>
+Not all languages are the same in org-mode. They do not all support sessions for example, and they may not all work like the examples here. The scimax iPython modifications do not behave like the examples above. That is probably due to bugs I have inadvertently introduced, and in the future I will try to make it work like emacs-lisp does above.
+</p>
+
+<p>
+Overall, org-mode has one of the most flexible and powerful systems for passing and reusing data in documents I have ever seen. It is not perfect, and in such a powerful system there are many unexplored or lightly traveled corners that may have hazards in them. It still seems pretty promising though.
+</p>
+</div>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2019-03-05</span>
+            <span title="last modification date" class="post-info">2019-04-26</span>
+            <span title="tags" class="post-info">:<a href="/tags/raw">raw</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-c7de1c50-88ed-412e-ae70-62694dd7dea5">lujun9972</a></span>
+        </div>
+    <script src="/media/js/jquery-2.1.3.min.js"></script>
+        <section>
+            <h1>Comments</h1>
+            <div id="comment-wrap">
+                    <a class="disqus_label">使用 Disqus 评论</a>
+    </ul>
+        <div id="disqus_thread"></div>
+        <script type="text/javascript">
+         //var disqus_developer = 1;
+         var preempt_signal=false;
+         var disqus_identifier = "/blog/2019/03/05/using-results-from-one-code-block-in-another-org-mode/";
+         var disqus_url = "https://lujun9972.github.io/emacs-document/blog/2019/03/05/using-results-from-one-code-block-in-another-org-mode/";
+         var disqus_shortname = 'emacs-document';
+         /* * * DON'T EDIT BELOW THIS LINE * * */
+         (function() {
+             var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+             dsq.src = 'https://' + disqus_shortname + '.disqus.com/embed.js';
+             (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+             $('#disqus_thread').css('display','none');
+         })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+    <script>
+     /* comments */
+     var ego_disqus_thread=$('#disqus_thread');
+     var ego_ds_label=$('.ds-thread');
+     $('.disqus_label').click(function(){
+         ego_disqus_thread.show();
+         ego_ds_label.hide();
+     });
+     $('.ds-label').click(function(){
+         ego_disqus_thread.hide();
+         ego_ds_label.show();
+     });
+    </script>
+        </section>
+    <script src="/media/js/main.js"></script>
+        <script type="text/javascript">
+         var _gaq = _gaq || [];
+         _gaq.push(['_setAccount', '7bac4fd0247f69c27887e0d4e3aee41e']);
+         _gaq.push(['_trackPageview']);
+         (function() {
+             var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+             ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+             var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-c7de1c50-88ed-412e-ae70-62694dd7dea5">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="//instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>

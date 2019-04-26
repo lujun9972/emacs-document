@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Use org-radiobutton to select an option from a list - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="raw" />
+  <style>
+   #ds-thread #ds-reset .ds-comment-body p {color: #ffffff;}
+   #ds-thread #ds-reset .ds-comment-body p a {color: #ff0;}
+   #ds-thread #ds-reset .ds-comment-body p a:hover {color: #0ff;}
+   #disqus_thread a {color: #00ffff;}
+  </style>
+  <link rel="stylesheet" href="/media/css/main.css" type="text/css"/>
+  <link rel="stylesheet" href="/media/css/comment.css" type="text/css"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="/">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <div class="menu-icon">
+        <svg viewBox="0 0 18 15">
+          <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.031C17.335,0,18,0.665,18,1.484L18,1.484z" fill="#ffff00"/>
+          <path d="M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0c0-0.82,0.665-1.484,1.484-1.484 h15.031C17.335,6.031,18,6.696,18,7.516L18,7.516z" fill="#ffff00"/>
+          <path d="M18,13.516C18,14.335,17.335,15,16.516,15H1.484C0.665,15,0,14.335,0,13.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.031C17.335,12.031,18,12.696,18,13.516L18,13.516z" fill="#ffff00"/>
+        </svg>
+      </div>
+      <ul class="trigger">
+        <li><a href="/years/">Years</a></li>
+        <li><a href="/authors/">Authors</a></li>
+        <li><a href="/tags/">Tags</a></li>
+        <li><a href="/about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="/rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="http://www.google.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">Use org-radiobutton to select an option from a list</h1>
+<div id="table-of-contents">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#orgedab0f1"><span class="done DONE">DONE</span> Use org-radiobutton to select an option from a list&#xa0;&#xa0;&#xa0;<span class="tag"><span class="ignore">ignore</span></span></a></li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-orgedab0f1" class="outline-2">
+<h2 id="orgedab0f1"><span class="done DONE">DONE</span> Use org-radiobutton to select an option from a list&#xa0;&#xa0;&#xa0;<span class="tag"><span class="ignore">ignore</span></span></h2>
+<div class="outline-text-2" id="text-orgedab0f1">
+<div class="org-src-container">
+<pre class="src src-elisp">(use-package org-radiobutton)
+</pre>
+</div>
+
+<p>
+Ever since I've come across the <a href="http://howardism.org/Technical/Emacs/literate-devops.html">Literate DevOps</a> article I was hooked
+and immediately started writing down "org notebooks" every time an
+incident occured along with all the code and steps on how to fix it in
+case it might happen in the future (protip: it <i>will</i> happen again).
+</p>
+
+<p>
+Recently we had some problems with webhook requests behaving weird and
+so I created a little notebook to query the mongo database where we
+store all the requests and some more functions (ranging from elisp to
+jq to ruby) to process the results.  As you sure know, threading data
+between code blocks in different languages is painless with <code>org-mode</code>
+and babel.
+</p>
+
+<p>
+So imagine a block like this (using <a href="https://github.com/krisajenkins/ob-mongo">ob-mongo</a>):
+</p>
+
+<div class="org-src-container">
+<pre class="src src-org"><span style="font-weight: bold; font-style: italic;">#+NAME: query</span>
+<span style="font-weight: bold; font-style: italic;">#+BEGIN_SRC mongo :db logs :host localhost :port 27017</span>
+db.webhookLogs.find({endpoint: "AddCustomer"}).sort({_id: -1}).limit(1)
+<span style="font-weight: bold; font-style: italic;">#+END_SRC</span>
+</pre>
+</div>
+
+<p>
+This gives me the most recent request to the <code>AddCustomer</code> endpoint.
+The results of this block are then piped into other code blocks to
+process the request, you can imagine how that looks.
+</p>
+
+<p>
+Usually I run the entire app stack locally but we also have separate
+staging and production environments.  So after I run the notebook on
+my own local stack I want to try it out in staging.
+</p>
+
+<p>
+I use <a href="https://github.com/rejeep/prodigy.el">prodigy</a> to manage my ssh tunnels and so all I need to do is
+change the port to one pointing to staging and re-run the notebook.
+The problem is that I have multiple query blocks and so I have to go
+and change all of the <code>:port</code> arguments.
+</p>
+
+<p>
+I have solved this by creating a block that would work as a source for
+the port and then reference it dynamically in the header line:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-org"><span style="font-weight: bold; font-style: italic;">#+NAME: port</span>
+<span style="font-weight: bold; font-style: italic;">#+BEGIN_SRC elisp</span>
+27017
+<span style="font-weight: bold; font-style: italic;">#+END_SRC</span>
+
+<span style="font-weight: bold; font-style: italic;">#+NAME: query</span>
+<span style="font-weight: bold; font-style: italic;">#+BEGIN_SRC mongo :db logs :host localhost :port (org-babel-ref-resolve "port")</span>
+db.webhookLogs.find({endpoint: "AddCustomer"}).sort({_id: -1}).limit(1)
+<span style="font-weight: bold; font-style: italic;">#+END_SRC</span>
+</pre>
+</div>
+
+<p>
+Since we can call elisp in the header I use <code>org-babel-ref-resolve</code> and
+give it the name of the source block and babel will automatically
+replace it with the value of the block.
+</p>
+
+<p>
+This solves the problem of changing the constant at one place but as I
+got to work with more environments I tended to forget what port was
+what.  So I created a list above the block to remind me of the
+available values:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-org">Use one of the following ports to operate on the given environment:
+
+- <span style="font-weight: bold;">localhost ::</span> 27017
+- <span style="font-weight: bold;">staging ::</span> 27004
+- <span style="font-weight: bold;">production ::</span> 27005
+
+<span style="font-weight: bold; font-style: italic;">#+NAME: port</span>
+<span style="font-weight: bold; font-style: italic;">#+BEGIN_SRC elisp</span>
+27017
+<span style="font-weight: bold; font-style: italic;">#+END_SRC</span>
+
+<span style="font-weight: bold; font-style: italic;">#+NAME: query</span>
+<span style="font-weight: bold; font-style: italic;">#+BEGIN_SRC mongo :db logs :host localhost :port (org-babel-ref-resolve "port")</span>
+db.webhookLogs.find({endpoint: "AddCustomer"}).sort({_id: -1}).limit(1)
+<span style="font-weight: bold; font-style: italic;">#+END_SRC</span>
+</pre>
+</div>
+
+<p>
+We can use the org mode list description syntax <code>foo ::</code> to attach a
+label to each item and leave the number as the "value".
+</p>
+
+<p>
+This is starting to look an awful lot like a list of choices I could
+pick from.  So my thinking goes like this: let's make it a checkbox
+list and then select the option by checking the option.  The trouble
+there is that toggling the input would require me to un-toggle the
+current one and then toggle the desired option.  Ideally, toggling one
+checkbox would uncheck the other so that there is always exactly one
+option selected: in other words, I wanted a radiobutton list.
+</p>
+
+<p>
+After a quick google session I've found (via <a href="http://irreal.org/blog/?p=4644">Irreal</a>) that <a href="http://kitchingroup.cheme.cmu.edu/blog/2015/10/05/A-checkbox-list-in-org-mode-with-one-value/">John Kitchin</a>
+already figured this out.  I took his code and cleaned it up a bit to
+work with "modern" org mode (the post is three years old) and packaged
+it as <a href="https://github.com/Fuco1/org-radiobutton">org-radiobutton</a>.
+</p>
+
+<p>
+Now I have a nice menu I can go to and with a single <code>C-c C-c</code> on the
+option I want I can select the environment where to run the notebook.
+Org mode is so cool!
+</p>
+
+<div class="org-src-container">
+<pre class="src src-org">Check one of the following ports to operate on the given environment:
+
+<span style="font-weight: bold; font-style: italic;">#+attr_org: :radio</span>
+<span style="font-weight: bold; font-style: italic;">#+NAME: port</span>
+- <span style="font-weight: bold;">[ ]</span><span style="font-weight: bold;"> localhost ::</span> 27017
+- <span style="font-weight: bold;">[X]</span><span style="font-weight: bold;"> staging ::</span> 27004
+- <span style="font-weight: bold;">[ ]</span><span style="font-weight: bold;"> production ::</span> 27005
+
+<span style="font-weight: bold; font-style: italic;">#+NAME: query</span>
+<span style="font-weight: bold; font-style: italic;">#+BEGIN_SRC mongo :db logs :host localhost :port (org-radiobutton-value "port")</span>
+db.webhookLogs.find({endpoint: "AddCustomer"}).sort({_id: -1}).limit(1)
+<span style="font-weight: bold; font-style: italic;">#+END_SRC</span>
+</pre>
+</div>
+
+<p>
+I'm going over all of my notebooks converting all the ugly option
+hacks to this setup and it is so damn pleasing! :D
+</p>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2018-03-11</span>
+            <span title="last modification date" class="post-info">2019-04-26</span>
+            <span title="tags" class="post-info">:<a href="/tags/raw">raw</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-c7de1c50-88ed-412e-ae70-62694dd7dea5">lujun9972</a></span>
+        </div>
+    <script src="/media/js/jquery-2.1.3.min.js"></script>
+        <section>
+            <h1>Comments</h1>
+            <div id="comment-wrap">
+                    <a class="disqus_label">使用 Disqus 评论</a>
+    </ul>
+        <div id="disqus_thread"></div>
+        <script type="text/javascript">
+         //var disqus_developer = 1;
+         var preempt_signal=false;
+         var disqus_identifier = "/blog/2018/03/11/use-org-radiobutton-to-select-an-option-from-a-list/";
+         var disqus_url = "https://lujun9972.github.io/emacs-document/blog/2018/03/11/use-org-radiobutton-to-select-an-option-from-a-list/";
+         var disqus_shortname = 'emacs-document';
+         /* * * DON'T EDIT BELOW THIS LINE * * */
+         (function() {
+             var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+             dsq.src = 'https://' + disqus_shortname + '.disqus.com/embed.js';
+             (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+             $('#disqus_thread').css('display','none');
+         })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+    <script>
+     /* comments */
+     var ego_disqus_thread=$('#disqus_thread');
+     var ego_ds_label=$('.ds-thread');
+     $('.disqus_label').click(function(){
+         ego_disqus_thread.show();
+         ego_ds_label.hide();
+     });
+     $('.ds-label').click(function(){
+         ego_disqus_thread.hide();
+         ego_ds_label.show();
+     });
+    </script>
+        </section>
+    <script src="/media/js/main.js"></script>
+        <script type="text/javascript">
+         var _gaq = _gaq || [];
+         _gaq.push(['_setAccount', '7bac4fd0247f69c27887e0d4e3aee41e']);
+         _gaq.push(['_trackPageview']);
+         (function() {
+             var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+             ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+             var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-c7de1c50-88ed-412e-ae70-62694dd7dea5">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="//instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>

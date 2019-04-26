@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>降低Emacs启动时间的高级技术 - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="emacs-common" />
+  <style>
+   #ds-thread #ds-reset .ds-comment-body p {color: #ffffff;}
+   #ds-thread #ds-reset .ds-comment-body p a {color: #ff0;}
+   #ds-thread #ds-reset .ds-comment-body p a:hover {color: #0ff;}
+   #disqus_thread a {color: #00ffff;}
+  </style>
+  <link rel="stylesheet" href="/media/css/main.css" type="text/css"/>
+  <link rel="stylesheet" href="/media/css/comment.css" type="text/css"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="/">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <div class="menu-icon">
+        <svg viewBox="0 0 18 15">
+          <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.031C17.335,0,18,0.665,18,1.484L18,1.484z" fill="#ffff00"/>
+          <path d="M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0c0-0.82,0.665-1.484,1.484-1.484 h15.031C17.335,6.031,18,6.696,18,7.516L18,7.516z" fill="#ffff00"/>
+          <path d="M18,13.516C18,14.335,17.335,15,16.516,15H1.484C0.665,15,0,14.335,0,13.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.031C17.335,12.031,18,12.696,18,13.516L18,13.516z" fill="#ffff00"/>
+        </svg>
+      </div>
+      <ul class="trigger">
+        <li><a href="/years/">Years</a></li>
+        <li><a href="/authors/">Authors</a></li>
+        <li><a href="/tags/">Tags</a></li>
+        <li><a href="/about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="/rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="http://www.google.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">降低Emacs启动时间的高级技术</h1>
+<div id="table-of-contents">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#org0d335a8">从 .emacs.d 破产到现在</a></li>
+<li><a href="#orgc5254cc">不过守护进程模式又如何呢</a></li>
+<li><a href="#org908436f">1. 估算当前以及最佳的启动时间</a></li>
+<li><a href="#orgcd317a5">2. 检测Emacs启动指标对你大有帮助</a></li>
+<li><a href="#org88f2d74">3. 启动时调高垃圾回收的阀值</a></li>
+<li><a href="#org13d7115">4. 不要require任何东西,转而使用use-package来自动加载</a></li>
+<li><a href="#org0405b48">5. 不要使用辅助函数来设置模式</a></li>
+<li><a href="#orgd6483a0">6. 使用惰性定时器(idle timer)来推迟加载非立即需要的包</a></li>
+<li><a href="#org52f3e0f">不值得的优化</a></li>
+</ul>
+</div>
+</div>
+<p>
+<a href="https://github.com/jschaf/esup">Emacs Start Up Profiler</a> 的作者教你六项技术减少Emacs启动时间.
+</p>
+
+<p>
+简而言之: 做下面几个步骤:
+</p>
+
+<ol class="org-ol">
+<li>使用Esup进行性能检测.</li>
+<li>调整垃圾回收的阀值.</li>
+<li>使用 usge-page 来自动(延迟)加载所有东西.</li>
+<li>不要使用会引起立即加载的辅助函数.</li>
+<li>参考我的 <a href="https://github.com/jschaf/dotfiles/blob/master/emacs/start.el">配置</a>.</li>
+</ol>
+
+<div id="outline-container-org0d335a8" class="outline-2">
+<h2 id="org0d335a8">从 .emacs.d 破产到现在</h2>
+<div class="outline-text-2" id="text-org0d335a8">
+<p>
+我最近宣布了第三次 .emacs.d 破产并完成了第四次Emacs配置的迭代. 演化过程为:
+</p>
+
+<ol class="org-ol">
+<li>拷贝并粘贴elisp片段到 <code>~/.emacs</code> 中，希望它能工作.</li>
+<li>借助 <code>el-get</code> 来以更结构化的方式来管理依赖关系.</li>
+<li>放弃自己从零配置，以Spacemacs为基础.</li>
+<li>厌倦了Spacemacs的复杂性，基于 <code>use-package</code> 重写配置.</li>
+</ol>
+
+<p>
+本文汇聚了三次重写和创建 <code>Emacs Start Up Profiler</code> 过程中的技巧. 
+非常感谢Spacemacs，use-package等背后的团队.
+没有这些无私的志愿者,这项任务将会困难得多.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgc5254cc" class="outline-2">
+<h2 id="orgc5254cc">不过守护进程模式又如何呢</h2>
+<div class="outline-text-2" id="text-orgc5254cc">
+<p>
+在我们开始之前, 让我声明一下常见的反对优化Emacs的观念: “Emacs 旨在作为守护进程来运行的，因此你只需要运行一次而已.”
+这个观点很好，只不过:
+</p>
+
+<ul class="org-ul">
+<li>速度总是越快越好</li>
+<li>配置Emacs时，可能会有不得不通过重启Emacs的情况. 例如,你可能为 <code>post-command-hook</code> 添加了一个运行缓慢的 <code>lambda</code> 函数, 很难删掉它.</li>
+<li>重启Emacs能帮你验证不同会话之间是否还能保留配置</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-org908436f" class="outline-2">
+<h2 id="org908436f">1. 估算当前以及最佳的启动时间</h2>
+<div class="outline-text-2" id="text-org908436f">
+<p>
+第一步是衡量当前的启动时间. 最简单的方法就是在启动时显示后续步骤进度的信息.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp"><span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Use a hook so the message doesn't get clobbered by other messages.</span>
+(add-hook 'emacs-startup-hook
+          (<span style="font-weight: bold;">lambda</span> ()
+            (message <span style="font-style: italic;">"Emacs ready in %s with %d garbage collections."</span>
+                     (format <span style="font-style: italic;">"%.2f seconds"</span>
+                             (float-time
+                              (time-subtract after-init-time before-init-time)))
+                     gcs-done)))
+</pre>
+</div>
+
+<p>
+第二部, 衡量最佳的启动速度,以便了解可能的情况. 我的是0.3秒.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell"><span style="font-weight: bold; font-style: italic;"># </span><span style="font-weight: bold; font-style: italic;">-q ignores personal Emacs files but loads the site files.</span>
+emacs -q --eval=<span style="font-style: italic;">'(message "%s" (emacs-init-time))'</span> 
+
+;; For macOS users:
+open -n /Applications/Emacs.app --args -q --eval=<span style="font-style: italic;">'(message "%s" (emacs-init-time))'</span> 
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgcd317a5" class="outline-2">
+<h2 id="orgcd317a5">2. 检测Emacs启动指标对你大有帮助</h2>
+<div class="outline-text-2" id="text-orgcd317a5">
+<p>
+<a href="https://github.com/jschaf/esup">Emacs StartUp Profiler</a> (ESUP) 将会给你顶层语句执行的详细指标.
+</p>
+
+
+<div class="figure">
+<p><img src="https://blog.d46.us/images/esup.png" alt="esup.png" />
+</p>
+</div>
+
+<p>
+图 1: Emacs Start Up Profiler 截图
+</p>
+
+<p>
+警告: Spacemacs 用户需要注意, ESUP 目前与 Spacemacs 的 init.el 文件有冲突. 遵照 <a href="https://github.com/jschaf/esup/issues/48">https://github.com/jschaf/esup/issues/48</a> 上说的进行升级.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org88f2d74" class="outline-2">
+<h2 id="org88f2d74">3. 启动时调高垃圾回收的阀值</h2>
+<div class="outline-text-2" id="text-org88f2d74">
+<p>
+这为我节省了 <b><b>0.3 秒</b></b>.
+</p>
+
+<p>
+Emacs默认值是 760kB，这在现代机器看来及其的保守.
+真正的诀窍在于初始化完成后再把它降到合理的水平.
+这为了节省了0.3秒
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp"><span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Make startup faster by reducing the frequency of garbage</span>
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">collection.  The default is 800 kilobytes.  Measured in bytes.</span>
+(<span style="font-weight: bold;">setq</span> gc-cons-threshold (* 50 1000 1000))
+
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">The rest of the init file.</span>
+
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Make gc pauses faster by decreasing the threshold.</span>
+(<span style="font-weight: bold;">setq</span> gc-cons-threshold (* 2 1000 1000))
+</pre>
+</div>
+</div>
+</div>
+
+
+<div id="outline-container-org13d7115" class="outline-2">
+<h2 id="org13d7115">4. 不要require任何东西,转而使用use-package来自动加载</h2>
+<div class="outline-text-2" id="text-org13d7115">
+<p>
+让Emacs变坏的最好方法就是减少要做的事情. <code>require</code> 会立即加载源文件. 
+但是很少会出现需要在启动阶段就立即需要这些功能的。
+</p>
+
+<p>
+在 <a href="https://github.com/jwiegley/use-package"><code>use-package</code></a> 中你只需要声明好需要哪个包中的哪个功能, <code>use-package</code> 就会帮你完成正确的事情.
+它看起来是这样的:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(use-package evil-lisp-state <span style="font-weight: bold; font-style: italic;">; </span><span style="font-weight: bold; font-style: italic;">the Melpa package name</span>
+
+  <span style="font-weight: bold;">:defer</span> t <span style="font-weight: bold; font-style: italic;">; </span><span style="font-weight: bold; font-style: italic;">autoload this package</span>
+
+  <span style="font-weight: bold;">:init</span> <span style="font-weight: bold; font-style: italic;">; </span><span style="font-weight: bold; font-style: italic;">Code to run immediately.</span>
+  (<span style="font-weight: bold;">setq</span> evil-lisp-state-global nil)
+
+  <span style="font-weight: bold;">:config</span> <span style="font-weight: bold; font-style: italic;">; </span><span style="font-weight: bold; font-style: italic;">Code to run after the package is loaded.</span>
+  (abn/define-leader-keys <span style="font-style: italic;">"k"</span> evil-lisp-state-map))
+</pre>
+</div>
+
+<p>
+可以通过查看 <code>features</code> 变量来查看Emacs现在加载了那些包. 
+想要更好看的输出可以使用 <a href="https://gist.github.com/RockyRoad29/bd4ca6fdb41196a71662986f809e2b1c">lpkg explorer</a> 或者我在 <a href="https://github.com/jschaf/dotfiles/blob/master/emacs/funcs/abn-funcs-benchmark.el">abn-funcs-benchmark.el</a> 中的变体.
+输出看起来类似这样的:
+</p>
+
+<pre class="example">
+479 features currently loaded
+ - abn-funcs-benchmark: /Users/jschaf/.dotfiles/emacs/funcs/abn-funcs-benchmark.el
+ - evil-surround: /Users/jschaf/.emacs.d/elpa/evil-surround-20170910.1952/evil-surround.elc
+ - misearch: /Applications/Emacs.app/Contents/Resources/lisp/misearch.elc
+ - multi-isearch: nil
+ - &lt;many more&gt;
+</pre>
+</div>
+</div>
+
+<div id="outline-container-org0405b48" class="outline-2">
+<h2 id="org0405b48">5. 不要使用辅助函数来设置模式</h2>
+<div class="outline-text-2" id="text-org0405b48">
+<p>
+通常, Emacs packages 会建议通过运行一个辅助函数来设置键绑定. 下面是一些例子:
+</p>
+
+<ul class="org-ul">
+<li><code>(evil-escape-mode)</code></li>
+<li><code>(windmove-default-keybindings) ; 设置快捷键.</code></li>
+<li><code>(yas-global-mode 1) ; 复杂的片段配置.</code></li>
+</ul>
+
+<p>
+可以通过use-package来对此进行重构以提高启动速度. 这些辅助函数只会让你立即加载那些尚用不到的package.
+</p>
+
+<p>
+下面这个例子告诉你如何自动加载 <code>evil-escape-mode</code>.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp"><span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">The definition of evil-escape-mode.</span>
+(<span style="font-weight: bold;">define-minor-mode</span> <span style="font-weight: bold;">evil-escape-mode</span>
+  (<span style="font-weight: bold;">if</span> evil-escape-mode
+      (add-hook 'pre-command-hook 'evil-escape-pre-command-hook)
+    (remove-hook 'pre-command-hook 'evil-escape-pre-command-hook)))
+
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Before:</span>
+(evil-escape-mode)
+
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">After:</span>
+(use-package evil-escape
+  <span style="font-weight: bold;">:defer</span> t
+  <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Only needed for functions without an autoload comment (;;;###autoload).</span>
+  <span style="font-weight: bold;">:commands</span> (evil-escape-pre-command-hook) 
+
+  <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Adding to a hook won't load the function until we invoke it.</span>
+  <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">With pre-command-hook, that means the first command we run will</span>
+  <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">load evil-escape.</span>
+  <span style="font-weight: bold;">:init</span> (add-hook 'pre-command-hook 'evil-escape-pre-command-hook))
+</pre>
+</div>
+
+<p>
+下面来看一个关于 <code>org-babel</code> 的例子,这个例子更为复杂. 我们通常的配置时这样的:
+</p>
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(org-babel-do-load-languages
+ 'org-babel-load-languages
+ '((shell . t)
+   (emacs-lisp . nil)))
+</pre>
+</div>
+
+<p>
+这种不是个好的配置，因为 <code>org-babel-do-load-languages</code> 定义在 <code>org.el</code> 中, 而该文件有超过2万4千行的代码，需要花 0.2 秒来加载. 
+通过查看源代码可以看到 <code>org-babel-do-load-languages</code> 仅仅只是加载 <code>ob-&lt;lang&gt;</code> 包而已，像这样:
+</p>
+<div class="org-src-container">
+<pre class="src src-emacs-lisp"><span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">From org.el in the org-babel-do-load-languages function.</span>
+(<span style="font-weight: bold;">require</span> (intern (concat <span style="font-style: italic;">"ob-"</span> lang)))
+</pre>
+</div>
+
+<p>
+而在 <code>ob-&lt;lang&gt;.el</code> 文件中, 我们只关心其中的两个方法 <code>org-babel-execute:&lt;lang&gt;</code> 和 <code>org-babel-expand-body:&lt;lang&gt;</code>. 
+我们可以延时加载 org-babel 相关功能而无需调用 <code>org-babel-do-load-languages</code>,像这样:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp"><span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Avoid `</span><span style="font-weight: bold; font-style: italic; text-decoration: underline;">org-babel-do-load-languages</span><span style="font-weight: bold; font-style: italic;">' since it does an eager require.</span>
+(use-package ob-python
+  <span style="font-weight: bold;">:defer</span> t
+  <span style="font-weight: bold;">:ensure</span> org-plus-contrib
+  <span style="font-weight: bold;">:commands</span> (org-babel-execute:python))
+
+(use-package ob-shell
+  <span style="font-weight: bold;">:defer</span> t
+  <span style="font-weight: bold;">:ensure</span> org-plus-contrib
+  <span style="font-weight: bold;">:commands</span>
+  (org-babel-execute:sh
+   org-babel-expand-body:sh
+
+   org-babel-execute:bash
+   org-babel-expand-body:bash))
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgd6483a0" class="outline-2">
+<h2 id="orgd6483a0">6. 使用惰性定时器(idle timer)来推迟加载非立即需要的包</h2>
+<div class="outline-text-2" id="text-orgd6483a0">
+<p>
+我推迟加载了9个包，这帮我节省了 <b><b>0.4 秒</b></b>.
+</p>
+
+<p>
+有些包特别有用，你希望可以很快就能使用它们，但是它们本身在Emacs启动过程中又不是必须的. 这些mode包括:
+</p>
+
+<ul class="org-ul">
+<li><code>recentf</code>: 保存最近的编辑过的那些文件.</li>
+<li><code>saveplace</code>: 保存访问过文件的光标位置.</li>
+<li><code>server</code>: 开启Emacs守护进程.</li>
+<li><code>autorevert</code>: 自动重载被修改过的文件.</li>
+<li><code>paren</code>: 高亮匹配的括号.</li>
+<li><code>projectile</code>: 项目管理工具.</li>
+<li><code>whitespace</code>: 高亮行尾的空格.</li>
+</ul>
+
+<p>
+不要require这些mode, <b><b>而是等到空闲N秒后再加载它们</b></b>. 
+我在1秒后加载那些比较重要的包，在2秒后加载其他所有的包.
+</p>
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(use-package recentf
+  <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Loads after 1 second of idle time.</span>
+  <span style="font-weight: bold;">:defer</span> 1)
+
+(use-package uniquify
+  <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Less important than recentf.</span>
+  <span style="font-weight: bold;">:defer</span> 2)
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org52f3e0f" class="outline-2">
+<h2 id="org52f3e0f">不值得的优化</h2>
+<div class="outline-text-2" id="text-org52f3e0f">
+<p>
+不要费力把你的Emacs配置文件编译成字节码了. 这只节省了大约 0.05 秒.
+把配置文件编译成字节码可能导致源文件与编译后的文件不匹配从而导致难以出现错误调试.
+</p>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2019-03-15</span>
+            <span title="last modification date" class="post-info">2019-04-26</span>
+            <span title="tags" class="post-info">:<a href="/tags/emacs-common">emacs-common</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-c7de1c50-88ed-412e-ae70-62694dd7dea5">lujun9972</a></span>
+        </div>
+    <script src="/media/js/jquery-2.1.3.min.js"></script>
+        <section>
+            <h1>Comments</h1>
+            <div id="comment-wrap">
+                    <a class="disqus_label">使用 Disqus 评论</a>
+    </ul>
+        <div id="disqus_thread"></div>
+        <script type="text/javascript">
+         //var disqus_developer = 1;
+         var preempt_signal=false;
+         var disqus_identifier = "/blog/2019/03/15/降低emacs启动时间的高级技术/";
+         var disqus_url = "https://lujun9972.github.io/emacs-document/blog/2019/03/15/降低emacs启动时间的高级技术/";
+         var disqus_shortname = 'emacs-document';
+         /* * * DON'T EDIT BELOW THIS LINE * * */
+         (function() {
+             var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+             dsq.src = 'https://' + disqus_shortname + '.disqus.com/embed.js';
+             (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+             $('#disqus_thread').css('display','none');
+         })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+    <script>
+     /* comments */
+     var ego_disqus_thread=$('#disqus_thread');
+     var ego_ds_label=$('.ds-thread');
+     $('.disqus_label').click(function(){
+         ego_disqus_thread.show();
+         ego_ds_label.hide();
+     });
+     $('.ds-label').click(function(){
+         ego_disqus_thread.hide();
+         ego_ds_label.show();
+     });
+    </script>
+        </section>
+    <script src="/media/js/main.js"></script>
+        <script type="text/javascript">
+         var _gaq = _gaq || [];
+         _gaq.push(['_setAccount', '7bac4fd0247f69c27887e0d4e3aee41e']);
+         _gaq.push(['_trackPageview']);
+         (function() {
+             var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+             ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+             var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-c7de1c50-88ed-412e-ae70-62694dd7dea5">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="//instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>

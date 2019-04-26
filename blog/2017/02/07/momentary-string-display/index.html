@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>momentary-string-display - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="elisp-common" />
+  <style>
+   #ds-thread #ds-reset .ds-comment-body p {color: #ffffff;}
+   #ds-thread #ds-reset .ds-comment-body p a {color: #ff0;}
+   #ds-thread #ds-reset .ds-comment-body p a:hover {color: #0ff;}
+   #disqus_thread a {color: #00ffff;}
+  </style>
+  <link rel="stylesheet" href="/media/css/main.css" type="text/css"/>
+  <link rel="stylesheet" href="/media/css/comment.css" type="text/css"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="/">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <div class="menu-icon">
+        <svg viewBox="0 0 18 15">
+          <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.031C17.335,0,18,0.665,18,1.484L18,1.484z" fill="#ffff00"/>
+          <path d="M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0c0-0.82,0.665-1.484,1.484-1.484 h15.031C17.335,6.031,18,6.696,18,7.516L18,7.516z" fill="#ffff00"/>
+          <path d="M18,13.516C18,14.335,17.335,15,16.516,15H1.484C0.665,15,0,14.335,0,13.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.031C17.335,12.031,18,12.696,18,13.516L18,13.516z" fill="#ffff00"/>
+        </svg>
+      </div>
+      <ul class="trigger">
+        <li><a href="/years/">Years</a></li>
+        <li><a href="/authors/">Authors</a></li>
+        <li><a href="/tags/">Tags</a></li>
+        <li><a href="/about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="/rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="http://www.google.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">momentary-string-display</h1>
+<p>
+<a href="http://mbork.pl/2016-11-07_Displaying_nonexistent_text_in_Emacs_buffers">前段时间</a> 我写过一篇文章,是关于如何在不修改buffer的情况让Emacs显示出新内容的方法.
+当时我是通过text properties来做到这一点的,然后我还提到了,其实借助于overlays,我们也能实现这一功能.
+</p>
+
+<p>
+结果我发现,Emacs针对这种情况已经内置了一个函数:momentary-string-display(而且它的内部就是使用overlay来实现的).
+该函数接受一个字符串以及要在buffer中显示的位置,它就会在指定位置显示出这个字符串了,直到你按一下键盘或点一下鼠标.
+不过 <code>momentary-string-display</code> 有一点让我不爽的就是,你必须选择一个 <code>退出字符</code>,(通常是空格或者回车), 按下这个字符也会让临时显示的字符串消失,但是该字符本身不会被插入(相对的按下其他字符则会插入).
+我试过将该参数设置为 <code>nil</code> ,然而并没有什么卵用,这种情况下, <code>momentary-string-display</code> 默认实用空格作为 <code>退出字符</code>.
+怎么说呢,毕竟人生总是不完满的.
+</p>
+
+<p>
+不过也说不定. 下面是 <code>momentary-string-display</code> 的源代码.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">momentary-string-display</span> (string pos <span style="font-weight: bold; text-decoration: underline;">&amp;optional</span> exit-char message)
+  <span style="font-style: italic;">"Momentarily display STRING in the buffer at POS.</span>
+<span style="font-style: italic;">Display remains until next event is input.</span>
+<span style="font-style: italic;">If POS is a marker, only its position is used; its buffer is ignored.</span>
+<span style="font-style: italic;">Optional third arg EXIT-CHAR can be a character, event or event</span>
+<span style="font-style: italic;">description list.  EXIT-CHAR defaults to SPC.  If the input is</span>
+<span style="font-style: italic;">EXIT-CHAR it is swallowed; otherwise it is then available as</span>
+<span style="font-style: italic;">input (as a command if nothing else).</span>
+<span style="font-style: italic;">Display MESSAGE (optional fourth arg) in the echo area.</span>
+<span style="font-style: italic;">If MESSAGE is nil, instructions to type EXIT-CHAR are displayed there."</span>
+  (<span style="font-weight: bold;">or</span> exit-char (<span style="font-weight: bold;">setq</span> exit-char ?\s))
+  (<span style="font-weight: bold;">let</span> ((ol (make-overlay pos pos))
+    (str (copy-sequence string)))
+  (<span style="font-weight: bold;">unwind-protect</span>
+    (<span style="font-weight: bold;">progn</span>
+      (<span style="font-weight: bold;">save-excursion</span>
+      (overlay-put ol 'after-string str)
+      (goto-char pos)
+      <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">To avoid trouble with out-of-bounds position</span>
+      (<span style="font-weight: bold;">setq</span> pos (point))
+      <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">If the string end is off screen, recenter now.</span>
+      (<span style="font-weight: bold;">if</span> (&lt;= (window-end nil t) pos)
+        (recenter (/ (window-height) 2))))
+      (message (<span style="font-weight: bold;">or</span> message <span style="font-style: italic;">"Type %s to continue editing."</span>)
+           (single-key-description exit-char))
+    (<span style="font-weight: bold;">let</span> ((event (read-key)))
+    <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">`</span><span style="font-weight: bold; font-style: italic; text-decoration: underline;">exit-char</span><span style="font-weight: bold; font-style: italic;">' can be an event, or an event description list.</span>
+    (<span style="font-weight: bold;">or</span> (eq event exit-char)
+    (eq event (event-convert-list exit-char))
+    (<span style="font-weight: bold;">setq</span> unread-command-events
+            (append (this-single-command-raw-keys)
+                unread-command-events)))))
+    (delete-overlay ol))))
+</pre>
+</div>
+
+<p>
+只需要经过少许修改就能让所有字符都能够在取消临时字符的同时插入自身:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">momentary-string-display-no-key</span> (string pos <span style="font-weight: bold; text-decoration: underline;">&amp;optional</span> message)
+  <span style="font-style: italic;">"Momentarily display STRING in the buffer at POS.</span>
+<span style="font-style: italic;">Display remains until next event is input.  If POS is a marker,</span>
+<span style="font-style: italic;">only its position is used; its buffer is ignored.  Display</span>
+<span style="font-style: italic;">MESSAGE (optional third arg) in the echo area."</span>
+  (<span style="font-weight: bold;">let</span> ((ol (make-overlay pos pos))
+        (str (copy-sequence string)))
+    (<span style="font-weight: bold;">unwind-protect</span>
+        (<span style="font-weight: bold;">progn</span>
+          (<span style="font-weight: bold;">save-excursion</span>
+            (overlay-put ol 'after-string str)
+            (goto-char pos)
+            <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">To avoid trouble with out-of-bounds position</span>
+            (<span style="font-weight: bold;">setq</span> pos (point))
+            <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">If the string end is off screen, recenter now.</span>
+            (<span style="font-weight: bold;">if</span> (&lt;= (window-end nil t) pos)
+                (recenter (/ (window-height) 2))))
+          (message <span style="font-style: italic;">"%s"</span> (<span style="font-weight: bold;">or</span> message <span style="font-style: italic;">"Press any key to continue editing."</span>))
+          (<span style="font-weight: bold;">let</span> ((event (read-key)))
+            (<span style="font-weight: bold;">setq</span> unread-command-events
+                  (append (this-single-command-raw-keys)
+                          unread-command-events))))
+      (delete-overlay ol))))
+</pre>
+</div>
+
+
+<p>
+你会发现,这并不复杂. 可能也就是 <code>read-key</code> 和 <code>this-single-command-raw-keys</code> 的使用难以理解一点. 
+我必须承认,我并没有很仔细地检查这段代码,不过似乎 <code>read-key</code> 会通过某种方式修改全局状态 – i.e., 它会将输入事件保存到某个地方 – 而 <code>this-single-command-raw-keys</code> 能够取出这些输入事件. 
+这可能不是实现该功能的最清晰的方法,不过它确实证实了Emacs真算得上是一个<a href="http://mbork.pl/2014-07-25_What_is_Emacs%2c_really">文本编辑器工具箱</a>. 
+不管怎样,我又学到了新东西.
+</p>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2017-02-07</span>
+            <span title="last modification date" class="post-info">2017-02-07</span>
+            <span title="tags" class="post-info">:<a href="/tags/elisp-common">elisp-common</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-c7de1c50-88ed-412e-ae70-62694dd7dea5">lujun9972</a></span>
+        </div>
+    <script src="/media/js/jquery-2.1.3.min.js"></script>
+        <section>
+            <h1>Comments</h1>
+            <div id="comment-wrap">
+                    <a class="disqus_label">使用 Disqus 评论</a>
+    </ul>
+        <div id="disqus_thread"></div>
+        <script type="text/javascript">
+         //var disqus_developer = 1;
+         var preempt_signal=false;
+         var disqus_identifier = "/blog/2017/02/07/momentary-string-display/";
+         var disqus_url = "https://lujun9972.github.io/emacs-document/blog/2017/02/07/momentary-string-display/";
+         var disqus_shortname = 'emacs-document';
+         /* * * DON'T EDIT BELOW THIS LINE * * */
+         (function() {
+             var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+             dsq.src = 'https://' + disqus_shortname + '.disqus.com/embed.js';
+             (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+             $('#disqus_thread').css('display','none');
+         })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+    <script>
+     /* comments */
+     var ego_disqus_thread=$('#disqus_thread');
+     var ego_ds_label=$('.ds-thread');
+     $('.disqus_label').click(function(){
+         ego_disqus_thread.show();
+         ego_ds_label.hide();
+     });
+     $('.ds-label').click(function(){
+         ego_disqus_thread.hide();
+         ego_ds_label.show();
+     });
+    </script>
+        </section>
+    <script src="/media/js/main.js"></script>
+        <script type="text/javascript">
+         var _gaq = _gaq || [];
+         _gaq.push(['_setAccount', '7bac4fd0247f69c27887e0d4e3aee41e']);
+         _gaq.push(['_trackPageview']);
+         (function() {
+             var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+             ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+             var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-c7de1c50-88ed-412e-ae70-62694dd7dea5">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="//instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>

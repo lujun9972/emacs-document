@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Emacs: More pro-tips - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="raw" />
+  <style>
+   #ds-thread #ds-reset .ds-comment-body p {color: #ffffff;}
+   #ds-thread #ds-reset .ds-comment-body p a {color: #ff0;}
+   #ds-thread #ds-reset .ds-comment-body p a:hover {color: #0ff;}
+   #disqus_thread a {color: #00ffff;}
+  </style>
+  <link rel="stylesheet" href="/media/css/main.css" type="text/css"/>
+  <link rel="stylesheet" href="/media/css/comment.css" type="text/css"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="/">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <div class="menu-icon">
+        <svg viewBox="0 0 18 15">
+          <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.031C17.335,0,18,0.665,18,1.484L18,1.484z" fill="#ffff00"/>
+          <path d="M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0c0-0.82,0.665-1.484,1.484-1.484 h15.031C17.335,6.031,18,6.696,18,7.516L18,7.516z" fill="#ffff00"/>
+          <path d="M18,13.516C18,14.335,17.335,15,16.516,15H1.484C0.665,15,0,14.335,0,13.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.031C17.335,12.031,18,12.696,18,13.516L18,13.516z" fill="#ffff00"/>
+        </svg>
+      </div>
+      <ul class="trigger">
+        <li><a href="/years/">Years</a></li>
+        <li><a href="/authors/">Authors</a></li>
+        <li><a href="/tags/">Tags</a></li>
+        <li><a href="/about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="/rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="http://www.google.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">Emacs: More pro-tips</h1>
+<div id="table-of-contents">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#org9520fb1">Speed up initialization</a></li>
+<li><a href="#org66b55d4">Avoid the pitfall of “loading old bytecode instead of newer source”</a></li>
+<li><a href="#org718f681">Site Lisp folder for local packages and development</a></li>
+<li><a href="#orgba21dae">Flyspell and whitespace-mode</a></li>
+<li><a href="#org04d4d10">Download video URL at point</a></li>
+<li><a href="#org2f30f14">List current minor modes</a></li>
+<li><a href="#org9e799e0">Window management</a></li>
+<li><a href="#orgc93c4c3">Use FreeDesktop.org's trash</a></li>
+<li><a href="#org23b1d66">Lisp parentheses editing</a></li>
+<li><a href="#org38303e5">Goodbye Paredit, hello Lispy</a></li>
+<li><a href="#org07699e3">Image manipulation and thumbnail gallery</a></li>
+<li><a href="#org6dc7ac7">Don't use terminal-Emacs</a></li>
+<li><a href="#org71b36ce">Making music in Emacs</a></li>
+<li><a href="#org1135ce5">Emacs chart library</a></li>
+<li><a href="#org426780b">Odd nconc behaviour</a></li>
+<li><a href="#org2cc2711">References</a></li>
+</ul>
+</div>
+</div>
+<p>
+This is a follow-up to my first <a href="../emacs/index.html">Emacs pro-tips</a>.
+</p>
+
+<div id="outline-container-org44e0f1f" class="outline-2">
+<h2 id="org9520fb1"><a id="org44e0f1f"></a>Speed up initialization</h2>
+<div class="outline-text-2" id="text-org9520fb1">
+<p>
+If you don't use Emacs daemon or if you develop Emacs, you might find yourself
+re-starting it a lot. In which case it may be useful to keep startup time to a
+minimum.
+</p>
+
+<pre class="example">
+;;; Temporarily reduce garbage collection during startup. Inspect `gcs-done'.
+(defun ambrevar/reset-gc-cons-threshold ()
+ (setq gc-cons-threshold (car (get 'gc-cons-threshold 'standard-value))))
+(setq gc-cons-threshold (* 64 1024 1024))
+(add-hook 'after-init-hook #'ambrevar/reset-gc-cons-threshold)
+
+;;; Temporarily disable the file name handler.
+(setq default-file-name-handler-alist file-name-handler-alist)
+(setq file-name-handler-alist nil)
+(defun ambrevar/reset-file-name-handler-alist ()
+ (setq file-name-handler-alist
+    (append default-file-name-handler-alist
+        file-name-handler-alist))
+ (cl-delete-duplicates file-name-handler-alist :test 'equal))
+(add-hook 'after-init-hook #'ambrevar/reset-file-name-handler-alist)
+</pre>
+</div>
+</div>
+
+<div id="outline-container-org64880b4" class="outline-2">
+<h2 id="org66b55d4"><a id="org64880b4"></a>Avoid the pitfall of “loading old bytecode instead of newer source”</h2>
+<div class="outline-text-2" id="text-org66b55d4">
+<pre class="example">
+(setq load-prefer-newer t)
+</pre>
+</div>
+</div>
+
+<div id="outline-container-org8fa1bda" class="outline-2">
+<h2 id="org718f681"><a id="org8fa1bda"></a>Site Lisp folder for local packages and development</h2>
+<div class="outline-text-2" id="text-org718f681">
+<p>
+We need to roll out our own function since we want the local site folder first
+in the <code>load-path</code>, while <code>normal-top-level-add-subdirs-to-load-path</code> appends it
+to the very end.
+</p>
+
+<pre class="example">
+(defun ambrevar/package-refresh-load-path (path)
+ "Add every non-hidden sub-folder of PATH to `load-path'."
+ (when (file-directory-p path)
+ (dolist (dir (directory-files path t "^[^\\.]"))
+ (when (file-directory-p dir)
+    (setq load-path (add-to-list 'load-path dir))
+    (dolist (subdir (directory-files dir t "^[^\\.]"))
+     (when (file-directory-p subdir)
+     (setq load-path (add-to-list 'load-path subdir))))))))
+(let ((site-lisp (expand-file-name "site-lisp/" "~/.local/share/emacs/")))
+ (add-to-list 'load-path site-lisp)
+ (ambrevar/package-refresh-load-path site-lisp))
+</pre>
+</div>
+</div>
+
+<div id="outline-container-orgf327259" class="outline-2">
+<h2 id="orgba21dae"><a id="orgf327259"></a>Flyspell and whitespace-mode</h2>
+<div class="outline-text-2" id="text-orgba21dae">
+<pre class="example">
+(defun ambrevar/flyspell-and-whitespace-mode ()
+ "Toggle `flyspell-mode' and `whitespace-mode'."
+ (interactive)
+ (if (derived-mode-p 'prog-mode)
+ (flyspell-prog-mode)
+ (flyspell-mode)
+ (when flyspell-mode
+ (flyspell-buffer)))
+ (whitespace-mode 'toggle))
+
+(global-set-key (kbd "&lt;f9&gt;") #'ambrevar/flyspell-and-whitespace-mode)
+</pre>
+</div>
+</div>
+
+<div id="outline-container-orgbc8a1bf" class="outline-2">
+<h2 id="org04d4d10"><a id="orgbc8a1bf"></a>Download video URL at point</h2>
+<div class="outline-text-2" id="text-org04d4d10">
+<p>
+The following requires the <code>youtube-dl</code> program.
+</p>
+
+<pre class="example">
+(defun ambrevar/youtube-dl-at-point (&amp;optional url)
+ "Run 'youtube-dl' over the URL at point.
+If URL is non-nil, use that instead."
+ (interactive)
+ (setq url (or url (thing-at-point-url-at-point)))
+ (let ((eshell-buffer-name "*youtube-dl*"))
+ (eshell)
+ (when (eshell-interactive-process)
+ (eshell t))
+ (eshell-interrupt-process)
+ (insert "cd ~/temp &amp;&amp; youtube-dl " url)
+ (eshell-send-input)))
+</pre>
+
+<p>
+See also <a href="https://github.com/skeeto/youtube-dl-emacs">youtube-dl-emacs</a>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org23aed66" class="outline-2">
+<h2 id="org2f30f14"><a id="org23aed66"></a>List current minor modes</h2>
+<div class="outline-text-2" id="text-org2f30f14">
+<pre class="example">
+(defun ambrevar/current-minor-modes ()
+ "Return the list of minor modes enabled in the current buffer."
+ (interactive)
+ (delq nil
+    (mapcar (lambda (mode)
+         (if (and (boundp mode) (symbol-value mode))
+         mode))
+        minor-mode-list)))
+</pre>
+</div>
+</div>
+
+<div id="outline-container-org95d1065" class="outline-2">
+<h2 id="org9e799e0"><a id="org95d1065"></a>Window management</h2>
+<div class="outline-text-2" id="text-org9e799e0">
+<p>
+Since I use <a href="../emacs-everywhere/index.html">EXWM</a> as a window manager, I can dedicate the <code>super</code> key to window
+management.
+</p>
+
+<p>
+Some simple, yet efficient rules:
+</p>
+
+<ul class="org-ul">
+<li><code>s-TAB</code>: Switch to last buffer.</li>
+<li><code>s-&lt;arrows&gt;</code> (or <code>s-&lt;hjkl&gt;</code> with Evil): select window in the chosen direction.</li>
+<li><code>S-s-&lt;arrows&gt;</code> (or <code>S-s-&lt;hjkl&gt;</code> with Evil): swap current window with window in
+the chosen direction.</li>
+<li><code>s-\</code>: Toggle between horizontal and vertical splitting.</li>
+<li><code>s-o</code>: Toggle-hide all other windows.</li>
+</ul>
+
+<p>
+With Helm, I use <code>C-c o</code> (or my custom binding <code>S-RET</code>) to find a file or a
+buffer in a new split window.
+</p>
+
+<p>
+I need some extra functions to implement the above workflow:
+</p>
+
+<pre class="example">
+(defun ambrevar/swap-windows (&amp;optional w1 w2)
+ "If 2 windows are up, swap them.
+Else if W1 is a window, swap it with current window.
+If W2 is a window too, swap both."
+ (interactive)
+ (unless (or (= 2 (count-windows))
+     (windowp w1)
+     (windowp w2))
+ (error "Ambiguous window selection"))
+ (let* ((w1 (or w1 (car (window-list))))
+     (w2 (or w2
+         (if (eq w1 (car (window-list)))
+         (nth 1 (window-list))
+         (car (window-list)))))
+     (b1 (window-buffer w1))
+     (b2 (window-buffer w2))
+     (s1 (window-start w1))
+     (s2 (window-start w2)))
+ (with-temp-buffer
+ ;; Some buffers like EXWM buffers can only be in one live buffer at once.
+ ;; Switch to a dummy buffer in w2 so that we don't display any buffer twice.
+ (set-window-buffer w2 (current-buffer))
+ (set-window-buffer w1 b2)
+ (set-window-buffer w2 b1))
+ (set-window-start w1 s2)
+ (set-window-start w2 s1))
+ (select-window w1))
+(global-set-key (kbd "C-x \\") 'swap-windows)
+
+(defun ambrevar/swap-windows-left ()
+ "Swap current window with the window to the left."
+ (interactive)
+ (ambrevar/swap-windows (window-in-direction 'left)))
+(defun ambrevar/swap-windows-below ()
+ "Swap current window with the window below."
+ (interactive)
+ (ambrevar/swap-windows (window-in-direction 'below)))
+(defun ambrevar/swap-windows-above ()
+ "Swap current window with the window above."
+ (interactive)
+ (ambrevar/swap-windows (window-in-direction 'above)))
+(defun ambrevar/swap-windows-right ()
+ "Swap current window with the window to the right."
+ (interactive)
+ (ambrevar/swap-windows (window-in-direction 'right)))
+
+(defun ambrevar/switch-to-last-buffer ()
+ "Switch to last open buffer in current window."
+ (interactive)
+ (switch-to-buffer (other-buffer (current-buffer) 1)))
+
+(defun ambrevar/toggle-single-window ()
+ "Un-maximize current window.
+If multiple windows are active, save window configuration and
+delete other windows. If only one window is active and a window
+configuration was previously save, restore that configuration."
+ (interactive)
+ (if (= (count-windows) 1)
+ (when single-window--last-configuration
+    (set-window-configuration single-window--last-configuration))
+ (setq single-window--last-configuration (current-window-configuration))
+ (delete-other-windows)))
+
+(defun ambrevar/toggle-window-split ()
+ "Switch between vertical and horizontal split.
+It only works for frames with exactly two windows."
+ (interactive)
+ (if (= (count-windows) 2)
+ (let* ((this-win-buffer (window-buffer))
+     (next-win-buffer (window-buffer (next-window)))
+     (this-win-edges (window-edges (selected-window)))
+     (next-win-edges (window-edges (next-window)))
+     (this-win-2nd (not (and (&lt;= (car this-win-edges)
+                     (car next-win-edges))
+                 (&lt;= (cadr this-win-edges)
+                     (cadr next-win-edges)))))
+     (splitter
+     (if (= (car this-win-edges)
+         (car (window-edges (next-window))))
+         'split-window-horizontally
+        'split-window-vertically)))
+    (delete-other-windows)
+    (let ((first-win (selected-window)))
+     (funcall splitter)
+     (if this-win-2nd (other-window 1))
+     (set-window-buffer (selected-window) this-win-buffer)
+     (set-window-buffer (next-window) next-win-buffer)
+     (select-window first-win)
+     (if this-win-2nd (other-window 1))))))
+</pre>
+</div>
+</div>
+
+<div id="outline-container-org5b3b3a8" class="outline-2">
+<h2 id="orgc93c4c3"><a id="org5b3b3a8"></a>Use FreeDesktop.org's trash</h2>
+<div class="outline-text-2" id="text-orgc93c4c3">
+<p>
+Whenever Emacs “delete” a file (from <code>dired</code>, Helm Find-Files or Elisp
+primitives), tell Emacs to move it to the trash instead:
+</p>
+
+<pre class="example">
+(setq delete-by-moving-to-trash t)
+</pre>
+</div>
+</div>
+
+<div id="outline-container-org774ee87" class="outline-2">
+<h2 id="org23b1d66"><a id="org774ee87"></a>Lisp parentheses editing</h2>
+<div class="outline-text-2" id="text-org23b1d66">
+<p>
+A recurring complaint with Lisp is the need for balancing parentheses.
+</p>
+
+<p>
+That is to say, on a blackboard... Since such a task should pose no difficulty to
+a computer and Emacs can obviously help here!
+</p>
+
+<p>
+First, let's enable parenthesis highlighting. I like to remove the delay so
+that Emacs highlights the matching parenthesis instantly:
+</p>
+
+<pre class="example">
+;;; Show matching parenthesis
+(show-paren-mode 1)
+;;; By default, there’s a small delay before showing a matching parenthesis. Set
+;;; it to 0 to deactivate.
+(setq show-paren-delay 0)
+(setq show-paren-when-point-inside-paren t)
+
+(with-eval-after-load 'paren
+ (set-face-background 'show-paren-match "#555555")
+ (set-face-foreground 'show-paren-match "#def")
+ (set-face-attribute 'show-paren-match nil :weight 'extra-bold))
+</pre>
+
+<p>
+Next, we can install the <a href="https://github.com/Fanael/rainbow-delimiters"><code>rainbow-delimiters</code></a> third-party package which colors
+parentheses according to their depth. This is no more than the moral equivalent
+of indenting in C or other members of the Algol family.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgfd0fdc4" class="outline-2">
+<h2 id="org38303e5"><a id="orgfd0fdc4"></a>Goodbye Paredit, hello Lispy</h2>
+<div class="outline-text-2" id="text-org38303e5">
+<p>
+Consider using <a href="https://github.com/abo-abo/lispy">Lispy</a> which brings Lisp syntactic editing to a whole new level:
+beside parenthesis balancing (which makes the previous section superfluous
+altogether), it offers advanced expression navigation, code transforms, style
+prettification and more.
+</p>
+
+<p>
+Have a looks at the demos for some concrete examples.
+</p>
+
+<p>
+If you think about it, Lispy is the obvious evolution of editor support for Lisp
+editing: it truly exploits the fact that the language syntax is an abstract
+syntax tree. It would be a shame not to make use of this property.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org60582c4" class="outline-2">
+<h2 id="org07699e3"><a id="org60582c4"></a>Image manipulation and thumbnail gallery</h2>
+<div class="outline-text-2" id="text-org07699e3">
+<p>
+A maybe not-so-well-known command is <code>image-dired</code>: when run in a directory of
+pictures, it displays a gallery of thumbnails with previews. <code>SPC</code> displays the
+next picture in another window while <code>C-RET</code> opens the picture in the
+<code>image-dired-external-viewer</code>. It's possible to rotate files, tag them in dired
+or add comments.
+</p>
+
+<p>
+The <a href="https://github.com/mhayashi1120/Emacs-imagex"><code>image+</code></a> third-party package adds extra picture capabilities to Emacs, like
+stiky transforms and file modifications.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org270d1ff" class="outline-2">
+<h2 id="org6dc7ac7"><a id="org270d1ff"></a>Don't use terminal-Emacs</h2>
+<div class="outline-text-2" id="text-org6dc7ac7">
+<p>
+<a href="https://blog.aaronbieber.com/2016/12/29/don-t-use-terminal-emacs.html">https://blog.aaronbieber.com/2016/12/29/don-t-use-terminal-emacs.html</a>
+</p>
+</div>
+</div>
+
+<div id="outline-container-org263a1d5" class="outline-2">
+<h2 id="org71b36ce"><a id="org263a1d5"></a>Making music in Emacs</h2>
+<div class="outline-text-2" id="text-org71b36ce">
+<p>
+<a href="https://vimeo.com/22798433">Quick Intro to Live Programming with Overtone</a>
+</p>
+</div>
+</div>
+
+<div id="outline-container-org71f38e2" class="outline-2">
+<h2 id="org1135ce5"><a id="org71f38e2"></a>Emacs chart library</h2>
+<div class="outline-text-2" id="text-org1135ce5">
+<p>
+<a href="http://francismurillo.github.io/2017-04-15-Exploring-Emacs-chart-Library/">http://francismurillo.github.io/2017-04-15-Exploring-Emacs-chart-Library/</a>
+</p>
+</div>
+</div>
+
+<div id="outline-container-orga2e4d1f" class="outline-2">
+<h2 id="org426780b"><a id="orga2e4d1f"></a>Odd nconc behaviour</h2>
+<div class="outline-text-2" id="text-org426780b">
+<p>
+One of the few oddities in the Elisp language:
+<a href="https://stackoverflow.com/questions/25157349/odd-behaviour-with-nconc-in-emacs-lisp">https://stackoverflow.com/questions/25157349/odd-behaviour-with-nconc-in-emacs-lisp</a>
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgf854ab0" class="outline-2">
+<h2 id="org2cc2711"><a id="orgf854ab0"></a>References</h2>
+<div class="outline-text-2" id="text-org2cc2711">
+<ul class="org-ul">
+<li><a href="http://emacs.sexy/">http://emacs.sexy/</a></li>
+<li><a href="https://writequit.org/org/">https://writequit.org/org/</a></li>
+<li><a href="http://doc.rix.si/cce/cce.html">Emacs as a Complete Computing Environment</a></li>
+<li><a href="https://github.com/bbatsov/emacs-lisp-style-guide/">The Emacs Lisp Style Guide</a></li>
+<li><a href="https://two-wrongs.com/why-you-should-buy-into-the-emacs-platform">Why You Should Buy Into the Emacs Platform</a></li>
+</ul>
+
+<p>
+Environment bootstraps:
+</p>
+
+<ul class="org-ul">
+<li><a href="http://emacs-bootstrap.com/">http://emacs-bootstrap.com/</a> (generic)</li>
+<li><a href="https://portacle.github.io/">https://portacle.github.io/</a> (Common Lisp)</li>
+</ul>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2018-10-23</span>
+            <span title="last modification date" class="post-info">2018-10-23</span>
+            <span title="tags" class="post-info">:<a href="/tags/raw">raw</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-c7de1c50-88ed-412e-ae70-62694dd7dea5">lujun9972</a></span>
+        </div>
+    <script src="/media/js/jquery-2.1.3.min.js"></script>
+        <section>
+            <h1>Comments</h1>
+            <div id="comment-wrap">
+                    <a class="disqus_label">使用 Disqus 评论</a>
+    </ul>
+        <div id="disqus_thread"></div>
+        <script type="text/javascript">
+         //var disqus_developer = 1;
+         var preempt_signal=false;
+         var disqus_identifier = "/blog/2018/10/23/emacs-more-pro-tips/";
+         var disqus_url = "https://lujun9972.github.io/emacs-document/blog/2018/10/23/emacs-more-pro-tips/";
+         var disqus_shortname = 'emacs-document';
+         /* * * DON'T EDIT BELOW THIS LINE * * */
+         (function() {
+             var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+             dsq.src = 'https://' + disqus_shortname + '.disqus.com/embed.js';
+             (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+             $('#disqus_thread').css('display','none');
+         })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+    <script>
+     /* comments */
+     var ego_disqus_thread=$('#disqus_thread');
+     var ego_ds_label=$('.ds-thread');
+     $('.disqus_label').click(function(){
+         ego_disqus_thread.show();
+         ego_ds_label.hide();
+     });
+     $('.ds-label').click(function(){
+         ego_disqus_thread.hide();
+         ego_ds_label.show();
+     });
+    </script>
+        </section>
+    <script src="/media/js/main.js"></script>
+        <script type="text/javascript">
+         var _gaq = _gaq || [];
+         _gaq.push(['_setAccount', '7bac4fd0247f69c27887e0d4e3aee41e']);
+         _gaq.push(['_trackPageview']);
+         (function() {
+             var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+             ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+             var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-c7de1c50-88ed-412e-ae70-62694dd7dea5">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="//instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>

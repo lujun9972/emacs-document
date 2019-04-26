@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Comint: Writing your own Command Interpreter - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="raw" />
+  <style>
+   #ds-thread #ds-reset .ds-comment-body p {color: #ffffff;}
+   #ds-thread #ds-reset .ds-comment-body p a {color: #ff0;}
+   #ds-thread #ds-reset .ds-comment-body p a:hover {color: #0ff;}
+   #disqus_thread a {color: #00ffff;}
+  </style>
+  <link rel="stylesheet" href="/media/css/main.css" type="text/css"/>
+  <link rel="stylesheet" href="/media/css/comment.css" type="text/css"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="/">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <div class="menu-icon">
+        <svg viewBox="0 0 18 15">
+          <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.031C17.335,0,18,0.665,18,1.484L18,1.484z" fill="#ffff00"/>
+          <path d="M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0c0-0.82,0.665-1.484,1.484-1.484 h15.031C17.335,6.031,18,6.696,18,7.516L18,7.516z" fill="#ffff00"/>
+          <path d="M18,13.516C18,14.335,17.335,15,16.516,15H1.484C0.665,15,0,14.335,0,13.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.031C17.335,12.031,18,12.696,18,13.516L18,13.516z" fill="#ffff00"/>
+        </svg>
+      </div>
+      <ul class="trigger">
+        <li><a href="/years/">Years</a></li>
+        <li><a href="/authors/">Authors</a></li>
+        <li><a href="/tags/">Tags</a></li>
+        <li><a href="/about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="/rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="http://www.google.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">Comint: Writing your own Command Interpreter</h1>
+<div id="table-of-contents">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#the-theory">The Theory</a></li>
+<li><a href="#writing-a-comint-mode">Writing a Comint Mode</a>
+<ul>
+<li><a href="#the-comint-template">The Comint Template</a></li>
+<li><a href="#extending-cassandra-mode">Extending Cassandra Mode</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+<p>
+One of the hallmarks of Emacs is its ability to interface with external processes and add to the user experience with the full coterie of Emacs functionality like syntax highlighting, macros, command history, and so on. This functionality has been in Emacs since time immemorial, yet few people make their own command interpreters -- also known as comint -- in Emacs, fearing that it is either really difficult or not possible.
+</p>
+
+<p>
+It's not surprising people feel this way when you consider how woefully underdocumented this functionality is; the few, scattered references to comint “mode” reveal little, and as a hacker you are forced to use the source, Luke.
+</p>
+
+<div id="outline-container-org68106aa" class="outline-2">
+<h2 id="the-theory"><a id="org68106aa"></a>The Theory</h2>
+<div class="outline-text-2" id="text-the-theory">
+<p>
+Before I demonstrate how you use comint, a quick briefing -- but rough, as I'm leaving out a few boring steps -- on how it works.
+</p>
+
+<p>
+At its core, you are spawning a process and either redirecting the stdin, stdout and stderr pipes to Emacs; or you use a pseudo-terminal. The choice between the two is governed by <code>process-connection-type</code>, but it's unlikely that you would ever want to change that manually.
+</p>
+
+<p>
+The fundamental building blocks for interacting with processes are <code>start-process</code>, for kinda-sorta-asynchronous process calls; and=call-process=, for synchronous process calls.
+</p>
+
+<p>
+One layer above that and we get to comint with its very pared-down, basic interpreter framework. This is what things like <code>M-x shell</code> and the various REPL modes like Python build on. comint has handles all the nitty-gritty stuff like handling input/output; a command history; basic input/output filter hooks; and so on. In other words, it's the perfect thing to build on if you want something interactive but want more than just what comint has to offer. To use comint is very simple: <code>comint-run</code> takes one argument, <code>PROGRAM</code>, and nothing else; run it with a filepath to your favourite program and watch it fly. For greater configurability, you can use <code>make-comint-in-buffer</code>.
+</p>
+
+<p>
+<b>Important caveat about pipe redirection:</b> Oftentimes programs will detect that you are redirecting its pipes to a dumb terminal or file and it disables its shell prompt; this is extremely frustrating as not all programs detect that it is running inside Emacs by looking for the signature environment variables Emacs will set: <code>EMACS</code> and <code>INSIDE_EMACS</code>. If that happens you may get lucky and find a flag you can set to force it to run in “interactive” mode -- for example, in Python it's <code>-i</code>.
+</p>
+
+<p>
+One layer above that and we get to things like <code>M-x shell</code>, which I've talked about before in Running Shells in Emacs: An Overview.
+</p>
+
+<p>
+And finally, you can list all running/open processes by typing <code>M-x list-processes</code>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgcc9b314" class="outline-2">
+<h2 id="writing-a-comint-mode"><a id="orgcc9b314"></a>Writing a Comint Mode</h2>
+<div class="outline-text-2" id="text-writing-a-comint-mode">
+<p>
+With that out of the way, let's write some code. I've been playing around with <a href="http://cassandra.apache.org/">Cassandra</a>, the database, and like all respectable databases it has a fine commandline interface -- but no Emacs mode! Oh no!
+</p>
+
+<p>
+The most important thing about writing a comint mode is that it's very easy to get 80% of the way there, but getting those remaining 20 percentage points is the really difficult part! I'm only doing the 80% here!
+</p>
+
+<p>
+Let's write one. To start the Cassandra CLI you run the program <code>cassandra-cli</code> and you're presented with output similar to this:
+</p>
+
+<pre class="example">
+$ ./cassandra-cli
+Connected to: "Test Cluster" on 127.0.0.1/9160
+Welcome to Cassandra CLI version 1.2.8
+
+Type 'help;' or '?' for help.
+Type 'quit;' or 'exit;' to quit.
+
+[default@unknown] 
+</pre>
+
+<p>
+If you run <code>cassandra-cli</code> with <code>comint-run</code> -- you already have a working, interactive process. It's barebones and simple, but its defaults are reasonable and it will work well enough. If you want to extend it, you have to write your own wrapper function around <code>make-comint-in-buffer</code> and write a major mode also. So let's do just that.
+</p>
+</div>
+
+<div id="outline-container-orga8a4139" class="outline-3">
+<h3 id="the-comint-template"><a id="orga8a4139"></a>The Comint Template</h3>
+<div class="outline-text-3" id="text-the-comint-template">
+<div class="org-src-container">
+<pre class="src src-lisp">(<span style="font-weight: bold;">defvar</span> <span style="font-weight: bold; font-style: italic;">cassandra-cli-file-path</span> <span style="font-style: italic;">"/opt/cassandra/bin/cassandra-cli"</span>
+ <span style="font-style: italic;">"Path to the program used by `</span><span style="font-weight: bold; font-style: italic; text-decoration: underline;">run-cassandra</span><span style="font-style: italic;">'"</span>)
+
+(<span style="font-weight: bold;">defvar</span> <span style="font-weight: bold; font-style: italic;">cassandra-cli-arguments</span> '()
+ <span style="font-style: italic;">"Commandline arguments to pass to `</span><span style="font-weight: bold; font-style: italic; text-decoration: underline;">cassandra-cli</span><span style="font-style: italic;">'"</span>)
+
+(<span style="font-weight: bold;">defvar</span> <span style="font-weight: bold; font-style: italic;">cassandra-mode-map</span>
+ (<span style="font-weight: bold;">let</span> ((map (nconc (make-sparse-keymap) comint-mode-map)))
+ <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">example definition</span>
+ (define-key map <span style="font-style: italic;">"\t"</span> 'completion-at-point)
+ map)
+ <span style="font-style: italic;">"Basic mode map for `</span><span style="font-weight: bold; font-style: italic; text-decoration: underline;">run-cassandra</span><span style="font-style: italic;">'"</span>)
+
+(<span style="font-weight: bold;">defvar</span> <span style="font-weight: bold; font-style: italic;">cassandra-prompt-regexp</span> <span style="font-style: italic;">"^\\(?:\\[[</span><span style="font-style: italic;">^</span><span style="font-style: italic;">@]+@[</span><span style="font-style: italic;">^</span><span style="font-style: italic;">@]+\\]\\)"</span>
+ <span style="font-style: italic;">"Prompt for `</span><span style="font-weight: bold; font-style: italic; text-decoration: underline;">run-cassandra</span><span style="font-style: italic;">'."</span>)
+</pre>
+</div>
+
+<p>
+The first thing we need to do is declare some sensible variables so users can change the settings without having to edit the code. The first one is obvious: we need to store a path to <code>cassandra-cli</code>, the program we want to run.
+</p>
+
+<p>
+The next variable, <code>cassandra-cli-arguments</code>, holds an (empty) list of commandline arguments.
+</p>
+
+<p>
+The third, is an empty and currently disused mode map for storing our custom keybindings. It is inherited from <code>comint-mode-map</code>, so we get the same keys exposed in <code>comint-mode</code>.
+</p>
+
+<p>
+Finally, we have <code>cassandra-prompt-regexp</code>, which holds a regular expression that matches the prompt style Cassandra uses. It so happens that by default it sort-of works already, but it pays to be prepared and it's a good idea to have a regular expression that matches no more than it needs to. Furthermore, as you're probably going to use this code to make your own comint derivatives, you'll probably have to change it anyway.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">run-cassandra</span> ()
+ <span style="font-style: italic;">"Run an inferior instance of `</span><span style="font-weight: bold; font-style: italic; text-decoration: underline;">cassandra-cli</span><span style="font-style: italic;">' inside Emacs."</span>
+ (interactive)
+ (<span style="font-weight: bold;">let*</span> ((cassandra-program cassandra-cli-file-path)
+ (buffer (comint-check-proc <span style="font-style: italic;">"Cassandra"</span>)))
+ <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">pop to the "*Cassandra*" buffer if the process is dead, the</span>
+ <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">buffer is missing or it's got the wrong mode.</span>
+ (pop-to-buffer-same-window
+ (<span style="font-weight: bold;">if</span> (or buffer (not (derived-mode-p 'cassandra-mode))
+ (comint-check-proc (current-buffer)))
+ (get-buffer-create (or buffer <span style="font-style: italic;">"*Cassandra*"</span>))
+ (current-buffer)))
+ <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">create the comint process if there is no buffer.</span>
+ (<span style="font-weight: bold;">unless</span> buffer
+ (apply 'make-comint-in-buffer <span style="font-style: italic;">"Cassandra"</span> buffer
+ cassandra-program cassandra-cli-arguments)
+ (cassandra-mode))))
+</pre>
+</div>
+
+<p>
+This messy pile of code does some basic housekeeping like re-starting the Cassandra process if you're already in the buffer, or create the buffer if it does not exist. Annoyingly there is a dearth of macros to do stuff like this in the comint library; a shame, as it would cut down on the boilerplate code you need to write. The main gist of this function is the <code>apply</code> call taking <code>make-comint-in-buffer</code> as the function. Quite honestly, a direct call to <code>make-comint-in-buffer</code> would suffice, but you lose out on niceties like restartable processes and so on; but if you're writing a comint-derived mode for personal use you may not care about that sort of stuff.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">cassandra--initialize</span> ()
+ <span style="font-style: italic;">"Helper function to initialize Cassandra"</span>
+ (setq comint-process-echoes t)
+ (setq comint-use-prompt-regexp t))
+
+(define-derived-mode cassandra-mode comint-mode <span style="font-style: italic;">"Cassandra"</span>
+ <span style="font-style: italic;">"Major mode for `</span><span style="font-weight: bold; font-style: italic; text-decoration: underline;">run-cassandra</span><span style="font-style: italic;">'.</span>
+
+<span style="font-style: italic;">\\&lt;cassandra-mode-map&gt;"</span>
+ nil <span style="font-style: italic;">"Cassandra"</span>
+ <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">this sets up the prompt so it matches things like: [foo@bar]</span>
+ (setq comint-prompt-regexp cassandra-prompt-regexp)
+ <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">this makes it read only; a contentious subject as some prefer the</span>
+ <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">buffer to be overwritable.</span>
+ (setq comint-prompt-read-only t)
+ <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">this makes it so commands like M-{ and M-} work.</span>
+ (set (make-local-variable 'paragraph-separate) <span style="font-style: italic;">"\\'"</span>)
+ (set (make-local-variable 'font-lock-defaults) '(cassandra-font-lock-keywords t))
+ (set (make-local-variable 'paragraph-start) cassandra-prompt-regexp))
+
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">this has to be done in a hook. grumble grumble.</span>
+(add-hook 'cassandra-mode-hook 'cassandra--initialize)
+</pre>
+</div>
+
+<p>
+And finally, we have our major mode definition. Observe that we derive from <code>comint-mode</code>. I overwrite the default <code>comint-prompt-regexp</code> with our own, and I force the prompt to be read only also. I add a mode hook and set <code>comint-process-echoes</code> to <code>t</code> to avoid duplicating the input we write on the screen. And finally, I tweak the paragraph settings so you can navigate between each prompt with <code>M-{</code> and <code>M-}</code>.
+</p>
+
+<p>
+And.. that's more or less it for the template. It's trivial to tweak it to your own needs and it's a good place to start.
+</p>
+
+<p>
+Let's add some cool functionality to our cassandra-mode: basic syntax highlighting.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org67df433" class="outline-3">
+<h3 id="extending-cassandra-mode"><a id="org67df433"></a>Extending Cassandra Mode</h3>
+<div class="outline-text-3" id="text-extending-cassandra-mode">
+<p>
+The first thing I want to do is add simple syntax highlighting for the commands you get when you run <code>help;</code>.
+</p>
+
+<p>
+We need to think about some simple rules we can come up with that will highlight stuff. This is the hard bit: coming up with a regular expression for non-regular languages is nigh-on impossible to get right; especially not when you're doing it for a commandline application that spits out all manner of output.
+</p>
+
+<p>
+Before we do that though, let's augment our major mode to support syntax highlighting (which is actually known as font locking in Emacs parlance.)
+</p>
+
+<div class="org-src-container">
+<pre class="src src-lisp">(set (make-local-variable 'font-lock-defaults) '(cassandra-font-lock-keywords t))
+</pre>
+</div>
+
+<p>
+Add this form to the body of the major mode (next to the existing setq calls) and then add the following form to the top of the file, to hold our font lock rules:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-lisp">(defconst cassandra-keywords
+ '(<span style="font-style: italic;">"assume"</span> <span style="font-style: italic;">"connect"</span> <span style="font-style: italic;">"consistencylevel"</span> <span style="font-style: italic;">"count"</span> <span style="font-style: italic;">"create column family"</span>
+ <span style="font-style: italic;">"create keyspace"</span> <span style="font-style: italic;">"del"</span> <span style="font-style: italic;">"decr"</span> <span style="font-style: italic;">"describe cluster"</span> <span style="font-style: italic;">"describe"</span>
+ <span style="font-style: italic;">"drop column family"</span> <span style="font-style: italic;">"drop keyspace"</span> <span style="font-style: italic;">"drop index"</span> <span style="font-style: italic;">"get"</span> <span style="font-style: italic;">"incr"</span> <span style="font-style: italic;">"list"</span>
+ <span style="font-style: italic;">"set"</span> <span style="font-style: italic;">"show api version"</span> <span style="font-style: italic;">"show cluster name"</span> <span style="font-style: italic;">"show keyspaces"</span>
+ <span style="font-style: italic;">"show schema"</span> <span style="font-style: italic;">"truncate"</span> <span style="font-style: italic;">"update column family"</span> <span style="font-style: italic;">"update keyspace"</span> <span style="font-style: italic;">"use"</span>))
+
+(<span style="font-weight: bold;">defvar</span> <span style="font-weight: bold; font-style: italic;">cassandra-font-lock-keywords</span>
+ (list
+ <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">highlight all the reserved commands.</span>
+ `(,(concat <span style="font-style: italic;">"\\_&lt;"</span> (regexp-opt cassandra-keywords) <span style="font-style: italic;">"\\_&gt;"</span>) . font-lock-keyword-face))
+ <span style="font-style: italic;">"Additional expressions to highlight in `</span><span style="font-weight: bold; font-style: italic; text-decoration: underline;">cassandra-mode</span><span style="font-style: italic;">'."</span>)
+</pre>
+</div>
+
+<p>
+There is one font lock rule: it highlights all matching keywords that I extracted from the <code>help;</code> command.
+</p>
+
+<p>
+comint exposes a set of filter function variables that're triggered and run (in order, it's a list) when certain conditions are met:
+</p>
+
+<p>
+<b>Variable Name</b>
+</p>
+
+<p>
+<b>Purpose</b>
+</p>
+
+<p>
+<code>comint-dynamic-complete-functions</code>
+</p>
+
+<p>
+List of functions called to perform completion.
+</p>
+
+<p>
+<code>comint-input-filter-functions</code>
+</p>
+
+<p>
+Abnormal hook run before input is sent to the process.
+</p>
+
+<p>
+<code>comint-output-filter-functions</code>
+</p>
+
+<p>
+Functions to call after output is inserted into the buffer.
+</p>
+
+<p>
+<code>comint-preoutput-filter-functions</code>
+</p>
+
+<p>
+List of functions to call before inserting Comint output into the buffer.
+</p>
+
+<p>
+<code>comint-redirect-filter-functions</code>
+</p>
+
+<p>
+List of functions to call before inserting redirected process output.
+</p>
+
+<p>
+<code>comint-redirect-original-filter-function</code>
+</p>
+
+<p>
+The process filter that was in place when redirection is started
+</p>
+
+<p>
+Another useful variable is <code>comint-input-sender</code>, which lets you alter the input string mid-stream. Annoyingly its name is inconsistent with the filter functions above.
+</p>
+
+<p>
+You can use them to control how input and output is processed and interpreted mid-stream.
+</p>
+
+<p>
+And there you go: a simple, comint-enabled Cassandra CLI in Emacs.
+</p>
+</div>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2018-10-24</span>
+            <span title="last modification date" class="post-info">2018-10-24</span>
+            <span title="tags" class="post-info">:<a href="/tags/raw">raw</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-c7de1c50-88ed-412e-ae70-62694dd7dea5">lujun9972</a></span>
+        </div>
+    <script src="/media/js/jquery-2.1.3.min.js"></script>
+        <section>
+            <h1>Comments</h1>
+            <div id="comment-wrap">
+                    <a class="disqus_label">使用 Disqus 评论</a>
+    </ul>
+        <div id="disqus_thread"></div>
+        <script type="text/javascript">
+         //var disqus_developer = 1;
+         var preempt_signal=false;
+         var disqus_identifier = "/blog/2018/10/24/comint-writing-your-own-command-interpreter/";
+         var disqus_url = "https://lujun9972.github.io/emacs-document/blog/2018/10/24/comint-writing-your-own-command-interpreter/";
+         var disqus_shortname = 'emacs-document';
+         /* * * DON'T EDIT BELOW THIS LINE * * */
+         (function() {
+             var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+             dsq.src = 'https://' + disqus_shortname + '.disqus.com/embed.js';
+             (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+             $('#disqus_thread').css('display','none');
+         })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+    <script>
+     /* comments */
+     var ego_disqus_thread=$('#disqus_thread');
+     var ego_ds_label=$('.ds-thread');
+     $('.disqus_label').click(function(){
+         ego_disqus_thread.show();
+         ego_ds_label.hide();
+     });
+     $('.ds-label').click(function(){
+         ego_disqus_thread.hide();
+         ego_ds_label.show();
+     });
+    </script>
+        </section>
+    <script src="/media/js/main.js"></script>
+        <script type="text/javascript">
+         var _gaq = _gaq || [];
+         _gaq.push(['_setAccount', '7bac4fd0247f69c27887e0d4e3aee41e']);
+         _gaq.push(['_trackPageview']);
+         (function() {
+             var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+             ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+             var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-c7de1c50-88ed-412e-ae70-62694dd7dea5">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="//instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>

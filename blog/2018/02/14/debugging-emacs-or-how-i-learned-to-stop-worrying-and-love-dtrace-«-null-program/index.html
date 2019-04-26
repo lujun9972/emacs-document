@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Debugging Emacs or: How I Learned to Stop Worrying and Love DTrace « null program - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="raw" />
+  <style>
+   #ds-thread #ds-reset .ds-comment-body p {color: #ffffff;}
+   #ds-thread #ds-reset .ds-comment-body p a {color: #ff0;}
+   #ds-thread #ds-reset .ds-comment-body p a:hover {color: #0ff;}
+   #disqus_thread a {color: #00ffff;}
+  </style>
+  <link rel="stylesheet" href="/media/css/main.css" type="text/css"/>
+  <link rel="stylesheet" href="/media/css/comment.css" type="text/css"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="/">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <div class="menu-icon">
+        <svg viewBox="0 0 18 15">
+          <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.031C17.335,0,18,0.665,18,1.484L18,1.484z" fill="#ffff00"/>
+          <path d="M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0c0-0.82,0.665-1.484,1.484-1.484 h15.031C17.335,6.031,18,6.696,18,7.516L18,7.516z" fill="#ffff00"/>
+          <path d="M18,13.516C18,14.335,17.335,15,16.516,15H1.484C0.665,15,0,14.335,0,13.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.031C17.335,12.031,18,12.696,18,13.516L18,13.516z" fill="#ffff00"/>
+        </svg>
+      </div>
+      <ul class="trigger">
+        <li><a href="/years/">Years</a></li>
+        <li><a href="/authors/">Authors</a></li>
+        <li><a href="/tags/">Tags</a></li>
+        <li><a href="/about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="/rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="http://www.google.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">Debugging Emacs or: How I Learned to Stop Worrying and Love DTrace « null program</h1>
+<div id="table-of-contents">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#debugging-emacs-or-how-i-learned-to-stop-worrying-and-love-dtrace">Debugging Emacs or: How I Learned to Stop Worrying and Love DTrace</a>
+<ul>
+<li><a href="#bryan-cantrill-dtrace-and-freebsd">Bryan Cantrill, DTrace, and FreeBSD</a></li>
+<li><a href="#what-is-dtrace">What is DTrace?</a></li>
+<li><a href="#freebsd-on-a-raspberry-pi-2">FreeBSD on a Raspberry Pi 2</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-org90c061a" class="outline-2">
+<h2 id="debugging-emacs-or-how-i-learned-to-stop-worrying-and-love-dtrace"><a id="org90c061a"></a><a href="file:///blog/2018/01/17/">Debugging Emacs or: How I Learned to Stop Worrying and Love DTrace</a></h2>
+<div class="outline-text-2" id="text-debugging-emacs-or-how-i-learned-to-stop-worrying-and-love-dtrace">
+<p>
+For some time <a href="https://github.com/skeeto/elfeed">Elfeed</a> was experiencing a strange, spurious
+failure. Every so often users were <a href="https://github.com/skeeto/elfeed/issues/248">seeing an error</a> (spoiler
+warning) when updating feeds: “error in process sentinel: Search
+failed.” If you use Elfeed, you might have even seen this yourself.
+From the surface it appeared that curl, tasked with the
+<a href="file:///blog/2016/06/16/">responsibility for downloading feed data</a>, was producing
+incomplete output despite reporting a successful run. Since the run
+was successful, Elfeed assumed certain data was in curl's output
+buffer, but, since it wasn't, it failed hard.
+</p>
+
+<p>
+Unfortunately this issue was not reproducible. Manually running curl
+outside of Emacs never revealed any issues. Asking Elfeed to retry
+fetching the feeds would work fine. The issue would only randomly rear
+its head when Elfeed was fetching many feeds in parallel, under
+stress. By the time the error was discovered, the curl process had
+exited and vital debugging information was lost. Considering that
+this was likely to be a bug in Emacs itself, there really wasn't a
+reliable way to capture the necessary debugging information from
+within Emacs Lisp. And, indeed, this later proved to be the case.
+</p>
+
+<p>
+A quick-and-dirty work around is to use <code>condition-case</code> to catch and
+swallow the error. When the bizarre issue shows up, rather than fail
+badly in front of the user, Elfeed could attempt to swallow the error
+--- assuming it can be reliably detected --- and treat the fetch as simply
+a failure. That didn't sit comfortably with me. Elfeed had done its
+due diligence checking for errors already. <i>Someone</i> was lying to
+Elfeed, and I intended to catch them with their pants on fire.
+Someday.
+</p>
+
+<p>
+I'd just need to witness the bug on one of my own machines. Elfeed is
+part of my daily routine, so surely I'd have to experience this issue
+myself someday. My plan was, should that day come, to run a modified
+Elfeed, instrumented to capture extra data. I would have also routinely
+run Emacs under GDB so that I could inspect the failure more deeply.
+</p>
+
+<p>
+For now I just had to wait to <a href="https://www.youtube.com/watch?v=fE2KDzZaxvE">hunt that zebra</a>.
+</p>
+</div>
+
+<div id="outline-container-org7238c53" class="outline-3">
+<h3 id="bryan-cantrill-dtrace-and-freebsd"><a id="org7238c53"></a>Bryan Cantrill, DTrace, and FreeBSD</h3>
+<div class="outline-text-3" id="text-bryan-cantrill-dtrace-and-freebsd">
+<p>
+Over the holidays I re-discovered <a href="https://en.wikipedia.org/wiki/Bryan_Cantrill">Bryan Cantrill</a>, a systems
+software engineer who worked for Sun between 1996 and 2010, and is most
+well known for <a href="http://dtrace.org/blogs/about/">DTrace</a>. My first exposure to him was in a <a href="https://www.youtube.com/watch?v=l6XQUciI-Sc">BSD
+Now interview</a> in 2015. I had re-watched that interview and decided
+there was a lot more I had to learn from him. He's become a personal
+hero to me. So I scoured the internet for <a href="http://dtrace.org/blogs/bmc/2018/02/03/talks/">more of his writing and
+talks</a>. Besides what I've already linked in this article, here
+are a couple more great presentations:
+</p>
+
+<ul class="org-ul">
+<li><a href="https://www.youtube.com/watch?v=4PaWFYm0kEw">Oral Tradition in Software Engineering</a></li>
+<li><a href="https://www.youtube.com/watch?v=-zRN7XLCRhc">Fork Yeah! The Rise and Development of illumos</a></li>
+</ul>
+
+<p>
+You can also find some of his writing <a href="http://dtrace.org/blogs/bmc/">scattered around the DTrace
+blog</a>.
+</p>
+
+<p>
+Some interesting operating system technology came out of Sun during
+its final 15 or so years --- most notably DTrace and ZFS --- and Bryan
+speaks about it passionately. Almost as a matter of luck, most of it
+survived the Oracle acquisition thanks to Sun releasing it as open
+source in just the nick of time. Otherwise it would have been lost
+forever. The scattered ex-Sun employees, still passionate about their
+prior work at Sun, along with some of their old customers have since
+picked up the pieces and kept going as a community under the name
+<a href="https://illumos.org/">illumos</a>. It's like an open source flotilla.
+</p>
+
+<p>
+Naturally I wanted to get my hands on this stuff to try it out for
+myself. Is it really as good as they say? Normally I stick to Linux,
+but it (generally) doesn't have these Sun technologies available. The
+main reason is license incompatibility. Sun released its code under
+the <a href="https://opensource.org/licenses/CDDL-1.0">CDDL</a>, which is incompatible with the GPL. Ubuntu <i>does</i>
+<a href="https://insights.ubuntu.com/2016/02/18/zfs-licensing-and-linux/">infamously include ZFS</a>, but other distributions are
+unwilling to take that risk. Porting DTrace is a serious undertaking
+since it's got its fingers throughout the kernel, which also makes the
+licensing issues even more complicated.
+</p>
+
+<p>
+Linux has a reputation for Not Invented Here (NIH) syndrome, and these
+licensing issues certainly contribute to that. Rather than adopt ZFS
+and DTrace, they've been reinvented from scratch: btrfs instead of
+ZFS, and <a href="http://www.brendangregg.com/blog/2015-07-08/choosing-a-linux-tracer.html">a slew of partial options</a> instead of DTrace.
+Normally I'm most interested in system call tracing, and my go to is
+<a href="https://en.wikipedia.org/wiki/Strace">strace</a>, though it certainly has its limitations --- including
+this situation of debugging curl under Emacs. Another famous example
+of NIH is Linux's <a href="http://man7.org/linux/man-pages/man7/epoll.7.html"><code>epoll(2)</code></a>, which is a <a href="https://idea.popcount.org/2017-02-20-epoll-is-fundamentally-broken-12/">broken</a>
+<a href="https://idea.popcount.org/2017-03-20-epoll-is-fundamentally-broken-22/">version</a> of BSD <a href="https://www.freebsd.org/cgi/man.cgi?query=kqueue&amp;sektion=2"><code>kqueue(2)</code></a>.
+</p>
+
+<p>
+So, if I want to try these for myself, I'll need to install a
+different operating system. I've dabbled with <a href="https://omnios.omniti.com/">OmniOS</a>, an OS
+built on illumos, in virtual machines, using it as an alien
+environment to test some of my software (e.g. <a href="file:///blog/2017/03/12/">enchive</a>).
+OmniOS has a philosophy called <a href="https://omnios.omniti.com/wiki.php/KYSTY">Keep Your Software To Yourself</a>
+(KYSTY), which is really just code for “we don't do packaging.”
+Honestly, you can't blame them since <a href="https://utcc.utoronto.ca/~cks/space/blog/solaris/IllumosSupportLimits">they're a tiny community</a>.
+The best solution to this is probably <a href="https://www.pkgsrc.org/">pkgsrc</a>, which is
+essentially a universal packaging system. Otherwise <a href="file:///blog/2017/06/19/">you're on your
+own</a>.
+</p>
+
+<p>
+There's also <a href="https://www.openindiana.org/">openindiana</a>, which is a more friendly
+desktop-oriented illumos distribution. Still, the short of it is that
+you're very much on your own when things don't work. The situation is
+like running Linux a couple decades ago, when it was still difficult
+to do.
+</p>
+
+<p>
+If you're interested in trying DTrace, the easiest option these days is
+probably <a href="https://www.freebsd.org/">FreeBSD</a>. It's got a big, active community, thorough
+documentation, and a huge selection of packages. Its license (the <i>BSD
+license</i>, duh) is compatible with the CDDL, so both ZFS and DTrace have
+been ported to FreeBSD.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgfcd19ae" class="outline-3">
+<h3 id="what-is-dtrace"><a id="orgfcd19ae"></a>What is DTrace?</h3>
+<div class="outline-text-3" id="text-what-is-dtrace">
+<p>
+I've done all this talking but haven't yet described what <a href="https://wiki.freebsd.org/DTrace/Tutorial">DTrace
+really is</a>. I won't pretend to write my own tutorial, but I'll
+provide enough information to follow along. DTrace is a tracing
+framework for debugging production systems <i>in real time</i>, both for
+the kernel and for applications. The “production systems” part means
+it's stable and safe --- using DTrace won't put your system at risk of
+crashing or damaging data. The “real time” part means it has little
+impact on performance. You can use DTrace on live, active systems with
+little impact. Both of these core design principles are vital for
+troubleshooting those really tricky bugs that only show up in
+production.
+</p>
+
+<p>
+There are DTrace <i>probes</i> scattered all throughout the system: on
+system calls, scheduler events, networking events, process events,
+signals, virtual memory events, etc. Using a specialized language
+called D (unrelated to the general purpose programming language D),
+you can dynamically add behavior at these instrumentation points.
+Generally the behavior is to capture information, but it can also
+manipulate the event being traced.
+</p>
+
+<p>
+Each probe is fully identified by a 4-tuple delimited by colons:
+provider, module, function, and probe name. An empty element denotes a
+sort of wildcard. For example, <code>syscall::open:entry</code> is a probe at the
+beginning (i.e. “entry”) of <code>open(2)</code>. <code>syscall:::entry</code> matches all
+system call entry probes.
+</p>
+
+<p>
+Unlike strace on Linux which monitors a specific process, DTrace
+applies to the entire system when active. To run curl under strace
+from Emacs, I'd have to modify Emacs' behavior to do so. With DTrace I
+can instrument every curl process without making a single change to
+Emacs, and with negligible impact to Emacs. That's a big deal.
+</p>
+
+<p>
+So, when it comes to this Elfeed issue, FreeBSD is much better poised
+for debugging the problem. All I have to do is catch it in the act.
+However, it's been months since that bug report and I'm not really
+making this connection yet. I'm just hoping I eventually find an
+interesting problem where I can apply DTrace.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org5f019d7" class="outline-3">
+<h3 id="freebsd-on-a-raspberry-pi-2"><a id="org5f019d7"></a>FreeBSD on a Raspberry Pi 2</h3>
+<div class="outline-text-3" id="text-freebsd-on-a-raspberry-pi-2">
+<p>
+So I've settled in FreeBSD as the playground for these technologies, I
+just have to decide where. I could always run it in a virtual machine,
+but it's always more interesting to try things out on real hardware.
+<a href="https://wiki.freebsd.org/FreeBSD/arm/Raspberry%20Pi">FreeBSD supports the Raspberry Pi 2</a> as a Tier 2 system, and
+I had a Raspberry Pi 2 sitting around collecting dust, so I put it to
+use.
+</p>
+
+<p>
+I wrote the image to an SD card, and for a few days I stretched my
+legs on this new system. I cloned a couple dozen of my own git
+repositories, ran the builds and the tests, and just got a feel for
+things. I tried out the ports system for the first time, mainly to
+discover that the low-powered Raspberry Pi 2 takes days to build some
+of the packages I want to try.
+</p>
+
+<p>
+I <a href="file:///blog/2017/04/01/">mostly program in Vim these days</a>, so it's some days before I
+even set up Emacs. Eventually I do build Emacs, clone my
+configuration, fire it up, and give Elfeed a spin.
+</p>
+
+<p>
+And that's when the “search failed” bug strikes! Not just once, but
+dozens of times. Perfect! This low-powered platform is the jackpot for
+this particular bug, triggering it left and right. Given that I've got
+DTrace at my disposal, it's <i>the</i> perfect place to debug this.
+Something is lying to Elfeed and DTrace will play the judge.
+</p>
+
+<p>
+Before I dive in I see three possibilities:
+</p>
+
+<ol class="org-ol">
+<li>curl is reporting success but truncating its output.</li>
+<li>Emacs is quietly truncating curl's output.</li>
+<li>Emacs is misinterpreting curl's exit status.</li>
+</ol>
+
+<p>
+With Dtrace I can observe what every curl process writes to Emacs, and
+I can also double check curl's exit status. I come up with the
+following (newbie) DTrace script:
+</p>
+
+<pre class="example">
+syscall::write:entry
+/execname == "curl"/
+{
+ printf("%d WRITE %d \"%s\"\n",
+ pid, arg2, stringof(copyin(arg1, arg2)));
+}
+
+syscall::exit:entry
+/execname == "curl"/
+{
+ printf("%d EXIT %d\n", pid, arg0);
+}
+</pre>
+
+<p>
+The <code>/execname =</code> "curl"/= is a predicate that (obviously) causes the
+behavior to only fire for curl processes. The first probe has DTrace
+print a line for every <code>write(2)</code> from curl. <code>arg0</code>, <code>arg1</code>, and
+<code>arg2</code> correspond to the arguments of <code>write(2)</code>: fd, buf, count. It
+logs the process ID (pid) of the write, the length of the write, and
+the actual contents written. Remember that these curl processes are
+run in parallel by Emacs, so the pid allows me to associate the
+separate writes and the exit status.
+</p>
+
+<p>
+The second probe prints the pid and the exit status (the first argument
+to <code>exit(2)</code>).
+</p>
+
+<p>
+I also want to compare this to exactly what is delivered to Elfeed when
+curl exits, so I modify the <a href="http://www.gnu.org/software/emacs/manual/html_node/elisp/Sentinels.html">process sentinel</a> --- the callback
+that handles a subprocess exiting --- to call <code>write-file</code> before any
+action is taken. I can compare these buffer dumps to the logs produced
+by DTrace.
+</p>
+
+<p>
+There are two important findings.
+</p>
+
+<p>
+First, when the “search failed” bug occurs, the buffer was completely
+empty (95% of the time) or truncated at the end of the HTTP headers
+(5% of the time), right at the blank line. DTrace indicates that curl
+did its job to the full, so it's Emacs who's the liar. It's not
+delivering all of curl's data to Elfeed. That's pretty annoying.
+</p>
+
+<p>
+Second, <b>curl was line-buffered</b>. Each line was a separate,
+independent <code>write(2)</code>. I was certainly <i>not</i> expecting this. Normally
+the C library only does line buffering when the output is a terminal.
+That's because it's guessing a user may be watching, expecting the
+output to arrive a line at a time.
+</p>
+
+<p>
+Here's a sample of what it looked like in the log:
+</p>
+
+<pre class="example">
+88188 WRITE 32 "Server: Apache/2.4.18 (Ubuntu)
+"
+88188 WRITE 46 "Location: https://blog.plover.com/index.atom
+"
+88188 WRITE 21 "Content-Length: 299
+"
+88188 WRITE 45 "Content-Type: text/html; charset=iso-8859-1
+"
+88188 WRITE 2 "
+"
+</pre>
+
+<p>
+Why would curl think Emacs is a terminal?
+</p>
+
+<p>
+<i>Oh.</i> That's right. <i>This is the <a href="file:///blog/2014/02/06/">same problem I ran into four years
+ago when writing EmacSQL</a>.</i> By default Emacs connects to
+subprocesses through a psuedo-terminal (pty). I called this a mistake
+in Emacs back then, and I still stand by that claim. The pty causes
+weird, annoying problems for little benefit:
+</p>
+
+<ul class="org-ul">
+<li>Interpreting control characters. Hope you weren't transferring binary
+data!</li>
+<li>Subprocesses will generally get line buffered. This makes them
+slower, though in some situations it might be desirable.</li>
+<li>Stdout and stderr get mixed together. (Optional since Emacs 25.)</li>
+<li><i>New!</i> There's a bug somewhere in Emacs that causes truncation when
+ptys are used heavily in parallel.</li>
+</ul>
+
+<p>
+Just from eyeballing the DTrace log I knew what to do: dump the pty
+and switch to a pipe. This is controlled with the
+<code>process-connection-type</code> variable, and fixing it <a href="https://github.com/skeeto/elfeed/commit/945765a57d2f27996b6a43bc62e803dc167d1547">is a
+one-liner</a>.
+</p>
+
+<p>
+Not only did this completely resolve the truncation issue, Elfeed is
+noticeably faster at fetching feeds on all machines. It's no longer
+receiving mountains of XML one line at a time, like sucking pudding
+through a straw. It's now quite zippy even on my Raspberry Pi 2, which
+had <i>never</i> been the case before (without the “search failed” bug).
+Even if you were never affected by this bug, you will benefit from the
+fix.
+</p>
+
+<p>
+I haven't officially reported this as an Emacs bug yet because
+reproducibility is still an issue. It needs something better than
+“fire off a bunch of HTTP requests across the internet in parallel
+from a Raspberry Pi.”
+</p>
+
+<p>
+The fix reminds me of that <a href="https://www.buzzmaven.com/old-engineer-hammer-2/">old boilermaker story</a> about
+charging a lot of money just to swing a hammer. Once the problem
+arose, <b>DTrace quickly helped to identify the place to hit Emacs with
+the hammer</b>.
+</p>
+
+<p>
+<i>Finally, a big thanks to alphapapa for originally taking the time to
+report this bug months ago.</i>
+</p>
+</div>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2018-02-14</span>
+            <span title="last modification date" class="post-info">2018-02-14</span>
+            <span title="tags" class="post-info">:<a href="/tags/raw">raw</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-c7de1c50-88ed-412e-ae70-62694dd7dea5">lujun9972</a></span>
+        </div>
+    <script src="/media/js/jquery-2.1.3.min.js"></script>
+        <section>
+            <h1>Comments</h1>
+            <div id="comment-wrap">
+                    <a class="disqus_label">使用 Disqus 评论</a>
+    </ul>
+        <div id="disqus_thread"></div>
+        <script type="text/javascript">
+         //var disqus_developer = 1;
+         var preempt_signal=false;
+         var disqus_identifier = "/blog/2018/02/14/debugging-emacs-or-how-i-learned-to-stop-worrying-and-love-dtrace-«-null-program/";
+         var disqus_url = "https://lujun9972.github.io/emacs-document/blog/2018/02/14/debugging-emacs-or-how-i-learned-to-stop-worrying-and-love-dtrace-«-null-program/";
+         var disqus_shortname = 'emacs-document';
+         /* * * DON'T EDIT BELOW THIS LINE * * */
+         (function() {
+             var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+             dsq.src = 'https://' + disqus_shortname + '.disqus.com/embed.js';
+             (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+             $('#disqus_thread').css('display','none');
+         })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+    <script>
+     /* comments */
+     var ego_disqus_thread=$('#disqus_thread');
+     var ego_ds_label=$('.ds-thread');
+     $('.disqus_label').click(function(){
+         ego_disqus_thread.show();
+         ego_ds_label.hide();
+     });
+     $('.ds-label').click(function(){
+         ego_disqus_thread.hide();
+         ego_ds_label.show();
+     });
+    </script>
+        </section>
+    <script src="/media/js/main.js"></script>
+        <script type="text/javascript">
+         var _gaq = _gaq || [];
+         _gaq.push(['_setAccount', '7bac4fd0247f69c27887e0d4e3aee41e']);
+         _gaq.push(['_trackPageview']);
+         (function() {
+             var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+             ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+             var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-c7de1c50-88ed-412e-ae70-62694dd7dea5">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="//instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>

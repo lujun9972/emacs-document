@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Basic Web Scraping with Emacs - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="raw" />
+  <style>
+   #ds-thread #ds-reset .ds-comment-body p {color: #ffffff;}
+   #ds-thread #ds-reset .ds-comment-body p a {color: #ff0;}
+   #ds-thread #ds-reset .ds-comment-body p a:hover {color: #0ff;}
+   #disqus_thread a {color: #00ffff;}
+  </style>
+  <link rel="stylesheet" href="/media/css/main.css" type="text/css"/>
+  <link rel="stylesheet" href="/media/css/comment.css" type="text/css"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="/">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <div class="menu-icon">
+        <svg viewBox="0 0 18 15">
+          <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.031C17.335,0,18,0.665,18,1.484L18,1.484z" fill="#ffff00"/>
+          <path d="M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0c0-0.82,0.665-1.484,1.484-1.484 h15.031C17.335,6.031,18,6.696,18,7.516L18,7.516z" fill="#ffff00"/>
+          <path d="M18,13.516C18,14.335,17.335,15,16.516,15H1.484C0.665,15,0,14.335,0,13.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.031C17.335,12.031,18,12.696,18,13.516L18,13.516z" fill="#ffff00"/>
+        </svg>
+      </div>
+      <ul class="trigger">
+        <li><a href="/years/">Years</a></li>
+        <li><a href="/authors/">Authors</a></li>
+        <li><a href="/tags/">Tags</a></li>
+        <li><a href="/about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="/rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="http://www.google.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">Basic Web Scraping with Emacs</h1>
+<p>
+<b>Web scraping</b> is the extraction of data from web pages. But most web pages aren't designed to accomodate automated data extraction; instead, they're designed to be easily read by humans, with colors and fonts and pictures and all sorts of junk. This makes web scraping tricky. There are two predominant techniques for web scraping: <b>HTML parsing</b> and <b>browser automation</b>.
+</p>
+
+<p>
+Before going on, I must confess a shameful secret: <b>I don't understand HTML very well</b>. It's just too ugly to get me interested. Every so often I'll try to sit down and read about HTML, and I usually get bored and quit right around the time they get to unordered lists (<b><code>&lt;ul&gt;</code></b>). Why couldn't they just use <b>S-expressions</b>? Do the brackets and explicit close tags actually add anything? Whatever, it doesn't matter. The bottom line is that I hate dealing with HTML and I'd prefer to avoid it if I possibly can.
+</p>
+
+<p>
+So I'm left with browser automation if I want to scrape. But for simple scraping tasks, especially <b>one-off</b> tasks, most browser automation tools seem like <b>overkill</b>. You have to download the thing, then figure out how to use it, wade through documentation, learn the relevant APIs, blah blah blah. Maybe it's another personal failing, but I hate doing all that stuff, and again I would prefer to avoid it if I possibly can.
+</p>
+
+<p>
+So what am I to do when I want to scrape? As usual, the answer is easy: <b>Emacs</b>. And why not? In most cases the data I want to scrape is text, and Emacs is an all-purpose text-handling tool, so really, what else would I use?
+</p>
+
+<p>
+As an example, consider <b>Hurriyet Daily News</b>, an English-language Turkish news site. Comparing it to American news outlets in terms of jounalistic quality, I would it's like CNN -- not a real journalism organization like the New York Times, but also not a propoganda dissemination machine like Fox News. If you want to keep up with Turkish news and you don't speak Turkish, it's not a bad option.
+</p>
+
+<p>
+Here's what <b><a href="http://www.hurriyetdailynews.com/">hurriyetdailynews.com</a></b> looks like:
+</p>
+
+
+<div class="figure">
+<p><img src="https://nickdrozd.github.io/assets/2018-10-17-web-scraping/hurriyet-web.png" alt="hurriyet-web.png" />
+</p>
+</div>
+
+<p>
+The centerpiece of the landing page is a box containing a half dozen or so headlines with accompanying images. These headlines scroll through one at a time. Suppose, for whatever reason, that I'm interested in tracking the headlines that show up in that box. Here's how I would do it in Emacs.
+</p>
+
+<p>
+First, pop the site open in the Emacs brower <b>eww</b>. It should looke like this (and if it doesn't, then the website has changed and this post is out of date):
+</p>
+
+
+<div class="figure">
+<p><img src="https://nickdrozd.github.io/assets/2018-10-17-web-scraping/hurriyet-eww.png" alt="hurriyet-eww.png" />
+</p>
+</div>
+
+<p>
+There are the headlines, together with topic keywords and some kind of text object corresponding to the story (I think it doesn't show up because <b>Javascript</b> isn't run). Now, open an empty buffer. I usually call my empty buffers <code>asdf</code>, but you can call yours something else if you want. Our ultimate goal is to copy each of those headlines into the empty buffer, at which point we can do whatever with them.
+</p>
+
+<p>
+To do this, we'll use a <b>keyboard macro</b>. <a href="https://sites.google.com/site/steveyegge2/effective-emacs">Steve Yegge</a> once said “I believe I can state without the slightest hint of exaggeration that Emacs keyboard macros are the coolest thing in the entire universe”, and he's not wrong. Keyboard macros make boring, repetitive tasks quick and even fun (I'll sometimes spend more time trying to craft the perfect macro than it would have taken me to do it manually). The way keyboard macros work is you start recording, then hit some keys, then stop recording. When you play back the macro, the keys you recorded will be entered again. The meaning of the keys is not recorded, just the keys themselves, so <b>be careful!</b>
+</p>
+
+<p>
+Now, pay attention here, because the details are important (except for the details of the headlines, which don't matter at all). For reference, the first few lines of the headline section looks something like this:
+</p>
+
+<pre class="example">
+Home Page
+
+WORLD
+
+
+Saudi consul in Istanbul 'relieved of post, to be investigated' as police knock door
+
+TURKEY
+
+
+Saudi journalist Khashoggi decapitated after fingers cut off: Reports
+</pre>
+
+<ol class="org-ol">
+<li>Move point (cursor) to the beginning of the line in the <code>eww</code> buffer that says Home Page.</li>
+<li>Start recording a keyboard macro. The default binding for this is <code>C-x (</code>.</li>
+<li>Hit <code>TAB</code>. This will jump down to the first topic keyword, which in this case is <code>WORLD</code>. (This is a link of some kind).</li>
+<li>For whatever reason, the headlines can't be reached by <code>TAB</code>-jumping, so move the cursor down three lines (<code>C-n</code>, or <code>&lt;down&gt;</code>).</li>
+<li>The cursor should now be at the beginning of the line that says “Saudi consul...”. If it isn't, move it there with <code>C-a</code>. Now highlight the whole line. This can be done by setting the mark and moving to the end of the line (<code>C-SPC C-e</code>), but it can be done other ways too.</li>
+<li>Copy the highlighted text, or kill it or whatever the weird Emacs terminology is. I use <code>C-k</code> for this, but that isn't the default binding, which I can never remember.</li>
+<li>Jump over to the empty buffer. The default binding for this is <code>C-x b</code>, which is an unbelievably shitty way do something as common as changing buffers. Anyway, hit that and then enter the name of the empty buffer (<code>asdf</code> for me).</li>
+<li>The cursor should be at the beginning of the buffer, which should have nothing in it. Paste in (or yank or whatever) the copied text. I use <code>C-v</code> for this, which again is not the standard binding.</li>
+<li>Enter a newline (<code>RET</code>). The cursor should be at the beginning of an empty line at the end of the buffer.</li>
+<li>Jump back back to the <code>eww</code> buffer. The cursor should be at the end of the “Saudi consul...” line.</li>
+<li>Stop recording the macro. The default binding for this is <code>C-x )</code>.</li>
+</ol>
+
+<p>
+At this point the previously empty buffer should have the first headline, with an inactive cursor at the beginning of an empty line below it, and the active cursor should be at the end of the first headline in the <code>eww</code> buffer. Good? Okay, now execute the macro with <code>C-x e</code>. If it worked, the situation should be the same, but with the second headline copied into the other buffer, and the cursor at the end of the second headline in the <code>eww</code> buffer. Neat, right? If it didn't work, something got screwed up, and there's no telling what happened. Undo whatever it did and try again.
+</p>
+
+<p>
+There are a few more headlines, so execute the macro as many times as needed to get all of them. For convenience, after hitting <code>C-x e</code> the first time, the macro can be replayed again by just hitting <code>e</code>.
+</p>
+
+<p>
+The copy buffer should look like this:
+</p>
+
+<pre class="example">
+Saudi consul in Istanbul 'relieved of post, to be investigated' as police knock door
+Saudi journalist Khashoggi decapitated after fingers cut off: Reports
+Suspects in Khashoggi case had ties to Saudi crown prince: Report
+Turkey to clear Manbij if US fails to do so: Erdoğan tells Pompeo
+Thousands of Turkish police, watchmen receive commando training
+Istanbul metro receives first reverse vending machine
+Dust storm from Syria immerses Turkey in orange cloud
+</pre>
+
+<p>
+<b>And the headlines are scraped!</b> Obviously this was a somewhat labored explanation, but once you get the hang of keyboard macros, this kind of thing can be done very quickly.
+</p>
+
+<p>
+Okay, but there are new headlines every day; what if we want to scrape them regularly? It would be annoying to have to fiddle with keyboard macros every time.
+</p>
+
+<p>
+Fortunately, macros can be named and saved. Go to your favorite config file or whatever and execute the following:
+</p>
+
+<pre class="example">
+(let ((macro-name 'hurriyet-scrape))
+ (name-last-kbd-macro macro-name)
+ (insert-kbd-macro macro-name))
+</pre>
+
+<p>
+It should spit out something like this:
+</p>
+
+<pre class="example">
+(fset 'hurriyet-scrape
+ [tab ?\C-n ?\C-n ?\C-n ?\C- ?\C-e ?\C-k ?\C-t ?a ?s ?d ?f return ?\C-v return ?\C-t ?e ?w ?w return])
+</pre>
+
+<p>
+Now, if you wanted to leave it at that, you could, and you would, as far as anyone could tell, have a function that did exactly what the macro did. You could call it, bind it to a key, whatever. However, with a macro as complex as this one, it's usually better just to <b>write a real function</b>. This can be done without too much trouble, as the bulk of the work is just figuring out what commands the key presses are bound to, and then putting those in the function. It doesn't have to be fancy.
+</p>
+
+<p>
+Here's a function for scraping Hurriyet based on that macro. It grabs the headlines and then dumps them into a file called <code>hurriyet-headlines</code> along with a timestamp. Some example output:
+</p>
+
+<pre class="example">
+2018-09-21 14:26:04 UTC
+
+Turkey, Russia agree on borders of Idlib disarmament zone
+German FM praises Turkey’s efforts for Idlib
+Turkey expects US to implement Manbij roadmap without delays
+Main opposition lawmaker Berberoğlu speaks after release from prison
+Letter with forged signature of Erdoğan stirs Swiss controversy
+Turkish mother found alive after going missing in wild for three days
+
+
+2018-09-20 13:08:09 UTC
+
+Turkey’s medium-term economic program revises inflation, growth targets
+Turkey will protect its energy rights in Mediterranean: Minister
+President Erdoğan meets representatives of US companies in Turkey
+Ankara sharply cuts investment levels for Turkish citizenship
+Turkish mayor of town bordering Syria attacked
+Main opposition leader criticizes party’s performance in June elections
+Turkey to work to strengthen ties with Russia: Minister
+
+
+2018-09-19 17:42:32 UTC
+
+No crisis in Turkey, all manipulations: President Erdoğan
+Ankara sharply cuts investment levels for Turkish citizenship
+Turkish mayor of town bordering Syria attacked
+Main opposition leader criticizes party’s performance in June elections
+Turkey to work to strengthen ties with Russia: Minister
+24 workers arrested after new Istanbul airport protests
+85-year-old man kills wife in Istanbul over ‘social media jealousy’
+</pre>
+
+<p>
+And the code itself:
+</p>
+
+<pre class="example">
+(require 'shr)
+
+(defun scrape-hurriyet-headlines ()
+ "Scrape the top Hurriyet Daily News headlines.
+
+The Hurriyet home page is expected to be laid out as follows:
+
+&lt;front matter&gt;
+
+Home Page
+
+&lt;topic -- LINK&gt;
+&lt;story&gt;
+
+&lt;headline&gt;
+
+&lt;topic -- LINK&gt;
+&lt;story&gt;
+
+&lt;headline&gt;
+
+&lt;topic -- LINK&gt;
+&lt;story&gt;
+
+&lt;headline&gt;
+
+...
+
+The scraping strategy will be to jump to that home page section, then
+walk down the first seven links and copy the headlines associated with
+them, pasting them in to a result file.
+"
+ (interactive)
+ (let ((site "http://www.hurriyetdailynews.com/")
+ (file (find-file "~/hurriyet-headlines"))
+ (headline-count 7))
+ ;; Add date and time
+ (switch-to-buffer file)
+ (goto-char (point-min))
+ (insert (format-time-string "%F %T %Z" nil t))
+ (newline 2)
+
+ ;; Give eww some time to load
+ (eww site)
+ (sit-for 2)
+
+ ;; Jump to "Home Page" header
+ (re-search-forward "^home page$")
+
+ ;; Stories look like this in eww:
+ ;; &lt;topic -- LINK&gt;
+ ;; &lt;story&gt;
+ ;;
+ ;; &lt;headline&gt;
+
+ (dotimes (_ headline-count)
+ ;; Navigate to headline
+ (shr-next-link)
+ (dotimes (_ 3)
+ (forward-line))
+
+ ;; Copy headline
+ (set-mark-command nil)
+ (move-end-of-line nil)
+ (kill-ring-save t t t)
+ (deactivate-mark)
+
+ ;; Paste headline
+ (switch-to-buffer file)
+ (yank)
+ (newline)
+ (switch-to-buffer "*eww*"))
+
+ ;; Save and prepare file for next invocation
+ (switch-to-buffer file)
+ (newline 2)
+ (save-buffer file)))
+</pre>
+
+<p>
+To be clear, this is <b>NOT elegant Elisp</b>, and it definitely does stuff that would be inappropriate in a distributed package. It's also <b>brittle</b>, as scrapers tend to be -- if the Hurriyet website changed its format, I would have to dump it in the trash and start over. Nonetheless, it works fine for personal use.
+</p>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2018-10-24</span>
+            <span title="last modification date" class="post-info">2019-04-26</span>
+            <span title="tags" class="post-info">:<a href="/tags/raw">raw</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-c7de1c50-88ed-412e-ae70-62694dd7dea5">lujun9972</a></span>
+        </div>
+    <script src="/media/js/jquery-2.1.3.min.js"></script>
+        <section>
+            <h1>Comments</h1>
+            <div id="comment-wrap">
+                    <a class="disqus_label">使用 Disqus 评论</a>
+    </ul>
+        <div id="disqus_thread"></div>
+        <script type="text/javascript">
+         //var disqus_developer = 1;
+         var preempt_signal=false;
+         var disqus_identifier = "/blog/2018/10/24/basic-web-scraping-with-emacs/";
+         var disqus_url = "https://lujun9972.github.io/emacs-document/blog/2018/10/24/basic-web-scraping-with-emacs/";
+         var disqus_shortname = 'emacs-document';
+         /* * * DON'T EDIT BELOW THIS LINE * * */
+         (function() {
+             var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+             dsq.src = 'https://' + disqus_shortname + '.disqus.com/embed.js';
+             (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+             $('#disqus_thread').css('display','none');
+         })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+    <script>
+     /* comments */
+     var ego_disqus_thread=$('#disqus_thread');
+     var ego_ds_label=$('.ds-thread');
+     $('.disqus_label').click(function(){
+         ego_disqus_thread.show();
+         ego_ds_label.hide();
+     });
+     $('.ds-label').click(function(){
+         ego_disqus_thread.hide();
+         ego_ds_label.show();
+     });
+    </script>
+        </section>
+    <script src="/media/js/main.js"></script>
+        <script type="text/javascript">
+         var _gaq = _gaq || [];
+         _gaq.push(['_setAccount', '7bac4fd0247f69c27887e0d4e3aee41e']);
+         _gaq.push(['_trackPageview']);
+         (function() {
+             var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+             ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+             var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-c7de1c50-88ed-412e-ae70-62694dd7dea5">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="//instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>

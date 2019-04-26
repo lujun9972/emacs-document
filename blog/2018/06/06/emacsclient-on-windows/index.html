@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Emacsclient on Windows - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="raw" />
+  <style>
+   #ds-thread #ds-reset .ds-comment-body p {color: #ffffff;}
+   #ds-thread #ds-reset .ds-comment-body p a {color: #ff0;}
+   #ds-thread #ds-reset .ds-comment-body p a:hover {color: #0ff;}
+   #disqus_thread a {color: #00ffff;}
+  </style>
+  <link rel="stylesheet" href="/media/css/main.css" type="text/css"/>
+  <link rel="stylesheet" href="/media/css/comment.css" type="text/css"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="/">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <div class="menu-icon">
+        <svg viewBox="0 0 18 15">
+          <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.031C17.335,0,18,0.665,18,1.484L18,1.484z" fill="#ffff00"/>
+          <path d="M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0c0-0.82,0.665-1.484,1.484-1.484 h15.031C17.335,6.031,18,6.696,18,7.516L18,7.516z" fill="#ffff00"/>
+          <path d="M18,13.516C18,14.335,17.335,15,16.516,15H1.484C0.665,15,0,14.335,0,13.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.031C17.335,12.031,18,12.696,18,13.516L18,13.516z" fill="#ffff00"/>
+        </svg>
+      </div>
+      <ul class="trigger">
+        <li><a href="/years/">Years</a></li>
+        <li><a href="/authors/">Authors</a></li>
+        <li><a href="/tags/">Tags</a></li>
+        <li><a href="/about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="/rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="http://www.google.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">Emacsclient on Windows</h1>
+<div id="table-of-contents">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#setup-in-elisp">Setup in elisp #</a>
+<ul>
+<li><a href="#use-tcp-sockets">Use TCP sockets #</a></li>
+<li><a href="#uniquify-the-server-authentication-directory">Uniquify the server authentication directory #</a></li>
+<li><a href="#prevent-server-is-unsafe-errors">Prevent ‘server is unsafe' errors #</a></li>
+</ul>
+</li>
+<li><a href="#windows-environment-variables">Windows environment variables #</a></li>
+<li><a href="#start-the-server">Start the server #</a></li>
+<li><a href="#using-the-emacsclient">Using the emacsclient #</a></li>
+</ul>
+</div>
+</div>
+<p>
+Using emacsclient instead of the emacs binary is a very useful technique to prevent loading emacs from scratch each time you open a new file. That technique is useful on Windows too. But for this to work on Windows, we need some more elisp and Windows environment variable configuration than just the below code,
+</p>
+
+<pre class="example">
+(require 'server)
+;; Start a server if (server-running-p) does not return t (e.g. if it
+;; returns nil or :other)
+(or (eq (server-running-p) t)
+ (server-start))
+</pre>
+
+<div id="outline-container-org9eda7de" class="outline-2">
+<h2 id="setup-in-elisp"><a id="org9eda7de"></a>Setup in elisp <a href="#setup-in-elisp">#</a></h2>
+<div class="outline-text-2" id="text-setup-in-elisp">
+</div>
+
+<div id="outline-container-org1c84329" class="outline-3">
+<h3 id="use-tcp-sockets"><a id="org1c84329"></a>Use TCP sockets <a href="#use-tcp-sockets">#</a></h3>
+<div class="outline-text-3" id="text-use-tcp-sockets">
+<p>
+I do not understand what this means, but you need to use TCP sockets instead of local sockets for the server to run on Windows. By default the value of <code>server-use-tcp</code> is <code>nil</code>. So for Windows, we need this,
+</p>
+
+<pre class="example">
+(when (equal window-system 'w32)
+ (setq server-use-tcp t))
+</pre>
+</div>
+</div>
+
+<div id="outline-container-org7af1e55" class="outline-3">
+<h3 id="uniquify-the-server-authentication-directory"><a id="org7af1e55"></a>Uniquify the server authentication directory <a href="#uniquify-the-server-authentication-directory">#</a></h3>
+<div class="outline-text-3" id="text-uniquify-the-server-authentication-directory">
+<p>
+When <code>server-use-tcp</code> is a non-nil value, the <code>server-auth-dir</code> is used to store the server authentication files. It is not unusual for me to have emacs running on two different machines (possibly different versions of emacs on the same machine too in rare occassions) sharing the same <code>~/.emacs.d/</code> via Dropbox. So I uniquify the <code>server-auth-dir</code>.
+</p>
+
+<pre class="example">
+;; Below needs to be set before you require 'server
+(setq server-auth-dir
+ (let ((dir (concat user-emacs-directory
+ "server_" (format "%s_%s"
+ emacs-major-version
+ emacs-minor-version)
+ "_" (system-name) ; Use the var `system-name' directly
+ ; if using emacs older than 25.1.
+ "/")))
+ (make-directory dir :parents)
+ dir))
+</pre>
+
+<p>
+So, if am running emacs 25.1, and if my Windows machine name is <code>FOO</code>, the value of <code>server-auth-dir</code> will be set to <code>~/.emacs.d/server_25_1_FOO/</code>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org404d847" class="outline-3">
+<h3 id="prevent-server-is-unsafe-errors"><a id="org404d847"></a>Prevent ‘server is unsafe' errors <a href="#prevent-server-is-unsafe-errors">#</a></h3>
+<div class="outline-text-3" id="text-prevent-server-is-unsafe-errors">
+<p>
+I also had to put the below hack in order for the server to start on Windows.
+</p>
+
+<pre class="example">
+(with-eval-after-load 'server
+ (when (equal window-system 'w32)
+ ;; Suppress error "directory ~/.emacs.d/server is unsafe". It is needed
+ ;; needed for the server to start on Windows.
+ (defun server-ensure-safe-dir (dir) "Noop" t)))
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orge3ca2ad" class="outline-2">
+<h2 id="windows-environment-variables"><a id="orge3ca2ad"></a>Windows environment variables <a href="#windows-environment-variables">#</a></h2>
+<div class="outline-text-2" id="text-windows-environment-variables">
+<p>
+You will need to set <code>EMACS_SERVER_FILE</code> and <code>HOME</code> environment variables in Windows. I came up with the below steps that work on Windows 7.
+</p>
+
+<ul class="org-ul">
+<li>Click on Start &gt; Control Panel.</li>
+<li>Search for environment in the search field.</li>
+<li>Click on Edit environment variables for your account.</li>
+<li>Click on New under User variables for ...</li>
+<li>Enter <code>EMACS_SERVER_FILE</code> in the Variable name field and appropriate value in the Variable value field to match the value set in <code>server-auth-dir</code>, appended by <code>server</code>.
+
+<ul class="org-ul">
+<li>My <code>server-auth-dir</code> value is <code>~/.emacs.d/server_25_1_FOO/</code>. So I have set Variable value to <code>C:\Users\KModi\Dropbox\home\.emacs.d\server_25_1_FOO\server</code>. Note the use of <code>/</code> instead of <code>\</code>.</li>
+<li>Also I have set my user environment variable <code>HOME</code> in Windows to <code>C:\Users\KModi\Dropbox\home</code> using the same steps as above.</li>
+</ul></li>
+
+<li>Hit OK to save your environment variable setup.</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-org71773ed" class="outline-2">
+<h2 id="start-the-server"><a id="org71773ed"></a>Start the server <a href="#start-the-server">#</a></h2>
+<div class="outline-text-2" id="text-start-the-server">
+<p>
+And then you need to have the below snippet that starts the server when you start emacs.
+</p>
+
+<pre class="example">
+(require 'server)
+;; Start a server if (server-running-p) does not return t (e.g. if it
+;; returns nil or :other)
+(or (eq (server-running-p) t)
+ (server-start))
+</pre>
+</div>
+</div>
+
+<div id="outline-container-org0c24519" class="outline-2">
+<h2 id="using-the-emacsclient"><a id="org0c24519"></a>Using the emacsclient <a href="#using-the-emacsclient">#</a></h2>
+<div class="outline-text-2" id="text-using-the-emacsclient">
+<ol class="org-ol">
+<li>Start emacs using the <code>runemacs.exe</code> executable for the first time on starting Windows.</li>
+<li>Use the <code>emacsclientw.exe</code> executable after that.</li>
+</ol>
+
+<p>
+To makes things easy, I add <code>runemacs.exe</code> Shortcut to All Programs &gt; Startup. So emacs starts automatically each time I boot Windows.
+</p>
+
+<p>
+If you need to always open certain files in emacs using emacsclient, - Shift + Right-click on that file. - Select Open with. - Click Select default program and choose the <code>emacsclientw.exe</code> executable.
+</p>
+
+<ul class="org-ul">
+<li>You can find my full setup related to emacs server setup <a href="https://github.com/kaushalmodi/.emacs.d/blob/6c7b77af6ea39fd6e016a873fad763a712547223/setup-files/setup-server.el">here</a>.</li>
+<li>This has been tested to work on emacs 25.1 on the <a href="https://ftp.gnu.org/gnu/emacs/windows/">official emacs Windows</a> as well as <a href="https://github.com/zklhp/emacs-w64/releases">emacs-w64</a> builds.</li>
+</ul>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2018-06-06</span>
+            <span title="last modification date" class="post-info">2018-06-06</span>
+            <span title="tags" class="post-info">:<a href="/tags/raw">raw</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-c7de1c50-88ed-412e-ae70-62694dd7dea5">lujun9972</a></span>
+        </div>
+    <script src="/media/js/jquery-2.1.3.min.js"></script>
+        <section>
+            <h1>Comments</h1>
+            <div id="comment-wrap">
+                    <a class="disqus_label">使用 Disqus 评论</a>
+    </ul>
+        <div id="disqus_thread"></div>
+        <script type="text/javascript">
+         //var disqus_developer = 1;
+         var preempt_signal=false;
+         var disqus_identifier = "/blog/2018/06/06/emacsclient-on-windows/";
+         var disqus_url = "https://lujun9972.github.io/emacs-document/blog/2018/06/06/emacsclient-on-windows/";
+         var disqus_shortname = 'emacs-document';
+         /* * * DON'T EDIT BELOW THIS LINE * * */
+         (function() {
+             var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+             dsq.src = 'https://' + disqus_shortname + '.disqus.com/embed.js';
+             (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+             $('#disqus_thread').css('display','none');
+         })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+    <script>
+     /* comments */
+     var ego_disqus_thread=$('#disqus_thread');
+     var ego_ds_label=$('.ds-thread');
+     $('.disqus_label').click(function(){
+         ego_disqus_thread.show();
+         ego_ds_label.hide();
+     });
+     $('.ds-label').click(function(){
+         ego_disqus_thread.hide();
+         ego_ds_label.show();
+     });
+    </script>
+        </section>
+    <script src="/media/js/main.js"></script>
+        <script type="text/javascript">
+         var _gaq = _gaq || [];
+         _gaq.push(['_setAccount', '7bac4fd0247f69c27887e0d4e3aee41e']);
+         _gaq.push(['_trackPageview']);
+         (function() {
+             var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+             ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+             var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-c7de1c50-88ed-412e-ae70-62694dd7dea5">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="//instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>

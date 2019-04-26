@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Emacs Lisp Lambda Expressions Are Not Self-Evaluating « null program - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="raw" />
+  <style>
+   #ds-thread #ds-reset .ds-comment-body p {color: #ffffff;}
+   #ds-thread #ds-reset .ds-comment-body p a {color: #ff0;}
+   #ds-thread #ds-reset .ds-comment-body p a:hover {color: #0ff;}
+   #disqus_thread a {color: #00ffff;}
+  </style>
+  <link rel="stylesheet" href="/media/css/main.css" type="text/css"/>
+  <link rel="stylesheet" href="/media/css/comment.css" type="text/css"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="/">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <div class="menu-icon">
+        <svg viewBox="0 0 18 15">
+          <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.031C17.335,0,18,0.665,18,1.484L18,1.484z" fill="#ffff00"/>
+          <path d="M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0c0-0.82,0.665-1.484,1.484-1.484 h15.031C17.335,6.031,18,6.696,18,7.516L18,7.516z" fill="#ffff00"/>
+          <path d="M18,13.516C18,14.335,17.335,15,16.516,15H1.484C0.665,15,0,14.335,0,13.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.031C17.335,12.031,18,12.696,18,13.516L18,13.516z" fill="#ffff00"/>
+        </svg>
+      </div>
+      <ul class="trigger">
+        <li><a href="/years/">Years</a></li>
+        <li><a href="/authors/">Authors</a></li>
+        <li><a href="/tags/">Tags</a></li>
+        <li><a href="/about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="/rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="http://www.google.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">Emacs Lisp Lambda Expressions Are Not Self-Evaluating « null program</h1>
+<div id="table-of-contents">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#taming-an-old-dragon">Taming an old dragon</a>
+<ul>
+<li><a href="#eval-after-load">eval-after-load</a></li>
+<li><a href="#a-workaround">A workaround</a></li>
+</ul>
+</li>
+<li><a href="#evaluating-function-objects">Evaluating function objects</a></li>
+<li><a href="#solving-the-problem-with-one-character">Solving the problem with one character</a></li>
+</ul>
+</div>
+</div>
+<p>
+This week I made a mistake that ultimately enlightened me about the
+nature of function objects in Emacs Lisp. There are three kinds of
+function objects, but they each behave very differently when evaluated
+as objects.
+</p>
+
+<p>
+But before we get to that, let's talk about one of Emacs'
+embarrassing, old missteps: <code>eval-after-load</code>.
+</p>
+
+<div id="outline-container-orgd026ee1" class="outline-2">
+<h2 id="taming-an-old-dragon"><a id="orgd026ee1"></a>Taming an old dragon</h2>
+<div class="outline-text-2" id="text-taming-an-old-dragon">
+<p>
+One of the long-standing issues with Emacs is that loading Emacs Lisp
+files (.el and .elc) is a slow process, even when those files have
+been byte compiled. There are a number of dirty hacks in place to deal
+with this issue, and the biggest and nastiest of them all is the
+<a href="https://lwn.net/Articles/707615/">dumper</a>, also known as unexec.
+</p>
+
+<p>
+The Emacs you routinely use throughout the day is actually a previous
+instance of Emacs that's been resurrected from the dead. Your undead
+Emacs was probably created months, if not years, earlier, back when it
+was originally compiled. The first stage of compiling Emacs is to
+compile a minimal C core called <code>temacs</code>. The second stage is loading
+a bunch of Emacs Lisp files, then dumping a memory image in an
+unportable, platform-dependent way. On Linux, this actually <a href="https://lwn.net/Articles/707615/">requires
+special hooks in glibc</a>. The Emacs you know and love is this
+dumped image loaded back into memory, continuing from where it left
+off just after it was compiled. Regardless of your own feelings on the
+matter, you have to admit <a href="file:///blog/2011/01/30/">this is a very lispy thing to do</a>.
+</p>
+
+<p>
+There are two notable costs to Emacs' dumper:
+</p>
+
+<ol class="org-ol">
+<li>The dumped image contains hard-coded memory addresses. This means
+Emacs can't be a Position Independent Executable (PIE). It can't
+take advantage of a security feature called Address Space Layout
+Randomization (ASLR), which would increase the difficulty of
+<a href="file:///blog/2017/07/19/">exploiting</a> some <a href="file:///blog/2012/09/28/">classes of bugs</a>. This might be
+important to you if Emacs processes untrusted data, such as when it's
+used as <a href="file:///blog/2013/09/03/">a mail client</a>, <a href="https://github.com/skeeto/emacs-web-server">a web server</a> or generally
+<a href="https://github.com/skeeto/elfeed">parses data downloaded across the network</a>.</li>
+
+<li>It's not possible to cross-compile Emacs since it can only be dumped
+by running <code>temacs</code> on its target platform. As an experiment I've
+attempted to dump the Windows version of Emacs on Linux using
+<a href="https://www.winehq.org/">Wine</a>, but was unsuccessful.</li>
+</ol>
+
+<p>
+The good news is that there's <a href="https://lists.gnu.org/archive/html/emacs-devel/2018-02/msg00347.html">a portable dumper</a> in the works
+that makes this a lot less nasty. If you're adventurous, you can
+already disable dumping and run <code>temacs</code> directly by setting
+<a href="https://lists.gnu.org/archive/html/bug-gnu-emacs/2016-11/msg00729.html"><code>CANNOT_DUMP=yes</code> at compile time</a>. Be warned, though, that a
+non-dumped Emacs takes several seconds, or worse, to initialize
+before it even begins loading your own configuration. It's also
+somewhat buggy since it seems nobody ever runs it this way
+productively.
+</p>
+
+<p>
+The other major way Emacs users have worked around slow loading is
+aggressive use of lazy loading, generally via autoloads. The major
+package interactive entry points are defined ahead of time as stub
+functions. These stubs, when invoked, load the full package, which
+overrides the stub definition, then finally the stub re-invokes the
+new definition with the same arguments.
+</p>
+
+<p>
+To further assist with lazy loading, an evaluated <code>defvar</code> form will
+not override an existing global variable binding. This means you can,
+to a certain extent, configure a package before it's loaded. The
+package will not clobber any existing configuration when it loads.
+This also explains the bizarre interfaces for the various hook
+functions, like <code>add-hook</code> and <code>run-hooks</code>. These accept symbols --- the
+names of the variables --- rather than values of those variables as
+would normally be the case. The <code>add-to-list</code> function does the same
+thing. It's all intended to cooperate with lazy loading, where the
+variable may not have been defined yet.
+</p>
+</div>
+
+<div id="outline-container-org2822c62" class="outline-3">
+<h3 id="eval-after-load"><a id="org2822c62"></a>eval-after-load</h3>
+<div class="outline-text-3" id="text-eval-after-load">
+<p>
+Sometimes this isn't enough and you need some some configuration to
+take place after the package has been loaded, but without forcing it
+to load early. That is, you need to tell Emacs “evaluate this code
+after this particular package loads.” That's where <code>eval-after-load</code>
+comes into play, except for its fatal flaw: it takes the word “eval”
+completely literally.
+</p>
+
+<p>
+The first argument to <code>eval-after-load</code> is the name of a package. Fair
+enough. The second argument is a form that will be passed to <code>eval</code>
+after that package is loaded. Now hold on a minute. The general rule
+of thumb is that if you're calling <code>eval</code>, you're probably doing
+something seriously wrong, and this function is no exception. This is
+completely the wrong mechanism for the task.
+</p>
+
+<p>
+The second argument should have been a function --- either a (sharp
+quoted) symbol or a function object. And then instead of <code>eval</code> it
+would be something more sensible, like <code>funcall</code>. Perhaps this
+improved version would be named <code>call-after-load</code> or <code>run-after-load</code>.
+</p>
+
+<p>
+The big problem with passing an s-expression is that it will be left
+uncompiled due to being quoted. <a href="file:///blog/2017/12/14/">I've talked before about the
+importance of evaluating your lambdas</a>. <code>eval-after-load</code> not
+only encourages badly written Emacs Lisp, it demands it.
+</p>
+
+<pre class="example">
+;;; BAD!
+(eval-after-load 'simple-httpd
+ '(push '("c" . "text/plain") httpd-mime-types))
+</pre>
+
+<p>
+This was all corrected in Emacs 25. If the second argument to
+<code>eval-after-load</code> is a function --- the result of applying <code>functionp</code> is
+non-nil --- then it uses <code>funcall</code>. There's also a new macro,
+<code>with-eval-after-load</code>, to package it all up nicely.
+</p>
+
+<pre class="example">
+;;; Better (Emacs &gt;= 25 only)
+(eval-after-load 'simple-httpd
+ (lambda ()
+ (push '("c" . "text/plain") httpd-mime-types)))
+
+;;; Best (Emacs &gt;= 25 only)
+(with-eval-after-load 'simple-httpd
+ (push '("c" . "text/plain") httpd-mime-types))
+</pre>
+
+<p>
+Though in both of these examples the compiler will likely warn about
+<code>httpd-mime-types</code> not being defined. That's a problem for another
+day.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org5b8670d" class="outline-3">
+<h3 id="a-workaround"><a id="org5b8670d"></a>A workaround</h3>
+<div class="outline-text-3" id="text-a-workaround">
+<p>
+But what if you need to use Emacs 24, as was the <a href="https://github.com/skeeto/elfeed/pull/268">situation that
+sparked this article</a>? What can we do with the bad version of
+<code>eval-after-load</code>? We could situate a lambda such that it's evaluated,
+but then smuggle the resulting function object into the form passed to
+<code>eval-after-load</code>, all using a backquote.
+</p>
+
+<pre class="example">
+;;; Note: this is subtly broken
+(eval-after-load 'simple-httpd
+ `(funcall
+ ,(lambda ()
+ (push '("c" . "text/plain") httpd-mime-types)))
+</pre>
+
+<p>
+When everything is compiled, the backquoted form evalutes to this:
+</p>
+
+<pre class="example">
+(funcall #[0 &lt;bytecode&gt; [httpd-mime-types ("c" . "text/plain")] 2])
+</pre>
+
+<p>
+Where the second value (<code>#[...]</code>) is a <a href="file:///blog/2014/01/04/">byte-code object</a>.
+However, as the comment notes, this is subtly broken. A cleaner and
+correct way to solve all this is with a named function. The damage
+caused by <code>eval-after-load</code> will have been (mostly) minimized.
+</p>
+
+<pre class="example">
+(defun my-simple-httpd-hook ()
+ (push '("c" . "text/plain") httpd-mime-types))
+
+(eval-after-load 'simple-httpd
+ '(funcall #'my-simple-httpd-hook))
+</pre>
+
+<p>
+But, let's go back to the anonymous function solution. What was broken
+about it? It all has to do with evaluating function objects.
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgbfe19b0" class="outline-2">
+<h2 id="evaluating-function-objects"><a id="orgbfe19b0"></a>Evaluating function objects</h2>
+<div class="outline-text-2" id="text-evaluating-function-objects">
+<p>
+So what happens when we evaluate an expression like the one above with
+<code>eval</code>? Here's what it looks like again.
+</p>
+
+<pre class="example">
+(funcall #[...])
+</pre>
+
+<p>
+First, <code>eval</code> notices it's been given a non-empty list, so it's probably
+a function call. The first argument is the name of the function to be
+called (<code>funcall</code>) and the remaining elements are its arguments. But
+each of these elements must be evaluated first, and the result of that
+evaluation becomes the arguments.
+</p>
+
+<p>
+Any value that isn't a list or a symbol is self-evaluating. That is,
+it evaluates to its own value:
+</p>
+
+<pre class="example">
+(eval 10)
+;; =&gt; 10
+</pre>
+
+<p>
+If the value is a symbol, it's treated as a variable. If the value is a
+list, it goes through the function call process I'm describing (or one
+of a number of other special cases, such as macro expansion, lambda
+expressions, and special forms).
+</p>
+
+<p>
+So, conceptually <code>eval</code> recurses on the function object <code>#[...]</code>. A
+function object is not a list or a symbol, so it's self-evaluating. No
+problem.
+</p>
+
+<pre class="example">
+;; Byte-code objects are self-evaluating
+
+(let ((x (byte-compile (lambda ()))))
+ (eq x (eval x)))
+;; =&gt; t
+</pre>
+
+<p>
+What if this code wasn't compiled? Rather than a byte-code object,
+we'd have some other kind of function object for the interpreter.
+Let's examine the dynamic scope (shudder) case. Here, a lambda
+appears to evaluate to itself, but appearances can be deceiving:
+</p>
+
+<pre class="example">
+(eval (lambda ())
+;; =&gt; (lambda ())
+</pre>
+
+<p>
+However, this is not self-evaluation. <b>Lambda expressions are not
+self-evaluating</b>. It's merely coincidence that the result of
+evaluating a lambda expression looks like the original expression.
+This is just how the Emacs Lisp interpreter is currently implemented
+and, strictly speaking, it's an implementation detail that just so
+happens to be mostly compatible with byte-code objects being
+self-evaluating. It would be a mistake to rely on this.
+</p>
+
+<p>
+Instead, <b>dynamic scope lambda expression evaluation is
+<a href="https://labs.spotify.com/2013/06/18/creative-usernames/">idempotent</a>.</b> Applying <code>eval</code> to the result will return
+an <code>equal</code>, but not identical (<code>eq</code>), expression. In contrast, a
+self-evaluating value is also idempotent under evaluation, but with
+<code>eq</code> results.
+</p>
+
+<pre class="example">
+;; Not self-evaluating:
+
+(let ((x '(lambda ())))
+ (eq x (eval x)))
+;; =&gt; nil
+
+;; Evaluation is idempotent:
+
+(let ((x '(lambda ())))
+ (equal x (eval x)))
+;; =&gt; t
+
+(let ((x '(lambda ())))
+ (equal x (eval (eval x))))
+;; =&gt; t
+</pre>
+
+<p>
+So, with dynamic scope, the subtly broken backquote example will still
+work, but only by sheer luck. Under lexical scope, the situation isn't
+so lucky:
+</p>
+
+<pre class="example">
+;;; -*- lexical-scope: t; -*-
+
+(lambda ())
+;; =&gt; (closure (t) nil)
+</pre>
+
+<p>
+These interpreted lambda functions are neither self-evaluating nor
+idempotent. Passing <code>t</code> as the second argument to <code>eval</code> tells it to
+use lexical scope, as shown below:
+</p>
+
+<pre class="example">
+;; Not self-evaluating:
+
+(let ((x '(lambda ())))
+ (eq x (eval x t)))
+;; =&gt; nil
+
+;; Not idempotent:
+
+(let ((x '(lambda ())))
+ (equal x (eval x t)))
+;; =&gt; nil
+
+(let ((x '(lambda ())))
+ (equal x (eval (eval x t) t)))
+;; error: (void-function closure)
+</pre>
+
+<p>
+I can <a href="file:///blog/2017/05/03/">imagine an implementation</a> of Emacs Lisp where dynamic
+scope lambda expressions are in the same boat, where they're not even
+idempotent. For example:
+</p>
+
+<pre class="example">
+;;; -*- lexical-binding: nil; -*-
+
+(lambda ())
+;; =&gt; (totally-not-a-closure ())
+</pre>
+
+<p>
+Most Emacs Lisp would work just fine under this change, and only code
+that makes some kind of logical mistake --- where there's nested
+evaluation of lambda expressions --- would break. This essentially
+already happened when lots of code was quietly switched over to
+lexical scope after Emacs 24. Lambda idempotency was lost and
+well-written code didn't notice.
+</p>
+
+<p>
+There's a temptation here for Emacs to define a <code>closure</code> function or
+special form that would allow interpreter closure objects to be either
+self-evaluating or idempotent. This would be a mistake. It would only
+serve as a hack that covers up logical mistakes that lead to nested
+evaluation. Much better to catch those problems early.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org4c61f3b" class="outline-2">
+<h2 id="solving-the-problem-with-one-character"><a id="org4c61f3b"></a>Solving the problem with one character</h2>
+<div class="outline-text-2" id="text-solving-the-problem-with-one-character">
+<p>
+So how do we fix the subtly broken example? With a strategically
+placed quote right before the comma.
+</p>
+
+<pre class="example">
+(eval-after-load 'simple-httpd
+ `(funcall
+ ',(lambda ()
+ (push '("c" . "text/plain") httpd-mime-types)))
+</pre>
+
+<p>
+So the form passed to <code>eval-after-load</code> becomes:
+</p>
+
+<pre class="example">
+;; Compiled:
+(funcall (quote #[...]))
+
+;; Dynamic scope:
+(funcall (quote (lambda () ...)))
+
+;; Lexical scope:
+(funcall (quote (closure (t) () ...)))
+</pre>
+
+<p>
+The quote prevents <code>eval</code> from evaluating the function object, which
+would be either needless or harmful. There's also an argument to be
+made that this is a perfect situation for a sharp-quote (<code>#'</code>), which
+exists to quote functions.
+</p>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2018-03-28</span>
+            <span title="last modification date" class="post-info">2018-03-28</span>
+            <span title="tags" class="post-info">:<a href="/tags/raw">raw</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-c7de1c50-88ed-412e-ae70-62694dd7dea5">lujun9972</a></span>
+        </div>
+    <script src="/media/js/jquery-2.1.3.min.js"></script>
+        <section>
+            <h1>Comments</h1>
+            <div id="comment-wrap">
+                    <a class="disqus_label">使用 Disqus 评论</a>
+    </ul>
+        <div id="disqus_thread"></div>
+        <script type="text/javascript">
+         //var disqus_developer = 1;
+         var preempt_signal=false;
+         var disqus_identifier = "/blog/2018/03/28/emacs-lisp-lambda-expressions-are-not-self-evaluating-«-null-program/";
+         var disqus_url = "https://lujun9972.github.io/emacs-document/blog/2018/03/28/emacs-lisp-lambda-expressions-are-not-self-evaluating-«-null-program/";
+         var disqus_shortname = 'emacs-document';
+         /* * * DON'T EDIT BELOW THIS LINE * * */
+         (function() {
+             var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+             dsq.src = 'https://' + disqus_shortname + '.disqus.com/embed.js';
+             (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+             $('#disqus_thread').css('display','none');
+         })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+    <script>
+     /* comments */
+     var ego_disqus_thread=$('#disqus_thread');
+     var ego_ds_label=$('.ds-thread');
+     $('.disqus_label').click(function(){
+         ego_disqus_thread.show();
+         ego_ds_label.hide();
+     });
+     $('.ds-label').click(function(){
+         ego_disqus_thread.hide();
+         ego_ds_label.show();
+     });
+    </script>
+        </section>
+    <script src="/media/js/main.js"></script>
+        <script type="text/javascript">
+         var _gaq = _gaq || [];
+         _gaq.push(['_setAccount', '7bac4fd0247f69c27887e0d4e3aee41e']);
+         _gaq.push(['_trackPageview']);
+         (function() {
+             var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+             ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+             var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-c7de1c50-88ed-412e-ae70-62694dd7dea5">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="//instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>

@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Splitting an Org block into two - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="raw" />
+  <style>
+   #ds-thread #ds-reset .ds-comment-body p {color: #ffffff;}
+   #ds-thread #ds-reset .ds-comment-body p a {color: #ff0;}
+   #ds-thread #ds-reset .ds-comment-body p a:hover {color: #0ff;}
+   #disqus_thread a {color: #00ffff;}
+  </style>
+  <link rel="stylesheet" href="/media/css/main.css" type="text/css"/>
+  <link rel="stylesheet" href="/media/css/comment.css" type="text/css"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="/">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <div class="menu-icon">
+        <svg viewBox="0 0 18 15">
+          <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.031C17.335,0,18,0.665,18,1.484L18,1.484z" fill="#ffff00"/>
+          <path d="M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0c0-0.82,0.665-1.484,1.484-1.484 h15.031C17.335,6.031,18,6.696,18,7.516L18,7.516z" fill="#ffff00"/>
+          <path d="M18,13.516C18,14.335,17.335,15,16.516,15H1.484C0.665,15,0,14.335,0,13.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.031C17.335,12.031,18,12.696,18,13.516L18,13.516z" fill="#ffff00"/>
+        </svg>
+      </div>
+      <ul class="trigger">
+        <li><a href="/years/">Years</a></li>
+        <li><a href="/authors/">Authors</a></li>
+        <li><a href="/tags/">Tags</a></li>
+        <li><a href="/about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="/rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="http://www.google.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">Splitting an Org block into two</h1>
+<div id="table-of-contents">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#org6a1ad66">Problem</a></li>
+<li><a href="#action-plan">Action Plan #</a></li>
+<li><a href="#org-in-any-block-p">Am I in an Org block? #</a></li>
+<li><a href="#org-block-split">If so, split the block #</a></li>
+<li><a href="#M-return-split-block-dwim">Now make M-return do that #</a></li>
+<li><a href="#full-code">Full code #</a></li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-org6a1ad66" class="outline-2">
+<h2 id="org6a1ad66">Problem</h2>
+<div class="outline-text-2" id="text-org6a1ad66">
+<p>
+If I have a huge Org Src block, I'd like to split it into multiple Org
+Src blocks so that I can write my explanations in-between.
+</p>
+
+<p>
+So I'd like to quickly split up:
+</p>
+
+<pre class="example">
+#+begin_src emacs-lisp
+(message "one")
+(message "two")
+#+end_src
+</pre>
+
+<p>
+into:
+</p>
+
+<pre class="example">
+#+begin_src emacs-lisp
+(message "one")
+#+end_src
+
+#+begin_src emacs-lisp
+(message "two")
+#+end_src
+</pre>
+</div>
+</div>
+
+<div id="outline-container-orgbb4b7d9" class="outline-2">
+<h2 id="action-plan"><a id="orgbb4b7d9"></a>Action Plan <a href="#action-plan">#</a></h2>
+<div class="outline-text-2" id="text-action-plan">
+<ol class="org-ol">
+<li>Write a function to return non-nil if point is in <b>any</b> Org block
+-- Not just “src”, “example”, “export” or any of the inbuilt Org
+blocks.. but also any Org Special block like <code>#+begin_foo .. #+end_foo</code>.</li>
+<li>Write a function that does this imagined block splitting.</li>
+<li>Overload the M-return binding so that this block splitting
+function gets called only when the point is inside an Org block
+(detected using that first function).</li>
+</ol>
+
+<p>
+Thanks to the comment by reader <b>Mankoff</b>, I learnt
+about the <code>org-babel-demarcate-block</code> function (bound by default to
+C-c C-v d and C-c C-v C-d).
+</p>
+
+<p>
+This function varies from the solution in this post in at least two
+ways:
+</p>
+
+<ol class="org-ol">
+<li>It works only for Org Src blocks.</li>
+<li>It splits the block exactly at where the point is, whereas I would
+like to always split only at EOL or BOL.</li>
+</ol>
+
+<p>
+But I can see that <code>org-babel-demarcate-block</code> can cover most of the
+block splitting use cases.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org30e9c7c" class="outline-2">
+<h2 id="org-in-any-block-p"><a id="org30e9c7c"></a>Am I in an Org block? <a href="#org-in-any-block-p">#</a></h2>
+<div class="outline-text-2" id="text-org-in-any-block-p">
+<p>
+Before venturing into writing this function, I looked at these
+existing ones, but none did what I exactly wanted:
+</p>
+
+<dl class="org-dl">
+<dt><code>org-in-src-block-p</code></dt><dd>Returns non-nil only if the point is in a
+<code>#+begin_src .. #+end_src</code> block; not when point is in any other
+Org block.</dd>
+<dt><code>org-in-block-p</code></dt><dd>Returns non-nil only if the point is in one of
+the pre-defined block names passed as a list (<code>'("src" "example" "quote" ..)</code>). So this again won't work as I cannot pre-define all
+Org Special blocks.</dd>
+</dl>
+
+<p>
+So I define the below <code>modi/org-in-any-block-p</code> function that returns
+non-nil if the point is in-between any <code>#+begin_FOOBAR .. #+end_FOOBAR</code>. Thankfully, I was able to reuse a lot of logic from
+the <code>org-between-regexps-p</code> function (<code>org-in-block-p</code> uses that
+function internally).
+</p>
+
+<p>
+<a id="org343ac51"></a>
+</p>
+
+<pre class="example">
+(defun modi/org-in-any-block-p ()
+ "Return non-nil if the point is in any Org block.
+
+The Org block can be *any*: src, example, verse, etc., even any
+Org Special block.
+
+This function is heavily adapted from `org-between-regexps-p'."
+ (save-match-data
+ (let ((pos (point))
+ (case-fold-search t)
+ (block-begin-re "^[[:blank:]]*#\\+begin_\\(?1:.+?\\)\\(?: .*\\)*$")
+ (limit-up (save-excursion (outline-previous-heading)))
+ (limit-down (save-excursion (outline-next-heading)))
+ beg end)
+ (save-excursion
+ ;; Point is on a block when on BLOCK-BEGIN-RE or if
+ ;; BLOCK-BEGIN-RE can be found before it...
+ (and (or (org-in-regexp block-begin-re)
+ (re-search-backward block-begin-re limit-up :noerror))
+ (setq beg (match-beginning 0))
+ ;; ... and BLOCK-END-RE after it...
+ (let ((block-end-re (concat "^[[:blank:]]*#\\+end_"
+ (match-string-no-properties 1)
+ "\\( .*\\)*$")))
+ (goto-char (match-end 0))
+ (re-search-forward block-end-re limit-down :noerror))
+ (&gt; (setq end (match-end 0)) pos)
+ ;; ... without another BLOCK-BEGIN-RE in-between.
+ (goto-char (match-beginning 0))
+ (not (re-search-backward block-begin-re (1+ beg) :noerror))
+ ;; Return value.
+ (cons beg end))))))
+</pre>
+
+<p>
+<a href="#org343ac51">Code Snippet 1</a>
+</p>
+
+<pre class="example">
+Function to check if point is in any Org block
+
+</pre>
+
+<ul class="org-ul">
+<li><code>(case-fold-search t)</code> ensures that either <code>#+BEGIN_ ..</code> or <code>#+begin_ ..</code> match.</li>
+<li>The regular expression in <code>block-begin-re</code> matches with
+<code>"#+begin_src foo"</code> or <code>" #+begin_src foo"</code> or <code>"#+BEGIN_EXAMPLE"</code>
+or <code>"#+begin_FOOBAR"</code> or ..</li>
+<li>The <code>limit-up</code> and <code>limit-down</code> are set to the buffer locations of
+the previous and next Org headings. The following regexp searches
+are limited to happen in those bounds for better performance.</li>
+<li>The <code>block-end-re</code> is dynamically constructed based on the string
+matched using <code>block-begin-re</code>. This is so that if <code>"#+begin_quote"</code>
+is found initially, it matches the block ending with specifically
+<code>"#+end_quote"</code> and not something like <code>"#+end_src"</code>.</li>
+<li>nil is returned if the point is not between <code>#+begin_FOOBAR .. #+end_FOOBAR</code>.</li>
+
+<li id="Caveat"><p>
+I haven't gone extra lengths to support nested block cases,
+specifically where the point is outside the inner-most
+block, but still inside the outer block:
+</p>
+
+<pre class="example">
+#+begin_src org
+▮
+#+begin_src emacs-lisp
+(message "hello!")
+#+end_src
+#+end_src
+</pre></li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-org9c8519b" class="outline-2">
+<h2 id="org-block-split"><a id="org9c8519b"></a>If so, split the block <a href="#org-block-split">#</a></h2>
+<div class="outline-text-2" id="text-org-block-split">
+<p>
+With the “point in an Org block” detection working, I now needed the
+split to happen with these rules:
+</p>
+
+<ol class="org-ol">
+<li>If the point is anywhere on the line, but not at the beginning of
+the line (BOL),
+
+<ul class="org-ul">
+<li><p>
+Go to the end of the line, and then split the block.
+</p>
+
+<p>
+So if the point is after the first <code>message</code> identifier,
+or at the end of that first <code>message</code> line:
+</p>
+
+<pre class="example">
+#+begin_src emacs-lisp
+(message "one")▮
+(message "two")
+#+end_src
+</pre>
+
+<p>
+Split the block at the point <b>after</b> <code>(message "one")</code> and move
+the point to between the split blocks:
+</p>
+
+<pre class="example">
+#+begin_src emacs-lisp
+(message "one")
+#+end_src
+▮
+#+begin_src emacs-lisp
+(message "two")
+#+end_src
+</pre></li>
+</ul></li>
+
+<li>Otherwise (if point is at BOL),
+
+<ul class="org-ul">
+<li><p>
+Split the block exactly at that point.
+</p>
+
+<p>
+So if the point is at the beginning of the second <code>message</code> line:
+</p>
+
+<pre class="example">
+#+begin_src emacs-lisp
+(message "one")
+▮(message "two")
+#+end_src
+</pre>
+
+<p>
+Split the block at the point <b>before</b> <code>(message "two")</code> and move
+the point to between the split blocks:
+</p>
+
+<pre class="example">
+#+begin_src emacs-lisp
+(message "one")
+#+end_src
+▮
+#+begin_src emacs-lisp
+(message "two")
+#+end_src
+</pre></li>
+</ul></li>
+</ol>
+
+<p>
+So here's the code that follows that spec:
+</p>
+
+<p>
+<a id="org3205a4f"></a>
+</p>
+
+<pre class="example">
+(defun modi/org-split-block ()
+ "Sensibly split the current Org block at point."
+ (interactive)
+ (if (modi/org-in-any-block-p)
+ (save-match-data
+ (save-restriction
+ (widen)
+ (let ((case-fold-search t)
+ (at-bol (bolp))
+ block-start
+ block-end)
+ (save-excursion
+ (re-search-backward "^\\(?1:[[:blank:]]*#\\+begin_.+?\\)\\(?: .*\\)*$" nil nil 1)
+ (setq block-start (match-string-no-properties 0))
+ (setq block-end (replace-regexp-in-string
+ "begin_" "end_" ;Replaces "begin_" with "end_", "BEGIN_" with "END_"
+ (match-string-no-properties 1))))
+ ;; Go to the end of current line, if not at the BOL
+ (unless at-bol
+ (end-of-line 1))
+ (insert (concat (if at-bol "" "\n")
+ block-end
+ "\n\n"
+ block-start
+ (if at-bol "\n" "")))
+ ;; Go to the line before the inserted "#+begin_ .." line
+ (beginning-of-line (if at-bol -1 0)))))
+ (message "Point is not in an Org block")))
+</pre>
+
+<p>
+<a href="#org3205a4f">Code Snippet 2</a>
+</p>
+
+<pre class="example">
+Function to split the current Org block in sensible fashion
+
+</pre>
+
+<ul class="org-ul">
+<li>The regexp for extracting <code>block-start</code> is the same as
+<code>block-begin-re</code> in code snippet <a href="#org343ac51">1</a>, but
+with different sub-grouping.</li>
+<li>The <code>block-end</code> string is derived from sub-group 1 of <code>block-start</code>
+string -- just replacing “begin\_” with “end\_”.</li>
+<li>And then based on if the point was initially at BOL (<code>at-bol</code>), the
+insertion of newlines and movement of point is done accordingly.</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-org88372d6" class="outline-2">
+<h2 id="M-return-split-block-dwim"><a id="org88372d6"></a>Now make M-return do that <a href="#M-return-split-block-dwim">#</a></h2>
+<div class="outline-text-2" id="text-M-return-split-block-dwim">
+<p>
+With these two functions evaluated, <code>M-x modi/org-split-block</code> will
+work right away.
+</p>
+
+<p>
+    But where's the fun in that‽<br />
+</p>
+
+<p>
+I needed to have the Org block splitting happen with an intuitive
+binding --- like M-return.
+</p>
+
+<ul class="org-ul">
+<li>By default, M-return is used to either create new headings, or do
+other things like insert an item, wrap a region in table, etc. based
+on the context. See the doc-string of <code>org-meta-return</code> (function
+bound to this key by default) for more info.</li>
+<li>But it doesn't have a context for “point in an Org block”. So it
+tries to create a heading when inside a block too, which doesn't
+make much sense.</li>
+<li>So fix that by adding that context.</li>
+</ul>
+
+<p>
+So I <b>advise</b> <code>org-meta-return</code> to call <code>modi/org-split-block</code> when
+the point is inside an Org block.
+</p>
+
+<p>
+The advising function <code>modi/org-meta-return</code> is the same as the
+advised function <code>org-meta-return</code> (as of ), except
+that a new context <code>(modi/org-in-any-block-p)</code> is added.
+</p>
+
+<p>
+You can tweak the precedence of this new context by moving the
+<code>((modi/org-in-any-block-p) #'modi/org-split-block)</code> form in that
+<code>cond</code> form.
+</p>
+
+<p>
+<a id="org7fd32dc"></a>
+</p>
+
+<pre class="example">
+(defun modi/org-meta-return (&amp;optional arg)
+ "Insert a new heading or wrap a region in a table.
+
+Calls `org-insert-heading', `org-insert-item',
+`org-table-wrap-region', or `modi/org-split-block' depending on
+context. When called with an argument, unconditionally call
+`org-insert-heading'."
+ (interactive "P")
+ (org-check-before-invisible-edit 'insert)
+ (or (run-hook-with-args-until-success 'org-metareturn-hook)
+ (call-interactively (cond (arg #'org-insert-heading)
+ ((org-at-table-p) #'org-table-wrap-region)
+ ((org-in-item-p) #'org-insert-item)
+ ((modi/org-in-any-block-p) #'modi/org-split-block)
+ (t #'org-insert-heading)))))
+(advice-add 'org-meta-return :override #'modi/org-meta-return)
+</pre>
+
+<p>
+<a href="#org7fd32dc">Code Snippet 3</a>=org-meta-return= to add context of point being inside any Org block
+</p>
+
+<pre class="example">
+Advisingto add context of point being inside any Org block
+
+</pre>
+
+<p>
+Now with the point in <b>any</b> Org block, M-return away!
+</p>
+</div>
+</div>
+
+<div id="outline-container-org0515e17" class="outline-2">
+<h2 id="full-code"><a id="org0515e17"></a>Full code <a href="#full-code">#</a></h2>
+<div class="outline-text-2" id="text-full-code">
+<p>
+Look for the source of <code>modi/org-split-block</code> (and dependent
+functions) added to <a href="https://github.com/kaushalmodi/.emacs.d/blob/master/setup-files/setup-org.el"><code>setup-org.el</code></a> in my Emacs config.
+</p>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2018-09-17</span>
+            <span title="last modification date" class="post-info">2019-04-26</span>
+            <span title="tags" class="post-info">:<a href="/tags/raw">raw</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-c7de1c50-88ed-412e-ae70-62694dd7dea5">lujun9972</a></span>
+        </div>
+    <script src="/media/js/jquery-2.1.3.min.js"></script>
+        <section>
+            <h1>Comments</h1>
+            <div id="comment-wrap">
+                    <a class="disqus_label">使用 Disqus 评论</a>
+    </ul>
+        <div id="disqus_thread"></div>
+        <script type="text/javascript">
+         //var disqus_developer = 1;
+         var preempt_signal=false;
+         var disqus_identifier = "/blog/2018/09/17/splitting-an-org-block-into-two/";
+         var disqus_url = "https://lujun9972.github.io/emacs-document/blog/2018/09/17/splitting-an-org-block-into-two/";
+         var disqus_shortname = 'emacs-document';
+         /* * * DON'T EDIT BELOW THIS LINE * * */
+         (function() {
+             var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+             dsq.src = 'https://' + disqus_shortname + '.disqus.com/embed.js';
+             (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+             $('#disqus_thread').css('display','none');
+         })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+    <script>
+     /* comments */
+     var ego_disqus_thread=$('#disqus_thread');
+     var ego_ds_label=$('.ds-thread');
+     $('.disqus_label').click(function(){
+         ego_disqus_thread.show();
+         ego_ds_label.hide();
+     });
+     $('.ds-label').click(function(){
+         ego_disqus_thread.hide();
+         ego_ds_label.show();
+     });
+    </script>
+        </section>
+    <script src="/media/js/main.js"></script>
+        <script type="text/javascript">
+         var _gaq = _gaq || [];
+         _gaq.push(['_setAccount', '7bac4fd0247f69c27887e0d4e3aee41e']);
+         _gaq.push(['_trackPageview']);
+         (function() {
+             var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+             ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+             var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-c7de1c50-88ed-412e-ae70-62694dd7dea5">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="//instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>

@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Emacs Unicode陷阱 - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="fannyxl" />
+  <meta name="keywords" content="emacs-common" />
+  <style>
+   #ds-thread #ds-reset .ds-comment-body p {color: #ffffff;}
+   #ds-thread #ds-reset .ds-comment-body p a {color: #ff0;}
+   #ds-thread #ds-reset .ds-comment-body p a:hover {color: #0ff;}
+   #disqus_thread a {color: #00ffff;}
+  </style>
+  <link rel="stylesheet" href="/media/css/main.css" type="text/css"/>
+  <link rel="stylesheet" href="/media/css/comment.css" type="text/css"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="/">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <div class="menu-icon">
+        <svg viewBox="0 0 18 15">
+          <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.031C17.335,0,18,0.665,18,1.484L18,1.484z" fill="#ffff00"/>
+          <path d="M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0c0-0.82,0.665-1.484,1.484-1.484 h15.031C17.335,6.031,18,6.696,18,7.516L18,7.516z" fill="#ffff00"/>
+          <path d="M18,13.516C18,14.335,17.335,15,16.516,15H1.484C0.665,15,0,14.335,0,13.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.031C17.335,12.031,18,12.696,18,13.516L18,13.516z" fill="#ffff00"/>
+        </svg>
+      </div>
+      <ul class="trigger">
+        <li><a href="/years/">Years</a></li>
+        <li><a href="/authors/">Authors</a></li>
+        <li><a href="/tags/">Tags</a></li>
+        <li><a href="/about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="/rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="http://www.google.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">Emacs Unicode陷阱</h1>
+<div id="table-of-contents">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#org82ee110">1. Unicode和编码值（Code Point）</a>
+<ul>
+<li><a href="#org8512a5c">1.1. 编码</a></li>
+</ul>
+</li>
+<li><a href="#orgb3fa803">2. Emacs和UTF-8</a></li>
+<li><a href="#org53723b2">3. 组合字符（Combining Characters）</a>
+<ul>
+<li><a href="#org678c9d0">3.1. 归一化（Normalization）</a></li>
+<li><a href="#org41565b5">3.2. 字符串宽度</a></li>
+<li><a href="#org52bacee">3.3. 字符串反转</a></li>
+<li><a href="#org56b31ac">3.4. 正则表达式</a></li>
+</ul>
+</li>
+<li><a href="#orgb783dee">4. 与世界交互</a></li>
+<li><a href="#org1e2d3f8">5. 进一步阅读</a></li>
+</ul>
+</div>
+</div>
+<p>
+GNU Emacs的发布要比Unicode早7年。Emacs存在以后是在相对较晚的时候才加入了对Unicode的支持，这意味着在Emacs的历史中，不支持Unicode的时间段（16年）比支持Unicode的时间段（14年）还要长「注：文章发表于2014年」。尽管如此，Emacs对Unicode的支持十分出色，让人感觉似乎它一直都支持Unicode。
+</p>
+
+<p>
+然而,由于Unicode的目标是要涵盖所有已知的人类语言及其各式各样的细枝末节,结果自然会存在一些陷阱和问题。如果仅作为一个Emacs使用者的话，你可能不太会因此而受到影响。但如果作为一个扩展（插件）的开发者，你很可能会在处理Emacs的strings和buffers时遇到麻烦，这两个都是基于字符的数据结构。
+</p>
+
+<p>
+在这篇文章中，我将分享Elisp中Unicode带给我们的“惊喜”。我自己就曾遇到过好几个，事实上，写这篇文章还让我在自己的扩展程序中发现了好几个编码方面的小bug。这些缺陷都不是Emcas的错，它们只是自然语言的复杂性导致的结果。
+</p>
+
+<div id="outline-container-org82ee110" class="outline-2">
+<h2 id="org82ee110"><span class="section-number-2">1</span> Unicode和编码值（Code Point）</h2>
+<div class="outline-text-2" id="text-1">
+<p>
+首先，网上有非常好的资料来学习Unicode，我推荐从<a href="http://www.cl.cam.ac.uk/~mgk25/unicode.html">UTF-8 and Unicode FAQ for Unix/Linux</a>开始。我没有理由在这里重复所有的信息，但是我会尝试快速地总结一下。Unicode将一个编码值（整数）映射到某个具体的字符，并带一个标准的名字。在写这篇文章的时候Unicode定义了超过11万个的字符。为了后向兼容性，前128个编码值映射到ASCII码。这个趋势也被其他的字符编码标准接受，比如Latin-1。
+</p>
+
+<p>
+在Emacs中，Unicode字符使用C-x 8 RET（insert-char）输入到buffer中。你既可以输入标准的字符名称（比如：π是“GREEK SMALL LETTER PI”），也可以直接输入十六进制的编码值。在Emacs之外的其他应用程序中如何输入是要看情况的，但是就我关心的应用来说C-S-u加上十六进制的编码值都是可以的。
+</p>
+</div>
+
+<div id="outline-container-org8512a5c" class="outline-3">
+<h3 id="org8512a5c"><span class="section-number-3">1.1</span> 编码</h3>
+<div class="outline-text-3" id="text-1-1">
+<p>
+Unicode标准也描述了几种方法来将编码值序列转成字节序列。很明显，11万个字符无法用一个字节来编码，所以就有了多字节编码格式。最流行的两种Unicode编码格式应该是UTF-8和UTF-16。
+</p>
+
+<p>
+UTF-8设计之初就是要后向兼容已存在的ASCII编码、Unix系统以及C语言API（以null作为终止符的C字符串）。前128个编码值直接编码为单字节，其他字符用2到6的字节来编码，所有字节的最高比特设置为1，这样所有多字节的字符都不会被解释为ASCII字符，也不会存在null（0）。这样C语言写的程序和API就能够不改变或者做稍微调整就能处理UTF-8的字符串了。最重要的是，每一个ASCII码编码的文件自动可以转换为UTF-8编码的文件。
+</p>
+
+<p>
+UTF-16用2个字节来编码基本多文种平面（第零平面，Basic Multilingual Plane - BMP）中的字符，甚至原本的ASCII字符也用2个字节（16比特）。第零平面基本上涵盖了所有现代语言中实际使用到的所有字符。然而,UTF-16却不包括辅助（星体）平面中重要的例如<a href="http://www.fileformat.info/info/unicode/char/1f379/index.htm">TROPICAL DRINK</a>或者<a href="http://www.fileformat.info/info/unicode/char/1F4A9/index.htm">PILE OF POO</a>字符。如果你需要在UTF-16中用这些字符将出现问题：超过第零平面的字符不能被放在2个字节中。为了能容纳这些字符，UTF-16使用代理对（surrogate pairs）：这些字符会用一对2字节单元来编码。
+</p>
+
+<p>
+由于最后一点, UTF-16相对于UTF-8没有实用上的优势。它的<a href="http://www.utf8everywhere.org/">存在可能是一个巨大的错误</a>。由于代理对的存在，你无法用恒定时间算法去查找，而且不能后向兼容也不能存储在以null结尾的字符串中。在Java和JavaScript中，它会导致一些字符串“长度”和字符、编码值甚至字节数不一至的窘境。最糟糕的是，它会导致<a href="https://speakerdeck.com/mathiasbynens/hacking-with-unicode?slide=114">严重的安全隐患</a>。新的应用程序应该尽可能地避免这些问题。
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgb3fa803" class="outline-2">
+<h2 id="orgb3fa803"><span class="section-number-2">2</span> Emacs和UTF-8</h2>
+<div class="outline-text-2" id="text-2">
+<p>
+<b>在Emacs内部所有的文本都用UTF-8格式存储</b> ，这是个非常明智的选择！当Emacs输出文本，比如写到文件或者传到另一个进程，Emacs会自动根据文件或进程所配置的编码系统来对文本进行编码。当读取一个文件或者进程的文本时，Emacs要么它将其转换为UTF-8编码格式，要么保持原字节。
+</p>
+
+<p>
+关于这点在Emacs中有2种模式：单字节和多字节。单字节strings/buffers就是原字节，它们满足常量时间O(1)访问但是进能保存单字节值<a href="http://nullprogram.com/blog/2014/01/04/">byte-code compiler outputs unibyte strings</a>。
+</p>
+
+<p>
+多字节strings/buffers保存UTF-8编码的编码值。字符访问时间复杂读是O(n)因为需要遍历一遍string/buffer来计算字符个数。
+</p>
+
+<p>
+实际在编码是很少需要关心这一点，因为没有太多方法（和需要）来直接访问。当文本输入或输出时，Emacs会自动将文本编码格式按需进行转换，所以不需要关心内部的编码。如果你 <i>确实</i> 想知道用来表示字符串的字节，你可以用string-as-unibyte来得。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(string-as-unibyte <span style="font-style: italic;">"&#960;"</span>)
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">=&gt; "\317\200"</span>
+</pre>
+</div>
+
+<p>
+使用string-as-multibyte可以反向将UTF-8编码的单字节string转换成多字节文本。需要注意这两个函数与string-to-unibyte和string-to-multibyte是不同的，后者是进行的是转换而不是保持原字节。
+</p>
+
+<p>
+length和buffer-size函数总是使用multibyte计算字符以及使用unibyte计算字节。使用UTF-8，则不需要担心代理对。string-bytes和position-bytes函数返回multibyte和unibyte两种类型的字节信息。
+</p>
+
+<p>
+如果想要在字符串中指定Unicode字符而又不直接使用字符，可以用\uXXXX。XXXX是该字符的十六进制编码值，长度总是4。对于第零平面外的字符，4个字符不够，要使用大写的U加上8位数字：\UXXXXXXXX。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp"><span style="font-style: italic;">"\u03C0"</span>
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">=&gt; "&#960;"</span>
+
+<span style="font-style: italic;">"\U0001F4A9"</span>
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">=&gt; "&#128169;"  (PILE OF POO)</span>
+</pre>
+</div>
+
+<p>
+最后，Emacs对Unicode进行了扩展，增加了256个额外的“字符”来表示原字节。这样允许自带的原字节与UTF-8序列不同。例如，它可以用来区别编码值U+0041和原字节#x41。要我说的话，这不是太常用。
+</p>
+</div>
+</div>
+
+<div id="outline-container-org53723b2" class="outline-2">
+<h2 id="org53723b2"><span class="section-number-2">3</span> 组合字符（Combining Characters）</h2>
+<div class="outline-text-2" id="text-3">
+<p>
+有些Unicode字符定义为组合字符。这些字符的作用是修改它前面的非组合字符，典型作用是加重或者变音标记。
+</p>
+
+<p>
+举个例子，单词“naïve”可以写作这6个字符"nai\u0308ve"。第4个字符U+0308（组合分音符）就是一个组合字符，用来将“i” (U+0069 LATIN SMALL LETTER I)变成一个变音字符。
+</p>
+
+<p>
+通常的加重字符也有它自己的编码值，叫做预组合字符（precomposed characters），包括ï (U+00EF LATIN SMALL LETTER I WITH DIAERESIS)。所以“naïve”也可以写作这5个字符"na\u00EFve"。
+</p>
+</div>
+
+<div id="outline-container-org678c9d0" class="outline-3">
+<h3 id="org678c9d0"><span class="section-number-3">3.1</span> 归一化（Normalization）</h3>
+<div class="outline-text-3" id="text-3-1">
+<p>
+那么比较两个两个不同表示的字符会结果如何呢？
+</p>
+
+<p>
+不相等。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(string= <span style="font-style: italic;">"nai\u0308ve"</span> <span style="font-style: italic;">"na\u00EFve"</span>)
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">=&gt; nil</span>
+</pre>
+</div>
+
+<p>
+为了应对这种情况，Unicode标准定义了4种不同的归一化。其中最重要的两种是NFC（组合）和NFD（分解）。前者尽可能地使用预组合字符而后者尽可能地将其拆分。ucs-normalize-NFC-string和ucs-normalize-NFD-string函数用来实现这两个操作。
+</p>
+
+<p>
+<b>陷阱提示#1： 务必先进行归一化再进行字符串比较。</b>  不管使用哪种归一化（NFD要稍微快一点），但需要一致。不幸的是，当你比较复杂的多字符串时依然可能产生奇怪的结果。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(string= (ucs-normalize-NFD-string <span style="font-style: italic;">"nai\u0308ve"</span>)
+         (ucs-normalize-NFD-string <span style="font-style: italic;">"na\u00EFve"</span>))
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">=&gt; t</span>
+</pre>
+</div>
+
+<p>
+用Emacs自带的函数比较会失败，它在使用intern函数前不会做归一化，也许这是个错误。这意味着你可以使用相同的名称（intern转换的canonical symbol）来定义不同的变量和函数。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(eq (intern <span style="font-style: italic;">"nai\u0308ve"</span>)
+    (intern <span style="font-style: italic;">"na\u00EFve"</span>))
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">=&gt; nil</span>
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">print-r&#233;sum&#233;</span> ()
+  <span style="font-style: italic;">"NFC-normalized form."</span>
+  (print <span style="font-style: italic;">"I'm going to sabotage your team."</span>))
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">print-re&#769;sume&#769;</span> ()
+  <span style="font-style: italic;">"NFD-normalized form."</span>
+  (print <span style="font-style: italic;">"I'd be a great asset to your team."</span>))
+
+(print-r&#233;sum&#233;)
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">=&gt; "I'm going to sabotage your team."</span>
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org41565b5" class="outline-3">
+<h3 id="org41565b5"><span class="section-number-3">3.2</span> 字符串宽度</h3>
+<div class="outline-text-3" id="text-3-2">
+<p>
+有三种方法可以用来计算多字节文本的数量，通常它们的值相同，但是在有些情况下它们却各不不同。
+</p>
+
+<ul class="org-ul">
+<li>长度： 字符个数，包括组合字符</li>
+<li>字节数： 用UTF-8编码的字节数</li>
+<li>宽度： 占当前缓冲区的列数</li>
+</ul>
+
+<p>
+大多数时候，一个字符就是一列（一个字符的宽度）。有些字符，比如组合字符，不占用宽度。一些亚洲国家字符占两列，比如(U+4000, 䀀)。Tab占用tab-width列，通常是8。
+</p>
+
+<p>
+通常来说，不管使用NFD或者NFC，字符串的宽度是一样的。然而，由于bug和对Unicode的支持不完整，这个说法不是完全正确。例如，有些组合字符，如U+20DD, ⃝  在Emacs中或者其他应用程序中无法正确地组合。
+</p>
+
+<p>
+<b>陷阱提示#2： 当展示一个buffer时，务必使用宽度而不是长度来计算文本。</b>  宽度通过string-width函数来计算，当展示buffer中的表格的时候会被调用。每列中适当的字符个数要根据是什么字符而定。
+</p>
+
+<p>
+幸运的是，有次碰巧通过<a href="http://nullprogram.com/blog/2013/09/04/">Elfeed</a>得到了正确结果，因为我使用了format函数来展示。如希望地那样，%s指示符用来操作宽度。然而有个副作用：很多格式化的输出会根据当前buffer而改变！ <b>陷阱提示#3： 使用format函数时务必注意当前buffer。</b>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">let</span> ((tab-width 4))
+  (length (format <span style="font-style: italic;">"%.6s"</span> <span style="font-style: italic;">"\t"</span>)))
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">=&gt; 1</span>
+
+(<span style="font-weight: bold;">let</span> ((tab-width 8))
+  (length (format <span style="font-style: italic;">"%.6s"</span> <span style="font-style: italic;">"\t"</span>)))
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">=&gt; 0</span>
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org52bacee" class="outline-3">
+<h3 id="org52bacee"><span class="section-number-3">3.3</span> 字符串反转</h3>
+<div class="outline-text-3" id="text-3-3">
+<p>
+加入要将一个多字节字符串反转。很简单，对吗？
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">reverse-string</span> (string)
+  (concat (reverse (string-to-list string))))
+
+(reverse-string <span style="font-style: italic;">"abc"</span>)
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">=&gt; "cba"</span>
+</pre>
+</div>
+
+<p>
+错了！组合字符经反转会对之前它右边的字符进行修改而产生错误。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(reverse-string <span style="font-style: italic;">"nai\u0308ve"</span>)
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">=&gt; "ev&#776;ian"</span>
+</pre>
+</div>
+
+<p>
+<b>陷阱提示#4：<a href="https://github.com/mathiasbynens/esrever">Unicode字符串反转务必小心</a>。</b> <a href="http://rosettacode.org/wiki/Reverse_a_string">Rosetta Code</a> 页面罗列了许多错误的案例， <a href="http://nullprogram.com/blog/2012/11/15/">我个人也出过错</a> 。之后我<a href="https://github.com/magnars/s.el/pull/58">提交了一个s.el的补丁</a> 来修正Unicode的s-reverse函数。如果被接受，你就不用再担心这个问题了。
+</p>
+</div>
+</div>
+
+<div id="outline-container-org56b31ac" class="outline-3">
+<h3 id="org56b31ac"><span class="section-number-3">3.4</span> 正则表达式</h3>
+<div class="outline-text-3" id="text-3-4">
+<p>
+正则表达式基于编码值。组合字符单独计算，匹配会根据字符如何组合可能不不同。为了避免这种情况，你需要在做某些正则匹配之前进行NFC归一化。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp"><span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Like string= from before:</span>
+(string-match-p  <span style="font-style: italic;">"na\u00EFve"</span> <span style="font-style: italic;">"nai\u0308ve"</span>)
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">=&gt; nil</span>
+
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Use NFC normilization</span>
+(string-match-p (ucs-normalize-NFC-string <span style="font-style: italic;">"na\u00EFve"</span>) 
+                (ucs-normalize-NFC-string <span style="font-style: italic;">"nai\u0308ve"</span>))
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">=&gt; 0</span>
+
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">The . only matches part of the composition</span>
+(string-match-p <span style="font-style: italic;">"na.ve"</span> <span style="font-style: italic;">"nai\u0308ve"</span>)
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">=&gt; nil</span>
+
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">.. matches i and the composition character</span>
+(string-match-p <span style="font-style: italic;">"na..ve"</span> <span style="font-style: italic;">"nai\u0308ve"</span>)
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">=&gt; 0</span>
+
+</pre>
+</div>
+
+<p>
+<b>陷阱提示#5： 使用正则表达式时务必注意组合字符，且优先选择NFC归一化。</b>
+</p>
+
+<p>
+另一个潜在的问题是范围，尽管这不太常见。字符的范围可以用中括号来表达，比如[a-zA-Z]。如果范围以分解的组合字符开始或结束，将得不到正确的结果，因为组合字符部分会被正则表达式引擎单独处理。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defvar</span> <span style="font-weight: bold; font-style: italic;">match-weird</span> <span style="font-style: italic;">"[\u00E0-\u00F6]+"</span>)
+
+(string-match-p match-weird <span style="font-style: italic;">"&#225;&#226;&#227;&#228;&#229;"</span>)
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">=&gt; 0  (successful match)</span>
+
+(string-match-p (ucs-normalize-NFD-string match-weird) <span style="font-style: italic;">"&#225;&#226;&#227;&#228;&#229;"</span>)
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">=&gt; nil</span>
+</pre>
+</div>
+
+<p>
+在审查一些不受信任的输入时将所有这些牢记于心是非常重要的，比如使用Emacs作为Web server，攻击者可能使用非归一化或奇怪的字符串来绕开过滤器。
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-orgb783dee" class="outline-2">
+<h2 id="orgb783dee"><span class="section-number-2">4</span> 与世界交互</h2>
+<div class="outline-text-2" id="text-4">
+<p>
+有个错误我现在犯过两次了。Emacs内部使用UTF-8，无论输入文本原始是什么编码。
+</p>
+
+<p>
+<b>陷阱提示#6：务必注意计算文本字节数可能和原来的不一样。</b>
+</p>
+
+<p>
+例如，HTTP/1.1提出了长连接（persistent connections）。在此之前，客户端连到服务端然后请求内容，一旦服务端回内容给客户端后就会发送一个信号来结束连接。在HTTP/1.1中，服务端不发送close而是发送包含Content-Length的头来指示内容的字节长度。这样有多个请求，或者，更重要管道请求时，连接可以被复用。HTTP头的主要问题在于很多时候消息体编码是不同的。Emacs不能由一个单独源来处理多种编码，所以唯一的方式是用原始的字节来与网络进程交互HTTP协议请求。我的错误在于允许Emacs进行UTF-8转换，然后以UTF-8的编码格式计算内容的长度。这碰巧在99.9%的时候能工作因为大多客户端使用UTF-8或其他类似的，但无论如何，这是不完全正确的。
+</p>
+</div>
+</div>
+<div id="outline-container-org1e2d3f8" class="outline-2">
+<h2 id="org1e2d3f8"><span class="section-number-2">5</span> 进一步阅读</h2>
+<div class="outline-text-2" id="text-5">
+<p>
+有很多研究是受JavaScript和其他语言的Unicode缺点而启发的。
+</p>
+
+<ul class="org-ul">
+<li><a href="http://www.cl.cam.ac.uk/~mgk25/unicode.html">UTF-8 and Unicode FAQ for Unix/Linux</a></li>
+<li><a href="https://speakerdeck.com/mathiasbynens/hacking-with-unicode">Hacking with Unicode</a></li>
+<li><a href="https://github.com/mathiasbynens/jsesc">jsesc</a></li>
+<li><a href="http://docs.oracle.com/javase/7/docs/api/java/lang/Character.html#unicode">java.lang.Character Unicode Character Representations</a></li>
+<li><a href="http://www.gnu.org/software/emacs/manual/html_node/elisp/Strings-and-Characters.html">GNU Emacs Lisp Reference Manual: Strings and Characters</a></li>
+</ul>
+
+<p>
+相比之下，Emacs Lisp有出色的Unicode支持。这也不会让人感到太意外，毕竟Emacs的最初目的就是进行文本处理。
+</p>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2017-04-05</span>
+            <span title="last modification date" class="post-info">2017-04-14</span>
+            <span title="tags" class="post-info">:<a href="/tags/emacs-common">emacs-common</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-c7de1c50-88ed-412e-ae70-62694dd7dea5">fannyxl</a></span>
+        </div>
+    <script src="/media/js/jquery-2.1.3.min.js"></script>
+        <section>
+            <h1>Comments</h1>
+            <div id="comment-wrap">
+                    <a class="disqus_label">使用 Disqus 评论</a>
+    </ul>
+        <div id="disqus_thread"></div>
+        <script type="text/javascript">
+         //var disqus_developer = 1;
+         var preempt_signal=false;
+         var disqus_identifier = "/blog/2017/04/05/emacs-unicode陷阱/";
+         var disqus_url = "https://lujun9972.github.io/emacs-document/blog/2017/04/05/emacs-unicode陷阱/";
+         var disqus_shortname = 'emacs-document';
+         /* * * DON'T EDIT BELOW THIS LINE * * */
+         (function() {
+             var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+             dsq.src = 'https://' + disqus_shortname + '.disqus.com/embed.js';
+             (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+             $('#disqus_thread').css('display','none');
+         })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+    <script>
+     /* comments */
+     var ego_disqus_thread=$('#disqus_thread');
+     var ego_ds_label=$('.ds-thread');
+     $('.disqus_label').click(function(){
+         ego_disqus_thread.show();
+         ego_ds_label.hide();
+     });
+     $('.ds-label').click(function(){
+         ego_disqus_thread.hide();
+         ego_ds_label.show();
+     });
+    </script>
+        </section>
+    <script src="/media/js/main.js"></script>
+        <script type="text/javascript">
+         var _gaq = _gaq || [];
+         _gaq.push(['_setAccount', '7bac4fd0247f69c27887e0d4e3aee41e']);
+         _gaq.push(['_trackPageview']);
+         (function() {
+             var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+             ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+             var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-c7de1c50-88ed-412e-ae70-62694dd7dea5">fannyxl</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="//instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>

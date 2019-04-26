@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>How to Make an Emacs Minor Mode « null program - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="raw" />
+  <style>
+   #ds-thread #ds-reset .ds-comment-body p {color: #ffffff;}
+   #ds-thread #ds-reset .ds-comment-body p a {color: #ff0;}
+   #ds-thread #ds-reset .ds-comment-body p a:hover {color: #0ff;}
+   #disqus_thread a {color: #00ffff;}
+  </style>
+  <link rel="stylesheet" href="/media/css/main.css" type="text/css"/>
+  <link rel="stylesheet" href="/media/css/comment.css" type="text/css"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="/">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <div class="menu-icon">
+        <svg viewBox="0 0 18 15">
+          <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.031C17.335,0,18,0.665,18,1.484L18,1.484z" fill="#ffff00"/>
+          <path d="M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0c0-0.82,0.665-1.484,1.484-1.484 h15.031C17.335,6.031,18,6.696,18,7.516L18,7.516z" fill="#ffff00"/>
+          <path d="M18,13.516C18,14.335,17.335,15,16.516,15H1.484C0.665,15,0,14.335,0,13.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.031C17.335,12.031,18,12.696,18,13.516L18,13.516z" fill="#ffff00"/>
+        </svg>
+      </div>
+      <ul class="trigger">
+        <li><a href="/years/">Years</a></li>
+        <li><a href="/authors/">Authors</a></li>
+        <li><a href="/tags/">Tags</a></li>
+        <li><a href="/about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="/rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="http://www.google.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">How to Make an Emacs Minor Mode « null program</h1>
+<div id="table-of-contents">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#minor-mode-options">Minor Mode Options</a></li>
+<li><a href="#minor-mode-body">Minor Mode Body</a></li>
+<li><a href="#automatically-enabling-the-minor-mode">Automatically Enabling the Minor Mode</a></li>
+<li><a href="#full-code">Full Code</a></li>
+</ul>
+</div>
+</div>
+<p>
+February 06, 2013
+</p>
+
+<p>
+nullprogram.com/blog/2013/02/06/
+</p>
+
+<p>
+An Emacs buffer always has one major mode and zero or more minor
+modes. Major modes tend to be significant efforts, especially when it
+comes to automatic indentation. In contrast, minor modes are often
+simple, perhaps only overlaying a small keymap for additional
+functionality. Creating a new minor mode is really easy, it's just a
+matter of understanding Emacs' conventions.
+</p>
+
+<p>
+Mode names should end in <code>-mode</code> and the command for toggling the mode
+should be the same name. They keymap for the mode should be called
+mode=-map= and the mode's toggle hook should be called
+mode=-hook=. Keep all of this in mind when picking a name for your
+minor mode.
+</p>
+
+<p>
+There are a number of other tedious issues that need to be taken into
+account when manually building a minor mode. The good news is that no
+one needs to worry about most of it! Lisp has macros for cutting down
+on boilerplate code and so there's a macro for this very purpose:
+<code>define-minor-mode</code>. Here's all it takes to make a new minor mode,
+<code>foo-mode</code>.
+</p>
+
+<pre class="example">
+(define-minor-mode foo-mode
+ "Get your foos in the right places.")
+</pre>
+
+<p>
+This creates a command <code>foo-mode</code> for toggling the minor mode and a
+hook called <code>foo-mode-hook</code>. There's a strange caveat about the hook:
+it's not immediately declared as a variable. My guess is that this is
+some archaic optimization which now exists as bad design. The hook
+function <code>add-hook</code> will create this variable lazily when needed and
+the function <code>run-hooks</code> will ignore hook variables that don't yet
+exist, so it doesn't get tripped up by this situation. So despite its
+strange initial absence, the new minor mode will use this hook as
+soon as functions are added to it.
+</p>
+
+<div id="outline-container-orga3eeba8" class="outline-2">
+<h2 id="minor-mode-options"><a id="orga3eeba8"></a>Minor Mode Options</h2>
+<div class="outline-text-2" id="text-minor-mode-options">
+<p>
+This mode doesn't do anything yet. It doesn't have its own keymap
+and it doesn't even show up in the modeline. It's just a toggle and a
+hook that's run when the toggle is used. To add more to the mode,
+<code>define-minor-mode</code> accepts a number of keywords. Here are the
+important ones.
+</p>
+
+<ul class="org-ul">
+<li><code>:lighter</code>: the name, a string, to show in the modeline</li>
+<li><code>:keymap</code>: the mode's keymap</li>
+<li><code>:global</code>: specifies if the minor mode is global</li>
+</ul>
+
+<p>
+The <code>:lighter</code> option has one caveat: it's concatenated to the rest of
+the modeline without any delimiter. This means it needs to be prefixed
+with a space. I think this is mistake, but we're stuck with it
+probably forever. Otherwise this string should be kept short: there's
+generally not much room on the modeline.
+</p>
+
+<pre class="example">
+(define-minor-mode foo-mode
+ "Get your foos in the right places."
+ :lighter " foo")
+</pre>
+
+<p>
+New, empty keymaps are created with <code>(make-keymap)</code> or
+<code>(make-sparse-keymap)</code>. The latter is more efficient when the map will
+contain a small number of keybindings, as is the case with most minor
+modes. The fact that these separate functions exist is probably
+another outdated, premature optimization. To avoid confusing others, I
+recommend you use the one that matches your intended usage.
+</p>
+
+<p>
+The keymap can be provided directly to <code>:keymap</code> and it will be bound
+to <code>foo-mode-map</code> automatically. I could just put an empty keymap here
+and define keys separately outside the <code>define-minor-mode</code>
+declaration, but I like the idea of creating the whole map in one
+expression.
+</p>
+
+<pre class="example">
+(defun insert-foo ()
+ (interactive)
+ (insert "foo"))
+
+(define-minor-mode foo-mode
+ "Get your foos in the right places."
+ :lighter " foo"
+ :keymap (let ((map (make-sparse-keymap)))
+ (define-key map (kbd "C-c f") 'insert-foo)
+ map))
+</pre>
+
+<p>
+The <code>:global</code> option means the minor mode is not local to a buffer,
+it's present everywhere. As far as I know, the only global minor mode
+I've ever used is <a href="https://github.com/capitaomorte/yasnippet">YASnippet</a>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org495cf30" class="outline-2">
+<h2 id="minor-mode-body"><a id="org495cf30"></a>Minor Mode Body</h2>
+<div class="outline-text-2" id="text-minor-mode-body">
+<p>
+The rest of <code>define-minor-mode</code> is a body for arbitrary Lisp, like a
+<code>defun</code>. It's run every time the mode is toggled off or on, so it's
+like a built-in hook function. Use it to do any sort of special setup
+or teardown, such hooking or unhooking Emacs' hooks. A likely thing to
+be done in here is specifying buffer-local variables.
+</p>
+
+<p>
+Any time the Emacs interpreter is evaluating an expression there's
+always a current buffer acting as context. Many functions that
+operate on buffers don't actually accept a buffer as an
+argument. Instead they operate on the current buffer. Furthermore,
+some variables are buffer-local: the binding is dynamic over the
+current buffer. This is useful for maintaining state relevant only to
+a particular buffer.
+</p>
+
+<p>
+Side note: the <code>with-current-buffer</code> macro is used to specify a
+different current buffer for a body of code. It can be used to access
+other buffer's local variables. Similarly, <code>with-temp-buffer</code> creates
+a brand new buffer, uses it as the current buffer for its body, and
+then destroys the buffer.
+</p>
+
+<p>
+For example, let's say I want to keep track of how many times
+<code>foo-mode</code> inserted “foo” into the current buffer.
+</p>
+
+<pre class="example">
+(defvar foo-count 0
+ "Number of foos inserted into the current buffer.")
+
+(defun insert-foo ()
+ (interactive)
+ (setq foo-count (1+ foo-count))
+ (insert "foo"))
+
+(define-minor-mode foo-mode
+ "Get your foos in the right places."
+ :lighter " foo"
+ :keymap (let ((map (make-sparse-keymap)))
+ (define-key map (kbd "C-c f") 'insert-foo)
+ map)
+ (make-local-variable 'foo-count))
+</pre>
+
+<p>
+The built-in function <code>make-local-variable</code> creates a new buffer-local
+version of a global variable in the current buffer. Here, the
+buffer-local <code>foo-count</code> will be initialized with the value 0 from the
+global variable but all reassignments will only be visible in the
+current buffer.
+</p>
+
+<p>
+However, in this case it may be better to use
+<code>make-variable-buffer-local</code> on the global variable and skip the
+<code>make-local-variable</code>. The main reason is that I don't want
+<code>insert-foo</code> to clobber the global variable if it happens to be used
+in a buffer that doesn't have the minor mode enabled.
+</p>
+
+<pre class="example">
+(make-variable-buffer-local
+ (defvar foo-count 0
+ "Number of foos inserted into the current buffer."))
+</pre>
+
+<p>
+A big advantage is that this buffer-local intention for the variable
+is documented globally. This message will appear in the variable's
+documentation.
+</p>
+
+<blockquote>
+<p>
+Automatically becomes buffer-local when set in any fashion.
+</p>
+</blockquote>
+
+<p>
+Which method you use is up to your personal preference. The Emacs
+documentation encourages the former but I think the latter is nicer
+in many situations.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org66aa20a" class="outline-2">
+<h2 id="automatically-enabling-the-minor-mode"><a id="org66aa20a"></a>Automatically Enabling the Minor Mode</h2>
+<div class="outline-text-2" id="text-automatically-enabling-the-minor-mode">
+<p>
+Some minor modes don't have any particular major mode association and
+the user will toggle it at will. Some minor modes only make sense when
+used with particular major mode and it might make sense to
+automatically enable along with that mode. This is done by hooking
+that major mode's hook. So long as the mode follows Emacs' conventions
+as mentioned at the top, this hook should be easy to find.
+</p>
+
+<pre class="example">
+(add-hook 'text-mode-hook 'foo-mode)
+</pre>
+
+<p>
+Here, <code>foo-mode</code> will automatically be activated in all <code>text-mode</code>
+buffers.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org4b72403" class="outline-2">
+<h2 id="full-code"><a id="org4b72403"></a>Full Code</h2>
+<div class="outline-text-2" id="text-full-code">
+<p>
+Here's the final code for our minor mode, saved to <code>foo-mode.el</code>. It
+has one keybinding and it's easily open for users to define more keys
+in <code>foo-mode-map</code>. It also automatically activates when the user is
+editing a plain text file.
+</p>
+
+<pre class="example">
+(make-variable-buffer-local
+ (defvar foo-count 0
+ "Number of foos inserted into the current buffer."))
+
+(defun insert-foo ()
+ (interactive)
+ (setq foo-count (1+ foo-count))
+ (insert "foo"))
+
+;;;###autoload
+(define-minor-mode foo-mode
+ "Get your foos in the right places."
+ :lighter " foo"
+ :keymap (let ((map (make-sparse-keymap)))
+ (define-key map (kbd "C-c f") 'insert-foo)
+ map))
+
+;;;###autoload
+(add-hook 'text-mode-hook 'foo-mode)
+
+(provide 'foo-mode)
+</pre>
+
+<p>
+I added some autoload declarations and a <code>provide</code> in case this mode
+is ever distributed or used as a package. If an autoloads script is
+generated for this minor mode, a temporary function called <code>foo-mode</code>
+will be defined whose sole purpose is to load the real <code>foo-mode.el</code>
+and then call <code>foo-mode</code> again with its new definition, which was
+loaded overtop the temporary definition.
+</p>
+
+<p>
+The autoloads script also adds this temporary <code>foo-mode</code> function to
+the <code>text-mode-hook</code>. If a <code>text-mode</code> buffer is created, the hook
+will call <code>foo-mode</code> which will load <code>foo-mode.el</code>, redefining
+<code>foo-mode</code> to its real definition, then activate <code>foo-mode</code>.
+</p>
+
+<p>
+The point of autoloads is to defer loading code until it's needed. You
+may notice this as a short delay the first time you activate a mode
+after starting Emacs. This is what keeps Emacs' start time reasonable
+despite having millions of lines of Elisp virtually loaded at startup.
+</p>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2018-07-05</span>
+            <span title="last modification date" class="post-info">2018-07-05</span>
+            <span title="tags" class="post-info">:<a href="/tags/raw">raw</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-c7de1c50-88ed-412e-ae70-62694dd7dea5">lujun9972</a></span>
+        </div>
+    <script src="/media/js/jquery-2.1.3.min.js"></script>
+        <section>
+            <h1>Comments</h1>
+            <div id="comment-wrap">
+                    <a class="disqus_label">使用 Disqus 评论</a>
+    </ul>
+        <div id="disqus_thread"></div>
+        <script type="text/javascript">
+         //var disqus_developer = 1;
+         var preempt_signal=false;
+         var disqus_identifier = "/blog/2018/07/05/how-to-make-an-emacs-minor-mode-«-null-program/";
+         var disqus_url = "https://lujun9972.github.io/emacs-document/blog/2018/07/05/how-to-make-an-emacs-minor-mode-«-null-program/";
+         var disqus_shortname = 'emacs-document';
+         /* * * DON'T EDIT BELOW THIS LINE * * */
+         (function() {
+             var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+             dsq.src = 'https://' + disqus_shortname + '.disqus.com/embed.js';
+             (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+             $('#disqus_thread').css('display','none');
+         })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+    <script>
+     /* comments */
+     var ego_disqus_thread=$('#disqus_thread');
+     var ego_ds_label=$('.ds-thread');
+     $('.disqus_label').click(function(){
+         ego_disqus_thread.show();
+         ego_ds_label.hide();
+     });
+     $('.ds-label').click(function(){
+         ego_disqus_thread.hide();
+         ego_ds_label.show();
+     });
+    </script>
+        </section>
+    <script src="/media/js/main.js"></script>
+        <script type="text/javascript">
+         var _gaq = _gaq || [];
+         _gaq.push(['_setAccount', '7bac4fd0247f69c27887e0d4e3aee41e']);
+         _gaq.push(['_trackPageview']);
+         (function() {
+             var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+             ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+             var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-c7de1c50-88ed-412e-ae70-62694dd7dea5">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="//instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>

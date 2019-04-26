@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>PComplete:根据上下文环境进行补全 - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="elisp-common" />
+  <style>
+   #ds-thread #ds-reset .ds-comment-body p {color: #ffffff;}
+   #ds-thread #ds-reset .ds-comment-body p a {color: #ff0;}
+   #ds-thread #ds-reset .ds-comment-body p a:hover {color: #0ff;}
+   #disqus_thread a {color: #00ffff;}
+  </style>
+  <link rel="stylesheet" href="/media/css/main.css" type="text/css"/>
+  <link rel="stylesheet" href="/media/css/comment.css" type="text/css"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="/">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <div class="menu-icon">
+        <svg viewBox="0 0 18 15">
+          <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.031C17.335,0,18,0.665,18,1.484L18,1.484z" fill="#ffff00"/>
+          <path d="M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0c0-0.82,0.665-1.484,1.484-1.484 h15.031C17.335,6.031,18,6.696,18,7.516L18,7.516z" fill="#ffff00"/>
+          <path d="M18,13.516C18,14.335,17.335,15,16.516,15H1.484C0.665,15,0,14.335,0,13.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.031C17.335,12.031,18,12.696,18,13.516L18,13.516z" fill="#ffff00"/>
+        </svg>
+      </div>
+      <ul class="trigger">
+        <li><a href="/years/">Years</a></li>
+        <li><a href="/authors/">Authors</a></li>
+        <li><a href="/tags/">Tags</a></li>
+        <li><a href="/about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="/rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="http://www.google.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">PComplete:根据上下文环境进行补全</h1>
+<div id="table-of-contents">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#org1f90a76">Programmable, Context-Sensitive Completion</a></li>
+<li><a href="#org8b15bee">Custom Completion</a></li>
+</ul>
+</div>
+</div>
+<p>
+我在 /What’s New In Emacs 24/系列文章中(<a href="file:///articles/2011/12/06/what-is-new-in-emacs-24-part-1/">part one</a>, <a href="file:///articles/2011/12/12/what-is-new-in-emacs-24-part-2/">part two</a>) 简单地提到过pcomplete(<a href="file:///articles/2010/12/13/complete-guide-mastering-eshell/">Eshell</a>中使用的可编程补全库)现在也能直接在 <code>M-x shell</code> 中使用了.
+这对喜欢shell mode的人来说可真是个好消息, 因为原来的shell mode并没补全功能(而补全的能力是底层shell本身就提供的).
+</p>
+
+<p>
+令人吃惊的是,补全机制在Emacs已经存在很久了,但是它在Emacs中很少用到,这使得大多数人对它知之甚少.
+事实上,我估计只有Eshell,ERC,Org Mode和现在Shell Mode中采用到了这个包吧.
+</p>
+
+<div id="outline-container-org1f90a76" class="outline-2">
+<h2 id="org1f90a76">Programmable, Context-Sensitive Completion</h2>
+<div class="outline-text-2" id="text-org1f90a76">
+<p>
+从Emacs 24开始,你什么都不用做就能使用 <code>pcomplete</code>, 当你打开一个新的shell session时,Emacs会自动做好相应的准备. 
+Emacs自带了很多 <code>pcomplete</code> 函数能够加强Emacs之前那种单纯的文件名补全的能力,使之能提供类似bash/zsh的那种基于上下文的补全. 
+尤其为 <code>scp</code>, <code>ssh</code>, <code>mount</code>, <code>umount</code> 和 <code>make</code> 命令提供了很好的补全支持.
+</p>
+
+<p>
+下面列出的是那些shell mode支持补全的命令(事实上该列表适用于任何支持pcomplete的mode,包括Eshell.)
+</p>
+
+<ul class="org-ul">
+<li><p>
+bzip2
+</p>
+
+<p>
+补全参数,并且只列出经过bzip2压缩后的文件.
+</p></li>
+
+<li><p>
+cd
+</p>
+
+<p>
+补全目录.
+</p></li>
+
+<li><p>
+chgrp
+</p>
+
+<p>
+补全系统中已有的祖名.
+</p></li>
+
+<li><p>
+chown
+</p>
+
+<p>
+补全用户和组,但只有使用 <code>user.group</code> 时才有用.
+</p></li>
+
+<li><p>
+cvs
+</p>
+
+<p>
+补全命令和参数选项,还有cvs entry 以及 module.
+</p></li>
+
+<li><p>
+gdb
+</p>
+
+<p>
+补全目录以及具有执行权限的文件
+</p></li>
+
+<li><p>
+gzip
+</p>
+
+<p>
+补全参数并只列出经过gzip压缩过后的文件.
+</p></li>
+
+<li><p>
+kill
+</p>
+
+<p>
+在 - 后面会列出signal,否则的话会补全所有的进程号.
+</p></li>
+
+<li><p>
+make
+</p>
+
+<p>
+补全参数以及目录中的所有makefile; 在 <code>make -f FILE</code> 后则会补全文件中的rule名称.
+</p></li>
+
+<li><p>
+mount
+</p>
+
+<p>
+补全参数,以及 <code>mount -t TYPE</code> 中的文件系统类型.
+</p></li>
+
+<li><p>
+pushd
+</p>
+
+<p>
+与cd的补全方式一样
+</p></li>
+
+<li><p>
+rm
+</p>
+
+<p>
+补全参数,文件名以及目录.
+</p></li>
+
+<li><p>
+rmdir
+</p>
+
+<p>
+补全目录.
+</p></li>
+
+<li><p>
+rpm
+</p>
+
+<p>
+rpm的补全机制实现的非常精妙. 能够根据上下文环境补全几乎所有的子命令,包括补全package名称.
+</p></li>
+
+<li><p>
+scp
+</p>
+
+<p>
+能够补全命令参数, SSH认证过的主机,并且在命令格式为 <code>scp host:/</code> 时还能补全远程服务器上的文件路径(借助TRAMP来实现).
+</p></li>
+
+<li><p>
+ssh
+</p>
+
+<p>
+补全命令参数,以及SSH认证过的主机.
+</p></li>
+
+<li><p>
+tar
+</p>
+
+<p>
+补全命令参数,尤其能根据上下文智能补全符合POSIX标准的参数,还能补全文件名.
+</p></li>
+
+<li><p>
+time
+</p>
+
+<p>
+补全目录,以及带有执行权限的命令.
+</p></li>
+
+<li><p>
+umount
+</p>
+
+<p>
+补全命令参数,挂载的目录以及文件系统类型(与mount类似)
+</p></li>
+
+<li><p>
+which
+</p>
+
+<p>
+本应能提供对所有二进制文件的补全,但貌似不能正常工作.
+</p></li>
+
+<li><p>
+xargs
+</p>
+
+<p>
+补全目录以及带有可执行权限的文件.
+</p></li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-org8b15bee" class="outline-2">
+<h2 id="org8b15bee">Custom Completion</h2>
+<div class="outline-text-2" id="text-org8b15bee">
+<p>
+一个补全库,既然号称 <i>programmable completion</i> 那它自然就是可编程的了.
+</p>
+
+<p>
+要用它来实现简单的参数补全是很简单的,但是除此之外的补全功能实现起来就有点棘手了,因为这个库并没有什么文档说明在里面(虽然乐观主义者会说代码就是最好的文档...).
+</p>
+
+<p>
+我接下来会演示一下,如何为 <code>git</code> 添加初步的补全功能
+</p>
+
+<p>
+首先我们需要确认一下命令参数的顺序; 对于 <code>git</code> 命令来说,这基本上是固定的: <code>git [options] &lt;command&gt; [&lt;args&gt;]</code>
+</p>
+
+<p>
+这里我只关注于常用的那几个命令. 把这些命令放在一个list中:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defconst</span> <span style="font-weight: bold; font-style: italic;">pcmpl-git-commands</span>
+  '(<span style="font-style: italic;">"add"</span> <span style="font-style: italic;">"bisect"</span> <span style="font-style: italic;">"branch"</span> <span style="font-style: italic;">"checkout"</span> <span style="font-style: italic;">"clone"</span>
+    <span style="font-style: italic;">"commit"</span> <span style="font-style: italic;">"diff"</span> <span style="font-style: italic;">"fetch"</span> <span style="font-style: italic;">"grep"</span>
+    <span style="font-style: italic;">"init"</span> <span style="font-style: italic;">"log"</span> <span style="font-style: italic;">"merge"</span> <span style="font-style: italic;">"mv"</span> <span style="font-style: italic;">"pull"</span> <span style="font-style: italic;">"push"</span> <span style="font-style: italic;">"rebase"</span>
+    <span style="font-style: italic;">"reset"</span> <span style="font-style: italic;">"rm"</span> <span style="font-style: italic;">"show"</span> <span style="font-style: italic;">"status"</span> <span style="font-style: italic;">"tag"</span> )
+  <span style="font-style: italic;">"List of `</span><span style="font-weight: bold; font-style: italic; text-decoration: underline;">git</span><span style="font-style: italic;">' commands"</span>)
+</pre>
+</div>
+
+<p>
+<code>pcomplete</code> 的语法规则很灵活(clever): 它会根据一定的命名规则来动态地选择调用哪个elisp函数来进行补全(it will use dynamic dispatch to resolve the elisp function provided it is named a certain way).
+一个command的补全函数按 <code>pcomplete/COMMAND</code> 或 <code>pcomplete/MAJOR-MODE/COMMAND</code> 这两种规则进行命名. 
+只要遵照这个命名规则进行命名,就能够实现补全了.
+</p>
+
+<p>
+下一步,我们需要提供一个包含有效子命令的列表 – 在这个例子中,这个列表就是 <code>pcmpl-git-commands</code> 的值, 不过实际上,提供给命令 <code>pcomplete-here</code> 的可以是任意的form(译者注:pcomplete-here内部会运行该form,然后将结果作为补全的依据).
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">pcomplete/git</span> ()
+  <span style="font-style: italic;">"Completion for `</span><span style="font-weight: bold; font-style: italic; text-decoration: underline;">git</span><span style="font-style: italic;">'"</span>
+  (<span style="font-weight: bold;">pcomplete-here*</span> pcmpl-git-commands))
+</pre>
+</div>
+
+<p>
+现在,当你按下tab来补全git的第一个参数时,就会列出所有的子命令了.真不错.
+</p>
+
+<p>
+现在让我们扩展一下这个函数,让它也为 <code>add</code> 和 <code>rm</code> 子命令添加补全支持. 我希望当子命令是 <code>add</code> 或 <code>rm</code> 时能补全文件名/文件路径.
+</p>
+
+<p>
+借助 <code>pcomplete-match</code> 函数,要实现这个功能出奇地容易. <code>pcomplete-match</code> 函数能够检查特定位置的参数是否匹配某个正则表达式. 
+你应该留意, 这里是在一个 <code>while</code> 循环中调用 <code>pcomplete-here</code> 的; 这样你就可以一个接一个地补全任意多个文件. 
+使用 <code>pcomplete-here</code> 的好处在于,它能自动忽略那些之前已经补全过的文件 - 这在为 <code>add</code> 子命令提供补全时非常有用.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">pcomplete/git</span> ()
+  <span style="font-style: italic;">"Completion for `</span><span style="font-weight: bold; font-style: italic; text-decoration: underline;">git</span><span style="font-style: italic;">'"</span>
+  <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Completion for the command argument.</span>
+  (<span style="font-weight: bold;">pcomplete-here*</span> pcmpl-git-commands)
+
+  <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">complete files/dirs forever if the command is `</span><span style="font-weight: bold; font-style: italic; text-decoration: underline;">add</span><span style="font-weight: bold; font-style: italic;">' or `</span><span style="font-weight: bold; font-style: italic; text-decoration: underline;">rm</span><span style="font-weight: bold; font-style: italic;">'.</span>
+  (<span style="font-weight: bold;">if</span> (pcomplete-match (regexp-opt '(<span style="font-style: italic;">"add"</span> <span style="font-style: italic;">"rm"</span>)) 1)
+      (<span style="font-weight: bold;">while</span> (<span style="font-weight: bold;">pcomplete-here</span> (pcomplete-entries)))))
+</pre>
+</div>
+
+<p>
+Ok, 到目前为止都还比较容易实现. 现在让我们把它变得更加动态一些,我们来扩展这段代码使之支持 <code>git checkout</code> 命令, 补全出本地可用的分支出来.
+</p>
+
+<p>
+要实现这个,我们需要一个辅助函数,这个辅助函数将 <code>shell-command</code> 的输出转换成一个elisp列表. 这个应该很容易实现.
+</p>
+
+<p>
+变量 <code>pcmpl-git-ref-list-cmd</code> 中保存的是我们希望Emacs运行的shell命令. 这个命令会返回repo中的所有ref,然后我们再根据ref的子类型进行过滤 (heads, tags, etc.). 
+函数 <code>pcmpl-git-get-refs</code> 接受一个参数,type,用于作为过滤ref的类型参数.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defvar</span> <span style="font-weight: bold; font-style: italic;">pcmpl-git-ref-list-cmd</span> <span style="font-style: italic;">"git for-each-ref refs/ --format='%(refname)'"</span>
+  <span style="font-style: italic;">"The `</span><span style="font-weight: bold; font-style: italic; text-decoration: underline;">git</span><span style="font-style: italic;">' command to run to get a list of refs"</span>)
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">pcmpl-git-get-refs</span> (type)
+  <span style="font-style: italic;">"Return a list of `</span><span style="font-weight: bold; font-style: italic; text-decoration: underline;">git</span><span style="font-style: italic;">' refs filtered by TYPE"</span>
+  (<span style="font-weight: bold;">with-temp-buffer</span>
+    (insert (shell-command-to-string pcmpl-git-ref-list-cmd))
+    (goto-char (point-min))
+    (<span style="font-weight: bold;">let</span> ((ref-list))
+      (<span style="font-weight: bold;">while</span> (re-search-forward (concat <span style="font-style: italic;">"^refs/"</span> type <span style="font-style: italic;">"/</span><span style="font-weight: bold; font-style: italic;">\\</span><span style="font-weight: bold; font-style: italic;">(</span><span style="font-style: italic;">.+</span><span style="font-weight: bold; font-style: italic;">\\</span><span style="font-weight: bold; font-style: italic;">)</span><span style="font-style: italic;">$"</span>) nil t)
+        (add-to-list 'ref-list (match-string 1)))
+      ref-list)))
+</pre>
+</div>
+
+<p>
+最后,我们把这些代码全部整合起来. 为了让代码更清晰,我改成用cond语句来保证可读性.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defconst</span> <span style="font-weight: bold; font-style: italic;">pcmpl-git-commands</span>
+  '(<span style="font-style: italic;">"add"</span> <span style="font-style: italic;">"bisect"</span> <span style="font-style: italic;">"branch"</span> <span style="font-style: italic;">"checkout"</span> <span style="font-style: italic;">"clone"</span>
+    <span style="font-style: italic;">"commit"</span> <span style="font-style: italic;">"diff"</span> <span style="font-style: italic;">"fetch"</span> <span style="font-style: italic;">"grep"</span>
+    <span style="font-style: italic;">"init"</span> <span style="font-style: italic;">"log"</span> <span style="font-style: italic;">"merge"</span> <span style="font-style: italic;">"mv"</span> <span style="font-style: italic;">"pull"</span> <span style="font-style: italic;">"push"</span> <span style="font-style: italic;">"rebase"</span>
+    <span style="font-style: italic;">"reset"</span> <span style="font-style: italic;">"rm"</span> <span style="font-style: italic;">"show"</span> <span style="font-style: italic;">"status"</span> <span style="font-style: italic;">"tag"</span> )
+  <span style="font-style: italic;">"List of `</span><span style="font-weight: bold; font-style: italic; text-decoration: underline;">git</span><span style="font-style: italic;">' commands"</span>)
+
+(<span style="font-weight: bold;">defvar</span> <span style="font-weight: bold; font-style: italic;">pcmpl-git-ref-list-cmd</span> <span style="font-style: italic;">"git for-each-ref refs/ --format='%(refname)'"</span>
+  <span style="font-style: italic;">"The `</span><span style="font-weight: bold; font-style: italic; text-decoration: underline;">git</span><span style="font-style: italic;">' command to run to get a list of refs"</span>)
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">pcmpl-git-get-refs</span> (type)
+  <span style="font-style: italic;">"Return a list of `</span><span style="font-weight: bold; font-style: italic; text-decoration: underline;">git</span><span style="font-style: italic;">' refs filtered by TYPE"</span>
+  (<span style="font-weight: bold;">with-temp-buffer</span>
+    (insert (shell-command-to-string pcmpl-git-ref-list-cmd))
+    (goto-char (point-min))
+    (<span style="font-weight: bold;">let</span> ((ref-list))
+      (<span style="font-weight: bold;">while</span> (re-search-forward (concat <span style="font-style: italic;">"^refs/"</span> type <span style="font-style: italic;">"/</span><span style="font-weight: bold; font-style: italic;">\\</span><span style="font-weight: bold; font-style: italic;">(</span><span style="font-style: italic;">.+</span><span style="font-weight: bold; font-style: italic;">\\</span><span style="font-weight: bold; font-style: italic;">)</span><span style="font-style: italic;">$"</span>) nil t)
+        (add-to-list 'ref-list (match-string 1)))
+      ref-list)))
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">pcomplete/git</span> ()
+  <span style="font-style: italic;">"Completion for `</span><span style="font-weight: bold; font-style: italic; text-decoration: underline;">git</span><span style="font-style: italic;">'"</span>
+  <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Completion for the command argument.</span>
+  (<span style="font-weight: bold;">pcomplete-here*</span> pcmpl-git-commands)  
+  <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">complete files/dirs forever if the command is `</span><span style="font-weight: bold; font-style: italic; text-decoration: underline;">add</span><span style="font-weight: bold; font-style: italic;">' or `</span><span style="font-weight: bold; font-style: italic; text-decoration: underline;">rm</span><span style="font-weight: bold; font-style: italic;">'</span>
+  (<span style="font-weight: bold;">cond</span>
+   ((pcomplete-match (regexp-opt '(<span style="font-style: italic;">"add"</span> <span style="font-style: italic;">"rm"</span>)) 1)
+    (<span style="font-weight: bold;">while</span> (<span style="font-weight: bold;">pcomplete-here</span> (pcomplete-entries))))
+   <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">provide branch completion for the command `</span><span style="font-weight: bold; font-style: italic; text-decoration: underline;">checkout</span><span style="font-weight: bold; font-style: italic;">'.</span>
+   ((pcomplete-match <span style="font-style: italic;">"checkout"</span> 1)
+    (<span style="font-weight: bold;">pcomplete-here*</span> (pcmpl-git-get-refs <span style="font-style: italic;">"heads"</span>)))))
+</pre>
+</div>
+
+<p>
+这就完成了. 为git命令而创建的简单补全机制. 把这些代码放在你的 <code>.emacs</code> 或其他初始化文件中就能用了.
+</p>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2017-06-21</span>
+            <span title="last modification date" class="post-info">2018-02-15</span>
+            <span title="tags" class="post-info">:<a href="/tags/elisp-common">elisp-common</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-c7de1c50-88ed-412e-ae70-62694dd7dea5">lujun9972</a></span>
+        </div>
+    <script src="/media/js/jquery-2.1.3.min.js"></script>
+        <section>
+            <h1>Comments</h1>
+            <div id="comment-wrap">
+                    <a class="disqus_label">使用 Disqus 评论</a>
+    </ul>
+        <div id="disqus_thread"></div>
+        <script type="text/javascript">
+         //var disqus_developer = 1;
+         var preempt_signal=false;
+         var disqus_identifier = "/blog/2017/06/21/pcomplete-根据上下文环境进行补全/";
+         var disqus_url = "https://lujun9972.github.io/emacs-document/blog/2017/06/21/pcomplete-根据上下文环境进行补全/";
+         var disqus_shortname = 'emacs-document';
+         /* * * DON'T EDIT BELOW THIS LINE * * */
+         (function() {
+             var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+             dsq.src = 'https://' + disqus_shortname + '.disqus.com/embed.js';
+             (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+             $('#disqus_thread').css('display','none');
+         })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+    <script>
+     /* comments */
+     var ego_disqus_thread=$('#disqus_thread');
+     var ego_ds_label=$('.ds-thread');
+     $('.disqus_label').click(function(){
+         ego_disqus_thread.show();
+         ego_ds_label.hide();
+     });
+     $('.ds-label').click(function(){
+         ego_disqus_thread.hide();
+         ego_ds_label.show();
+     });
+    </script>
+        </section>
+    <script src="/media/js/main.js"></script>
+        <script type="text/javascript">
+         var _gaq = _gaq || [];
+         _gaq.push(['_setAccount', '7bac4fd0247f69c27887e0d4e3aee41e']);
+         _gaq.push(['_trackPageview']);
+         (function() {
+             var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+             ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+             var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-c7de1c50-88ed-412e-ae70-62694dd7dea5">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="//instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>

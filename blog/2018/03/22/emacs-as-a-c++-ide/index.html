@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Emacs as a C++ IDE - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="raw" />
+  <style>
+   #ds-thread #ds-reset .ds-comment-body p {color: #ffffff;}
+   #ds-thread #ds-reset .ds-comment-body p a {color: #ff0;}
+   #ds-thread #ds-reset .ds-comment-body p a:hover {color: #0ff;}
+   #disqus_thread a {color: #00ffff;}
+  </style>
+  <link rel="stylesheet" href="/media/css/main.css" type="text/css"/>
+  <link rel="stylesheet" href="/media/css/comment.css" type="text/css"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="/">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <div class="menu-icon">
+        <svg viewBox="0 0 18 15">
+          <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.031C17.335,0,18,0.665,18,1.484L18,1.484z" fill="#ffff00"/>
+          <path d="M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0c0-0.82,0.665-1.484,1.484-1.484 h15.031C17.335,6.031,18,6.696,18,7.516L18,7.516z" fill="#ffff00"/>
+          <path d="M18,13.516C18,14.335,17.335,15,16.516,15H1.484C0.665,15,0,14.335,0,13.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.031C17.335,12.031,18,12.696,18,13.516L18,13.516z" fill="#ffff00"/>
+        </svg>
+      </div>
+      <ul class="trigger">
+        <li><a href="/years/">Years</a></li>
+        <li><a href="/authors/">Authors</a></li>
+        <li><a href="/tags/">Tags</a></li>
+        <li><a href="/about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="/rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="http://www.google.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">Emacs as a C++ IDE</h1>
+<div id="table-of-contents">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#company">Company</a></li>
+<li><a href="#flycheck">Flycheck</a></li>
+<li><a href="#compilation-database">Compilation database</a></li>
+<li><a href="#irony">Irony</a>
+<ul>
+<li><a href="#lacking-support-for-header-files">Lacking support for header files</a></li>
+<li><a href="#code-completion">Code completion</a></li>
+<li><a href="#real-time-syntax-checking">Real-time syntax checking</a></li>
+<li><a href="#configuration">Configuration</a></li>
+<li><a href="#features">Features</a></li>
+<li><a href="#setup">Setup</a></li>
+<li><a href="#configuration-1">Configuration</a></li>
+</ul>
+</li>
+<li><a href="#projectile">Projectile</a></li>
+<li><a href="#helm">Helm</a></li>
+<li><a href="#summary">Summary</a></li>
+</ul>
+</div>
+</div>
+
+<div class="figure">
+<p><img src="http://martinsosic.com/images/emacs-loves-cpp.png" alt="emacs-loves-cpp.png" />
+</p>
+</div>
+
+<p>
+<b>TL;DR</b> -&gt; take a look at the <a href="#summary">summary</a>.
+</p>
+
+<p>
+I have been using Emacs for a few years for development in different languages, including C++.
+Since I was working mostly on smaller C++ projects and I heard how notoriously hard it is to setup Emacs as a C++ IDE, I never took time to fully set it up. That was working fine for me until I got my hands on a bigger C++ project and figured out I am really missing some of the more advanced features.
+I decided to give it a go and realized it is not as hard as I expected!
+</p>
+
+<p>
+Since it did take some time to try different setups and I feel like information about them is not accessible enough, I decided to share what I learned so others can have an easier start.
+</p>
+
+<p>
+Some of the main features that we can expect from C++ IDE:
+</p>
+
+<ul class="org-ul">
+<li>Navigation (jump from reference to definition and vice versa).</li>
+<li>File outline (list of symbols in file for quick navigation).</li>
+<li>Code completion.</li>
+<li>Real-time syntax checking.</li>
+</ul>
+
+<p>
+While there are solutions for C that work quite well (e.g. CEDET), and some of them also work pretty well for C++, none of them fully support C++, since it is more complicated than C.
+Thanks to release of <a href="https://clang.llvm.org/doxygen/group__CINDEX.html">libclang</a>, which brought capabilities needed to create full support for C++, multiple tools/IDEs specialized for C++ were created. I am going to focus on two of them, Irony and RTags, which are among the most popular Emacs packages offering C++ IDE functionality.
+</p>
+
+<p>
+Also, since I work on Linux and usually use CMake with make or ninja as generators, that is what I am going to focus on in examples.
+I found a lot of great advice and inspiration in <a href="https://tuhdo.github.io/c-ide.html">blog post by tuhdo</a>, so make sure to check it out for wider overview of available solutions!
+</p>
+
+<div id="outline-container-org1c9df43" class="outline-2">
+<h2 id="company"><a id="org1c9df43"></a>Company</h2>
+<div class="outline-text-2" id="text-company">
+<p>
+<a href="http://company-mode.github.io">Company</a> is a code completion frontend, meaning it handles all the logic regarding code completion while typing except for actually coming up with completions.
+So basically, Company does all the work with showing and handling completions, but it needs a brain (backend) to provide it with completions.
+It can use different sources (backends) of completions, including Irony and Rtags, which work really well for C++.
+</p>
+
+<p>
+My basic configuration looks like this (without Irony or RTags added as a backend yet):
+</p>
+
+<pre class="example">
+(req-package company
+ :config
+ (progn
+ (add-hook 'after-init-hook 'global-company-mode)
+ (global-set-key (kbd "M-/") 'company-complete-common-or-cycle)
+ (setq company-idle-delay 0)))
+</pre>
+</div>
+</div>
+
+<div id="outline-container-org0604030" class="outline-2">
+<h2 id="flycheck"><a id="org0604030"></a>Flycheck</h2>
+<div class="outline-text-2" id="text-flycheck">
+<p>
+<a href="http://www.flycheck.org">Flycheck</a> is package for Emacs that brings on-the-fly syntax checking.
+It already comes with support for a lot of languages and can also use other packages as backend.
+In our case, we are going to use it together with Irony or Rtags as backend.
+</p>
+
+<p>
+For me, this might just be the most important package of the ones listed here, as it helps you write code that will most likely compile in first try. I find it super useful, it saves me a lot of time.
+</p>
+
+<p>
+My basic configuration looks like this (without Irony or RTags added as a backend yet):
+</p>
+
+<pre class="example">
+(req-package flycheck
+ :config
+ (progn
+ (global-flycheck-mode)))
+</pre>
+</div>
+</div>
+
+<div id="outline-container-orga287153" class="outline-2">
+<h2 id="compilation-database"><a id="orga287153"></a>Compilation database</h2>
+<div class="outline-text-2" id="text-compilation-database">
+<p>
+In order for both Irony and Rtags to work, we need to supply them with detailed information about our C++ project.
+</p>
+
+<p>
+This is done by providing <a href="http://clang.llvm.org/docs/JSONCompilationDatabase.html">compilation database</a>, which is a standard way to describe how your project is compiled.
+Compilation database is (usually) just a JSON file that contains compilation information for each translation unit and there are multiple ways to generate it.
+</p>
+
+<p>
+If you are using Cmake to build your project, it is really easy to generate compilation database, since CMake has support for it.
+You just provide CMake with correct flag (<code>cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON ...</code>) and that is it! Later you can just call <code>cmake .</code> and it will update compilation database if needed.
+This is what I used for my project, since it uses CMake.
+</p>
+
+<p>
+In case tool that you are using to build your project does not have support for generation of compilation database, you can use <a href="https://github.com/rizsotto/Bear">bear</a> tool, which records all calls to compiler by your build system and builds compilation database from it. It is easy to use and gives very good results.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org86dd34f" class="outline-2">
+<h2 id="irony"><a id="org86dd34f"></a>Irony</h2>
+<div class="outline-text-2" id="text-irony">
+<p>
+<a href="https://github.com/Sarcasm/irony-mode">Irony mode</a> brings IDE functionality to C, C++ and Objective-C.
+It consists of Emacs package (client) and Irony server (which runs on your machine and uses libclang).
+Features are: code completion, real-time syntax checking, live documentation.
+</p>
+
+<p>
+Irony is not hard to set up, just follow instructions from their documentation: you put configuration in your
+<code>init.el</code> file and that is it, it will automatically run <code>irony-server</code>.
+Irony is going to find <a href="#compilation-database">compilation database</a> on its own, as long as it is positioned in some logical place, so you only have to generate it and make sure it is up to date.
+In my case, since I have an out of source build, compilation database was in directory <code>build/</code> which is sibling of directory <code>source/</code>, and Irony had no problem picking it up.
+</p>
+
+<p>
+What I really like about Irony is that even on big projects (10k files) it is still fast and does not consume noticable amount of resources.
+</p>
+</div>
+
+<div id="outline-container-orgc1ff82c" class="outline-3">
+<h3 id="lacking-support-for-header-files"><a id="orgc1ff82c"></a>Lacking support for header files</h3>
+<div class="outline-text-3" id="text-lacking-support-for-header-files">
+<p>
+Bad side when using Irony is that it does not know how to work with header files (.h, .hpp), because compilation database provides compilation information for source files but not for headers, meaning you get all the nifty features only for source files!
+This was a pretty big deal for me, and at the time of writing of this post author of Irony said he is actively working on solution for this, which is great.
+</p>
+
+<p>
+Luckily, Irony has fallback options when compilation database is not enough or not available, so we can use those while waiting for solution.
+In my case, I used <code>.clang_complete</code> file as a fallback option, which results with Irony using compilation database for source files and <code>.clang_complete</code> file for header files.
+</p>
+
+<p>
+<code>.clang_complete</code> is a file with special format, originally used by a Vim plugin to provide code completion. It is simpler than compilation database since it can not provide specific compilation commands for each source file, instead it provides compilation flags for all files in the project. In most cases that is enough for Irony to work with your header files.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org580aa63" class="outline-3">
+<h3 id="code-completion"><a id="org580aa63"></a>Code completion</h3>
+<div class="outline-text-3" id="text-code-completion">
+<p>
+Irony code completion works really well and fast, and can be provided as backend for different code completion frontends (Company, AC). I use it with Company.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgbb3c6c1" class="outline-3">
+<h3 id="real-time-syntax-checking"><a id="orgbb3c6c1"></a>Real-time syntax checking</h3>
+<div class="outline-text-3" id="text-real-time-syntax-checking">
+<p>
+Irony integrates with Flycheck and works really well. Syntax checking is fast and on spot.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgd2d0d14" class="outline-3">
+<h3 id="configuration"><a id="orgd2d0d14"></a>Configuration</h3>
+<div class="outline-text-3" id="text-configuration">
+<p>
+Here is my configuration in <code>init.el</code>:
+</p>
+
+<pre class="example">
+(req-package irony
+ :config
+ (progn
+ ;; If irony server was never installed, install it.
+ (unless (irony--find-server-executable) (call-interactively #'irony-install-server))
+
+ (add-hook 'c++-mode-hook 'irony-mode)
+ (add-hook 'c-mode-hook 'irony-mode)
+
+ ;; Use compilation database first, clang_complete as fallback.
+ (setq-default irony-cdb-compilation-databases '(irony-cdb-libclang
+ irony-cdb-clang-complete))
+
+ (add-hook 'irony-mode-hook 'irony-cdb-autosetup-compile-options)
+ ))
+
+ ;; I use irony with company to get code completion.
+ (req-package company-irony
+ :require company irony
+ :config
+ (progn
+ (eval-after-load 'company '(add-to-list 'company-backends 'company-irony))))
+
+ ;; I use irony with flycheck to get real-time syntax checking.
+ (req-package flycheck-irony
+ :require flycheck irony
+ :config
+ (progn
+ (eval-after-load 'flycheck '(add-hook 'flycheck-mode-hook #'flycheck-irony-setup))))
+
+ ;; Eldoc shows argument list of the function you are currently writing in the echo area.
+ (req-package irony-eldoc
+ :require eldoc irony
+ :config
+ (progn
+ (add-hook 'irony-mode-hook #'irony-eldoc)))
+</pre>
+
+<p>
+<a href="https://github.com/Andersbakken/rtags">RTags</a> is indexer for C/C++ (and ObjC/ObjC++) that comes with integration for Emacs. Basically, what it does is it actually understands your C++ project and therefore offers all the functionality that C++ IDE needs.
+</p>
+
+<p>
+As mentioned above, RTags indexes the whole projects and builds an index on the disk which it can query for information.
+RTags consists of <code>rc</code> (client), <code>rdm</code> (daemon that does indexing) and Emacs <code>rtags</code> package that interacts with <code>rc</code>.
+<code>rdm</code> runs in the background, re-indexes files as needed (on change) and answers to queries from <code>rc</code>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgd09198c" class="outline-3">
+<h3 id="features"><a id="orgd09198c"></a>Features</h3>
+<div class="outline-text-3" id="text-features">
+<ul class="org-ul">
+<li>Code completion (both source and header files).</li>
+<li>Real-time syntax checking.</li>
+<li>Jump to definition.</li>
+<li>Find references.</li>
+<li>...</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-orgaf1f288" class="outline-3">
+<h3 id="setup"><a id="orgaf1f288"></a>Setup</h3>
+<div class="outline-text-3" id="text-setup">
+<p>
+<code>rdm</code> and <code>rc</code> can be installed through Emacs <code>rtags</code> package by running <code>rtags-install</code>, or manually.
+Manual installation gives more control, and in that case it is best to configure it as systemd socket service.
+</p>
+
+<p>
+I like better manual installation, since in that case I can control number of processes that RTags uses.
+This is important because on larger projects reindexing takes a lot of CPU, so it makes sense to either go with smaller number of processes or turning automatic reindexing off.
+</p>
+
+<p>
+We have to manually register each new project with RTags, which is done by running <code>rc -J &lt;path_to_compile_commands.json&gt;</code>.
+If you installed RTags through emacs, <code>rc</code> is somewhere in its internal directory structure, so you have to find it to run this command. Also, make sure that <code>rdm</code> is running when doing that, and make sure it finishes indexing.
+</p>
+
+<p>
+RTags will make sure to automatically detect which project currently active buffer belongs to and tell rdm to switch to that project.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org79a94c6" class="outline-3">
+<h3 id="configuration-1"><a id="org79a94c6"></a>Configuration</h3>
+<div class="outline-text-3" id="text-configuration-1">
+<p>
+Below is my configuration for RTags:
+</p>
+
+<pre class="example">
+(req-package rtags
+ :config
+ (progn
+ (unless (rtags-executable-find "rc") (error "Binary rc is not installed!"))
+ (unless (rtags-executable-find "rdm") (error "Binary rdm is not installed!"))
+
+ (define-key c-mode-base-map (kbd "M-.") 'rtags-find-symbol-at-point)
+ (define-key c-mode-base-map (kbd "M-,") 'rtags-find-references-at-point)
+ (define-key c-mode-base-map (kbd "M-?") 'rtags-display-summary)
+ (rtags-enable-standard-keybindings)
+
+ (setq rtags-use-helm t)
+
+ ;; Shutdown rdm when leaving emacs.
+ (add-hook 'kill-emacs-hook 'rtags-quit-rdm)
+ ))
+
+;; TODO: Has no coloring! How can I get coloring?
+(req-package helm-rtags
+ :require helm rtags
+ :config
+ (progn
+ (setq rtags-display-result-backend 'helm)
+ ))
+
+;; Use rtags for auto-completion.
+(req-package company-rtags
+ :require company rtags
+ :config
+ (progn
+ (setq rtags-autostart-diagnostics t)
+ (rtags-diagnostics)
+ (setq rtags-completions-enabled t)
+ (push 'company-rtags company-backends)
+ ))
+
+;; Live code checking.
+(req-package flycheck-rtags
+ :require flycheck rtags
+ :config
+ (progn
+ ;; ensure that we use only rtags checking
+ ;; https://github.com/Andersbakken/rtags#optional-1
+ (defun setup-flycheck-rtags ()
+ (flycheck-select-checker 'rtags)
+ (setq-local flycheck-highlighting-mode nil) ;; RTags creates more accurate overlays.
+ (setq-local flycheck-check-syntax-automatically nil)
+ (rtags-set-periodic-reparse-timeout 2.0) ;; Run flycheck 2 seconds after being idle.
+ )
+ (add-hook 'c-mode-hook #'setup-flycheck-rtags)
+ (add-hook 'c++-mode-hook #'setup-flycheck-rtags)
+ ))
+</pre>
+
+<p>
+Compared to Irony, RTags is more powerful but it is also more heavyweight.
+For example, RTags can jump to definitions, find references and do similar advanced stuff that Irony can't do, however Irony does not have to reindex big part of the project with each change which makes it much faster for big C++ projects.
+Also, it is worth noting that RTags works correctly with header files out of the box, while Irony does not support that yet.
+</p>
+
+<p>
+On smaller projects, I might go just with RTags, however on bigger projects (&gt; 10k files) automatic reindexing becomes very resource demanding.
+What works well for me on bigger projects is using Irony for auto-complete and flycheck, since Irony works correct enough and is fast, while on the other hand I use RTags for more advanced features (jump to definition, find references, ...) and reindex manually from time to time.
+</p>
+
+<p>
+In this post I have shown my init.el configurations for both RTags and Irony, but I don't have all of it active at the same time.
+I do have all of it in my init.el, but usually I (un)comment parts that I am (not)using currently, so for a very big project I might comment out company-rtags and flycheck-rtags configuration in favour of Irony.
+</p>
+
+<p>
+In the future, as both packages advance, I expect Irony will get more features while RTags will become faster and I will able to choose just one of them.
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org680ebd7" class="outline-2">
+<h2 id="projectile"><a id="org680ebd7"></a>Projectile</h2>
+<div class="outline-text-2" id="text-projectile">
+<p>
+<a href="https://github.com/bbatsov/projectile">Projectile</a> is a really nifty package, that “teaches” Emacs the concept of project.
+</p>
+
+<p>
+This means that when working on a certain source file, it will understand which project this file belongs to and offer some nice features based on that.
+</p>
+
+<p>
+Projectile usually works out of the box, since it will detect your VCS (I use git) files automatically and figure out the project root from that.
+If your case is more complicated, you can just create empty <code>.projectile</code> file in the root directory of your project and Projectile will detect it.
+</p>
+
+<p>
+Setting it up is as easy as:
+</p>
+
+<pre class="example">
+(req-package projectile
+ :config
+ (progn
+ (projectile-global-mode)
+ ))
+</pre>
+
+<p>
+Features I found most useful are jumping to a file/buffer in project and switching from source file to corresponding header file.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orge323eb7" class="outline-2">
+<h2 id="helm"><a id="orge323eb7"></a>Helm</h2>
+<div class="outline-text-2" id="text-helm">
+<p>
+<a href="https://emacs-helm.github.io/helm/">Helm</a> is Emacs incremental completion and selection narrowing framework.
+What that actually means is that if you use Helm, most of the searches/selections (finding file/buffer, browsing kill ring, executing command, ...) you do will have the same interface: Helm interface.
+It also comes with some other useful features, and there are many integrations with other packages.
+</p>
+
+<p>
+Helm does not bring any C++ specific features, but since it is useful and adds to making Emacs a C++ IDE, I thought it is worth mentioning it.
+</p>
+
+<p>
+My setup for it goes like this:
+</p>
+
+<pre class="example">
+;; Helm makes searching for anything nicer.
+;; It works on top of many other commands / packages and gives them nice, flexible UI.
+(req-package helm
+ :config
+ (progn
+ (require 'helm-config)
+
+ ;; Use C-c h instead of default C-x c, it makes more sense.
+ (global-set-key (kbd "C-c h") 'helm-command-prefix)
+ (global-unset-key (kbd "C-x c"))
+
+ (setq
+ ;; move to end or beginning of source when reaching top or bottom of source.
+ helm-move-to-line-cycle-in-source t
+ ;; search for library in `require' and `declare-function' sexp.
+ helm-ff-search-library-in-sexp t
+ ;; scroll 8 lines other window using M-&lt;next&gt;/M-&lt;prior&gt;
+ helm-scroll-amount 8
+ helm-ff-file-name-history-use-recentf t
+ helm-echo-input-in-header-line t)
+
+ (global-set-key (kbd "M-x") 'helm-M-x)
+ (setq helm-M-x-fuzzy-match t) ;; optional fuzzy matching for helm-M-x
+
+ (global-set-key (kbd "C-x C-f") 'helm-find-files)
+
+ (global-set-key (kbd "M-y") 'helm-show-kill-ring)
+
+ (global-set-key (kbd "C-x b") 'helm-mini)
+ (setq helm-buffers-fuzzy-matching t
+ helm-recentf-fuzzy-match t)
+
+ ;; TOOD: helm-semantic has not syntax coloring! How can I fix that?
+ (setq helm-semantic-fuzzy-match t
+ helm-imenu-fuzzy-match t)
+
+ ;; Lists all occurences of a pattern in buffer.
+ (global-set-key (kbd "C-c h o") 'helm-occur)
+
+ (global-set-key (kbd "C-h SPC") 'helm-all-mark-rings)
+
+ ;; open helm buffer inside current window, not occupy whole other window
+ (setq helm-split-window-in-side-p t)
+ (setq helm-autoresize-max-height 50)
+ (setq helm-autoresize-min-height 30)
+ (helm-autoresize-mode 1)
+
+ (helm-mode 1)
+ ))
+
+;; Use Helm in Projectile.
+(req-package helm-projectile
+ :require helm projectile
+ :config
+ (progn
+ (setq projectile-completion-system 'helm)
+ (helm-projectile-on)
+ ))
+</pre>
+
+<p>
+As you can see from the comments, I have an issue with helm-semantic not doing syntax coloring, I haven't figured out yet how to fix that.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org4698afa" class="outline-2">
+<h2 id="summary"><a id="org4698afa"></a>Summary</h2>
+<div class="outline-text-2" id="text-summary">
+<p>
+With few packages, Emacs can become a full-fledged C++ IDE!
+</p>
+
+<p>
+I use Company, Flycheck, Helm, Projectile and Irony and/or RTags. Most of these packages require pretty simple setup, Irony and RTags being the most demanding but still manageable with medium effort.
+</p>
+
+<p>
+Irony and RTags are the “brain”, as they understand your C++ project (thanks to libclang) and provide code completion and other features.
+Although they are alternatives to each other and are not meant to be used together, I found that combination of the two is sometimes the best option since they have different strengths and weaknesses. In the future I hope to be able to use just one of them for projects of all types/sizes.
+</p>
+
+<p>
+I hope this post will give you a good idea of how to get more out of Emacs for C++ development!
+I am also sure there is a lot that can be improved over my setup, so please write your suggestions and I will do my best to try them out and update this post.
+And again, big thanks to <b>tuhdo</b> for writing his <a href="https://tuhdo.github.io/c-ide.html">blog post</a> that helped me a lot while setting up Emacs for C++ development, check it out.
+</p>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2018-03-22</span>
+            <span title="last modification date" class="post-info">2018-03-22</span>
+            <span title="tags" class="post-info">:<a href="/tags/raw">raw</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-c7de1c50-88ed-412e-ae70-62694dd7dea5">lujun9972</a></span>
+        </div>
+    <script src="/media/js/jquery-2.1.3.min.js"></script>
+        <section>
+            <h1>Comments</h1>
+            <div id="comment-wrap">
+                    <a class="disqus_label">使用 Disqus 评论</a>
+    </ul>
+        <div id="disqus_thread"></div>
+        <script type="text/javascript">
+         //var disqus_developer = 1;
+         var preempt_signal=false;
+         var disqus_identifier = "/blog/2018/03/22/emacs-as-a-c++-ide/";
+         var disqus_url = "https://lujun9972.github.io/emacs-document/blog/2018/03/22/emacs-as-a-c++-ide/";
+         var disqus_shortname = 'emacs-document';
+         /* * * DON'T EDIT BELOW THIS LINE * * */
+         (function() {
+             var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+             dsq.src = 'https://' + disqus_shortname + '.disqus.com/embed.js';
+             (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+             $('#disqus_thread').css('display','none');
+         })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+    <script>
+     /* comments */
+     var ego_disqus_thread=$('#disqus_thread');
+     var ego_ds_label=$('.ds-thread');
+     $('.disqus_label').click(function(){
+         ego_disqus_thread.show();
+         ego_ds_label.hide();
+     });
+     $('.ds-label').click(function(){
+         ego_disqus_thread.hide();
+         ego_ds_label.show();
+     });
+    </script>
+        </section>
+    <script src="/media/js/main.js"></script>
+        <script type="text/javascript">
+         var _gaq = _gaq || [];
+         _gaq.push(['_setAccount', '7bac4fd0247f69c27887e0d4e3aee41e']);
+         _gaq.push(['_trackPageview']);
+         (function() {
+             var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+             ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+             var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-c7de1c50-88ed-412e-ae70-62694dd7dea5">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="//instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>

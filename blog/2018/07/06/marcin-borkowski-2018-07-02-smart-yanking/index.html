@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Marcin Borkowski: 2018-07-02 Smart yanking - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="raw" />
+  <style>
+   #ds-thread #ds-reset .ds-comment-body p {color: #ffffff;}
+   #ds-thread #ds-reset .ds-comment-body p a {color: #ff0;}
+   #ds-thread #ds-reset .ds-comment-body p a:hover {color: #0ff;}
+   #disqus_thread a {color: #00ffff;}
+  </style>
+  <link rel="stylesheet" href="/media/css/main.css" type="text/css"/>
+  <link rel="stylesheet" href="/media/css/comment.css" type="text/css"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="/">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <div class="menu-icon">
+        <svg viewBox="0 0 18 15">
+          <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.031C17.335,0,18,0.665,18,1.484L18,1.484z" fill="#ffff00"/>
+          <path d="M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0c0-0.82,0.665-1.484,1.484-1.484 h15.031C17.335,6.031,18,6.696,18,7.516L18,7.516z" fill="#ffff00"/>
+          <path d="M18,13.516C18,14.335,17.335,15,16.516,15H1.484C0.665,15,0,14.335,0,13.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.031C17.335,12.031,18,12.696,18,13.516L18,13.516z" fill="#ffff00"/>
+        </svg>
+      </div>
+      <ul class="trigger">
+        <li><a href="/years/">Years</a></li>
+        <li><a href="/authors/">Authors</a></li>
+        <li><a href="/tags/">Tags</a></li>
+        <li><a href="/about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="/rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="http://www.google.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">Marcin Borkowski: 2018-07-02 Smart yanking</h1>
+<p>
+Notice: this is a long, technical post about a useful piece of Emacs Lisp. What it does it allowing to yank text with a space at either end both before and after a space between words and have Emacs adjust things so that you don't end up with two spaces at one end of the yanked fragment and no space at the other one. If you just want the working code, you may get it from here: <a href="https://gist.github.com/mbork/9ee1bd8216424e07342e88739fe65547">https://gist.github.com/mbork/9ee1bd8216424e07342e88739fe65547</a>. If you want to know the gory details, read on.
+</p>
+
+<p>
+
+Edit: in the first version of this blog post, I made an embarrassing rookie mistake. Sorry for that. Given that this post is one of the most popular ones in recent months, it is both ironic and humbling...
+</p>
+
+<p>
+
+</p>
+
+<p>
+Anyway, the mistake is now corrected. Expect another blog post where I explain what I did wrong (I think it's easy to fall for this!).
+</p>
+
+<p>
+I use Emacs fairly often to write text in a natural language. While I consider Emacs support for human languages to be very good, there are still a few rough edges. One of them is connected with cutting and pasting, or, as Emacs insists on calling these, killing and yanking.
+</p>
+
+<p>
+It's been a long time since I wrote anything in Word, but I vaguely recall that its pasting command is fairly smart with respect to spaces. For instance, consider the following text:<br />
+</p>
+
+<pre class="example">
+The quick| brown fox jumps over the lazy dog.
+</pre>
+
+<p>
+(The vertical bar denotes the point.) Now imagine pressing <code>M-d</code> (<code>kill-word</code>):<br />
+</p>
+
+<pre class="example">
+The quick| fox jumps over the lazy dog.
+</pre>
+
+<p>
+and moving to the “lazy” part:<br />
+</p>
+
+<pre class="example">
+The quick fox jumps over the |lazy dog.
+</pre>
+
+<p>
+Notice how we are now on the beginning of the word instead of at the end of the previous one. (This might have happened if we e.g. went to the end of line -- <code>C-e</code> -- and then back by two words -- <code>M-2 M-b</code>.)
+</p>
+
+<p>
+If we now press <code>C-y</code>, we end up with this:<br />
+</p>
+
+<pre class="example">
+The quick fox jumps over the brown|lazy dog.
+</pre>
+
+<p>
+As you can see, we now have a double space before “brown” and no space after it.
+</p>
+
+<p>
+It is not difficult to code a function doing the right thing in this case. (The “right thing” could be e.g. moving the point back by a space before yanking.) The problem, however, is to know when we should do that.
+</p>
+
+<p>
+First of all, it is definitely a bad idea in programming modes. (Possibly unless we are editing comments or strings, but let's forget about it for now.) On the other hand, Org-mode, LaTeX modes etc. are fine. This means that we probably should put our customizations in <code>text-mode-hook</code>.
+</p>
+
+<p>
+Then, we should decide where in the Emacs system we should plug our functionality into. Redefining <code>yank</code> is probably a bad idea -- we do not want to do all the hard work that command does (it has more than a dozen lines!). We could define our own command, let's call it <code>smart-yank</code>, which would do its magic and then call <code>yank</code>, but there is no need to. Emacs has a special facility designed exactly to this kind of customizations, called <code>advice</code>. We can advise the <code>yank</code> command, which means that we provide some Elisp code to be run before or after <code>yank</code> (or even instead of it).
+</p>
+
+<p>
+One drawback of using advice is that it is global: there is no way to install advice only in a specific mode or buffer. In other words, <code>text-mode-hook</code> will be of no use for us. This is not a huge problem, though, since we can make our function check whether we are in a mode derived from <code>text-mode</code>, and do nothing if we are not in such a mode.
+</p>
+
+<p>
+Now let's think about what exactly our advice should do. This is not easy, especially that we should probably take into consideration the fact that we may have two spaces at the end of the sentence, and that instead of a space we may have a newline between words. My first idea is to check whether the last entry in the kill ring has a whitespace character at the left or right. My assumptions are as follow.<br />
+</p>
+
+<ul class="org-ul">
+<li>If it has whitespace on both sides, nothing special should happen.</li>
+<li>If it has whitespace on e.g. left side, and there is whitespace to the left of the point, we should move point before any whitespace.</li>
+<li>Similarly if the last kill rinf entry has whitespace on the right side.<br />
+If the kill ring entry has no space on either side, it might be difficult to decide what to do. It might be the case that it is not a whole word but only a prefix (though this would be strange). I think I could try to make sure that in this case, space is inserted on whichever side had no space before, and just see what happens during daily usage.</li>
+</ul>
+
+<p>
+All this is rather simplified, since we do not really care for newlines and filling, but let's do it one step at a time.
+</p>
+
+<pre class="example">
+(defun has-space-at-boundary-p (string)
+ "Check whether STRING has any whitespace on the boundary.
+Return 'left, 'right, 'both or nil."
+ (let ((result nil))
+ (when (string-match-p "^[[:space:]]+" string)
+ (setq result 'left))
+ (when (string-match-p "[[:space:]]+$" string)
+ (if (eq result 'left)
+     (setq result 'both)
+    (setq result 'right)))
+ result))
+</pre>
+
+<p>
+Notice how I used <code>string-match-p</code>, which does not modify match data (which is global state, so I don't like modifying it by my functions).
+</p>
+
+<p>
+Let us now write the function checking whether we should do something special when yanking. The criteria are as follows:<br />
+</p>
+
+<ul class="org-ul">
+<li>If there is no space around point or on both sides of the point, do nothing special.</li>
+<li>If there is space e.g. to the left of the point, and the yanked text has space on the left, move point left across all the space first.</li>
+<li>If there is space to the right of the point, do the analogous thing.</li>
+</ul>
+
+<p>
+First, we want to be able to check whether there is any whitespace around the point.<br />
+</p>
+
+<pre class="example">
+(defun is-there-space-around-point-p ()
+ "Check whether there is whitespace around point.
+Return 'left, 'right, 'both or nil."
+ (let ((result nil))
+ (when (&lt; (save-excursion
+     (skip-chars-backward "[:space:]"))
+     0)
+ (setq result 'left))
+ (when (&gt; (save-excursion
+     (skip-chars-forward "[:space:]"))
+     0)
+ (if (eq result 'left)
+     (setq result 'both)
+    (setq result 'right)))
+ result))
+</pre>
+
+<p>
+We can now write the function combining all we have done so far.
+</p>
+
+<pre class="example">
+(defun set-point-before-yanking (string)
+ "Put point in the appropriate place before yanking STRING."
+ (let ((space-in-yanked-string (has-space-at-boundary-p string))
+    (space-at-point (is-there-space-around-point-p)))
+ (cond ((and (eq space-in-yanked-string 'left)
+        (eq space-at-point 'left))
+     (skip-chars-backward "[:space:]"))
+     ((and (eq space-in-yanked-string 'right)
+        (eq space-at-point 'right))
+     (skip-chars-forward "[:space:]")))))
+</pre>
+
+<p>
+Now there is one problem. We cannot advice <code>yank</code>, since we do not know the yanked string before <code>yank</code> is actually evaluated. (We could of course look up the source code for <code>yank</code>, and see how it uses <code>current-kill</code> to get the right string. Copying and pasting code between a function and its advice, however, kind of defeats the purpose of advising it in the first place.) It turns out, however, that <code>yank</code> is a pretty complicated mechanism, which calls the <code>insert-for-yank</code> command. It allows for some deep magic, manipulating text before yanking (and indeed, this mechanism could be used to solve our initial problem!). We may than advice <code>insert-for-yank</code>, which gets exactly what we want (the string) as its sole argument.
+</p>
+
+<p>
+One possible drawback of this approach is that <code>yank</code> calls <code>push-mark</code> before <code>insert-for-yank</code>, which may or may not be what we want. We could circumvent that, but I'm not sure whether it's worth the effort, and the code would be even more hacky than it is now.
+</p>
+
+<p>
+So let's finally define and install our advice, remembering about checking whether the mode is a text one.<br />
+</p>
+
+<pre class="example">
+(defun set-point-before-yanking-if-in-text-mode (string)
+ "Invoke `set-point-before-yanking' in text modes."
+ (when (derived-mode-p 'text-mode)
+ (set-point-before-yanking string)))
+
+(advice-add
+ 'insert-for-yank
+ :before
+ #'set-point-before-yanking-if-in-text-mode)
+</pre>
+
+<p>
+This solution has one drawback. It installs some magic working behind the scenes (such kind of magic is traditionally called “DWIM” -- or “do what I mean” in Emacs world), and does not give the user any convenient way of turning this magic off. I don't like it when computers try to be smarter than they are, so I'd prefer to be able to tell Emacs “just yank this as it is, without paying attention to any spaces whatsoever”. Now the question is: how to tell that to Emacs? A prefix argument (<code>C-u</code>) is the first idea, but a prefix argument to <code>yank</code> has a well established meaning and I don't want to give up that.
+</p>
+
+<p>
+Well, another natural choice is <code>C-u C-u</code>. We have one problem, though. The <code>insert-for-yank</code> function knows nothing about the prefix argument to <code>yank</code>.
+</p>
+
+<p>
+We may overcome this problem in a few ways. The first that came to my mind was to advise <code>yank</code> instead. This is probably not a bad idea, although there is one problem with it: what about other yanking commands? There aren't many of them in stock Emacs, and I don't care for yanking rectangles a lot (although my advice will break it, since <code>yank-rectangle</code> calls <code>insert-for-yank</code> repeatedly for each line), but there are at least <code>yank-pop</code> and mouse yanking commands. Since I don't yank rectangles very often (although I happen to use <code>delete-rectangle</code> every now and again), I am willing to pay the price.
+</p>
+
+<p>
+This leaves us with the problem of telling <code>insert-for-yank</code> about the prefix argument to the command that invoked it. Luckily for us, we don't have to do anything. There is already the <a href="http://mbork.pl/2017-07-09_current-prefix-arg">current-prefix-arg</a> variable, which is global state, so blah, blah, you shouldn't use it, but really, who cares.
+</p>
+
+<p>
+So here again is our advice.<br />
+</p>
+
+<pre class="example">
+(defun set-point-before-yanking (string)
+ "Put point in the appropriate place before yanking STRING."
+ (unless (equal current-prefix-arg '(16))
+ (let ((space-in-yanked-string (has-space-at-boundary-p string))
+     (space-at-point (is-there-space-around-point-p)))
+ (cond ((and (eq space-in-yanked-string 'left)
+         (eq space-at-point 'left))
+     (skip-chars-backward "[:space:]"))
+     ((and (eq space-in-yanked-string 'right)
+         (eq space-at-point 'right))
+     (skip-chars-forward "[:space:]"))))))
+</pre>
+
+<p>
+Now <code>C-u C-u C-y</code> inserts the last entry in the kill ring as is. This is still not ideal -- we cannot meaningfully pass <code>C-u C-u</code> to <code>yank-pop</code>, for instance -- but should work well enough. (Remember that in a pinch, you can always manually reinsert the spaces. This is not as bad as it sounds -- yanking puts the point and mark around the yanked stuff, although without activating the mark, so jumping to the other side of the yanked text is as simple as <code>C-u C-SPC</code> or <code>C-x C-x</code>.) Incidentally, this also fixes the problem with yanking rectangles -- if <code>yank-rectangle</code> behaves wrong (i.e., the yanked lines are not aligned because of our machinations), you can just undo it and say <code>C-u C-u C-x r y</code> -- it's cumbersome, but possible.
+</p>
+
+<p>
+Interestingly, there exists a completely different approach to the whole problem. There is a <code>yank-handler</code> property which you can put on a string passed to <code>insert-for-yank</code>, and it specifies a function that is called instead of <code>insert</code> when yanking text. So, we might just leave the yanking as it is, and make <code>kill-region</code> put this property on the text, with a “modified insert”. This approach looks promising, but I envision one problem: it won't support yanking texts from outside Emacs. For now, I'm staying with the above.
+</p>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2018-07-06</span>
+            <span title="last modification date" class="post-info">2018-07-06</span>
+            <span title="tags" class="post-info">:<a href="/tags/raw">raw</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-c7de1c50-88ed-412e-ae70-62694dd7dea5">lujun9972</a></span>
+        </div>
+    <script src="/media/js/jquery-2.1.3.min.js"></script>
+        <section>
+            <h1>Comments</h1>
+            <div id="comment-wrap">
+                    <a class="disqus_label">使用 Disqus 评论</a>
+    </ul>
+        <div id="disqus_thread"></div>
+        <script type="text/javascript">
+         //var disqus_developer = 1;
+         var preempt_signal=false;
+         var disqus_identifier = "/blog/2018/07/06/marcin-borkowski-2018-07-02-smart-yanking/";
+         var disqus_url = "https://lujun9972.github.io/emacs-document/blog/2018/07/06/marcin-borkowski-2018-07-02-smart-yanking/";
+         var disqus_shortname = 'emacs-document';
+         /* * * DON'T EDIT BELOW THIS LINE * * */
+         (function() {
+             var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+             dsq.src = 'https://' + disqus_shortname + '.disqus.com/embed.js';
+             (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+             $('#disqus_thread').css('display','none');
+         })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+    <script>
+     /* comments */
+     var ego_disqus_thread=$('#disqus_thread');
+     var ego_ds_label=$('.ds-thread');
+     $('.disqus_label').click(function(){
+         ego_disqus_thread.show();
+         ego_ds_label.hide();
+     });
+     $('.ds-label').click(function(){
+         ego_disqus_thread.hide();
+         ego_ds_label.show();
+     });
+    </script>
+        </section>
+    <script src="/media/js/main.js"></script>
+        <script type="text/javascript">
+         var _gaq = _gaq || [];
+         _gaq.push(['_setAccount', '7bac4fd0247f69c27887e0d4e3aee41e']);
+         _gaq.push(['_trackPageview']);
+         (function() {
+             var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+             ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+             var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-c7de1c50-88ed-412e-ae70-62694dd7dea5">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="//instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>

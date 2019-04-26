@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Getting geo-tagged information from photos for blogging - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="raw" />
+  <style>
+   #ds-thread #ds-reset .ds-comment-body p {color: #ffffff;}
+   #ds-thread #ds-reset .ds-comment-body p a {color: #ff0;}
+   #ds-thread #ds-reset .ds-comment-body p a:hover {color: #0ff;}
+   #disqus_thread a {color: #00ffff;}
+  </style>
+  <link rel="stylesheet" href="/media/css/main.css" type="text/css"/>
+  <link rel="stylesheet" href="/media/css/comment.css" type="text/css"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="/">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <div class="menu-icon">
+        <svg viewBox="0 0 18 15">
+          <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.031C17.335,0,18,0.665,18,1.484L18,1.484z" fill="#ffff00"/>
+          <path d="M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0c0-0.82,0.665-1.484,1.484-1.484 h15.031C17.335,6.031,18,6.696,18,7.516L18,7.516z" fill="#ffff00"/>
+          <path d="M18,13.516C18,14.335,17.335,15,16.516,15H1.484C0.665,15,0,14.335,0,13.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.031C17.335,12.031,18,12.696,18,13.516L18,13.516z" fill="#ffff00"/>
+        </svg>
+      </div>
+      <ul class="trigger">
+        <li><a href="/years/">Years</a></li>
+        <li><a href="/authors/">Authors</a></li>
+        <li><a href="/tags/">Tags</a></li>
+        <li><a href="/about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="/rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="http://www.google.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">Getting geo-tagged information from photos for blogging</h1>
+<p>
+I am kind of late to this game, but recently I turned on location services for the camera on my phone. That means the location of the photo is stored in the photo, and we can use that to create urls to the photo location in a map for example. While traveling, I thought this would be a good application for org-mode to add functionality to documents with photos in them, e.g. to be able to click on them to see where they are from, or to automate creation of html pages with links to maps, etc. In this post I explore some ways to achieve those ideas. What I would like is a custom org link that shows me a thumbnail of the image, and which exports to show the image in an html file with a link to a pin on Google maps.
+</p>
+
+<p>
+So, let's dig in. Imagemagick provides an identify command that can extract the information stored in the images. Here we consider just the GPS information. I some pictures on a recent vacation, and one is unimaginatively named IMG\_1759.JPG. Let's see where it was taken.
+</p>
+
+<pre class="example">
+identify -verbose IMG_1759.JPG | grep GPS
+</pre>
+
+<p>
+exif:GPSAltitude: 14426/387
+   
+exif:GPSAltitudeRef: 0
+   
+exif:GPSDateStamp: 2018:06:30
+   
+exif:GPSDestBearing: 11767/80
+   
+exif:GPSDestBearingRef: T
+   
+exif:GPSImgDirection: 11767/80
+   
+exif:GPSImgDirectionRef: T
+   
+exif:GPSInfo: 1632
+   
+exif:GPSLatitude: 22/1, 11/1, 614/100
+exif:GPSLatitudeRef: N
+   
+exif:GPSLongitude: 159/1, 40/1, 4512/100
+exif:GPSLongitudeRef: W
+   
+exif:GPSSpeed: 401/100
+   
+exif:GPSSpeedRef: K
+   
+exif:GPSTimeStamp: 3/1, 44/1, 3900/100
+</p>
+
+<p>
+The interpretation here is that I took that photo at latitude 22° 11' 6.14" N, and longitude 159° 40' 45.12" W. Evidently I was moving at 4.01 in some unit; I can confirm that I was at least moving, I was on a ship when I took that picture, and it was moving.
+</p>
+
+<p>
+According to <a href="http://alvarestech.com/temp/routeconverter/RouteConverter/navigation-formats/src/main/doc/googlemaps/Google_Map_Parameters.htm">this</a> you can make a url to a Google maps pin in satellite picture mode that looks like this: <a href="http://maps.google.com/maps?q=22%2011%206.14N,159%2040%2045.12W&amp;t=k">http://maps.google.com/maps?q=22 11 6.14N,159 40 45.12W&amp;t=k</a>. It doesn't seem possible to set the zoom in this url (at least setting the zoom doesn't do anything, and I didn't feel like trying all the other variations that are reported to sometimes work). I guess that is ok for now, it adds some suspense that you have to zoom out to see where the image is in some cases.
+</p>
+
+<p>
+We need a little function to take an image file and generate that link. We have to do some algebra on the latitude and longitude which are stored as integers with a division operator. I am going to pipe this through an old unix utility called bc mostly because it is simple, and I won't have to parse it much. bc is a little archaic, you have to set the scale first, which tells it how many decimal places to output. The degrees and minutes are integers, so we will have to deal with that later.
+</p>
+
+<pre class="example">
+echo "scale=2; 614/100" | bc
+</pre>
+
+<pre class="example">
+6.14
+</pre>
+
+<p>
+Here is our function. I filter out the lines with GPS in them into an a-list. Then, I grab out the specific quantities I want and construct the url. There is a little hackery since it appears the degrees and minutes should be integers in the url formulation used here, so I convert them to numbers and then take the floor. The function is a little longer than I thought, but it isn't too bad I guess. It is a little repetitious, but not enough to justify refactoring.
+</p>
+
+<pre class="example">
+(defun iphoto-map-url (fname)
+ (let* ((gps-lines (-keep (lambda (line)
+ (when (s-contains? "GPS" line) (s-trim line)))
+ (process-lines "identify" "-verbose" fname)))
+ (gps-alist (mapcar (lambda (s) (s-split ": " s t)) gps-lines))
+ (latitude (mapcar
+ (lambda (s)
+ (s-trim (shell-command-to-string
+ (format "echo \"scale=2;%s\" | bc" s))))
+ (s-split "," (cadr (assoc "exif:GPSLatitude" gps-alist)))))
+ (latitude-ref (cadr (assoc "exif:GPSLatitudeRef" gps-alist)))
+ (longitude (mapcar
+ (lambda (s)
+ (s-trim
+ (shell-command-to-string
+ (format "echo \"scale=2;%s\" | bc" s))))
+ (s-split "," (cadr (assoc "exif:GPSLongitude" gps-alist)))))
+ (longitude-ref (cadr (assoc "exif:GPSLongitudeRef" gps-alist))))
+ (s-format "http://maps.google.com/maps?q=$0 $1 $2$3,$4 $5 $6$7&amp;t=k"
+ 'elt
+ (list
+ (floor (string-to-number (nth 0 latitude)))
+ (floor (string-to-number (nth 1 latitude)))
+ (nth 2 latitude)
+ latitude-ref
+ (floor (string-to-number (nth 0 longitude)))
+ (floor (string-to-number (nth 1 longitude)))
+ (nth 2 longitude)
+ longitude-ref))))
+</pre>
+
+<pre class="example">
+iphoto-map-url
+</pre>
+
+<p>
+Here is the function in action, making the url.
+</p>
+
+<pre class="example">
+(iphoto-map-url "IMG_1759.JPG")
+</pre>
+
+<pre class="example">
+http://maps.google.com/maps?q=22 11 6.14N,159 40 45.12W&amp;t=k
+</pre>
+
+<p>
+It is kind of slow, but that is because the identify shell command is kind of slow when you run it with the -verbose tag. Now, I would like the following things to happen when I publish it to html:
+</p>
+
+<ol class="org-ol">
+<li>I want the image wrapped in an img tag inside a figure environment.</li>
+<li>I want the image to by hyperlinked to its location in Google maps.</li>
+</ol>
+
+<p>
+In the org file, I want a thumbnail overlay on it, so I can see the image while writing, and I want it to toggle like other images. I use an iPhone to take the photos, so we will call it an iphoto link.
+</p>
+
+<p>
+Here is the html export function I will use. It is a little hacky that I hard code the width in at 300 pixels, but I didn't feel like figuring out how to get it from an #+attr\_html line right now. It probably requires a filter function where you have access to the actual org-elements. I put the url to the image location in a figure caption here.
+</p>
+
+<pre class="example">
+(defun iphoto-export (path desc backend)
+ (cond
+ ((eq 'html backend)
+ (format "&lt;figure&gt;
+&lt;img src=\"%s\" width=\"300\"&gt;
+%s
+&lt;/figure&gt;"
+ path
+ (format "&lt;figcaption&gt;%s &lt;a href=\"%s\"&gt;map&lt;/a&gt;&lt;/figcaption&gt;"
+ (or desc "")
+ (iphoto-map-url path))))))
+</pre>
+
+<pre class="example">
+iphoto-export
+</pre>
+
+<p>
+Ok, the last detail I want is to put an image overlay on my new link so I can see it. I want this to work with org-toggle-inline-images so I can turn the images on and off like regular image links with C-c C-x C-v. This function creates overlays as needed, and ties into the org-inline-image-overlays so they get deleted on toggling. We have to advise the display function to redraw these, which we clumsily do by restarting the org font-lock machinery which will redraw the thumbnails from the activate-func property of the links. I also hard code the thumbnail width in this function, when it could be moved out to a variable or attribute.
+</p>
+
+<pre class="example">
+(defun iphoto-thumbnails (start end imgfile bracketp)
+ (unless bracketp
+ (when (and
+ ;; it is an image
+ (org-string-match-p (image-file-name-regexp) imgfile)
+ ;; and it exists
+ (f-exists? imgfile)
+ ;; and there is no overlay here.
+ (not (ov-at start)))
+ (setq img (create-image (expand-file-name imgfile)
+ 'imagemagick nil :width 300
+ :background "lightgray"))
+ (setq ov (make-overlay start end))
+ (overlay-put ov 'display img)
+ (overlay-put ov 'face 'default)
+ (overlay-put ov 'org-image-overlay t)
+ (overlay-put ov 'modification-hooks
+ (list
+ `(lambda (&amp;rest args)
+ (org-display-inline-remove-overlay ,ov t ,start ,end))))
+ (push ov org-inline-image-overlays))))
+
+(defun iphoto-redraw-thumbnails (&amp;rest args)
+ (org-restart-font-lock))
+
+;; this redisplays these thumbnails on image toggling
+(advice-add 'org-display-inline-images :after 'iphoto-redraw-thumbnails)
+</pre>
+
+<p>
+Next, we define the link with a follow, export, tooltip and activate-func (which puts the overlay on).
+</p>
+
+<pre class="example">
+(org-link-set-parameters
+ "iphoto"
+ :follow (lambda (path) (browse-url (iphoto-map-url path)))
+ :export 'iphoto-export
+ :help-echo "Click me to see where this photo is on a map."
+ :activate-func 'iphoto-thumbnails)
+</pre>
+
+<p>
+So finally, here is the mysterious image.
+</p>
+
+<p>
+<img src="http://kitchingroup.cheme.cmu.edu/media/IMG_1759.JPG" alt="IMG_1759.JPG" />
+<a href="http://maps.google.com/maps?q=22%2011%206.14N,159%2040%2045.12W&amp;t=k">map</a>
+</p>
+
+<p>
+Now, in org-mode, I see the image in an overlay, and I can toggle it on and off. If I click on the image, it opens a browser to Google maps with a pin at the spot I took it. When I export it, it wraps the image in a &lt;figure&gt; tag, and puts a url in the caption to the map. If you click on it, and zoom out, you will see this is a picture of the Nāpali Coast on Kauai in Hawaii, and I was in fact out at sea when I took the picture. It was spectacular. Here is another one. This one is a little more obvious with the zoom. Here, I was on land. Since this link is bracketed, it does not show the overlay however in the org-file.
+</p>
+
+<p>
+<img src="http://kitchingroup.cheme.cmu.edu/media/IMG_1749.JPG" alt="IMG_1749.JPG" />
+Another vacation picture, this time with a caption. <a href="http://maps.google.com/maps?q=21%2057%2037.01N,159%2021%206.72W&amp;t=k">map</a>
+</p>
+
+<p>
+Overall, this was easier than I expected. It might be faster to outsource reading the exif data to some dedicate library, perhaps in python that would return everything you want in an easy to parse json data structure. The speed of computing the url is only annoying when you export or click on the links though.
+</p>
+
+<p>
+I didn't build in any error handling, e.g. if you do this on a photo with no GPS data it will probably not handle it gracefully. I also haven't tested this on any other images, e.g. south of the equator, from other cameras, etc. I assume this exif data is pretty standard, but it is a wild world out there... It would still be nice to find a way to get a string representing the nearest known location somehow, that would help the caption be more useful.
+</p>
+
+<p>
+There is one little footnote to speak of, and that is I had to do a little hackery to get this to work with my blog machinery. You can see what it is in the org-source, I buried it in a noexport subheading, because it isn't that interesting in the grand scheme of things. It was just necessary because I export these org-files to blogofile, which then builds the html pages, instead of just exporting them. The images have to be copied to a source directory, and paths changed in the html to point to them. See, boring stuff. Otherwise, the code above should be fine for regular org and html files! Now, my vacation is over so it is time to get back to work.
+</p>
+
+<p>
+Copyright (C) 2018 by John Kitchin. See the <a href="file:///copying.html">License</a> for information about copying.
+</p>
+
+<p>
+<a href="file:///org/2018/07/01/Getting-geo-tagged-information-from-photos-for-blogging.html">org-mode source</a>
+</p>
+
+<p>
+Org-mode version = 9.1.13
+</p>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2018-07-02</span>
+            <span title="last modification date" class="post-info">2018-07-02</span>
+            <span title="tags" class="post-info">:<a href="/tags/raw">raw</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-c7de1c50-88ed-412e-ae70-62694dd7dea5">lujun9972</a></span>
+        </div>
+    <script src="/media/js/jquery-2.1.3.min.js"></script>
+        <section>
+            <h1>Comments</h1>
+            <div id="comment-wrap">
+                    <a class="disqus_label">使用 Disqus 评论</a>
+    </ul>
+        <div id="disqus_thread"></div>
+        <script type="text/javascript">
+         //var disqus_developer = 1;
+         var preempt_signal=false;
+         var disqus_identifier = "/blog/2018/07/02/getting-geo-tagged-information-from-photos-for-blogging/";
+         var disqus_url = "https://lujun9972.github.io/emacs-document/blog/2018/07/02/getting-geo-tagged-information-from-photos-for-blogging/";
+         var disqus_shortname = 'emacs-document';
+         /* * * DON'T EDIT BELOW THIS LINE * * */
+         (function() {
+             var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+             dsq.src = 'https://' + disqus_shortname + '.disqus.com/embed.js';
+             (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+             $('#disqus_thread').css('display','none');
+         })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+    <script>
+     /* comments */
+     var ego_disqus_thread=$('#disqus_thread');
+     var ego_ds_label=$('.ds-thread');
+     $('.disqus_label').click(function(){
+         ego_disqus_thread.show();
+         ego_ds_label.hide();
+     });
+     $('.ds-label').click(function(){
+         ego_disqus_thread.hide();
+         ego_ds_label.show();
+     });
+    </script>
+        </section>
+    <script src="/media/js/main.js"></script>
+        <script type="text/javascript">
+         var _gaq = _gaq || [];
+         _gaq.push(['_setAccount', '7bac4fd0247f69c27887e0d4e3aee41e']);
+         _gaq.push(['_trackPageview']);
+         (function() {
+             var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+             ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+             var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-c7de1c50-88ed-412e-ae70-62694dd7dea5">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="//instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>

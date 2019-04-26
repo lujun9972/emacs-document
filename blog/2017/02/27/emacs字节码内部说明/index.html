@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Emacs字节码内部说明 - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="elisp-common" />
+  <style>
+   #ds-thread #ds-reset .ds-comment-body p {color: #ffffff;}
+   #ds-thread #ds-reset .ds-comment-body p a {color: #ff0;}
+   #ds-thread #ds-reset .ds-comment-body p a:hover {color: #0ff;}
+   #disqus_thread a {color: #00ffff;}
+  </style>
+  <link rel="stylesheet" href="/media/css/main.css" type="text/css"/>
+  <link rel="stylesheet" href="/media/css/comment.css" type="text/css"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="/">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <div class="menu-icon">
+        <svg viewBox="0 0 18 15">
+          <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.031C17.335,0,18,0.665,18,1.484L18,1.484z" fill="#ffff00"/>
+          <path d="M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0c0-0.82,0.665-1.484,1.484-1.484 h15.031C17.335,6.031,18,6.696,18,7.516L18,7.516z" fill="#ffff00"/>
+          <path d="M18,13.516C18,14.335,17.335,15,16.516,15H1.484C0.665,15,0,14.335,0,13.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.031C17.335,12.031,18,12.696,18,13.516L18,13.516z" fill="#ffff00"/>
+        </svg>
+      </div>
+      <ul class="trigger">
+        <li><a href="/years/">Years</a></li>
+        <li><a href="/authors/">Authors</a></li>
+        <li><a href="/tags/">Tags</a></li>
+        <li><a href="/about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="/rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="http://www.google.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">Emacs字节码内部说明</h1>
+<div id="table-of-contents">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#org2e077c2">The Humble Stack Machine</a></li>
+<li><a href="#orgf120a01">Segmentation Fault Warning</a></li>
+<li><a href="#org6cc91e1">The Byte-code Object</a>
+<ul>
+<li><a href="#org01b26be">Parameter List</a></li>
+<li><a href="#org2ff99b0">Unibyte String Byte-code</a></li>
+<li><a href="#org56e823a">Constants Vector</a></li>
+<li><a href="#org5e5f759">Maximum Stack Usage</a></li>
+<li><a href="#org7c85866">Docstring</a></li>
+<li><a href="#org10f7385">Interactive Specification</a></li>
+</ul>
+</li>
+<li><a href="#orgf09e6ba">Opcodes</a></li>
+<li><a href="#org5f98f9a">Calling Convention</a>
+<ul>
+<li><a href="#org42c9366">Dynamic Scope Calling Convention</a></li>
+<li><a href="#org09514c9">Lexical Scope Calling Convention</a></li>
+</ul>
+</li>
+<li><a href="#org7f0ec78">Compiler Intermediate “lapcode”</a></li>
+<li><a href="#org38b7bb3">Project Ideas?</a></li>
+</ul>
+</div>
+</div>
+<p>
+并没有文档说明Emacs是如何将源代码编译成字节码的 — 特别是是Emacs最近进行了一次升级,开始支持静态作用域了- 这部分资料尤其少. 
+大多数用户对于Elisp编译的理解仅限于编译的结果是保存在 <code>.elc</code> 文件中,以及字节码加载起来要比未编译的Elisp要快.
+对于用户来说,知道这两点基本上也足够了, GNU Emacs Lisp Reference Manual 也明确不鼓励深入了解该编译过程.
+</p>
+
+<blockquote>
+<p>
+人不会去手写字节码; 字节码由编译器产出就行了. 不过为了满足你的好奇心,我们还是提供一个反汇编工具给你用吧.
+</p>
+</blockquote>
+
+<p>
+什么鬼! 你怎么知道我不想手写字节码? :-) 本文就将带领你了解一下Elisp编译器的内部. 我会解释一下它的工作原理,静态作用域速度更快的秘密并展示一下如何手写字节码.
+</p>
+
+<div id="outline-container-org2e077c2" class="outline-2">
+<h2 id="org2e077c2">The Humble Stack Machine</h2>
+<div class="outline-text-2" id="text-org2e077c2">
+<p>
+Emacs的字节码解释器就是一个简单的堆栈机. 它用栈来存放lisp对象. 解释器是向后兼容的,但是无法向前兼容(即旧版本的解释器无法运行新版本的字节码).
+每条指令占用1到3个字节大小. 第一个字节存放的是操作码,而第二,第三个字节存放的是操作数或者间接值. 不过有些操作数也会被压缩进操作码字节中.
+</p>
+
+<p>
+写作该文时 (Emacs 24.3) Emacs共有142个操作码, 其中6已经被废弃了. 大多数的操作码都与那些常用的内置函数相关(看看那些内置函数,你会发现Elisp真的在优化文本处理上费了大劲了!). 
+考虑到有些操作码只是将其他操作码与操作数整合在一起,有多达27个操作码是预备给以后用的.
+</p>
+
+<ul class="org-ul">
+<li>opcodes 48 - 55</li>
+<li>opcode 97</li>
+<li>opcode 128</li>
+<li>opcodes 169 - 174</li>
+<li>opcodes 180 - 181</li>
+<li>opcodes 183 - 191</li>
+</ul>
+
+<p>
+查询操作码列表的最方便途径是查询 <a href="http://cvs.savannah.gnu.org/viewvc/emacs/emacs/lisp/emacs-lisp/bytecomp.el?view=markup">bytecomp.el</a> 中的内容. 不过要小心,其中有些操作码的注释已经过时了.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgf120a01" class="outline-2">
+<h2 id="orgf120a01">Segmentation Fault Warning</h2>
+<div class="outline-text-2" id="text-orgf120a01">
+<p>
+字节码可比普通Elisp代码要危险得多. <b>它甚至可能导致Emacs崩溃</b>. 你可以试试运行一下(译者注:我在Emacs25.1下实验,并没有崩溃),
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">emacs -batch -Q --eval <span style="font-style: italic;">'(print (#[0 "\300\207" [] 0]))'</span>
+</pre>
+</div>
+
+<p>
+或者手工执行下面这段代码(请先保存好其他资料!),
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(#[0 <span style="font-style: italic;">"\300\207"</span> [] 0])
+</pre>
+</div>
+
+<p>
+之所以产生这个segfault,并不是因为Emacs有BUG,而是是因为这段代码尝试跨界引用了常量数组后面的元素(caused by referencing beyond the end of the constants vector). 
+因为进行边界检查会拖慢解释器的速度,因此基于实用性的考虑,在运行期并不会进行边界检查.
+Emacs开发人员默认所执行的字节码肯定是由编译器产生的有效代码, 对于手写代码不保证没有问题.
+</p>
+
+<blockquote>
+<p>
+永远不要尝试自己去编写字节码函数,它可能会与你的Emacs不相容从而在调用该函数时引起Emacs崩溃. 
+让编译器帮你做做这件事情;它产出的字节码肯定是相容的(希望是吧).
+</p>
+</blockquote>
+
+<p>
+我已经提前给你打好预防针了. 现在开始玩火吧.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org6cc91e1" class="outline-2">
+<h2 id="org6cc91e1">The Byte-code Object</h2>
+<div class="outline-text-2" id="text-org6cc91e1">
+<p>
+字节码对象,在功能上等价于普通的Elisp数组,只不过它同时还可以作为函数来执行.
+两者的元素访问时间都是常量,语法也很接近(<code>[...]</code> vs. <code>#[...]</code>),对其中元素的数量理论上也是没有限制的(不过一个合法的函数至少都会有4个元素).
+</p>
+
+<p>
+有两种方法可以用来创建字节码对象: 使用字面量表示法或调用 <code>make-byte-code</code> 函数. <a href="http://nullprogram.com/blog/2012/07/17/">跟数组的字面量一样</a>, 字节码的字面量也不需要被引用起来.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(make-byte-code 0 <span style="font-style: italic;">""</span> [] 0)
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">=&gt; #[0 "" [] 0]</span>
+
+#[1 2 3 4]
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">=&gt; #[1 2 3 4]</span>
+
+(#[0 <span style="font-style: italic;">""</span> [] 0])
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">error: Invalid byte opcode</span>
+</pre>
+</div>
+
+<p>
+一个字节码对象的字面量可以包括以下这些元素:
+</p>
+
+<ul class="org-ul">
+<li>函数参数列表</li>
+<li>表示字节码的单字节字符串</li>
+<li>常量数组</li>
+<li>最大栈使用量(Maximum stack usage)</li>
+<li>Docstring (可选,没有的话为nil)</li>
+<li>Interactive声明(可选)</li>
+</ul>
+</div>
+
+<div id="outline-container-org01b26be" class="outline-3">
+<h3 id="org01b26be">Parameter List</h3>
+<div class="outline-text-3" id="text-org01b26be">
+<p>
+参数列表依据该函数是在动态作用域下还是静态作用域下而有两种形式. 如何是在动态作用域下,那么它跟lisp代码中的参数列表一模一样.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(byte-compile (<span style="font-weight: bold;">lambda</span> (a b <span style="font-weight: bold; text-decoration: underline;">&amp;optional</span> c)))
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">=&gt; #[(a b &amp;optional c) "\300\207" [nil] 1]</span>
+</pre>
+</div>
+
+<p>
+我们不能修改参数名称,因此确实也没有更简短的表示参数列表的方法了. 请记住,因为在动态作用域下,函数体执行时,这些参数是要与外部变量绑定在一起的.
+</p>
+
+<p>
+当函数是在静态作用域中时,则参数列表会被打包成一个Elisp整数,用于指明有多少参数是必须的,有多少参数是 <code>&amp;optional</code> 的,以及是否有 <code>&amp;rest</code> 参数.
+</p>
+
+
+<div class="figure">
+<p><img src="http://nullprogram.com/img/diagram/elisp-params.png" alt="elisp-params.png" />
+</p>
+</div>
+
+<p>
+最后7位表示的是必填参数个数. 请注意,这使得静态作用域下编译后的函数最多只能有127个必填参数. 
+第8为指明是否有 <code>&amp;rest</code> 参数(1表示有). 剩下的字节表示的是必填参数与 <code>&amp;optional</code> 参数的数量和(不包括 <code>&amp;rest</code> 参数). 
+你把整数的16进制画出来后就很清晰了,每一部分的意义都是非常明确的.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(byte-compile-make-args-desc '())
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">=&gt; #x000  (0 args, 0 rest, 0 required)</span>
+
+(byte-compile-make-args-desc '(a b))
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">=&gt; #x202  (2 args, 0 rest, 2 required)</span>
+
+(byte-compile-make-args-desc '(a b <span style="font-weight: bold; text-decoration: underline;">&amp;optional</span> c))
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">=&gt; #x302  (3 args, 0 rest, 2 required)</span>
+
+(byte-compile-make-args-desc '(a b <span style="font-weight: bold; text-decoration: underline;">&amp;optional</span> c <span style="font-weight: bold; text-decoration: underline;">&amp;rest</span> d))
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">=&gt; #x382  (3 args, 1 rest, 2 required)</span>
+</pre>
+</div>
+
+<p>
+在静态作用域下,这些参数的名称变得无关紧要了: 它们只是单纯地与出现的位置相关. 这种紧凑的参数声明式也是静态作用域能更快的原因之一: 解释器无需在每次函数调用时都解析整个lambda表达式然后为各参数分配绑定的变量.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org2ff99b0" class="outline-3">
+<h3 id="org2ff99b0">Unibyte String Byte-code</h3>
+<div class="outline-text-3" id="text-org2ff99b0">
+<p>
+第二个元素是一个单字节字符串 — 它严格地以8个比特为一组,而且并不会被挡任何一种Unicode的编码形式来看待. 这种字符串必须用函数 <code>unibyte-string</code> 来产生,因为 <code>string</code> 有可能会返回多字节字符串.
+为了防止lisp reader误判字符串类型,大于127的字符会以转义的8进制表示法来表示,这样就保证了字符串的字面量能够用ASCII码来表示.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(unibyte-string 100 200 250)
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">=&gt; "d\310\372"</span>
+</pre>
+</div>
+
+<p>
+一般来说,字节码字符串都是以135结尾的(即八进制的207). Perhaps this should have been implicit? 后面还会再讲到字节码.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org56e823a" class="outline-3">
+<h3 id="org56e823a">Constants Vector</h3>
+<div class="outline-text-3" id="text-org56e823a">
+<p>
+字节码部分只能携带有限的操作数. 大多数操作数只有几个比特大小,少数能有1个字节大小,极少的有两个个字节大小的情况.
+函数是使用常量数组来存放所有的常量,函数符号以及变量符号的. 
+常量数组其实即iu是一个普通的Elisp数组,可以用 <code>vector</code> 函数或数组字面量的形式生成. 
+操作数则可能是指向常量数组中元素的应用或者是栈本身的索引(Operands reference either this vector or they index into the stack itself).
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(byte-compile (<span style="font-weight: bold;">lambda</span> (a b) (my-func b a)))
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">=&gt; #[(a b) "\302\134\011\042\207" [b a my-func] 3]</span>
+</pre>
+</div>
+
+<p>
+注意,常量数组中不仅仅有变量符号,还有外部的函数符号. 若该函数处于静态作用域下,则常量数组不会包含有变量符号,只有 <code>[my-func]</code> 而已.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org5e5f759" class="outline-3">
+<h3 id="org5e5f759">Maximum Stack Usage</h3>
+<div class="outline-text-3" id="text-org5e5f759">
+<p>
+该部分为字节码占用的最大栈空间. 该值本来可以通过字节码字符串本身来计算出来, 但为了让解释器能够快速发现栈溢出的情况,该值被预先计算好了放在这里.
+若该值算少了,可能也会让Emacs崩溃.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org7c85866" class="outline-3">
+<h3 id="org7c85866">Docstring</h3>
+<div class="outline-text-3" id="text-org7c85866">
+<p>
+这是最简单的部分了,而且完全可以省略. 它一般就是 docstring 本身, 不过如果docstring特别大的话,也可能是一个 cons cell 指明了docstring可以从哪个elc文件的哪个位置开始读到.
+之所以只需要记录docstring的开始位置是因为解释器使用lisp reader来读取该字符串,因此能够正确地识别出结束的位置.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org10f7385" class="outline-3">
+<h3 id="org10f7385">Interactive Specification</h3>
+<div class="outline-text-3" id="text-org10f7385">
+<p>
+若该部分存在且为非nil,则表示该函数是可交互的函数. 它的值就是函数定义源代码中 <code>interactive</code> 语句中的内容.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(byte-compile (<span style="font-weight: bold;">lambda</span> (n) (<span style="font-weight: bold;">interactive</span> <span style="font-style: italic;">"nNumber: "</span>) n))
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">=&gt; #[(n) "\010\207" [n] 1 nil "nNumber: "]</span>
+
+(byte-compile (<span style="font-weight: bold;">lambda</span> (n) (<span style="font-weight: bold;">interactive</span> (list (read))) n))
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">=&gt; #[(n) "\010\207" [n] 1 nil (list (read))]</span>
+</pre>
+</div>
+
+<p>
+interactive语句并不会被编译成字节码. 这通常没什么影响,因为根据定义,这部分代码一般需要等待用户输入. 不过它确实会拖慢键盘宏的回放速度.
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgf09e6ba" class="outline-2">
+<h2 id="orgf09e6ba">Opcodes</h2>
+<div class="outline-text-2" id="text-orgf09e6ba">
+<p>
+下面这些操作码都是与变量,栈和常量存取相关的, 其中大部分都自带操作数.
+</p>
+
+<ul class="org-ul">
+<li>0 - 7 : (stack-ref) 栈引用</li>
+<li>8 - 15 : (varref) 变量引用(from constants vector)</li>
+<li>16 - 23 : (varset) 变量设置(from constants vector)</li>
+<li>24 - 31 : (varbind) 变量绑定(from constants vector)</li>
+<li>32 - 39 : (call) 函数调用(immediate = number of arguments)</li>
+<li>40 - 47 : (unbind) 变量解绑(from constants vector)</li>
+<li>129, 192-255 : (constant) 常量数组的直接访问</li>
+</ul>
+
+<p>
+除了最后那批指令,每种指令以8个为一组. 其中排在第N位的指令表示操作的是第N个值. 
+比如,指令 <code>2</code> 拷贝栈的中第三个值到栈顶. 而指令 <code>9</code> 表示将常量数组中第二个元素所表示变量的变量值压入栈中.
+</p>
+
+<p>
+不过这写指令组中的第7,第8条指令很特殊,它们额外接受一个/两个字节的操作数字节. 第7条指令接受一个字节的操作数而第8条指令接受两个字节的操作数.
+不管处于哪个平台,这两个字节的操作数都遵循 little-endian 的字节序.
+</p>
+
+<p>
+下面,我们来人工创建一个字节码函数,该函数会返回全局变量 <code>foo</code> 的值. 每个操作码都有一个 <code>byte-X</code> 的常量与之相对应,所以我们无需记忆这些操作码的具体值.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">require</span> '<span style="font-weight: bold; text-decoration: underline;">bytecomp</span>)  <span style="font-weight: bold; font-style: italic;">; </span><span style="font-weight: bold; font-style: italic;">named opcodes</span>
+
+(<span style="font-weight: bold;">defvar</span> <span style="font-weight: bold; font-style: italic;">foo</span> <span style="font-style: italic;">"hello"</span>)
+
+(<span style="font-weight: bold;">defalias</span> '<span style="font-weight: bold;">get-foo</span>
+  (make-byte-code
+   #x000                 <span style="font-weight: bold; font-style: italic;">; </span><span style="font-weight: bold; font-style: italic;">no arguments</span>
+   (unibyte-string
+    (+ 0 byte-varref)   <span style="font-weight: bold; font-style: italic;">; </span><span style="font-weight: bold; font-style: italic;">ref variable under first constant</span>
+    byte-return)        <span style="font-weight: bold; font-style: italic;">; </span><span style="font-weight: bold; font-style: italic;">pop and return</span>
+   [foo]                 <span style="font-weight: bold; font-style: italic;">; </span><span style="font-weight: bold; font-style: italic;">constants</span>
+   1))                   <span style="font-weight: bold; font-style: italic;">; </span><span style="font-weight: bold; font-style: italic;">only using 1 stack space</span>
+
+(get-foo)
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">=&gt; "hello"</span>
+</pre>
+</div>
+
+<p>
+Ta-da! 我们成功地手写了一个字节码函数. 我这里保留了 <code>+ 0</code> 是为了方便我以后修改偏移量. 
+</p>
+
+<p>
+下面这个函数的功能也是一样,只是没那么高效而已.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defalias</span> '<span style="font-weight: bold;">get-foo</span>
+  (make-byte-code
+   #x000
+   (unibyte-string
+    (+ 3 byte-varref)     <span style="font-weight: bold; font-style: italic;">; </span><span style="font-weight: bold; font-style: italic;">4th form of varref</span>
+    byte-return)
+   [nil nil nil foo]
+   1))
+</pre>
+</div>
+
+<p>
+如果 <code>foo</code> 在常量数组中排第10位的话,我们就需要使用能接受1字节操作数的操作码了. 
+</p>
+
+<p>
+下面函数也是一样的功能,但是不够高效.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defalias</span> '<span style="font-weight: bold;">get-foo</span>
+  (make-byte-code
+   #x000
+   (unibyte-string
+    (+ 6 byte-varref)     <span style="font-weight: bold; font-style: italic;">; </span><span style="font-weight: bold; font-style: italic;">7th form of varref</span>
+    9                     <span style="font-weight: bold; font-style: italic;">; </span><span style="font-weight: bold; font-style: italic;">operand, (constant index 9)</span>
+    byte-return)
+   [nil nil nil nil nil nil nil nil nil foo]
+   1))
+</pre>
+</div>
+
+<p>
+动态作用域下的代码会大量地使用 <code>varref</code> 指令,而静态作用域下的代码很少使用到这个指令(只有在访问全局变量时才用), 取而代之的是 <code>stack-ref</code>, 而 <code>stack-ref</code> 的速度相对要快.
+这也是两种调用约定(calling conventions)的不同之处.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org5f98f9a" class="outline-2">
+<h2 id="org5f98f9a">Calling Convention</h2>
+<div class="outline-text-2" id="text-org5f98f9a">
+<p>
+每种作用域都有它们自己的调用约定. 在这里你会了解到Stefan Monniner为编译器加上静态作用域是多么重要的一项升级.
+</p>
+</div>
+
+<div id="outline-container-org42c9366" class="outline-3">
+<h3 id="org42c9366">Dynamic Scope Calling Convention</h3>
+<div class="outline-text-3" id="text-org42c9366">
+<p>
+回头来看看字节码对象力的参数列表元素, 动态作用域函数保留完整的参数名称. 在指向函数前,解释器需要检查lambda列表并用 <code>varbnd</code> 指令将变量跟参数绑定起来.
+</p>
+
+<p>
+如果调用者已经被编译成字节码了, 那么栈中的每个参数都需要一个一个地弹出来与变量进行绑定, 然后为了被函数能够访问,又要再压回栈中(varref).
+每次函数调用时,都需要对参数进行这么一番折腾.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org09514c9" class="outline-3">
+<h3 id="org09514c9">Lexical Scope Calling Convention</h3>
+<div class="outline-text-3" id="text-org09514c9">
+<p>
+而在静态作用域下,字节码中并不包含参数名称,因为编译器已经将局部变量转换成了栈偏移量了.
+</p>
+
+<p>
+当调用静态作用域函数时, 字节码解释器会对照表示参数列表的那个整数,来检查参数个数是否一致,然后对每个没有提供参数值的 <code>&amp;optional</code> 参数都将nil压入栈内, 如果函数有定义 <code>&amp;rest</code> 参数,那么多出来的那些参数会被组成一个list,再被压入栈中.
+</p>
+
+<p>
+这样一来,函数就可以直接通过栈来访问它的参数了,而无需通过变量名来跳转. 甚至函数可以直接使用该参数而无需通过栈来访问.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp"><span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">-*- lexical-binding: t -*-</span>
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">foo</span> (x) x)
+
+(symbol-function #'foo)
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">=&gt; #[#x101 "\207" [] 2]</span>
+</pre>
+</div>
+
+<p>
+<code>foo</code> 的字节码只有一条指令: return. 函数的参数已经入栈所以无需而外的操作. 
+比较奇怪的是,这里最大栈使用量错误地标注成了2,不过这也没关系,并不会造成解释器崩溃.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp"><span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">(As of this writing `</span><span style="font-weight: bold; font-style: italic; text-decoration: underline;">byte-compile</span><span style="font-weight: bold; font-style: italic;">' always uses dynamic scope.)</span>
+
+(byte-compile 'foo)
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">=&gt; #[(x) "\010\207" [x] 1]</span>
+</pre>
+</div>
+
+<p>
+It takes longer to set up (x is implicitly bound), it has to make an explicit variable dereference (varref), then it has to clean up by
+unbinding x (implicit unbind). 
+毫无疑问,静态作用域要更快一些!
+</p>
+
+<p>
+值得注意的是,有一个 <code>disassemble</code> 函数可以帮你理解字节码.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(disassemble #'foo)
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">byte code:</span>
+<span style="font-weight: bold; font-style: italic;">;;   </span><span style="font-weight: bold; font-style: italic;">args: (x)</span>
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">0       varref    x</span>
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">1       return</span>
+</pre>
+</div>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org7f0ec78" class="outline-2">
+<h2 id="org7f0ec78">Compiler Intermediate “lapcode”</h2>
+<div class="outline-text-2" id="text-org7f0ec78">
+<p>
+Elisp字节码编译器支持一种叫做 <code>lapcode</code> (“Lisp Assembly Program”) 的中间语言, 它要比直接使用字节码方便的多.
+<code>lapcode</code> 基本上可以看成是基于s表达式的汇编语言. 它为每个操作码都提供了一个名称,并将操作码和操作数作为一个整体来处理. 
+一个lapcode程序就是一个由指令组成的list,而每条指令又是一个行为 <code>(opcode . operand)</code> 的cons cell.
+</p>
+
+<p>
+比如,我们可以这样用lapcode来改写最后那个版本的 <code>get-foo</code> 函数.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defalias</span> '<span style="font-weight: bold;">get-foo</span>
+  (make-byte-code
+   #x000
+   (byte-compile-lapcode
+    '((byte-varref . 9)
+      (byte-return)))
+   [nil nil nil nil nil nil nil nil nil foo]
+   1))
+</pre>
+</div>
+
+<p>
+我们不用关心哪个版本的 <code>varref</code> 的指令格式,也不用关心如何如何对2字节长的操作数进行编码. 所有的细节都由lapcode “assembler” 帮我们保定.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org38b7bb3" class="outline-2">
+<h2 id="org38b7bb3">Project Ideas?</h2>
+<div class="outline-text-2" id="text-org38b7bb3">
+<p>
+Emacs编译器和解释器都很好玩. 在研究过它们之后,我真的打算创建一个相关的项目来试试手. 
+也许是实现一门解释器支持的新语言,也许是改进编译器的优化措施,或者干脆玩一票大的,实现运行时编译Emacs字节码.
+</p>
+
+<p>
+<b>谁说不能手工编写字节码!</b>
+</p>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2017-02-27</span>
+            <span title="last modification date" class="post-info">2017-11-12</span>
+            <span title="tags" class="post-info">:<a href="/tags/elisp-common">elisp-common</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-c7de1c50-88ed-412e-ae70-62694dd7dea5">lujun9972</a></span>
+        </div>
+    <script src="/media/js/jquery-2.1.3.min.js"></script>
+        <section>
+            <h1>Comments</h1>
+            <div id="comment-wrap">
+                    <a class="disqus_label">使用 Disqus 评论</a>
+    </ul>
+        <div id="disqus_thread"></div>
+        <script type="text/javascript">
+         //var disqus_developer = 1;
+         var preempt_signal=false;
+         var disqus_identifier = "/blog/2017/02/27/emacs字节码内部说明/";
+         var disqus_url = "https://lujun9972.github.io/emacs-document/blog/2017/02/27/emacs字节码内部说明/";
+         var disqus_shortname = 'emacs-document';
+         /* * * DON'T EDIT BELOW THIS LINE * * */
+         (function() {
+             var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+             dsq.src = 'https://' + disqus_shortname + '.disqus.com/embed.js';
+             (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+             $('#disqus_thread').css('display','none');
+         })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+    <script>
+     /* comments */
+     var ego_disqus_thread=$('#disqus_thread');
+     var ego_ds_label=$('.ds-thread');
+     $('.disqus_label').click(function(){
+         ego_disqus_thread.show();
+         ego_ds_label.hide();
+     });
+     $('.ds-label').click(function(){
+         ego_disqus_thread.hide();
+         ego_ds_label.show();
+     });
+    </script>
+        </section>
+    <script src="/media/js/main.js"></script>
+        <script type="text/javascript">
+         var _gaq = _gaq || [];
+         _gaq.push(['_setAccount', '7bac4fd0247f69c27887e0d4e3aee41e']);
+         _gaq.push(['_trackPageview']);
+         (function() {
+             var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+             ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+             var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-c7de1c50-88ed-412e-ae70-62694dd7dea5">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="//instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>

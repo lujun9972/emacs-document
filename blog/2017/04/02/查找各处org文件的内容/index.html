@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>查找各处org文件的内容 - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="sadwheel" />
+  <meta name="keywords" content="org-mode" />
+  <style>
+   #ds-thread #ds-reset .ds-comment-body p {color: #ffffff;}
+   #ds-thread #ds-reset .ds-comment-body p a {color: #ff0;}
+   #ds-thread #ds-reset .ds-comment-body p a:hover {color: #0ff;}
+   #disqus_thread a {color: #00ffff;}
+  </style>
+  <link rel="stylesheet" href="/media/css/main.css" type="text/css"/>
+  <link rel="stylesheet" href="/media/css/comment.css" type="text/css"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="/">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <div class="menu-icon">
+        <svg viewBox="0 0 18 15">
+          <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.031C17.335,0,18,0.665,18,1.484L18,1.484z" fill="#ffff00"/>
+          <path d="M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0c0-0.82,0.665-1.484,1.484-1.484 h15.031C17.335,6.031,18,6.696,18,7.516L18,7.516z" fill="#ffff00"/>
+          <path d="M18,13.516C18,14.335,17.335,15,16.516,15H1.484C0.665,15,0,14.335,0,13.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.031C17.335,12.031,18,12.696,18,13.516L18,13.516z" fill="#ffff00"/>
+        </svg>
+      </div>
+      <ul class="trigger">
+        <li><a href="/years/">Years</a></li>
+        <li><a href="/authors/">Authors</a></li>
+        <li><a href="/tags/">Tags</a></li>
+        <li><a href="/about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="/rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="http://www.google.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">查找各处org文件的内容</h1>
+<div id="table-of-contents">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#org9e02ffe">1 数据库结构</a></li>
+<li><a href="#org4aea285">2 查询链接表</a></li>
+<li><a href="#orgf501ffc">3 查询标题</a></li>
+<li><a href="#org8ee6308">4 查询关键字</a></li>
+<li><a href="#org3012413">5 全文搜索</a></li>
+<li><a href="#org3a99b28">6 总结</a></li>
+</ul>
+</div>
+</div>
+<p>
+我经常使用org-mode.我用它写论文，记会议笔记，写推荐信，记文献笔记，维护项目的TODO列表和软件
+的帮助文档，写演讲稿，甚至处理学生们的作业和保存联系人信息。我的一些文件存在Dropbox, GoogleDrive, Box
+上，一些在git repos里。问题是，这样org文件就渐渐散布在我硬盘各处。如今我已经有了几千个org文件记录
+着我五年来的工作。
+</p>
+
+<p>
+像这样过上一段时间，查找文件就很困难了。确实有像recent-files, bookmarks, counsel-find-file,
+helm-for-files, counsel/helm-locate, helm/counsel-grep/ag/pt, projectile 这样的工具
+可以用来搜索项目里的文件，有一大堆工具可以搜索打开的buffer，还有 <a href="https://www.lesbonscomptes.com/recoll/">recoll</a> 等桌面搜索工具，当然还得有良好的
+组织习惯等等。但五年过去，我终于找到了查找目标文件的更好的方法。如果说想找一份我一年前创建的文件，但
+它现在既不在当前目录或项目，也不在我的org-agenda-files列表里呢？还有，我怎样才能得到一份包含所有文件的todo
+的动态列表呢？或是怎么找到包含特定bibtex entry的文件或某个学生所写的所有文件呢？
+</p>
+
+<p>
+起初，<a href="http://kitchingroup.cheme.cmu.edu/blog/2015/07/06/Indexing-headlines-in-org-files-with-swish-e-with-laser-sharp-results/">我用Switch-e来给org文件作索引</a>, 这样搜索起来很容易，但它只能搜索headline或paragraph等等。
+这个方法的问题是，由于Swish-e的局限我不得不每次重新生成数据库，因此作索引变得非常慢。后来我找到了
+另一个方法－－一个更好的数据库。在这篇文章里，我将会用 <a href="http://sqlite.org">sqlite</a> 来保存org文件中的headline和
+link。
+</p>
+
+<p>
+我的目标是每次打开或保存任何org文件时，它就会被添加进数据库或是更新数据库。这个数据库会保存headline，
+property，content... 这样我就能够高效地查询那些包含我曾访问过的todo headine，tagged headline，
+以及各类link的文件。让我们来看看有没有效果吧。
+</p>
+
+<div id="outline-container-org9e02ffe" class="outline-2">
+<h2 id="org9e02ffe">1 数据库结构</h2>
+<div class="outline-text-2" id="text-org9e02ffe">
+<p>
+我用 <a href="https://github.com/skeeto/emacsql">emacsql</a> 来创建sqlite3数据库并与之交互。它能够用lisp来生成SQL query。我不会
+在这讨论太多代码，你想了解的话可以看看这个： <a href="http://kitchingroup.cheme.cmu.edu/media/org-db.el">org-db.el</a> 。数据库由一些包含filename，
+headline，tag，property，headline-content（可选），headline-tags，headline-property，
+和link的表（table）组成。这里的lisp代码只是作为演示而非我日常使用的。这篇文章只是用来证明
+这方法的效果。
+</p>
+
+<p>
+当org文件被打开或保存时，我用hook来更新数据库（当然只有当文件与数据库中内容不同时才会更新，
+基于md5码校验）。通常，这些函数先删除文件在数据库中的entry再把数据添加回库。我发现
+这比用org-element来parse org文件更快，尤其是处理大文件时。因为这些都由hook来完成，
+所以无论我在何时何地打开一个org 文件，它都会被加进数据库或是更新数据库，效果还可以。虽然这个
+方法不能保证数据库永远保持准确（比如文件在emacs外被更改，如一次git pull），但它也并不需要
+永远准确，大多数文件都不会经常改动，而数据库在每次打开文件时都会更新。你也可以手动让数据库为
+文件重建索引。渐渐的你会找出合适的更新频率。
+</p>
+
+<p>
+emacsql 允许你用lisp代码生成SQL送往数据库。下面是个例子：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(emacsql-flatten-sql [<span style="font-weight: bold;">:select</span> [name] <span style="font-weight: bold;">:from</span> main:sqlite_master <span style="font-weight: bold;">:where</span> (= type table)])
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-sql"><span style="font-weight: bold;">SELECT</span> <span style="font-weight: bold;">name</span> <span style="font-weight: bold;">FROM</span> main.sqlite_master <span style="font-weight: bold;">WHERE</span> <span style="font-weight: bold;">type</span> = "<span style="font-weight: bold;">table</span>";
+</pre>
+</div>
+
+<p>
+这里有些微小的差异，比如main:sqlite_master会被转换成main.sqlite_master。你可以用vector，
+keyword和sexps来设置命令。emacsql会把像filename-id这样的名字转换成filename_id。理解起来
+并不困难，而且emacsql的作者很热心。我以后会回头看看这篇文章来回顾这些差异。
+</p>
+
+<p>
+下面是一个数据库中表（table）的列表。有一些主表（primary table），还有一些表（table）
+只保存标题里的tag，property和keyword。这是典型的emacsql代码：一条生成SQL的lisp表达式。
+表达式中的org-db是个保存数据库连接（database connection）的变量。它由org-db.el创建。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(emacsql org-db [<span style="font-weight: bold;">:select</span> [name] <span style="font-weight: bold;">:from</span> main:sqlite_master <span style="font-weight: bold;">:where</span> (= type table)])
+</pre>
+</div>
+
+<!-- This HTML table template is generated by emacs 27.0.50 -->
+<table border="1">
+  <tr>
+    <td align="left" valign="top">
+      &nbsp;files&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      ---------------------------<br />
+      &nbsp;tags&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      ---------------------------<br />
+      &nbsp;properties&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      ---------------------------<br />
+      &nbsp;keywords&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      ---------------------------<br />
+      &nbsp;headlines&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      ---------------------------<br />
+      &nbsp;headline_content&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      ---------------------------<br />
+      &nbsp;headline_content_content&nbsp;&nbsp;<br />
+      ---------------------------<br />
+      &nbsp;headline_content_segments&nbsp;<br />
+      ---------------------------<br />
+      &nbsp;headline_content_segdir&nbsp;&nbsp;&nbsp;<br />
+      ---------------------------<br />
+      &nbsp;headline_content_docsize&nbsp;&nbsp;<br />
+      ---------------------------<br />
+      &nbsp;headline_content_stat&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      ---------------------------<br />
+      &nbsp;headline_tags&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      ---------------------------<br />
+      &nbsp;headline_properties&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      ---------------------------<br />
+      &nbsp;file_keywords&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      ---------------------------<br />
+      &nbsp;links&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    </td>
+  </tr>
+</table>
+
+<p>
+这是文件表（files table）里各列的描述：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(emacsql org-db [<span style="font-weight: bold;">:pragma</span> (funcall table_info files)])
+</pre>
+</div>
+
+<!-- This HTML table template is generated by emacs 27.0.50 -->
+<table border="1">
+  <tr>
+    <td align="left" valign="top">
+      &nbsp;0&nbsp;
+    </td>
+  </tr>
+</table>
+
+<p>
+还有标题表（headlines table）里的各列：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(emacsql org-db [<span style="font-weight: bold;">:pragma</span> (funcall table_info headlines)])
+</pre>
+</div>
+
+<!-- This HTML table template is generated by emacs 27.0.50 -->
+<table border="1">
+  <tr>
+    <td align="left" valign="top">
+      &nbsp;0&nbsp;
+    </td>
+  </tr>
+</table>
+
+<p>
+标题里的标签和属性保存在 headline-tags 和 headline-properties 两张表里。
+</p>
+
+<p>
+如果只保存标题和链接（不保存内容）的话，数据库不会很大。而保存了内容后，它会达到500MB而且
+变得有点慢。所以这篇文章里，我就不讨论包含内容的表了。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">du -hs ~/org-db/org-db.sqlite
+</pre>
+</div>
+
+<!-- This HTML table template is generated by emacs 27.0.50 -->
+<table border="1">
+  <tr>
+    <td align="left" valign="top">
+      &nbsp;56M&nbsp;|&nbsp;/Users/jkitchin/org-db/org-db.sqlite&nbsp;
+    </td>
+  </tr>
+</table>
+
+<p>
+我们可以看看数据库里有多少文件。这些只是我Dropbox文件夹里的org文件。除此之外还有很多！如果
+我把我所有的研究和教学项目的org文件包括进来，这个数字会达到10,000! 你是不会想要对这些文件
+运行org-map-entries的。注意这也包括了所有的org_archive文件。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(emacsql org-db [<span style="font-weight: bold;">:select</span> (funcall count) <span style="font-weight: bold;">:from</span> files])
+</pre>
+</div>
+
+<!-- This HTML table template is generated by emacs 27.0.50 -->
+<table border="1">
+  <tr>
+    <td align="left" valign="top">
+      &nbsp;1569&nbsp;
+    </td>
+  </tr>
+</table>
+
+<p>
+这是标题总数。你可以看到根本不可能记住这些标题都在哪里！
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(emacsql org-db [<span style="font-weight: bold;">:select</span> (funcall count) <span style="font-weight: bold;">:from</span> headlines])
+</pre>
+</div>
+
+<!-- This HTML table template is generated by emacs 27.0.50 -->
+<table border="1">
+  <tr>
+    <td align="left" valign="top">
+      &nbsp;38587&nbsp;
+    </td>
+  </tr>
+</table>
+
+<p>
+还有链接总数。有如此多链接！
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(emacsql org-db [<span style="font-weight: bold;">:select</span> (funcall count) <span style="font-weight: bold;">:from</span> links])
+</pre>
+</div>
+
+<!-- This HTML table template is generated by emacs 27.0.50 -->
+<table border="1">
+  <tr>
+    <td align="left" valign="top">
+      &nbsp;303739&nbsp;
+    </td>
+  </tr>
+</table>
+
+<p>
+这真是一堆数目可观的链接。
+</p>
+</div>
+</div>
+
+<div id="outline-container-org4aea285" class="outline-2">
+<h2 id="org4aea285">2 查询链接表</h2>
+<div class="outline-text-2" id="text-org4aea285">
+<p>
+让我们看看有多少引用链接（cite link）：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(emacsql org-db [<span style="font-weight: bold;">:select</span> (funcall count) <span style="font-weight: bold;">:from</span> links <span style="font-weight: bold;">:where</span> (= type <span style="font-style: italic;">"cite"</span>)])
+</pre>
+</div>
+
+<!-- This HTML table template is generated by emacs 27.0.50 -->
+<table border="1">
+  <tr>
+    <td align="left" valign="top">
+      &nbsp;14766&nbsp;
+    </td>
+  </tr>
+</table>
+
+<p>
+哇，这些链接也好多！我以写proposal和paper为生，我用org-ref来简化工作，所以也许这个数字
+没什么奇怪的。我们可以在链接表（link table）里搜索引用了"kitchin-2015-examp"的文件。链接表
+里只有filename-id,所以我们把它和文件表合并来得出有用的信息。这里我们可以看到引用了
+"kitchin-2015-examp"的文件列表。里面有手稿，企划，展示，文档和笔记。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(emacsql org-db [<span style="font-weight: bold;">:select</span> <span style="font-weight: bold;">:distinct</span> [files:filename]
+                         <span style="font-weight: bold;">:from</span> links <span style="font-weight: bold;">:inner</span> <span style="font-weight: bold;">:join</span> files <span style="font-weight: bold;">:on</span> (= links:filename-id files:rowid) 
+                         <span style="font-weight: bold;">:where</span> (<span style="font-weight: bold;">and</span> (= type <span style="font-style: italic;">"cite"</span>) (like path <span style="font-style: italic;">"%kitchin-2015-examp%"</span>))])
+</pre>
+</div>
+
+<!-- This HTML table template is generated by emacs 27.0.50 -->
+<table border="1">
+  <tr>
+    <td align="left" valign="top">
+      &nbsp;/Users/jkitchin/Dropbox/CMU/manuscripts/2015/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      &nbsp;Research_Data_Publishing_Paper/manuscript.org&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      ----------------------------------------------------------------------------<br />
+      &nbsp;/Users/jkitchin/Dropbox/CMU/manuscripts/2015/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      &nbsp;Research_Data_Publishing_Paper/manuscript-2015-06-29/manuscript.org&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      ----------------------------------------------------------------------------<br />
+      &nbsp;/Users/jkitchin/Dropbox/CMU/manuscripts/2015/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      &nbsp;Research_Data_Publishing_Paper/manuscript-2015-10-10/manuscript.org&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      ----------------------------------------------------------------------------<br />
+      &nbsp;/Users/jkitchin/Dropbox/CMU/manuscripts/2015/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      &nbsp;Research_Data_Publishing_Paper/manuscript-2016-03-09/manuscript.org&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      ----------------------------------------------------------------------------<br />
+      &nbsp;/Users/jkitchin/Dropbox/CMU/manuscripts/2015/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      &nbsp;Research_Data_Publishing_Paper/manuscript-2016-04-18/manuscript.org&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      ----------------------------------------------------------------------------<br />
+      &nbsp;/Users/jkitchin/Dropbox/CMU/manuscripts/2015/human-readable-data/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      &nbsp;manuscript.org&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      ----------------------------------------------------------------------------<br />
+      &nbsp;/Users/jkitchin/Dropbox/CMU/manuscripts/@archive/2015/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      &nbsp;Research_Data_Publishing_Paper/manuscript.org&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      ----------------------------------------------------------------------------<br />
+      &nbsp;/Users/jkitchin/Dropbox/CMU/manuscripts/@archive/2015/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      &nbsp;Research_Data_Publishing_Paper/manuscript-2015-06-29/manuscript.org&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      ----------------------------------------------------------------------------<br />
+      &nbsp;/Users/jkitchin/Dropbox/CMU/manuscripts/@archive/2015/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      &nbsp;Research_Data_Publishing_Paper/manuscript-2015-10-10/manuscript.org&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      ----------------------------------------------------------------------------<br />
+      &nbsp;/Users/jkitchin/Dropbox/CMU/manuscripts/@archive/2015/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      &nbsp;Research_Data_Publishing_Paper/manuscript-2016-03-09/manuscript.org&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      ----------------------------------------------------------------------------<br />
+      &nbsp;/Users/jkitchin/Dropbox/CMU/manuscripts/@archive/2015/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      &nbsp;Research_Data_Publishing_Paper/manuscript-2016-04-18/manuscript.org&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      ----------------------------------------------------------------------------<br />
+      &nbsp;/Users/jkitchin/Dropbox/CMU/manuscripts/@archive/2015/human-readable-data/&nbsp;<br />
+      &nbsp;manuscript.org&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      ----------------------------------------------------------------------------<br />
+      &nbsp;/Users/jkitchin/Dropbox/CMU/meetings/@archive/2015/BES-2015/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      &nbsp;doe-bes-wed-data-briefing/doe-bes-wed-data-sharing.org&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      ----------------------------------------------------------------------------<br />
+      &nbsp;/Users/jkitchin/Dropbox/CMU/meetings/@archive/2015/NIST-july-2015/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      &nbsp;data-sharing.org&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      ----------------------------------------------------------------------------<br />
+      &nbsp;/Users/jkitchin/Dropbox/CMU/meetings/@archive/2015/UD-webinar/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      &nbsp;ud-webinar.org&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      ----------------------------------------------------------------------------<br />
+      &nbsp;/Users/jkitchin/Dropbox/CMU/meetings/@archive/2016/AICHE/data-sharing/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      &nbsp;data-sharing.org&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      ----------------------------------------------------------------------------<br />
+      &nbsp;/Users/jkitchin/Dropbox/CMU/meetings/@archive/2016/Spring-ACS/data-sharing&nbsp;<br />
+      &nbsp;/data-sharing.org&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      ----------------------------------------------------------------------------<br />
+      &nbsp;/Users/jkitchin/Dropbox/CMU/projects/DOE-Early-Career/annual-reports/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      &nbsp;final-report/kitchin-DESC0004031-final-report.org&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      ----------------------------------------------------------------------------<br />
+      &nbsp;/Users/jkitchin/Dropbox/CMU/proposals/@archive/2015/DOE-renewal/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      &nbsp;proposal-v2.org&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      ----------------------------------------------------------------------------<br />
+      &nbsp;/Users/jkitchin/Dropbox/CMU/proposals/@archive/2015/DOE-renewal/archive/&nbsp;&nbsp;&nbsp;<br />
+      &nbsp;proposal.org&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      ----------------------------------------------------------------------------<br />
+      &nbsp;/Users/jkitchin/Dropbox/CMU/proposals/@archive/2016/DOE-single-atom-alloy/&nbsp;<br />
+      &nbsp;proposal.org&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      ----------------------------------------------------------------------------<br />
+      &nbsp;/Users/jkitchin/Dropbox/CMU/proposals/@archive/2016/MRSEC/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      &nbsp;MRSEC-IRG-metastable-materials-preproposal/IRG-concept.org&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      ----------------------------------------------------------------------------<br />
+      &nbsp;/Users/jkitchin/Dropbox/CMU/proposals/@archive/2016/ljaf-open-science/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      &nbsp;kitchin-proposal.org&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      ----------------------------------------------------------------------------<br />
+      &nbsp;/Users/jkitchin/Dropbox/CMU/proposals/@archive/2016/nsf-germination/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      &nbsp;project-description.org&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      ----------------------------------------------------------------------------<br />
+      &nbsp;/Users/jkitchin/Dropbox/CMU/proposals/@archive/2016/nsf-reu-supplement/&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      &nbsp;project-description.org&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      ----------------------------------------------------------------------------<br />
+      &nbsp;/Users/jkitchin/Dropbox/CMU/proposals/@archive/2016/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      &nbsp;proctor-and-gamble-education/proposal.org&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      ----------------------------------------------------------------------------<br />
+      &nbsp;/Users/jkitchin/Dropbox/bibliography/notes.org&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      ----------------------------------------------------------------------------<br />
+      &nbsp;/Users/jkitchin/Dropbox/kitchingroup/jmax/org-ref/citeproc/readme.org&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      ----------------------------------------------------------------------------<br />
+      &nbsp;/Users/jkitchin/Dropbox/kitchingroup/jmax/org-ref/citeproc/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      &nbsp;readme-unsrt.org&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      ----------------------------------------------------------------------------<br />
+      &nbsp;/Users/jkitchin/Dropbox/kitchingroup/jmax/org-ref/citeproc/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      &nbsp;readme-author-year.org&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      ----------------------------------------------------------------------------<br />
+      &nbsp;/Users/jkitchin/Dropbox/kitchingroup/jmax/org-ref/tests/test-1.org&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      ----------------------------------------------------------------------------<br />
+      &nbsp;/Users/jkitchin/Dropbox/kitchingroup/jmax/org-ref/tests/sandbox/elpa/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      &nbsp;org-ref-20160122.1725/citeproc/readme.org&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    </td>
+  </tr>
+</table>
+
+<p>
+很明显，我们可以用这种方式生成helm和ivy这类工具的候选条目。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(ivy-read <span style="font-style: italic;">"Open: "</span> (emacsql org-db [<span style="font-weight: bold;">:select</span> [files:filename links:begin]
+                                            <span style="font-weight: bold;">:from</span> links <span style="font-weight: bold;">:inner</span> <span style="font-weight: bold;">:join</span> files <span style="font-weight: bold;">:on</span> (= links:filename-id files:rowid) 
+                                            <span style="font-weight: bold;">:where</span> (<span style="font-weight: bold;">and</span> (= type <span style="font-style: italic;">"cite"</span>) (like path <span style="font-style: italic;">"%kitchin-2015-examp%"</span>))])
+          <span style="font-weight: bold;">:action</span> '(1 (<span style="font-style: italic;">"o"</span>
+                       (<span style="font-weight: bold;">lambda</span> (c)
+                         (find-file (car c))
+                         (goto-char (nth 1 c))
+                         (org-show-entry)))))
+</pre>
+</div>
+
+<pre class="example">
+/Users/jkitchin/Dropbox/CMU/manuscripts/2015/human-readable-data/manuscript.org
+</pre>
+
+<p>
+现在，你可以找到引用任何bibtex key的所有文件。因为SQL是查询语言（query language），
+你应该可以写出更复杂的查询（query），比如过滤出多次引用（multiple citation）和
+不同引用等等。
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgf501ffc" class="outline-2">
+<h2 id="orgf501ffc">3 查询标题</h2>
+<div class="outline-text-2" id="text-orgf501ffc">
+<p>
+每个标题，连同它的位置，标签和属性都被保存了下来。我们可以用数据库找到带有标签或特定属性的标题。
+你可以看到我的数据库里有293个标签。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(emacsql org-db [<span style="font-weight: bold;">:select</span> (funcall count) <span style="font-weight: bold;">:from</span> tags])
+</pre>
+</div>
+
+<!-- This HTML table template is generated by emacs 27.0.50 -->
+<table border="1">
+  <tr>
+    <td align="left" valign="top">
+      &nbsp;293&nbsp;
+    </td>
+  </tr>
+</table>
+
+<p>
+这里我们查找带有electrolyte标签的标题。我有时用它来标记一些相关的文献。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(emacsql org-db [<span style="font-weight: bold;">:select</span> <span style="font-weight: bold;">:distinct</span> [files:filename headlines:title]
+                         <span style="font-weight: bold;">:from</span> headlines <span style="font-weight: bold;">:inner</span> <span style="font-weight: bold;">:join</span> headline-tags <span style="font-weight: bold;">:on</span> (=  headlines:rowid headline-tags:headline-id)
+                         <span style="font-weight: bold;">:inner</span> <span style="font-weight: bold;">:join</span> tags <span style="font-weight: bold;">:on</span> (= tags:rowid headline-tags:tag-id)
+                         <span style="font-weight: bold;">:inner</span> <span style="font-weight: bold;">:join</span> files <span style="font-weight: bold;">:on</span> (= headlines:filename-id files:rowid)
+                         <span style="font-weight: bold;">:where</span> (= tags:tag <span style="font-style: italic;">"electrolyte"</span>) <span style="font-weight: bold;">:limit</span> 5])
+</pre>
+</div>
+
+<!-- This HTML table template is generated by emacs 27.0.50 -->
+<table border="1">
+  <tr>
+    <td align="left" valign="top">
+      &nbsp;/Users/jkitchin/Dropbox/&nbsp;<br />
+      &nbsp;org-mode/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      &nbsp;prj-doe-early-career.org&nbsp;
+    </td>
+  </tr>
+</table>
+
+<p>
+这里我们可以看到有很多带EMAIL属性的entry，这些可以作为邮件联系人。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(emacsql org-db [<span style="font-weight: bold;">:select</span> [(funcall count)] <span style="font-weight: bold;">:from</span>
+                         headlines <span style="font-weight: bold;">:inner</span> <span style="font-weight: bold;">:join</span> headline-properties <span style="font-weight: bold;">:on</span> (=  headlines:rowid headline-properties:headline-id)
+                         <span style="font-weight: bold;">:inner</span> <span style="font-weight: bold;">:join</span> properties <span style="font-weight: bold;">:on</span> (= properties:rowid headline-properties:property-id)
+                         <span style="font-weight: bold;">:where</span> (<span style="font-weight: bold;">and</span> (= properties:property <span style="font-style: italic;">"EMAIL"</span>) (not (null headline-properties:value)))])
+</pre>
+</div>
+
+<!-- This HTML table template is generated by emacs 27.0.50 -->
+<table border="1">
+  <tr>
+    <td align="left" valign="top">
+      &nbsp;7452&nbsp;
+    </td>
+  </tr>
+</table>
+
+<p>
+如果你想看匹配"jkitchin"的标题，它们在这。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(emacsql org-db [<span style="font-weight: bold;">:select</span> <span style="font-weight: bold;">:distinct</span> [headlines:title headline-properties:value] <span style="font-weight: bold;">:from</span>
+                         headlines <span style="font-weight: bold;">:inner</span> <span style="font-weight: bold;">:join</span> headline-properties <span style="font-weight: bold;">:on</span> (=  headlines:rowid headline-properties:headline-id)
+                         <span style="font-weight: bold;">:inner</span> <span style="font-weight: bold;">:join</span> properties <span style="font-weight: bold;">:on</span> (= properties:rowid headline-properties:property-id)
+                         <span style="font-weight: bold;">:where</span> (<span style="font-weight: bold;">and</span> (= properties:property <span style="font-style: italic;">"EMAIL"</span>) (like headline-properties:value <span style="font-style: italic;">"%jkitchin%"</span>))])
+</pre>
+</div>
+
+<!-- This HTML table template is generated by emacs 27.0.50 -->
+<table border="1">
+  <tr>
+    <td align="left" valign="top">
+      &nbsp;John&nbsp;Kitchin&nbsp;&nbsp;
+    </td>
+  </tr>
+</table>
+
+<p>
+这是一个查找有多少deadline是2017年的标题。看来我很忙啊！
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(emacsql org-db [<span style="font-weight: bold;">:select</span> (funcall count) <span style="font-weight: bold;">:from</span>
+                         headlines <span style="font-weight: bold;">:inner</span> <span style="font-weight: bold;">:join</span> headline-properties <span style="font-weight: bold;">:on</span> (=  headlines:rowid headline-properties:headline-id)
+                         <span style="font-weight: bold;">:inner</span> <span style="font-weight: bold;">:join</span> properties <span style="font-weight: bold;">:on</span> (= properties:rowid headline-properties:property-id)
+                         <span style="font-weight: bold;">:where</span> (<span style="font-weight: bold;">and</span> (= properties:property <span style="font-style: italic;">"DEADLINE"</span>) (glob headline-properties:value <span style="font-style: italic;">"*2017*"</span>))])
+</pre>
+</div>
+
+<!-- This HTML table template is generated by emacs 27.0.50 -->
+<table border="1">
+  <tr>
+    <td align="left" valign="top">
+      &nbsp;50&nbsp;
+    </td>
+  </tr>
+</table>
+</div>
+</div>
+
+<div id="outline-container-org8ee6308" class="outline-2">
+<h2 id="org8ee6308">4 查询关键字</h2>
+<div class="outline-text-2" id="text-org8ee6308">
+<p>
+我们也保存了文件关键字，这样就能搜索文档标题，作者等等。这里是五篇title长度超过35个字符的
+文档，按照降序排列。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(emacsql org-db [<span style="font-weight: bold;">:select</span> <span style="font-weight: bold;">:distinct</span> [value] <span style="font-weight: bold;">:from</span>
+                         file-keywords <span style="font-weight: bold;">:inner</span> <span style="font-weight: bold;">:join</span> keywords <span style="font-weight: bold;">:on</span> (= file-keywords:keyword-id keywords:rowid)
+                         <span style="font-weight: bold;">:where</span> (<span style="font-weight: bold;">and</span> (&gt; (funcall length value) 35) (= keywords:keyword <span style="font-style: italic;">"TITLE"</span>))
+                         <span style="font-weight: bold;">:order</span> <span style="font-weight: bold;">:by</span> value <span style="font-weight: bold;">:desc</span>
+                         <span style="font-weight: bold;">:limit</span> 5])
+</pre>
+</div>
+
+<!-- This HTML table template is generated by emacs 27.0.50 -->
+<table border="1">
+  <tr>
+    <td align="left" valign="top">
+      &nbsp;pycse&nbsp;-&nbsp;Python3&nbsp;Computations&nbsp;in&nbsp;Science&nbsp;and&nbsp;Engineering&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      ----------------------------------------------------------------------------<br />
+      &nbsp;org-show&nbsp;-&nbsp;simple&nbsp;presentations&nbsp;in&nbsp;org-mode&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      ----------------------------------------------------------------------------<br />
+      &nbsp;org-mode&nbsp;-&nbsp;A&nbsp;Human&nbsp;Readable,&nbsp;Machine&nbsp;Addressable&nbsp;Approach&nbsp;to&nbsp;Data&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      &nbsp;Archiving&nbsp;and&nbsp;Sharing&nbsp;in&nbsp;Science&nbsp;and&nbsp;Engineering&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      ----------------------------------------------------------------------------<br />
+      &nbsp;modifying&nbsp;emacs&nbsp;to&nbsp;make&nbsp;typing&nbsp;easier.&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+      ----------------------------------------------------------------------------<br />
+      &nbsp;jmax&nbsp;-&nbsp;John's&nbsp;customizations&nbsp;to&nbsp;maximize&nbsp;Emacs&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    </td>
+  </tr>
+</table>
+
+<p>
+我们也可以搜索作者或别的东西。我的便签（memo）带有#+SUBJECT关键字，所以我可以找到某个
+subject的便签。这里我可以轻松地找到所有带LATEX_CLASS关键字的cmu-memo：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(emacsql org-db [<span style="font-weight: bold;">:select</span> [(funcall count)] <span style="font-weight: bold;">:from</span>
+                         file-keywords <span style="font-weight: bold;">:inner</span> <span style="font-weight: bold;">:join</span> keywords <span style="font-weight: bold;">:on</span> (= file-keywords:keyword-id keywords:rowid)
+                         <span style="font-weight: bold;">:where</span> (<span style="font-weight: bold;">and</span> (= value <span style="font-style: italic;">"cmu-memo"</span>) (= keywords:keyword <span style="font-style: italic;">"LATEX_CLASS"</span>))
+                         <span style="font-weight: bold;">:limit</span> 5])
+</pre>
+</div>
+
+<!-- This HTML table template is generated by emacs 27.0.50 -->
+<table border="1">
+  <tr>
+    <td align="left" valign="top">
+      &nbsp;119&nbsp;
+    </td>
+  </tr>
+</table>
+
+<p>
+有119条符合条件的便签。能够找出它们真是不错。
+</p>
+</div>
+</div>
+
+<div id="outline-container-org3012413" class="outline-2">
+<h2 id="org3012413">5 全文搜索</h2>
+<div class="outline-text-2" id="text-org3012413">
+<p>
+理论上，数据库里有标题内容（headline content）的表, 它也完全是可搜索的。我发现加上这些表
+的话数据库变得有点慢，体积也增长到500GB，所以现在我把它们略去不谈。
+</p>
+</div>
+</div>
+
+<div id="outline-container-org3a99b28" class="outline-2">
+<h2 id="org3a99b28">6 总结</h2>
+<div class="outline-text-2" id="text-org3a99b28">
+<p>
+真正有趣的地方在这。当所有表合并在一起时，查询写起来有点繁琐。但是其中一些查询可以
+包装起来成为函数。尽管把所有的概念对应地转变成SQL中概念要费点功夫，但我喜欢lisp式的查询。
+一个包装起来的函数可能像下面这样：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(org-db-query (<span style="font-weight: bold;">and</span> (= properties:property <span style="font-style: italic;">"DEADLINE"</span>) (glob headline-properties:value <span style="font-style: italic;">"*2017*"</span>)))
+</pre>
+</div>
+
+<p>
+使用tag或property来匹配的话就像下面这样。有时要写类似上面那样的代码的话，字符串不得不展开。
+我不清楚这有多难。用上 <a href="https://github.com/skeeto/rdp">a recursive descent parser</a> (由emacsql作者编写) 应该就容易多了。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(org-db-query <span style="font-style: italic;">"DEADLINE={2017}"</span>)
+</pre>
+</div>
+
+<p>
+数据库的效果还可以。对于大型的org文件，更新数据库时有明显的停顿，因为更新时Emacs
+处于block的状态。我可以通过计时器 (timer) 来按顺序更新数据库甚至定时更新。数据库并不
+需要保持实时更新，因为下次搜索时它们也不一定完全准确。至少目前来说这还不是个大问题。我
+关注过 <a href="https://xapian.org">xapian</a> （一个搜索引擎函数库：Search Engine Library）因为mu4e使用它。利用外部
+函数库而非emacs来parse org文件也许会好一点。但这似乎是个大工程，可能得到下个暑假才能
+弄完。
+</p>
+
+<p>
+用外部函数库的另一个好处是“忽略模式”（ignore pattern）或是一些防止被建索引的文件特性。
+比如我用org-mode维护一个加密的密码文件，但是当我打开它时，数据库就会建立它的纯文本的索引。
+正如你在目录间跳转时会尽量避开 .dropbox.cache 这样的目录，这样不加筛选地建立索引可是个
+大问题，不解决好的话，这个方法就还不够完善。
+</p>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2017-04-02</span>
+            <span title="last modification date" class="post-info">2017-04-03</span>
+            <span title="tags" class="post-info">:<a href="/tags/org-mode">org-mode</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-c7de1c50-88ed-412e-ae70-62694dd7dea5">sadwheel</a></span>
+        </div>
+    <script src="/media/js/jquery-2.1.3.min.js"></script>
+        <section>
+            <h1>Comments</h1>
+            <div id="comment-wrap">
+                    <a class="disqus_label">使用 Disqus 评论</a>
+    </ul>
+        <div id="disqus_thread"></div>
+        <script type="text/javascript">
+         //var disqus_developer = 1;
+         var preempt_signal=false;
+         var disqus_identifier = "/blog/2017/04/02/查找各处org文件的内容/";
+         var disqus_url = "https://lujun9972.github.io/emacs-document/blog/2017/04/02/查找各处org文件的内容/";
+         var disqus_shortname = 'emacs-document';
+         /* * * DON'T EDIT BELOW THIS LINE * * */
+         (function() {
+             var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+             dsq.src = 'https://' + disqus_shortname + '.disqus.com/embed.js';
+             (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+             $('#disqus_thread').css('display','none');
+         })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+    <script>
+     /* comments */
+     var ego_disqus_thread=$('#disqus_thread');
+     var ego_ds_label=$('.ds-thread');
+     $('.disqus_label').click(function(){
+         ego_disqus_thread.show();
+         ego_ds_label.hide();
+     });
+     $('.ds-label').click(function(){
+         ego_disqus_thread.hide();
+         ego_ds_label.show();
+     });
+    </script>
+        </section>
+    <script src="/media/js/main.js"></script>
+        <script type="text/javascript">
+         var _gaq = _gaq || [];
+         _gaq.push(['_setAccount', '7bac4fd0247f69c27887e0d4e3aee41e']);
+         _gaq.push(['_trackPageview']);
+         (function() {
+             var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+             ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+             var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-c7de1c50-88ed-412e-ae70-62694dd7dea5">sadwheel</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="//instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>

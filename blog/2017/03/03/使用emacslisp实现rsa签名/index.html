@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>使用emacslisp实现RSA签名 - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="elisp-common" />
+  <style>
+   #ds-thread #ds-reset .ds-comment-body p {color: #ffffff;}
+   #ds-thread #ds-reset .ds-comment-body p a {color: #ff0;}
+   #ds-thread #ds-reset .ds-comment-body p a:hover {color: #0ff;}
+   #disqus_thread a {color: #00ffff;}
+  </style>
+  <link rel="stylesheet" href="/media/css/main.css" type="text/css"/>
+  <link rel="stylesheet" href="/media/css/comment.css" type="text/css"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="/">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <div class="menu-icon">
+        <svg viewBox="0 0 18 15">
+          <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.031C17.335,0,18,0.665,18,1.484L18,1.484z" fill="#ffff00"/>
+          <path d="M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0c0-0.82,0.665-1.484,1.484-1.484 h15.031C17.335,6.031,18,6.696,18,7.516L18,7.516z" fill="#ffff00"/>
+          <path d="M18,13.516C18,14.335,17.335,15,16.516,15H1.484C0.665,15,0,14.335,0,13.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.031C17.335,12.031,18,12.696,18,13.516L18,13.516z" fill="#ffff00"/>
+        </svg>
+      </div>
+      <ul class="trigger">
+        <li><a href="/years/">Years</a></li>
+        <li><a href="/authors/">Authors</a></li>
+        <li><a href="/tags/">Tags</a></li>
+        <li><a href="/about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="/rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="http://www.google.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">使用emacslisp实现RSA签名</h1>
+<div id="table-of-contents">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#org1d9c71d">Evaluation with calc</a></li>
+<li><a href="#orgaa9b47e">Generating primes</a></li>
+<li><a href="#org2e4d770">Computing e and d</a></li>
+<li><a href="#org76fec82">Signatures</a></li>
+<li><a href="#orgdbbd072">Putting it all together</a></li>
+</ul>
+</div>
+</div>
+<p>
+Emacs自带一个很牛逼的,能实现任意精度计算的代数系统，名叫 <a href="http://www.gnu.org/software/emacs/manual/html_mono/calc.html">calc</a>. 我 <a href="http://nullprogram.com/blog/2009/06/23/">之前有介绍过它</a>, 现在它已经成为我日常使用的工具之一了. 
+是的,兄弟,Emacs可以作代数运算. 而且它和Emacs中的其他玩意一样,是可编程的,可以通过EmacsLisp对其进行扩展.
+本文我就要告诉你怎么在EmacsLisp中用calc来实现 <a href="https://en.wikipedia.org/wiki/RSA_(cryptosystem)">RSA公钥密码体系</a> 
+</p>
+
+<p>
+下面是完成的成果:
+</p>
+
+<ul class="org-ul">
+<li><a href="https://github.com/skeeto/emacs-rsa">https://github.com/skeeto/emacs-rsa</a></li>
+</ul>
+
+<p>
+当然这只是实现来玩玩的,不是真的想把它应用起来. 而且它的速度实在是太慢了.
+</p>
+
+<div id="outline-container-org1d9c71d" class="outline-2">
+<h2 id="org1d9c71d">Evaluation with calc</h2>
+<div class="outline-text-2" id="text-org1d9c71d">
+<p>
+由于Emacs的整数型是有长度限制的,因此 <code>calc</code> package就特别的有用.
+Emacs并不会先分配一个整形对象然后用一个指针指向它,而是直接在指针中存放整数. 这样做的好处是,它的访问速度更快,但是意味着,Emacs中的整型能表示的范围要更小一些.
+</p>
+
+<p>
+<code>calc</code> 定义了大量的API, 其中有一个特别好用的函数叫 <code>calc-eval</code>. 它可以接受一个字符串形式的运算式并计算出结果,甚至运算式还能用 <code>$n</code> 来进行参数替换.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(calc-eval <span style="font-style: italic;">"2^16 - 1"</span>)
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">=&gt; "65535"</span>
+
+(calc-eval <span style="font-style: italic;">"2^$1 - 1"</span> nil 128)
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">=&gt; "340282366920938463463374607431768211455"</span>
+</pre>
+</div>
+
+<p>
+请注意,该函数返回的结果是字符串, 这是 <code>calc</code> 用来表示任意精度数字的一种方式. 而对于传递给它的参数,则既可以是普通的Elisp数字也可以是字符串.
+默认情况下, <code>calc</code> 认为这些数字都是十进制的. 不过你也可以修改它的基,方法是在数字前加上基数和#. 就跟交互式使用 <code>calc</code> 时一样.
+举个例子:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(calc-eval <span style="font-style: italic;">"16#deadbeef"</span>)
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">=&gt; "3735928559"</span>
+</pre>
+</div>
+
+<p>
+<code>calc-eval</code> 的第二个参数是可选的,用来修改 <code>calc-eval</code> 的计算方式. 若为nil,则表示计算运算式并返回结果. 至于其他的值是什么意思,可以去查看manual文档.
+不过在本文中,唯一用到的非nil值只有符号 <code>pred</code>,它表示让 <code>calc-eval</code> 返回时返回一个布尔值.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(calc-eval <span style="font-style: italic;">"$1 &lt; $2"</span> 'pred <span style="font-style: italic;">"4000"</span> <span style="font-style: italic;">"5000"</span>)
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">=&gt; t</span>
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgaa9b47e" class="outline-2">
+<h2 id="orgaa9b47e">Generating primes</h2>
+<div class="outline-text-2" id="text-orgaa9b47e">
+<p>
+RSA是建立在大数分解的复杂度基础上的. 要产生RSA键值对先需要产生两个质数 <code>p</code> 和 <code>q</code>,然后用这两个质数进行运算得到两个数学上相关的合成数(composite numbers).
+</p>
+
+<p>
+<code>calc</code> 提供一个 <code>calc-next-prime</code> 函数来获取大于某个数的下一个质数. 该函数使用probabilistic primarily test — the Fermat Miller-Rabin primality test — 来实现对大数据的高效测试.
+It increments the input until it finds a result that passes enough iterations of the primality test.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(calc-eval <span style="font-style: italic;">"nextprime($1)"</span> nil <span style="font-style: italic;">"100000000000000000"</span>)
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">=&gt; "100000000000000003"</span>
+</pre>
+</div>
+
+<p>
+那么要产生一个随机的n位的质数,只需要先产生一个n位的随机数,然后找出大于它的下一个质数就行了.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp"><span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Generate a 128-bit prime, 10 iterations (0.000084% error rate)</span>
+(calc-eval <span style="font-style: italic;">"nextprime(random(2^$1), 10)"</span> nil 128)
+<span style="font-style: italic;">"111618319598394878409654851283959105123"</span>
+</pre>
+</div>
+
+<p>
+不过 <code>calc</code> 的随机函数是基于Emacs的随机函数来实现的, 而Emacs随机函数的强度不足以被用于加密. 所以在实际实现时,我从 <code>/dev/urandom</code> 来读取n个比特作为n位的随机数.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">with-temp-buffer</span>
+  (set-buffer-multibyte nil)
+  (call-process <span style="font-style: italic;">"head"</span> <span style="font-style: italic;">"/dev/urandom"</span> t nil <span style="font-style: italic;">"-c"</span> (format <span style="font-style: italic;">"%d"</span> (/ bits 8)))
+  (<span style="font-weight: bold;">let</span> ((f (apply-partially #'format <span style="font-style: italic;">"%02x"</span>)))
+    (concat <span style="font-style: italic;">"16#"</span> (mapconcat f (buffer-string) <span style="font-style: italic;">""</span>))))
+</pre>
+</div>
+
+<p>
+(请注意: 一定要使用 <code>/dev/urandom</code>. 原因请参见 <a href="http://www.2uo.de/myths-about-urandom/">no reason to use /dev/random for generating keys</a>)
+</p>
+</div>
+</div>
+
+<div id="outline-container-org2e4d770" class="outline-2">
+<h2 id="org2e4d770">Computing e and d</h2>
+<div class="outline-text-2" id="text-org2e4d770">
+<p>
+接下来就是按照 <code>Wikipedia</code> 来写代码了. 产生了质数 <code>p</code> 和 <code>q</code> 后, 使用公式 <code>n = p * q</code> 和 <code>i = (p - 1) * (q - 1)</code> 计算出两个相关数.
+另外,我随意地选择 <code>65,537</code> 来作为指数e.
+</p>
+
+<p>
+至于 <code>rsa--inverse</code> 不过是把Extended Euclidean算法按照 <a href="https://en.wikipedia.org/wiki/Extended_Euclidean_algorithm">Wiki上的伪代码</a> 用 Emacs Lisp + calc 来实现罢了. 
+它本身没有什么好说的,如果你好奇怎么实现的话,直接看仓库中的代码吧.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">rsa-generate-keypair</span> (bits)
+  <span style="font-style: italic;">"Generate a fresh RSA keypair plist of BITS length."</span>
+  (<span style="font-weight: bold;">let*</span> ((p (rsa-generate-prime (+ 1 (/ bits 2))))
+         (q (rsa-generate-prime (+ 1 (/ bits 2))))
+         (n (calc-eval <span style="font-style: italic;">"$1 * $2"</span> nil p q))
+         (i (calc-eval <span style="font-style: italic;">"($1 - 1) * ($2 - 1)"</span> nil p q))
+         (e (calc-eval <span style="font-style: italic;">"2^16+1"</span>))
+         (d (rsa--inverse e i)))
+    `(<span style="font-weight: bold;">:public</span>  (<span style="font-weight: bold;">:n</span> ,n <span style="font-weight: bold;">:e</span> ,e) <span style="font-weight: bold;">:private</span> (<span style="font-weight: bold;">:n</span> ,n <span style="font-weight: bold;">:d</span> ,d))))
+</pre>
+</div>
+
+<p>
+这里n和e就是公钥,n和d就是私钥. 下面我们就要开始计算并验证签名了.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org76fec82" class="outline-2">
+<h2 id="org76fec82">Signatures</h2>
+<div class="outline-text-2" id="text-org76fec82">
+<p>
+计算整数m(m&lt;n)的签名算式是 <code>s ≡ m^d (mod n)</code>.
+为了偷懒,我直接 <a href="https://en.wikipedia.org/wiki/Modular_exponentiation#Right-to-left_binary_method">将Wikipedia上right-to-left binary method的伪代码转换成Elisp实现</a>.
+由于实现方法很简短,我这里把它也列出来了. 注意,震撼力的反斜杠表示整型除法.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">rsa--mod-pow</span> (base exponent modulus)
+  (<span style="font-weight: bold;">let</span> ((result 1))
+    (<span style="font-weight: bold;">setf</span> base (calc-eval <span style="font-style: italic;">"$1 % $2"</span> nil base modulus))
+    (<span style="font-weight: bold;">while</span> (calc-eval <span style="font-style: italic;">"$1 &gt; 0"</span> 'pred exponent)
+      (<span style="font-weight: bold;">when</span> (calc-eval <span style="font-style: italic;">"$1 % 2 == 1"</span> 'pred exponent)
+        (<span style="font-weight: bold;">setf</span> result (calc-eval <span style="font-style: italic;">"($1 * $2) % $3"</span> nil result base modulus)))
+      (<span style="font-weight: bold;">setf</span> exponent (calc-eval <span style="font-style: italic;">"$1 \\ 2"</span> nil exponent)
+            base (calc-eval <span style="font-style: italic;">"($1 * $1) % $2"</span> nil base modulus)))
+    result))
+</pre>
+</div>
+
+<p>
+校验签名的过程跟上面是一样的,只不过使用公钥e参与运算: <code>m ≡ s^e (mod n)</code>. 
+如果签名是正确的,那么m会被正确地还原. 
+理论上讲,只有在直到 <code>d</code> 的情况下才能从 <code>m</code> 计算出 <code>s</code> 来.
+不过,如果 <code>n</code> 的值 <a href="http://crypto.stackexchange.com/a/5942">太小了</a>, 很容易就能分解出 <code>p</code> 和 <code>q</code> 来,那么 <code>d</code> 也就很容易从公钥中推算出来. 
+所以,一定要注意你选择的 <code>p</code> 和 <code>q</code> 有足够的强度.
+</p>
+
+<p>
+现在还剩下一个问题: 一般用户都是对字符串或者文件这类东西作签名的,不太可能对一个整数去做签名.
+所幸,通过hash函数可以将任意长度的数据转换成一段适合签名的整数. 
+Emacs本身就自带了很多hash算法,可以通过 <code>secure-hash</code> 函数来调用. 它可以对字符串和buffer进行hash运算.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(secure-hash 'sha224 <span style="font-style: italic;">"Hello, world!"</span>)
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">=&gt; "8552d8b7a7dc5476cb9e25dee69a8091290764b7f2a64fe6e78e9568"</span>
+</pre>
+</div>
+
+<p>
+由于结果是一个十六进制数,所以只要在签名加上 <code>16#</code> 就能直接当成calc中的整型来用了.
+</p>
+
+<p>
+下面是实现的签名和验签函数,可以用来对字符串或buffer进行签名.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">rsa-sign</span> (private-key object)
+  (<span style="font-weight: bold;">let</span> ((n (plist-get private-key <span style="font-weight: bold;">:n</span>))
+        (d (plist-get private-key <span style="font-weight: bold;">:d</span>))
+        (hash (concat <span style="font-style: italic;">"16#"</span> (secure-hash 'sha384 object))))
+    <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">truncate hash such that hash &lt; n</span>
+    (<span style="font-weight: bold;">while</span> (calc-eval <span style="font-style: italic;">"$1 &gt; $2"</span> 'pred hash n)
+      (<span style="font-weight: bold;">setf</span> hash (calc-eval <span style="font-style: italic;">"$1 \\ 2"</span> nil hash)))
+    (rsa--mod-pow hash d n)))
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">rsa-verify</span> (public-key object sig)
+  (<span style="font-weight: bold;">let</span> ((n (plist-get public-key <span style="font-weight: bold;">:n</span>))
+        (e (plist-get public-key <span style="font-weight: bold;">:e</span>))
+        (hash (concat <span style="font-style: italic;">"16#"</span> (secure-hash 'sha384 object))))
+    <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">truncate hash such that hash &lt; n</span>
+    (<span style="font-weight: bold;">while</span> (calc-eval <span style="font-style: italic;">"$1 &gt; $2"</span> 'pred hash n)
+      (<span style="font-weight: bold;">setf</span> hash (calc-eval <span style="font-style: italic;">"$1 \\ 2"</span> nil hash)))
+    (<span style="font-weight: bold;">let*</span> ((result (rsa--mod-pow sig e n)))
+      (calc-eval <span style="font-style: italic;">"$1 == $2"</span> 'pred result hash))))
+</pre>
+</div>
+
+<p>
+注意到这里面包含了一个对hash结果进行阶段的步骤. 这一步实际上会让你的 <code>n</code> 变得很容易被分解!
+我这里之所以有这么一个步骤是因为本来这也就是写来玩玩的,而且我也不希望太大的key造成运算速度太过缓慢.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgdbbd072" class="outline-2">
+<h2 id="orgdbbd072">Putting it all together</h2>
+<div class="outline-text-2" id="text-orgdbbd072">
+<p>
+下面是一段演示,使用了128位的key.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">setf</span> message <span style="font-style: italic;">"hello, world!"</span>)
+
+(<span style="font-weight: bold;">setf</span> keypair (rsa-generate-keypair 128))
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">=&gt; (:public  (:n "74924929503799951536367992905751084593"</span>
+<span style="font-weight: bold; font-style: italic;">;;               </span><span style="font-weight: bold; font-style: italic;">:e "65537")</span>
+<span style="font-weight: bold; font-style: italic;">;;     </span><span style="font-weight: bold; font-style: italic;">:private (:n "74924929503799951536367992905751084593"</span>
+<span style="font-weight: bold; font-style: italic;">;;               </span><span style="font-weight: bold; font-style: italic;">:d "36491277062297490768595348639394259869"))</span>
+
+(<span style="font-weight: bold;">setf</span> sig (rsa-sign (plist-get keypair <span style="font-weight: bold;">:private</span>) message))
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">=&gt; "31982247477262471348259501761458827454"</span>
+
+(rsa-verify (plist-get keypair <span style="font-weight: bold;">:public</span>) message sig)
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">=&gt; t</span>
+
+(rsa-verify (plist-get keypair <span style="font-weight: bold;">:public</span>) (capitalize message) sig)
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">=&gt; nil</span>
+</pre>
+</div>
+
+<p>
+其中的每个步骤耗时不超过一秒. 不过若使用更长的,足够安全的key,那么这个实现就太慢了.
+比如,在我的笔记本上,产生一个2048位的key足足花了我半个小时, 而使用这个key来对消息进行签名又要花费大概一分钟.
+这个速度,若想用来对ELPA package进行签名恐怕还是太慢了一些.
+</p>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2017-03-03</span>
+            <span title="last modification date" class="post-info">2017-03-03</span>
+            <span title="tags" class="post-info">:<a href="/tags/elisp-common">elisp-common</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-c7de1c50-88ed-412e-ae70-62694dd7dea5">lujun9972</a></span>
+        </div>
+    <script src="/media/js/jquery-2.1.3.min.js"></script>
+        <section>
+            <h1>Comments</h1>
+            <div id="comment-wrap">
+                    <a class="disqus_label">使用 Disqus 评论</a>
+    </ul>
+        <div id="disqus_thread"></div>
+        <script type="text/javascript">
+         //var disqus_developer = 1;
+         var preempt_signal=false;
+         var disqus_identifier = "/blog/2017/03/03/使用emacslisp实现rsa签名/";
+         var disqus_url = "https://lujun9972.github.io/emacs-document/blog/2017/03/03/使用emacslisp实现rsa签名/";
+         var disqus_shortname = 'emacs-document';
+         /* * * DON'T EDIT BELOW THIS LINE * * */
+         (function() {
+             var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+             dsq.src = 'https://' + disqus_shortname + '.disqus.com/embed.js';
+             (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+             $('#disqus_thread').css('display','none');
+         })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+    <script>
+     /* comments */
+     var ego_disqus_thread=$('#disqus_thread');
+     var ego_ds_label=$('.ds-thread');
+     $('.disqus_label').click(function(){
+         ego_disqus_thread.show();
+         ego_ds_label.hide();
+     });
+     $('.ds-label').click(function(){
+         ego_disqus_thread.hide();
+         ego_ds_label.show();
+     });
+    </script>
+        </section>
+    <script src="/media/js/main.js"></script>
+        <script type="text/javascript">
+         var _gaq = _gaq || [];
+         _gaq.push(['_setAccount', '7bac4fd0247f69c27887e0d4e3aee41e']);
+         _gaq.push(['_trackPageview']);
+         (function() {
+             var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+             ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+             var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-c7de1c50-88ed-412e-ae70-62694dd7dea5">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="//instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>

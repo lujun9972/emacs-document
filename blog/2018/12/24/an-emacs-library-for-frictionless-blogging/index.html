@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>An Emacs Library for frictionless Blogging - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="raw" />
+  <style>
+   #ds-thread #ds-reset .ds-comment-body p {color: #ffffff;}
+   #ds-thread #ds-reset .ds-comment-body p a {color: #ff0;}
+   #ds-thread #ds-reset .ds-comment-body p a:hover {color: #0ff;}
+   #disqus_thread a {color: #00ffff;}
+  </style>
+  <link rel="stylesheet" href="/media/css/main.css" type="text/css"/>
+  <link rel="stylesheet" href="/media/css/comment.css" type="text/css"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="/">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <div class="menu-icon">
+        <svg viewBox="0 0 18 15">
+          <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.031C17.335,0,18,0.665,18,1.484L18,1.484z" fill="#ffff00"/>
+          <path d="M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0c0-0.82,0.665-1.484,1.484-1.484 h15.031C17.335,6.031,18,6.696,18,7.516L18,7.516z" fill="#ffff00"/>
+          <path d="M18,13.516C18,14.335,17.335,15,16.516,15H1.484C0.665,15,0,14.335,0,13.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.031C17.335,12.031,18,12.696,18,13.516L18,13.516z" fill="#ffff00"/>
+        </svg>
+      </div>
+      <ul class="trigger">
+        <li><a href="/years/">Years</a></li>
+        <li><a href="/authors/">Authors</a></li>
+        <li><a href="/tags/">Tags</a></li>
+        <li><a href="/about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="/rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="http://www.google.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">An Emacs Library for frictionless Blogging</h1>
+<div id="table-of-contents">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#library-idea">Library idea</a>
+<ul>
+<li><a href="#extracting-information-from-org-document">Extracting information from Org document</a></li>
+<li><a href="#submitting-a-post-request">Submitting a POST request</a></li>
+<li><a href="#getting-the-id-and-token-from-the-response">Getting the ID and Token from the response</a></li>
+<li><a href="#storing-writefreely-data-somewhere-meaningful">Storing writefreely data somewhere meaningful</a></li>
+<li><a href="#putting-it-all-together">Putting it all together</a></li>
+</ul>
+</li>
+<li><a href="#next-steps">Next steps</a></li>
+<li><a href="#things-i-wish-to-see-in-write-as">Things I wish to see in write.as</a></li>
+</ul>
+</div>
+</div>
+<p>
+<b>TLDR: Blog post you are about to read was written in Org Mode and instantly published to this website with one function call. Code <a href="https://github.com/dangom/writefreely.el">on GitHub</a>.</b>
+</p>
+
+<div id="outline-container-orge4753d6" class="outline-2">
+<h2 id="library-idea"><a id="orge4753d6"></a>Library idea</h2>
+<div class="outline-text-2" id="text-library-idea">
+<p>
+There is this thing called the Fediverse. <a href="https://en.wikipedia.org/wiki/Fediverse">According to Wikipedia</a>, Fediverse (a portmanteau of “federation” and “universe”) is the ensemble of federated servers that are used for web publishing (i.e. social networking, microblogging or websites) and file hosting. I came across one of such federated microblogging platforms not long ago, <a href="https://writefreely.org">writefreely</a>, and it's flagship instance <a href="https://write.as">write.as</a> . It offers a distraction-free experience, no adds, privacy by default, and users can even write using markdown. I guess the time has finally come to start a blog. Being an Emacs user, though, I figured that before actually starting a blog or doing any meaningful writing, I should write an Elisp library that allows posting to said blogging platform. My goal is to write posts in Org Mode, have them exported to markdown using <code>ox-md.el</code>, and directly pushed to the Fediverse. Luckily, <a href="https://write.as">write.as</a> offers an easy to use API. Users can write anonymous blogposts by simply submitting POST requests with a “title” and a “body” to their RESTful API endpoint. With an authorization token in the request header, the blogpost is automatically associated to an user account.
+</p>
+
+<p>
+After some minutes of thinking I figured my library would have to support the following functionality:
+</p>
+
+<ol class="org-ol">
+<li>Extract “title” and “body” from an Org document (exported to markdown)</li>
+<li>Submit a POST request to the write.as API endpoint</li>
+<li>Get the post id and access token from the request response.</li>
+<li>Store this information somewhere meaningful for later use.</li>
+</ol>
+
+<p>
+I never did anything like that with Elisp. In fact, I never did much at all with Elisp, so this library would be the perfect opportunity to start learning.
+</p>
+</div>
+
+<div id="outline-container-orgd682022" class="outline-3">
+<h3 id="extracting-information-from-org-document"><a id="orgd682022"></a>Extracting information from Org document</h3>
+<div class="outline-text-3" id="text-extracting-information-from-org-document">
+<p>
+The first one is easy. The title of an Org document is specified in <code>#+TITLE</code>, so I just need a programatic way to read the property. The body is all the content in the Org-to-markdown export.
+</p>
+
+<p>
+To get the title, I found the following function in the Emacs devel <a href="http://lists.gnu.org/archive/html/emacs-orgmode/2018-11/msg00133.html">mailing list</a>. Coincidently, it was posted about a week ago.
+</p>
+
+<pre class="example">
+(defun get-orgmode-keyword (key)
+ (org-element-map (org-element-parse-buffer) 'keyword
+ (lambda (k)
+ (when (string= key (org-element-property :key k))
+ (org-element-property :value k))) 
+ nil t))
+</pre>
+
+<p>
+And so to get the title all we have to do is:
+</p>
+
+<pre class="example">
+(get-orgmode-keyword "TITLE")
+</pre>
+
+<p>
+Getting the md export is also trivial. All we need to do is export the file to a temporary buffer as mardown, then get a string between <code>point-min</code> and <code>point-max</code> and save it to a body variable.
+</p>
+
+<pre class="example">
+(defun writefreely-org-to-md-string ()
+ (let ((org-buffer (current-buffer))
+ (md-buffer (org-md-export-as-markdown)))
+ (let ((md-string
+ (with-current-buffer md-buffer
+ (buffer-substring (point-min) (point-max)))))
+ (set-buffer org-buffer)
+ (kill-buffer md-buffer)
+ md-string)))
+</pre>
+</div>
+</div>
+
+<div id="outline-container-orgc7ddd3b" class="outline-3">
+<h3 id="submitting-a-post-request"><a id="orgc7ddd3b"></a>Submitting a POST request</h3>
+<div class="outline-text-3" id="text-submitting-a-post-request">
+<p>
+This one is also simple. I know nothing about RESTful APIs and asynchronous requests, yet the examples in the <a href="https://github.com/tkf/emacs-request">request.el</a> library are enough to come up with the following:
+</p>
+
+<pre class="example">
+(defvar writefreely-api-endpoint "https://write.as/api/posts"
+ "URL of the writefreely instance API endpoint")
+
+(defun writefreely-post-publish-request (title body)
+ "post title and body. Return parsed JSON response"
+ (request-response-data
+ (request
+ writefreely-api-endpoint
+ :type "POST"
+ :parser #'json-read
+ :data (json-encode
+ `(("title" . ,title)
+ ("body" . ,body)))
+ :headers '(("Content-Type" . "application/json"))
+ :sync t
+ :error (function* (lambda (&amp;key error-thrown &amp;allow-other-keys&amp;rest _)
+ (message "Got error: %S" error-thrown))))))
+</pre>
+
+<p>
+What this function is doing is simple: it's submitting a request using <code>request</code>, waiting for the response (see the <code>sync</code> keyword set to <code>t</code>) and then reading and returning it with <code>request-response-data</code>. Note that I'm using <code>:sync t</code> because I haven't learned yet how to deal with async, and the request takes less than a second anyway (and I'll probably only submit a blogpost every now and then). For now, what we have is enough for us to submit anonymous posts.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org844d2a8" class="outline-3">
+<h3 id="getting-the-id-and-token-from-the-response"><a id="org844d2a8"></a>Getting the ID and Token from the response</h3>
+<div class="outline-text-3" id="text-getting-the-id-and-token-from-the-response">
+<p>
+A response, after parsed, will look like the following:
+</p>
+
+<p>
+((code . 201)
+(data
+(id . “1234567890123”)
+(slug)
+(token . “uffVIr18ygX2kR7e3vISjVv9o8ukLlmi”)
+(appearance . “norm”)
+(language . “”)
+(rtl . :json-false)
+(created . “2018-11-16T21:51:58Z”)
+(updated . “2018-11-16T21:51:58Z”)
+(title . “title”)
+(body . “body”)
+(tags .
+[])
+(views . 0)))
+</p>
+
+<p>
+The 13-digit post id is what tells us where to find the post in the web. If id is the one in the example above, then the url of a post is given by <code>https://write.as/1234567890123</code>, or <code>https://write.as/1234567890123.md</code> (note the .md extension) for displaying it with markdown syntax. The 32-character token is only required if we want to either update or claim an anonymous post.
+</p>
+
+<p>
+To get the <code>id</code> and <code>token</code> from the response, the following is sufficient.
+</p>
+
+<pre class="example">
+(assoc-default 'id (assoc 'data writefreely-response))
+(assoc-default 'token (assoc 'data writefreely-response))
+</pre>
+</div>
+</div>
+
+<div id="outline-container-orga5b6094" class="outline-3">
+<h3 id="storing-writefreely-data-somewhere-meaningful"><a id="orga5b6094"></a>Storing writefreely data somewhere meaningful</h3>
+<div class="outline-text-3" id="text-storing-writefreely-data-somewhere-meaningful">
+<p>
+We could have a directory where we save all posts. Or alternatively a cache file that stores information about all posts we submit. But I figured the simplest thing to do is to store the ID and token information in the Org document itself. The advantages of this approach is that we can then update posts later, by checking if the document already has an ID and token, and we don't have to clutter our filesystem with extra stuff. Additionally, we can get an URL in the Org document to visit the post online.
+</p>
+
+<p>
+I decided to store the id and token, and the url in file-local variables. That's also easy to accomplish using one of two Emacs built-in functions: <code>add-file-local-variable</code> or <code>add-file-local-variable-prop-line</code>.
+</p>
+
+<pre class="example">
+(add-file-local-variable 'writefreely-id "1234567890123")
+(add-file-local-variable 'writefreely-token "uffVIr18ygX2kR7e3vISjVv9o8ukLlmi")
+</pre>
+</div>
+</div>
+
+<div id="outline-container-org40d3af6" class="outline-3">
+<h3 id="putting-it-all-together"><a id="org40d3af6"></a>Putting it all together</h3>
+<div class="outline-text-3" id="text-putting-it-all-together">
+<p>
+Now we write an interactive function that gets the title and the body of a document, sends them to write.as using a POST request, and stores the post-id and post-token in the current file.
+</p>
+
+<pre class="example">
+(defun writefreely-publish-buffer ()
+ "Publish the current Org buffer to a writefreely instance."
+ (let* ((title (writefreely-get-orgmode-keyword "TITLE"))
+ (body (writefreely-org-to-md-string))
+ ;; POST the blogpost with title and body
+ (response (writefreely-post-publish-request title body))
+ ;; Get the id and token from the response
+ (post-id (assoc-default 'id (assoc 'data response)))
+ (post-token (assoc-default 'token (assoc 'data response))))
+ ;; Use setq-local as well because otherwise the local variables won't be
+ ;; evaluated until we reopen the file.
+ (setq-local writefreely-post-id post-id)
+ (add-file-local-variable 'writefreely-post-id post-id)
+ (setq-local writefreely-post-token post-token)
+ (add-file-local-variable 'writefreely-post-token post-token)))
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org4861853" class="outline-2">
+<h2 id="next-steps"><a id="org4861853"></a>Next steps</h2>
+<div class="outline-text-2" id="text-next-steps">
+<p>
+<a href="https://github.com/dangom/writefreely.el">WriteFreely.el</a> is available on GitHub. You can find install instructions on the README file. For now, what I'd like to add are the following features:
+</p>
+
+<ul class="org-ul">
+<li>Get a confirmation from the user before publishing.</li>
+<li>Update a post, if the Org file already contains writefreely local variables.</li>
+<li>A function to open the post online.</li>
+<li>Allow posting as authenticated user.</li>
+</ul>
+
+<p>
+This is done by setting the variable <code>writefreely-auth-token</code> to an authentication token. In order to not keep it hanging around in the open, you can encrypt and load it on startup as described <a href="https://www.masteringemacs.org/article/keeping-secrets-in-emacs-gnupg-auth-sources">in this post</a> from Mastering Emacs.
+</p>
+
+<ul class="org-ul">
+<li class="off"><code>[&#xa0;]</code> Delete a post.</li>
+<li class="off"><code>[&#xa0;]</code> Automatically upload images from the filesystem.</li>
+<li class="off"><code>[&#xa0;]</code> Retrieve post into an Org file.</li>
+<li>Figure out how to make Ox-md export code as code, not text.</li>
+</ul>
+
+<p>
+Now depend on ox-gfm instead of ox-md.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgc1733be" class="outline-2">
+<h2 id="things-i-wish-to-see-in-write-as"><a id="orgc1733be"></a>Things I wish to see in write.as</h2>
+<div class="outline-text-2" id="text-things-i-wish-to-see-in-write-as">
+<p>
+Proper syntax highlighting for different languages would be awesome.
+</p>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2018-12-24</span>
+            <span title="last modification date" class="post-info">2018-12-24</span>
+            <span title="tags" class="post-info">:<a href="/tags/raw">raw</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-c7de1c50-88ed-412e-ae70-62694dd7dea5">lujun9972</a></span>
+        </div>
+    <script src="/media/js/jquery-2.1.3.min.js"></script>
+        <section>
+            <h1>Comments</h1>
+            <div id="comment-wrap">
+                    <a class="disqus_label">使用 Disqus 评论</a>
+    </ul>
+        <div id="disqus_thread"></div>
+        <script type="text/javascript">
+         //var disqus_developer = 1;
+         var preempt_signal=false;
+         var disqus_identifier = "/blog/2018/12/24/an-emacs-library-for-frictionless-blogging/";
+         var disqus_url = "https://lujun9972.github.io/emacs-document/blog/2018/12/24/an-emacs-library-for-frictionless-blogging/";
+         var disqus_shortname = 'emacs-document';
+         /* * * DON'T EDIT BELOW THIS LINE * * */
+         (function() {
+             var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+             dsq.src = 'https://' + disqus_shortname + '.disqus.com/embed.js';
+             (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+             $('#disqus_thread').css('display','none');
+         })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+    <script>
+     /* comments */
+     var ego_disqus_thread=$('#disqus_thread');
+     var ego_ds_label=$('.ds-thread');
+     $('.disqus_label').click(function(){
+         ego_disqus_thread.show();
+         ego_ds_label.hide();
+     });
+     $('.ds-label').click(function(){
+         ego_disqus_thread.hide();
+         ego_ds_label.show();
+     });
+    </script>
+        </section>
+    <script src="/media/js/main.js"></script>
+        <script type="text/javascript">
+         var _gaq = _gaq || [];
+         _gaq.push(['_setAccount', '7bac4fd0247f69c27887e0d4e3aee41e']);
+         _gaq.push(['_trackPageview']);
+         (function() {
+             var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+             ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+             var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-c7de1c50-88ed-412e-ae70-62694dd7dea5">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="//instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>

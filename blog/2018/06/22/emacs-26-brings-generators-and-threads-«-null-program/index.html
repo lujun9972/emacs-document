@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Emacs 26 Brings Generators and Threads « null program - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="raw" />
+  <style>
+   #ds-thread #ds-reset .ds-comment-body p {color: #ffffff;}
+   #ds-thread #ds-reset .ds-comment-body p a {color: #ff0;}
+   #ds-thread #ds-reset .ds-comment-body p a:hover {color: #0ff;}
+   #disqus_thread a {color: #00ffff;}
+  </style>
+  <link rel="stylesheet" href="/media/css/main.css" type="text/css"/>
+  <link rel="stylesheet" href="/media/css/comment.css" type="text/css"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="/">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <div class="menu-icon">
+        <svg viewBox="0 0 18 15">
+          <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.031C17.335,0,18,0.665,18,1.484L18,1.484z" fill="#ffff00"/>
+          <path d="M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0c0-0.82,0.665-1.484,1.484-1.484 h15.031C17.335,6.031,18,6.696,18,7.516L18,7.516z" fill="#ffff00"/>
+          <path d="M18,13.516C18,14.335,17.335,15,16.516,15H1.484C0.665,15,0,14.335,0,13.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.031C17.335,12.031,18,12.696,18,13.516L18,13.516z" fill="#ffff00"/>
+        </svg>
+      </div>
+      <ul class="trigger">
+        <li><a href="/years/">Years</a></li>
+        <li><a href="/authors/">Authors</a></li>
+        <li><a href="/tags/">Tags</a></li>
+        <li><a href="/about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="/rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="http://www.google.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">Emacs 26 Brings Generators and Threads « null program</h1>
+<div id="table-of-contents">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#generators">Generators</a></li>
+<li><a href="#threads">Threads</a>
+<ul>
+<li><a href="#building-generators-on-threads">Building generators on threads</a></li>
+<li><a href="#the-future-of-threads">The future of threads</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+<p>
+Emacs 26.1 was <a href="https://lists.gnu.org/archive/html/emacs-devel/2018-05/msg00765.html">recently released</a>. As you would expect from a
+major release, it comes with lots of new goodies. Being <a href="file:///tags/emacs/">a bit of an
+Emacs Lisp enthusiast</a>, the two most interesting new features
+are <a href="https://www.gnu.org/software/emacs/draft/manual/html_node/elisp/Generators.html">generators</a> (<code>iter</code>) and <a href="https://www.gnu.org/software/emacs/draft/manual/html_node/elisp/Threads.html">native threads</a>
+(<code>thread</code>).
+</p>
+
+<p>
+<b>Correction</b>: Generators were actually introduced in Emacs 25.1
+(Sept. 2016), not Emacs 26.1. Doh!
+</p>
+
+<div id="outline-container-orgd87bcdb" class="outline-2">
+<h2 id="generators"><a id="orgd87bcdb"></a>Generators</h2>
+<div class="outline-text-2" id="text-generators">
+<p>
+Generators are one of those cool language features that provide a lot of
+power at a small implementation cost. They're like a constrained form of
+coroutines, but, unlike coroutines, they're typically built entirely on
+top of first-class functions (e.g. closures). This means no additional
+run-time support is needed in order to add generators to a language.
+The only complication is the changes the compiler. Generators are not
+compiled the same way as normal functions despite looking so similar.
+</p>
+
+<p>
+What's perhaps coolest of all about lisp-family generators, including
+Emacs Lisp, is that the compiler component can be implemented
+entirely with macros. The compiler need not be modified at all,
+making generators no more than a library, and not actually part of the
+language. That's exactly how they've been implemented in Emacs Lisp
+(<code>emacs-lisp/generator.el</code>).
+</p>
+
+<p>
+So what's a generator? It's a function that returns an iterator
+object. When an iterator object is invoked (e.g. <code>iter-next</code>) it
+evaluates the body of the generator. Each iterator is independent.
+What makes them unusual (and useful) is that the evaluation is
+paused in the middle of the body to return a value, saving all the
+internal state in the iterator. Normally pausing in the middle of
+functions isn't possible, which is what requires the special compiler
+support.
+</p>
+
+<p>
+Emacs Lisp generators appear to be most closely modeled after <a href="https://wiki.python.org/moin/Generators">Python
+generators</a>, though it also shares some similarities to
+<a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Iterators_and_Generators">JavaScript generators</a>. What makes it most like Python is the use
+of signals for flow control --- something I'm <a href="http://wiki.c2.com/?DontUseExceptionsForFlowControl">not personally enthused
+about</a> (though <a href="https://stackoverflow.com/questions/7799610/exceptions-signaling-end-of-iterator-why-is-it-bad-in-java-and-normal-in-pyth">see also</a>). When a Python generator
+completes, it throws a <code>StopItertion</code> exception. In Emacs Lisp, it's
+an <code>iter-end-of-sequence</code> signal. A signal is out-of-band and avoids
+the issue relying on some special in-band value to communicate the end
+of iteration.
+</p>
+
+<p>
+In contrast, JavaScript's solution is to return a “rich” object wrapping
+the actual yield value. This object has a <code>done</code> field that communicates
+whether iteration has completed. This avoids the use of exceptions for
+flow control, but the caller has to unpack the rich object.
+</p>
+
+<p>
+Fortunately the flow control issue isn't normally exposed to Emacs Lisp
+code. Most of the time you'll use the <code>iter-do</code> macro or (my preference)
+the new <code>cl-loop</code> keyword <code>iter-by</code>.
+</p>
+
+<p>
+To illustrate how a generator works, here's a really simple iterator
+that iterates over a list:
+</p>
+
+<pre class="example">
+(iter-defun walk (list)
+ (while list
+ (iter-yield (pop list))))
+</pre>
+
+<p>
+Here's how it might be used:
+</p>
+
+<pre class="example">
+(setf i (walk '(:a :b :c)))
+
+(iter-next i) ; =&gt; :a
+(iter-next i) ; =&gt; :b
+(iter-next i) ; =&gt; :c
+(iter-next i) ; error: iter-end-of-sequence
+</pre>
+
+<p>
+The iterator object itself is opaque and you shouldn't rely on any
+part of its structure. That being said, I'm a firm believer that we
+should understand how things work underneath the hood so that we can
+make the most effective use of at them. No program should rely on the
+particulars of the iterator object internals for correctness, but a
+well-written program should employ them in a way that <a href="file:///blog/2017/01/30/">best exploits
+their expected implementation</a>.
+</p>
+
+<p>
+Currently iterator objects are closures, and <code>iter-next</code> invokes the
+closure with its own internal protocol. It asks the closure to return
+the next value (<code>:next</code> operation), and <code>iter-close</code> asks it to clean
+itself up (<code>:close</code> operation).
+</p>
+
+<p>
+Since they're just closures, another really cool thing about Emacs
+Lisp generators is that <a href="file:///blog/2013/12/30/">iterator objects are generally readable</a>.
+That is, you can serialize them out with <code>print</code> and bring them back to
+life with <code>read</code>, even in another instance of Emacs. They exist
+independently of the original generator function. This will not work if
+one of the values captured in the iterator object is not readable (e.g.
+buffers).
+</p>
+
+<p>
+How does pausing work? Well, one of other exciting new features of
+Emacs 26 is the introduction of a jump table opcode, <code>switch</code>. I'd
+lamented in the past that large <code>cond</code> and <code>cl-case</code> expressions could
+be a lot more efficient if Emacs' byte code supported jump tables. It
+turns an O(n) sequence of comparisons into an O(1) lookup and jump.
+It's essentially the perfect foundation for a generator since it can
+be used to jump straight back to the position where evaluation was
+paused.
+</p>
+
+<p>
+Buuut, generators do not currently use jump tables. The generator
+library predates the new <code>switch</code> opcode, and, being independent of it,
+its author, Daniel Colascione, went with the best option at the time.
+Chunks of code between yields are packaged as individual closures. These
+closures are linked together a bit like nodes in a graph, creating a
+sort of state machine. To get the next value, the iterator object
+invokes the closure representing the next state.
+</p>
+
+<p>
+I've manually macro expanded the <code>walk</code> generator above into a form
+that roughly resembles the expansion of <code>iter-defun</code>:
+</p>
+
+<pre class="example">
+(defun walk (list)
+ (let (state)
+ (cl-flet* ((state-2 ()
+ (signal 'iter-end-of-sequence nil))
+ (state-1 ()
+ (prog1 (pop list)
+ (when (null list)
+ (setf state #'state-2))))
+ (state-0 ()
+ (if (null list)
+ (state-2)
+ (setf state #'state-1)
+ (state-1))))
+ (setf state #'state-0)
+ (lambda ()
+ (funcall state)))))
+</pre>
+
+<p>
+This omits the protocol I mentioned, and it doesn't have yield results
+(values passed to the iterator). The actual expansion is a whole lot
+messier and less optimal than this, but hopefully my hand-rolled
+generator is illustrative enough. Without the protocol, this iterator is
+stepped using <code>funcall</code> rather than <code>iter-next</code>.
+</p>
+
+<p>
+The <code>state</code> variable keeps track of where in the body of the generator
+this iterator is currently “paused.” Continuing the iterator is
+therefore just a matter of invoking the closure that represents this
+state. Each state closure may update <code>state</code> to point to a new part of
+the generator body. The terminal state is obviously <code>state-2</code>. Notice
+how state transitions occur around branches.
+</p>
+
+<p>
+I had said generators can be implemented as a library in Emacs Lisp.
+Unfortunately theres a hole in this: <code>unwind-protect</code>. It's not valid to
+yield inside an <code>unwind-protect</code> form. Unlike, say, a throw-catch,
+there's no mechanism to trap an unwinding stack so that it can be
+restarted later. The state closure needs to return and fall through the
+<code>unwind-protect</code>.
+</p>
+
+<p>
+A jump table version of the generator might look like the following.
+I've used <code>cl-labels</code> since it allows for recursion.
+</p>
+
+<pre class="example">
+(defun walk (list)
+ (let ((state 0))
+ (cl-labels
+ ((closure ()
+ (cl-case state
+ (0 (if (null list)
+ (setf state 2)
+ (setf state 1))
+ (closure))
+ (1 (prog1 (pop list)
+ (when (null list)
+ (setf state 2))))
+ (2 (signal 'iter-end-of-sequence nil)))))
+ #'closure)))
+</pre>
+
+<p>
+When byte compiled on Emacs 26, that <code>cl-case</code> is turned into a jump
+table. This “switch” form is closer to how generators are implemented in
+other languages.
+</p>
+
+<p>
+Iterator objects can <a href="file:///blog/2017/12/14/">share state between themselves</a> if they
+close over a common environment (or, of course, use the same global
+variables).
+</p>
+
+<pre class="example">
+(setf foo
+ (let ((list '(:a :b :c)))
+ (list
+ (funcall
+ (iter-lambda ()
+ (while list
+ (iter-yield (pop list)))))
+ (funcall
+ (iter-lambda ()
+ (while list
+ (iter-yield (pop list))))))))
+
+(iter-next (nth 0 foo)) ; =&gt; :a
+(iter-next (nth 1 foo)) ; =&gt; :b
+(iter-next (nth 0 foo)) ; =&gt; :c
+</pre>
+
+<p>
+For years there has been a very crude way to “pause” a function and
+allow other functions to run: <code>accept-process-output</code>. It only works in
+the context of processes, but five years ago this was <a href="file:///blog/2013/01/14/">sufficient for me
+to build primitives on top of it</a>. Unlike this old process
+function, generators do not block threads, including the user interface,
+which is really important.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org3bc1f13" class="outline-2">
+<h2 id="threads"><a id="org3bc1f13"></a>Threads</h2>
+<div class="outline-text-2" id="text-threads">
+<p>
+Emacs 26 also bring us threads, which have been attached in a very
+bolted on fashion. It's not much more than a subset of pthreads: shared
+memory threads, recursive mutexes, and condition variables. The
+interfaces look just like they do in pthreads, and there hasn't been
+much done to integrate more naturally into the Emacs Lisp ecosystem.
+</p>
+
+<p>
+This is also only the first step in bringing threading to Emacs Lisp.
+Right now there's effectively a global interpreter lock (GIL), and
+threads only run one at a time cooperatively. Like with generators, the
+Python influence is obvious. In theory, sometime in the future this
+interpreter lock will be removed, making way for actual concurrency.
+</p>
+
+<p>
+This is, again, where I think it's useful to contrast with JavaScript,
+which was also initially designed to be single-threaded. Low-level
+threading primitives weren't exposed --- though mostly because
+JavaScript typically runs sandboxed and there's no safe way to expose
+those primitives. Instead it got a <a href="file:///blog/2013/01/26/">web worker API</a> that exposes
+concurrency at a much higher level, along with an efficient interface
+for thread coordination.
+</p>
+
+<p>
+For Emacs Lisp, I'd prefer something safer, more like the JavaScript
+approach. Low-level pthreads are now a great way to wreck Emacs with
+deadlocks (with no <code>C-g</code> escape). Playing around with the new
+threading API for just a few days, I've already had to restart Emacs a
+bunch of times. Bugs in Emacs Lisp are normally a lot more forgiving.
+</p>
+
+<p>
+One important detail that has been designed well is that dynamic
+bindings are thread-local. This is really essential for correct
+behavior. This is also an easy way to create thread-local storage
+(TLS): dynamically bind variables in the thread's entrance function.
+</p>
+
+<pre class="example">
+;;; -*- lexical-binding: t; -*-
+
+(defvar foo-counter-tls)
+(defvar foo-path-tls)
+
+(defun foo-make-thread (path)
+ (make-thread
+ (lambda ()
+ (let ((foo-counter-tls 0)
+ (foo-name-tls path))
+ ...))))
+</pre>
+
+<p>
+However, <b><code>cl-letf</code> “bindings” are not thread-local</b>, which makes
+this <a href="file:///blog/2017/10/27/">otherwise incredibly useful macro</a> quite dangerous in the
+presence of threads. This is one way that the new threading API feels
+bolted on.
+</p>
+</div>
+
+<div id="outline-container-org9bce5a0" class="outline-3">
+<h3 id="building-generators-on-threads"><a id="org9bce5a0"></a>Building generators on threads</h3>
+<div class="outline-text-3" id="text-building-generators-on-threads">
+<p>
+In <a href="file:///blog/2017/06/21/">my stack clashing article</a> I showed a few different ways to
+add coroutine support to C. One method spawned per-coroutine threads,
+and coordinated using semaphores. With the new threads API in Emacs,
+it's possible to do exactly the same thing.
+</p>
+
+<p>
+Since generators are just a limited form of coroutines, this means
+threads offer another, very different way to implement them. The
+threads API doesn't provide semaphores, but condition variables can fill
+in for them. To “pause” in the middle of the generator, just wait on a
+condition variable.
+</p>
+
+<p>
+So, naturally, I just had to see if I could make it work. I call it a
+“thread iterator” or “thriter.” The API is very similar to <code>iter</code>:
+</p>
+
+<p>
+<b><a href="https://github.com/skeeto/thriter">https://github.com/skeeto/thriter</a></b>
+</p>
+
+<p>
+This is merely a proof of concept so don't actually use this library
+for anything. These thread-based generators are about 5x slower than
+<code>iter</code> generators, and they're a lot more heavy-weight, needing an
+entire thread per iterator object. This makes <code>thriter-close</code> all the
+more important. On the other hand, these generators have no problem
+yielding inside <code>unwind-protect</code>.
+</p>
+
+<p>
+Originally this article was going to dive into the details of how
+these thread-iterators worked, but <code>thriter</code> turned out to be quite a
+bit more complicated than I anticipated, especially as I worked
+towards feature matching <code>iter</code>.
+</p>
+
+<p>
+The gist of it is that each side of a next/yield transaction gets its
+own condition variable, but share a common mutex. Values are passed
+between the threads using slots on the iterator object. The side that
+isn't currently running waits on a condition variable until the other
+side frees it, after which the releaser waits on its own condition
+variable for the result. This is similar to <a href="file:///blog/2017/02/14/">asynchronous requests in
+Emacs dynamic modules</a>.
+</p>
+
+<p>
+Rather than use signals to indicate completion, I modeled it after
+JavaScript generators. Iterators return a cons cell. The car indicates
+continuation and the cdr holds the yield result. To terminate an
+iterator early (<code>thriter-close</code> or garbage collection), <code>thread-signal</code>
+is used to essentially “cancel” the thread and knock it off the
+condition variable.
+</p>
+
+<p>
+Since threads aren't (and shouldn't be) garbage collected, failing to
+run a thread-iterator to completion would normally cause a memory leak,
+as the thread <a href="https://www.youtube.com/watch?v=AK3PWHxoT_E">sits there forever waiting on a “next” that will never
+come</a>. To deal with this, there's a finalizer is attached to the
+iterator object in such a way that it's not visible to the thread. A
+lost iterator is eventually cleaned up by the garbage collector, but, as
+usual with finalizers, this is <a href="https://utcc.utoronto.ca/~cks/space/blog/programming/GoFinalizersStopLeaks">only a last resort</a>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgfdfe67d" class="outline-3">
+<h3 id="the-future-of-threads"><a id="orgfdfe67d"></a>The future of threads</h3>
+<div class="outline-text-3" id="text-the-future-of-threads">
+<p>
+This thread-iterator project was my initial, little experiment with
+Emacs Lisp threads, similar to why I <a href="file:///blog/2016/11/05/">connected a joystick to Emacs
+using a dynamic module</a>. While I don't expect the current thread
+API to go away, it's not really suitable for general use in its raw
+form. Bugs in Emacs Lisp programs should virtually never bring down
+Emacs and require a restart. Outside of threads, the few situations
+that break this rule are very easy to avoid (and very obvious that
+something dangerous is happening). Dynamic modules are dangerous by
+necessity, but concurrency doesn't have to be.
+</p>
+
+<p>
+There really needs to be a safe, high-level API with clean thread
+isolation. Perhaps this higher-level API will eventually build on top of
+the low-level threading API.
+</p>
+</div>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2018-06-22</span>
+            <span title="last modification date" class="post-info">2018-06-22</span>
+            <span title="tags" class="post-info">:<a href="/tags/raw">raw</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-c7de1c50-88ed-412e-ae70-62694dd7dea5">lujun9972</a></span>
+        </div>
+    <script src="/media/js/jquery-2.1.3.min.js"></script>
+        <section>
+            <h1>Comments</h1>
+            <div id="comment-wrap">
+                    <a class="disqus_label">使用 Disqus 评论</a>
+    </ul>
+        <div id="disqus_thread"></div>
+        <script type="text/javascript">
+         //var disqus_developer = 1;
+         var preempt_signal=false;
+         var disqus_identifier = "/blog/2018/06/22/emacs-26-brings-generators-and-threads-«-null-program/";
+         var disqus_url = "https://lujun9972.github.io/emacs-document/blog/2018/06/22/emacs-26-brings-generators-and-threads-«-null-program/";
+         var disqus_shortname = 'emacs-document';
+         /* * * DON'T EDIT BELOW THIS LINE * * */
+         (function() {
+             var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+             dsq.src = 'https://' + disqus_shortname + '.disqus.com/embed.js';
+             (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+             $('#disqus_thread').css('display','none');
+         })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+    <script>
+     /* comments */
+     var ego_disqus_thread=$('#disqus_thread');
+     var ego_ds_label=$('.ds-thread');
+     $('.disqus_label').click(function(){
+         ego_disqus_thread.show();
+         ego_ds_label.hide();
+     });
+     $('.ds-label').click(function(){
+         ego_disqus_thread.hide();
+         ego_ds_label.show();
+     });
+    </script>
+        </section>
+    <script src="/media/js/main.js"></script>
+        <script type="text/javascript">
+         var _gaq = _gaq || [];
+         _gaq.push(['_setAccount', '7bac4fd0247f69c27887e0d4e3aee41e']);
+         _gaq.push(['_trackPageview']);
+         (function() {
+             var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+             ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+             var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-c7de1c50-88ed-412e-ae70-62694dd7dea5">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="//instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>

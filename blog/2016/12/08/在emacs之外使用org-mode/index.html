@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>在Emacs之外使用org-mode - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="org-mode,emacs script,elisp" />
+  <style>
+   #ds-thread #ds-reset .ds-comment-body p {color: #ffffff;}
+   #ds-thread #ds-reset .ds-comment-body p a {color: #ff0;}
+   #ds-thread #ds-reset .ds-comment-body p a:hover {color: #0ff;}
+   #disqus_thread a {color: #00ffff;}
+  </style>
+  <link rel="stylesheet" href="/media/css/main.css" type="text/css"/>
+  <link rel="stylesheet" href="/media/css/comment.css" type="text/css"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="/">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <div class="menu-icon">
+        <svg viewBox="0 0 18 15">
+          <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.031C17.335,0,18,0.665,18,1.484L18,1.484z" fill="#ffff00"/>
+          <path d="M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0c0-0.82,0.665-1.484,1.484-1.484 h15.031C17.335,6.031,18,6.696,18,7.516L18,7.516z" fill="#ffff00"/>
+          <path d="M18,13.516C18,14.335,17.335,15,16.516,15H1.484C0.665,15,0,14.335,0,13.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.031C17.335,12.031,18,12.696,18,13.516L18,13.516z" fill="#ffff00"/>
+        </svg>
+      </div>
+      <ul class="trigger">
+        <li><a href="/years/">Years</a></li>
+        <li><a href="/authors/">Authors</a></li>
+        <li><a href="/tags/">Tags</a></li>
+        <li><a href="/about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="/rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="http://www.google.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">在Emacs之外使用org-mode</h1>
+<div id="table-of-contents">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#org60a565f">Extracting tables from an org-file</a></li>
+<li><a href="#org4966674">Running code in an org-file</a></li>
+</ul>
+</div>
+</div>
+<p>
+我之前写过一篇关于把Emacs当成脚本语言来用的博文(<a href="http://kitchingroup.cheme.cmu.edu/blog/2014/08/06/Writing-scripts-in-Emacs-lisp/">http://kitchingroup.cheme.cmu.edu/blog/2014/08/06/Writing-scripts-in-Emacs-lisp/</a> ). 
+有人觉得很奇怪,我们已经有了shell,python和perl,为啥还要把Emacs当成脚本语言来用呢? 有一个很好的场景就是用来获取org文件中的数据和代码!
+这样一来你无需使用Emacs就能利用org-mode的强大能力了. 
+</p>
+
+<p>
+下面来看几个例子.
+</p>
+
+<div id="outline-container-org60a565f" class="outline-2">
+<h2 id="org60a565f">Extracting tables from an org-file</h2>
+<div class="outline-text-2" id="text-org60a565f">
+<p>
+若一个表格是有名字的,我们可以从org文件中将其内容抽取出来. 
+</p>
+
+<p>
+比如有两个表格:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-org">| x      | y |
+|------+---|
+| 1      | 1 |
+| 2      | 4 |
+| 3      | 9 |
+</pre>
+</div>
+
+<p>
+和
+</p>
+
+<div class="org-src-container">
+<pre class="src src-org">| a      |  b |
+| 1      |  1 |
+| 2      |  8 |
+| 3      | 27 |
+</pre>
+</div>
+
+<p>
+我们希望能够有一个命令行工具可以像下面这样抽取出表格中的数据:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">extract-org-table tblname orgfile --format lisp|csv|tab
+</pre>
+</div>
+
+<p>
+我们可以这样来实现这个工具:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp"><span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">org-table tblname orgfile lisp|csv|tab</span>
+
+(<span style="font-weight: bold;">let</span> ((tblname (<span style="font-weight: bold;">pop</span> command-line-args-left))
+      (org-file (<span style="font-weight: bold;">pop</span> command-line-args-left))
+      (format)
+      (table)
+      (content))
+  (<span style="font-weight: bold;">when</span> command-line-args-left
+    (<span style="font-weight: bold;">setq</span> format (<span style="font-weight: bold;">pop</span> command-line-args-left)))
+  (find-file org-file)
+  (<span style="font-weight: bold;">setq</span> table 
+        (org-element-map (org-element-parse-buffer) 'table 
+          (<span style="font-weight: bold;">lambda</span> (element)
+            (<span style="font-weight: bold;">when</span> (string= tblname (org-element-property <span style="font-weight: bold;">:name</span> element))
+              element))
+          nil <span style="font-weight: bold; font-style: italic;">;</span><span style="font-weight: bold; font-style: italic;">info</span>
+          t )) <span style="font-weight: bold; font-style: italic;">; </span><span style="font-weight: bold; font-style: italic;">first-match</span>
+
+  (<span style="font-weight: bold;">unless</span> table
+    (<span style="font-weight: bold;">error</span> <span style="font-style: italic;">"no table found for %s"</span> tblname))
+
+  (<span style="font-weight: bold;">when</span> table
+    (goto-char (org-element-property <span style="font-weight: bold;">:contents-begin</span> table))
+    (<span style="font-weight: bold;">let</span> ((contents (org-table-to-lisp)))
+      (<span style="font-weight: bold;">if</span> (string= format <span style="font-style: italic;">"lisp"</span>)
+          (print contents)
+        <span style="font-weight: bold; font-style: italic;">;</span><span style="font-weight: bold; font-style: italic;">else      </span>
+        (<span style="font-weight: bold;">dolist</span> (row contents)
+          (<span style="font-weight: bold;">unless</span> (eq row 'hline)
+            (<span style="font-weight: bold;">cond</span>
+             ((string= format <span style="font-style: italic;">"csv"</span>)
+              (princ (mapconcat 'identity row <span style="font-style: italic;">","</span>)))
+             ((string= format <span style="font-style: italic;">"tab"</span>)
+              (princ (mapconcat 'identity row <span style="font-style: italic;">"\t"</span>)))
+             (t
+              (<span style="font-weight: bold;">error</span> <span style="font-style: italic;">"unsupported format: %s"</span> format)))
+            (princ <span style="font-style: italic;">"\n"</span>)))))))
+</pre>
+</div>
+
+<p>
+让我们试试这个工具.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">./extract-org-table data-2 org-outside-emacs.org lisp
+</pre>
+</div>
+
+<pre class="example">
+(("a" "b") ("1" "1") ("2" "8") ("3" "27"))
+</pre>
+
+<div class="org-src-container">
+<pre class="src src-sh">./extract-org-table data-1 org-outside-emacs.org csv
+</pre>
+</div>
+
+<pre class="example">
+x,y
+1,1
+2,4
+3,9
+</pre>
+
+<div class="org-src-container">
+<pre class="src src-sh">./extract-org-table data-2 org-outside-emacs.org tab
+</pre>
+</div>
+
+<pre class="example">
+a       b
+1       1
+2       8
+3       27
+</pre>
+
+<p>
+看起来完全满足我们的需求,你甚至可以运用管道将结果传送给其他unix命令. 比如我们要获取第二列的内容:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">./extract-org-table data-1 org-outside-emacs.org csv | cut -d , -f 2
+</pre>
+</div>
+
+<pre class="example">
+y
+1
+4
+9
+</pre>
+
+<p>
+这个效果看起来就好像不用org就获取到org文件中的数据了. 当然实际上我们还是用到了Emacs和org-mode来做到这一点的,但是用户无需知道这些,只要他们安装了Emacs和Org-mode就行了.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org4966674" class="outline-2">
+<h2 id="org4966674">Running code in an org-file</h2>
+<div class="outline-text-2" id="text-org4966674">
+<p>
+可能遇到这么一种情况,你需要调用org文件中的某一段代码块中的代码,但是由于某种原因,你不想将这段代码从org文件中拷贝出来存成独立的脚本来用.
+我们假设org文件中有这么一段代码块:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-org"><span style="font-weight: bold; font-style: italic;">#+BEGIN_SRC python</span>
+<span style="font-weight: bold;">import</span> time
+<span style="font-weight: bold;">with</span> <span style="font-weight: bold;">open</span>(<span style="font-style: italic;">'results.dat'</span>, <span style="font-style: italic;">'w'</span>) <span style="font-weight: bold;">as</span> f:
+    f.write(time.asctime())
+<span style="font-weight: bold; font-style: italic;">#+END_SRC</span>
+</pre>
+</div>
+
+<p>
+要调用这段代码块,我们需要先找到这段代码,然后再运行这段代码.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp"><span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">org-run blockname org-file</span>
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">run a code block in an org file</span>
+(<span style="font-weight: bold;">let</span> ((blockname (<span style="font-weight: bold;">pop</span> command-line-args-left))
+      (org-file (<span style="font-weight: bold;">pop</span> command-line-args-left))
+      (src))
+  (find-file org-file)
+  (<span style="font-weight: bold;">setq</span> src
+        (org-element-map (org-element-parse-buffer) 'src-block
+          (<span style="font-weight: bold;">lambda</span> (element)
+            (<span style="font-weight: bold;">when</span> (string= blockname (org-element-property <span style="font-weight: bold;">:name</span> element))
+              element))
+          nil <span style="font-weight: bold; font-style: italic;">;</span><span style="font-weight: bold; font-style: italic;">info</span>
+          t )) <span style="font-weight: bold; font-style: italic;">; </span><span style="font-weight: bold; font-style: italic;">first-match</span>
+  (<span style="font-weight: bold;">when</span> src
+    (goto-char (org-element-property <span style="font-weight: bold;">:begin</span> src))
+    <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">since we start with a fresh emacs, we have to configure some things.</span>
+    (org-babel-do-load-languages
+     'org-babel-load-languages
+     '((python . t)))
+    (<span style="font-weight: bold;">let</span> ((org-confirm-babel-evaluate nil))
+      (org-babel-execute-src-block))))
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-sh">./org-call.el python-block org-outside-emacs.org
+cat results.dat
+</pre>
+</div>
+
+<pre class="example">
+Mon Aug 11 20:17:01 2014
+</pre>
+
+<p>
+上面的例子说明了确实可以调用org文件中的代码块,但是同时也存在者局限性: 你一次只能调用一个代码块,而且我们无法捕获代码块运行时输出的那些内容,只能够检测运行产生的副作用. 
+我们只能通过文件向代码中传递数据,除此之外别无他法. 也许可以修改上面代码,让它在调用 <code>org-babel-execute-src-block</code> 时传递一些参数给代码块吧,不过这不是本文的重点. 
+顺便说一下,emacs script还可以从stdin中读取数据,具体方法请参见这里: <a href="http://stackoverflow.com/questions/2879746/idomatic-batch-processing-of-text-in-emacs">http://stackoverflow.com/questions/2879746/idomatic-batch-processing-of-text-in-emacs</a> .
+</p>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2016-12-08</span>
+            <span title="last modification date" class="post-info">2016-12-08</span>
+            <span title="tags" class="post-info">:<a href="/tags/org-mode">org-mode</a> : <a href="/tags/emacs-script">emacs script</a> : <a href="/tags/elisp">elisp</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-c7de1c50-88ed-412e-ae70-62694dd7dea5">lujun9972</a></span>
+        </div>
+    <script src="/media/js/jquery-2.1.3.min.js"></script>
+        <section>
+            <h1>Comments</h1>
+            <div id="comment-wrap">
+                    <a class="disqus_label">使用 Disqus 评论</a>
+    </ul>
+        <div id="disqus_thread"></div>
+        <script type="text/javascript">
+         //var disqus_developer = 1;
+         var preempt_signal=false;
+         var disqus_identifier = "/blog/2016/12/08/在emacs之外使用org-mode/";
+         var disqus_url = "https://lujun9972.github.io/emacs-document/blog/2016/12/08/在emacs之外使用org-mode/";
+         var disqus_shortname = 'emacs-document';
+         /* * * DON'T EDIT BELOW THIS LINE * * */
+         (function() {
+             var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+             dsq.src = 'https://' + disqus_shortname + '.disqus.com/embed.js';
+             (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+             $('#disqus_thread').css('display','none');
+         })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+    <script>
+     /* comments */
+     var ego_disqus_thread=$('#disqus_thread');
+     var ego_ds_label=$('.ds-thread');
+     $('.disqus_label').click(function(){
+         ego_disqus_thread.show();
+         ego_ds_label.hide();
+     });
+     $('.ds-label').click(function(){
+         ego_disqus_thread.hide();
+         ego_ds_label.show();
+     });
+    </script>
+        </section>
+    <script src="/media/js/main.js"></script>
+        <script type="text/javascript">
+         var _gaq = _gaq || [];
+         _gaq.push(['_setAccount', '7bac4fd0247f69c27887e0d4e3aee41e']);
+         _gaq.push(['_trackPageview']);
+         (function() {
+             var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+             ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+             var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-c7de1c50-88ed-412e-ae70-62694dd7dea5">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="//instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>

@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>为emacs-lisp创建的加强版defun语句 - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="elisp-common" />
+  <style>
+   #ds-thread #ds-reset .ds-comment-body p {color: #ffffff;}
+   #ds-thread #ds-reset .ds-comment-body p a {color: #ff0;}
+   #ds-thread #ds-reset .ds-comment-body p a:hover {color: #0ff;}
+   #disqus_thread a {color: #00ffff;}
+  </style>
+  <link rel="stylesheet" href="/media/css/main.css" type="text/css"/>
+  <link rel="stylesheet" href="/media/css/comment.css" type="text/css"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="/">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <div class="menu-icon">
+        <svg viewBox="0 0 18 15">
+          <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.031C17.335,0,18,0.665,18,1.484L18,1.484z" fill="#ffff00"/>
+          <path d="M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0c0-0.82,0.665-1.484,1.484-1.484 h15.031C17.335,6.031,18,6.696,18,7.516L18,7.516z" fill="#ffff00"/>
+          <path d="M18,13.516C18,14.335,17.335,15,16.516,15H1.484C0.665,15,0,14.335,0,13.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.031C17.335,12.031,18,12.696,18,13.516L18,13.516z" fill="#ffff00"/>
+        </svg>
+      </div>
+      <ul class="trigger">
+        <li><a href="/years/">Years</a></li>
+        <li><a href="/authors/">Authors</a></li>
+        <li><a href="/tags/">Tags</a></li>
+        <li><a href="/about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="/rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="http://www.google.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">为emacs-lisp创建的加强版defun语句</h1>
+<p>
+我一直在想以怎样的方式来写代码才能拥有漂亮的文档. 这些文档应该是随代码实时更新的,最好还能够做到自动校验.
+有一种实现的方法就是将文档与代码紧密地结合起来. 越紧密越好. 
+我在 <a href="http://kitchingroup.cheme.cmu.edu/blog/2017/03/19/A-Hy-macro-for-defining-functions-with-docstrings-on-each-argument/">上一篇文章中</a> 进行过一些有趣的尝试, 我通过宏来让我在定义函数参数的同时也指定参数的docstring. 
+这一次我扩展了这个思想,除了生成文档说明之外,还能提供参数的默认值以及要插入函数中的参数验证代码.
+本文以Emacs-lisp为例,但仅仅是因为我对它比较熟悉而已. 这个思想应该对其他lisp系语言都是通用的.
+</p>
+
+<p>
+考虑下面这个原型, 很普通的函数定义,用法和docstring. 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">f1</span> (arg1 arg2)
+  <span style="font-style: italic;">"Add two numbers."</span>
+  (+ arg1 arg2))
+
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">usage</span>
+(f1 3 4)
+</pre>
+</div>
+
+<p>
+可以在Emacs中查看它的帮助信息. 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(describe-function 'f1)
+</pre>
+</div>
+
+<p>
+很明显,我懒得写docstring; 这条docstring中甚至没有关于参数的只言片语. 而且函数中也没有对参数进行校验,你可以传入一个字符串和一个数字,但是结果会报错.
+也没有给参数提供默认值,这样你就必须同时提供两个参数的值才能调用该函数. 很明显这个函数还有很大的改进空间.  
+当然如果我不嫌麻烦,我也可以写出一个更好的函数,像这样: 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">f1a</span> (arg1 <span style="font-weight: bold; text-decoration: underline;">&amp;optional</span> arg2)
+  <span style="font-style: italic;">"Add ARG1 and ARG2 together.</span>
+<span style="font-style: italic;">ARG1 and  ARG2 should both be numbers."</span>
+  (<span style="font-weight: bold;">when</span> (null arg2) (<span style="font-weight: bold;">setq</span> arg2 2))
+  (<span style="font-weight: bold;">unless</span> (<span style="font-weight: bold;">and</span> (numberp arg1) (numberp arg2)) (<span style="font-weight: bold;">error</span> <span style="font-style: italic;">"arg1 and arg2 should both be numbers"</span>))
+  (+ arg1 arg2))
+
+(list (f1a 3 4) (f1a 3))
+</pre>
+</div>
+
+<p>
+这样子一次两次还可以,要是一直这样就太无聊了. 而且它对我来说也不是那么的完美. 比如,docstring中并没有提到参数默认值是什么,而且这个docstring是写死在代码里的,除非你查看代码否则你不知道这个docstring是什么.
+下面让我们考虑一下另一种写函数的方法. 相比于上面的函数定义,用法和文档. 这次的函数定义有点罗嗦. 
+ Providing documentation, defaults and validation code in any form would make it that way no matter what. 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(defn f2 ((arg1 <span style="font-style: italic;">"A number"</span> <span style="font-weight: bold;">:validate</span> numberp)
+          (arg2 <span style="font-style: italic;">"A number"</span> <span style="font-weight: bold;">:validate</span> numberp <span style="font-weight: bold;">:default</span> 2))
+  <span style="font-style: italic;">"Add the arguments."</span>
+  (+ arg1 arg2))
+
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">usage</span>
+(list (f2 3 4) (f2 3))
+(describe-function 'f2)
+</pre>
+</div>
+
+<p>
+使用这种方式定义函数时,会使用函数定义中的信息来组建函数的说明文档,而且生成的文档会遵循emacs-lisp的文档规范.
+<code>defn</code> 并不是普通的emacs-lisp函数; 这是我开发的用于生成函数代码的一个宏. 它的实现很长,但是它的实现思想是在开始定义函数之前先遍历各个函数,人啊后收集函数中的docstring,默认值以及对应校验函数.
+然后我又生成函数的参数列表. 若设置了参数的默认值,那么我会生成一些代码来让函数在不带参数调用时设置这些参数的默认值. 类似的若这只了验证函数,那么也会生成对应的验证代码.
+最后,我组成一条 <code>defun</code> 语句然后返回这条defun语句. 如果你想的话,可以从这里看到该宏的实现代码:
+<a href="https://github.com/jkitchin/scimax/blob/master/scimax-macros.el">https://github.com/jkitchin/scimax/blob/master/scimax-macros.el</a>. 
+</p>
+
+<p>
+我们可以看看上面这段代码会被扩展成什么样子. 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(macroexpand-1
+ '(defn f2 ((arg1 <span style="font-style: italic;">"A number"</span> <span style="font-weight: bold;">:validate</span> numberp)
+            (arg2 <span style="font-style: italic;">"A number"</span> <span style="font-weight: bold;">:validate</span> numberp <span style="font-weight: bold;">:default</span> 2))
+    <span style="font-style: italic;">"Add the arguments."</span>
+    (+ arg1 arg2)))
+</pre>
+</div>
+
+<p>
+你会发现它被扩展成了一个普通的 <code>defun</code> 语句, 而且自动生成了docstring,设置默认值的代码以及验证代码. 真不错.
+</p>
+
+<p>
+让我们试着用破坏验证的参数来调用函数会发生什么. 运行会抛出一个错误. 现在我们来捕获这个错误来看看这个错误究竟是什么.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">condition-case</span> err
+    (f2 <span style="font-style: italic;">"oak"</span>)
+  (<span style="font-weight: bold;">error</span>
+   (error-message-string err)))
+</pre>
+</div>
+
+<p>
+我们发现,当提供了错误类型的参数时,会报出一个很有意义的错误信息. 相比来说,原始版本的那个函数只能告诉我们有类型错误,但是不能告诉我们究竟是那个参数错了.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">condition-case</span> err
+    (f1 <span style="font-style: italic;">"oak"</span> 4)
+  (<span style="font-weight: bold;">error</span>
+   (error-message-string err)))
+</pre>
+</div>
+
+<p>
+最后一个例子,让我们来检查 <code>&amp;rest</code> 参数,校验其中所有的参数都是数字. 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(defn f4 ((rarg <span style="font-weight: bold;">:rest</span>
+                <span style="font-weight: bold;">:validate</span> (<span style="font-weight: bold;">lambda</span> (x)
+                            (-all-p 'identity (mapcar 'numberp x)))))
+  <span style="font-style: italic;">"multiply all the arguments."</span>
+  (apply '* rarg))
+
+(f4 1 2 3)
+(<span style="font-weight: bold;">condition-case</span> err
+    (f4 <span style="font-style: italic;">"oak"</span> 4)
+  (<span style="font-weight: bold;">error</span>
+   (error-message-string err)))
+(describe-function 'f4)
+</pre>
+</div>
+
+<p>
+效果看起来也蛮不错的.
+</p>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2017-06-16</span>
+            <span title="last modification date" class="post-info">2017-06-16</span>
+            <span title="tags" class="post-info">:<a href="/tags/elisp-common">elisp-common</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-c7de1c50-88ed-412e-ae70-62694dd7dea5">lujun9972</a></span>
+        </div>
+    <script src="/media/js/jquery-2.1.3.min.js"></script>
+        <section>
+            <h1>Comments</h1>
+            <div id="comment-wrap">
+                    <a class="disqus_label">使用 Disqus 评论</a>
+    </ul>
+        <div id="disqus_thread"></div>
+        <script type="text/javascript">
+         //var disqus_developer = 1;
+         var preempt_signal=false;
+         var disqus_identifier = "/blog/2017/06/16/为emacs-lisp创建的加强版defun语句/";
+         var disqus_url = "https://lujun9972.github.io/emacs-document/blog/2017/06/16/为emacs-lisp创建的加强版defun语句/";
+         var disqus_shortname = 'emacs-document';
+         /* * * DON'T EDIT BELOW THIS LINE * * */
+         (function() {
+             var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+             dsq.src = 'https://' + disqus_shortname + '.disqus.com/embed.js';
+             (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+             $('#disqus_thread').css('display','none');
+         })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+    <script>
+     /* comments */
+     var ego_disqus_thread=$('#disqus_thread');
+     var ego_ds_label=$('.ds-thread');
+     $('.disqus_label').click(function(){
+         ego_disqus_thread.show();
+         ego_ds_label.hide();
+     });
+     $('.ds-label').click(function(){
+         ego_disqus_thread.hide();
+         ego_ds_label.show();
+     });
+    </script>
+        </section>
+    <script src="/media/js/main.js"></script>
+        <script type="text/javascript">
+         var _gaq = _gaq || [];
+         _gaq.push(['_setAccount', '7bac4fd0247f69c27887e0d4e3aee41e']);
+         _gaq.push(['_trackPageview']);
+         (function() {
+             var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+             ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+             var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-c7de1c50-88ed-412e-ae70-62694dd7dea5">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="//instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>

@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Robust Notes with Embedded Code - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="raw" />
+  <style>
+   #ds-thread #ds-reset .ds-comment-body p {color: #ffffff;}
+   #ds-thread #ds-reset .ds-comment-body p a {color: #ff0;}
+   #ds-thread #ds-reset .ds-comment-body p a:hover {color: #0ff;}
+   #disqus_thread a {color: #00ffff;}
+  </style>
+  <link rel="stylesheet" href="/media/css/main.css" type="text/css"/>
+  <link rel="stylesheet" href="/media/css/comment.css" type="text/css"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="/">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <div class="menu-icon">
+        <svg viewBox="0 0 18 15">
+          <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.031C17.335,0,18,0.665,18,1.484L18,1.484z" fill="#ffff00"/>
+          <path d="M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0c0-0.82,0.665-1.484,1.484-1.484 h15.031C17.335,6.031,18,6.696,18,7.516L18,7.516z" fill="#ffff00"/>
+          <path d="M18,13.516C18,14.335,17.335,15,16.516,15H1.484C0.665,15,0,14.335,0,13.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.031C17.335,12.031,18,12.696,18,13.516L18,13.516z" fill="#ffff00"/>
+        </svg>
+      </div>
+      <ul class="trigger">
+        <li><a href="/years/">Years</a></li>
+        <li><a href="/authors/">Authors</a></li>
+        <li><a href="/tags/">Tags</a></li>
+        <li><a href="/about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="/rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="http://www.google.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">Robust Notes with Embedded Code</h1>
+<div id="table-of-contents">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#org235c01d">direnv as glue</a></li>
+<li><a href="#org57d7047">C++</a></li>
+<li><a href="#org93133ce">Haskell</a></li>
+<li><a href="#org0b4e715">Not Perfect</a></li>
+</ul>
+</div>
+</div>
+<p>
+Emacs's org-mode has great <a href="https://orgmode.org/manual/Working-with-source-code.html#Working-with-source-code">facilities for working with source code</a>, often referred to by the name <b>Org Babel</b>. A simple use is having source code from various languages embedded in a single text file that is otherwise occupied with talking about that code.
+</p>
+
+<p>
+There are myriad ways one can use this functionality, but here let's focus on just one: short code demonstrations. While working on a large project, you encounter a technique or library whose usage is not obvious to you today. This means that even as you figure out how to solve your problem today, when you come back to your code a year from now, your solution may again not be obvious to future-you who has forgotten the hard-won lessons of today-you. What we want to record in our notes is a set of example programs we wish we found when writing today's code.
+</p>
+
+<p>
+Now, the tricky part in finding the perfect example for whatever problem you're facing is that the author of the perfect example must be using the <i>exact same</i> tools that you are. It's hardly a perfect example if the author uses a different version of some software library at the center of what you're trying to do! We want the example to exactly reproduce the environment in which we are building our larger project. No surprises, please.
+</p>
+
+<p>
+Reproducible development environments just happen to be the forte of the <a href="https://nixos.org/nix/">nix package manager</a>. Here we can pin down precise versions of the source code of each of our tools, that of their dependencies, that of their dependencies' dependencies, and so on all the way up stream.
+</p>
+
+<p>
+Coming back to where we started: we want to record in our <code>org-mode</code> notes example programs that clearly demonstrate a technique or API exactly as it is used in our larger project. We thus want Emacs to know how to evaluate source code blocks in the context of the project the notes are related to.
+</p>
+
+<div id="outline-container-org58d6112" class="outline-2">
+<h2 id="org235c01d"><a id="org58d6112"></a>direnv as glue</h2>
+<div class="outline-text-2" id="text-org235c01d">
+<p>
+<a href="https://github.com/direnv/direnv">direnv</a> is a shell tool that swaps out a shell environment (in particular, the <code>PATH</code> variable) based on the current directory. When your working directory is that of your project, all your project specific tools are in scope (i.e. on <code>PATH</code>). When you switch to the directory of another project, all of that project's tools are in scope. Some <code>nix</code> users recognized an opportunity, and worked out fairly magical <a href="https://github.com/direnv/direnv/wiki/Nix">integration between nix and direnv</a>. This lets you specify your project with <code>nix</code>'s flair for pedantry, then drop into it entirely implicitly based on a working directory. There is yet another group of prodigious developers who like to tie into every other system who have a role to play in our story: emacs users. There is <a href="https://github.com/wbolster/emacs-direnv">emacs integration with direnv</a> that uses the directory of any file you are looking at to trigger <code>direnv</code>'s <code>PATH</code> manipulation behind the scenes. Let's recap: we specify our project with <code>nix</code>, we edit files with <code>emacs</code>, and <code>direnv</code> tells emacs what nix knows.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org2e7cc7e" class="outline-2">
+<h2 id="org57d7047"><a id="org2e7cc7e"></a>C++</h2>
+<div class="outline-text-2" id="text-org57d7047">
+<p>
+Something missing from most C++ development setups is a REPL suitable for experimentation. Something missing from most development setups with a REPL is a good way of saving REPL sessions for future reference. We'll solve both of those here.
+</p>
+
+<p>
+Let's figure out how to load an image and show it in a window using <code>OpenCV</code>. This is just one component of our project, but it's something we want to write down. Here is an example <code>shell.nix</code> if you want to follow along at home. <i>(Note: it involves a slow build of a customized OpenCV to make the point that your project's needs are usually special.)</i>
+</p>
+
+<pre class="example">
+with (import &lt;nixpkgs&gt; {});
+let opencv3gtk = opencv3.override { enableGtk3 = true; }; in
+mkShell {
+ buildInputs = [ opencv3gtk ];
+}
+</pre>
+
+<p>
+We then create an <code>.envrc</code> file in our shell so that <code>direnv</code> will kick into action.
+</p>
+
+<pre class="example">
+echo 'use nix' &gt; .envrc
+direnv allow
+</pre>
+
+<p>
+And now we can write a note about using OpenCV. I put mine in a <code>notes.org</code> file in each project directory.
+</p>
+
+<pre class="example">
+I always forget how to display images with OpenCV (useful for
+debugging intermediate image processing steps). Remember to wait for
+keyboard input so the window doesn't close immediately!
+
+#+BEGIN_SRC C++ :libs -lopencv_core -lopencv_highgui :results silent
+#include &lt;opencv2/opencv.hpp&gt;
+
+int main(void) {
+ const auto img = cv::imread("hello.jpg");
+ cv::imshow("Window Title", img);
+ cv::waitKey();
+ return 0;
+}
+#+END_SRC
+</pre>
+
+<p>
+With our cursor in that source block, we can hit <code>C-c C-c</code> to execute it, and a window with our image pops up!
+</p>
+</div>
+</div>
+
+<div id="outline-container-org7ad7748" class="outline-2">
+<h2 id="org93133ce"><a id="org7ad7748"></a>Haskell</h2>
+<div class="outline-text-2" id="text-org93133ce">
+<p>
+Sometimes we want to do something a little tricky in Haskell that will be embedded within a larger piece of code. Extracting the tricky bit so that we can poke it to see how it reacts is hugely useful. Something I had to do recently involved the <code>lens</code> and <code>aeson</code> libraries for working with JSON data.
+</p>
+
+<p>
+The main Haskell compiler, GHC, does provide a REPL, but it has a few drawbacks:
+</p>
+
+<ul class="org-ul">
+<li>It uses slightly different syntax (e.g. multi-line input, pragmas)</li>
+<li>It does not immediately support use as a playground</li>
+</ul>
+
+<p>
+Here I mean <i>playground</i> as a programming environment that makes it easy to see the effects of small changes. A screenshot of a REPL session can be a useful artifact, but you can not re-run it (perhaps with upgraded software), and you can not easily tweak it to see how it responds.
+</p>
+
+<p>
+Here is our <code>shell.nix</code>,
+</p>
+
+<pre class="example">
+with (import &lt;nixpkgs&gt; {});
+mkShell {
+ buildInputs = [ (ghc.withPackages (p: [
+ p.lens p.aeson p.lens-aeson p.text p.vector
+ ]))];
+}
+</pre>
+
+<p>
+Again we create an <code>.envrc</code> file to enable <code>direnv</code>.
+</p>
+
+<pre class="example">
+echo 'use nix' &gt; .envrc
+direnv allow
+</pre>
+
+<p>
+For our notes file, we jump through a small hoop because <code>org-babel</code>'s support of Haskell is not very robust. For this example, we do not need to support any of <code>babel</code>'s interesting features like setting parameters for a source block, or persistent sessions. With this in mind, we define our own <code>runhaskell</code> language support for <code>org-babel</code> in an <code>elisp</code> source block. Evaluate that block (with <code>C-c C-c</code>) to teach emacs how to use <code>runhaskell</code>, and then the subsequent <code>runhaskell</code> block can be evaluated.
+</p>
+
+<pre class="example">
+* Preamble
+Teach emacs how to use =runhaskell=
+
+#+BEGIN_SRC elisp :results silent
+(defun org-babel-execute:runhaskell (body params)
+ (org-babel-eval "runhaskell"
+ (org-babel-expand-body:generic body params)))
+(add-to-list 'org-src-lang-modes '("runhaskell" . haskell))
+#+END_SRC
+
+* Deep JSON Traversal
+
+I have a JSON document that is a nested list of single-field objects
+instead of a top-level object with multiple fields, and I want to
+flatten the list. I am using
+[[https://hackage.haskell.org/package/lens-4.17/docs/Control-Lens-Plated.html#v:deep][deep]]=lens= package to do this. Its type doesn't make it obvious
+what it does, so here is a example of how we are using it.
+
+#+BEGIN_SRC runhaskell :results output
+{-# LANGUAGE OverloadedStrings #-}
+import Control.Lens (view, deep)
+import Data.Aeson
+import Data.Aeson.Lens (_Object)
+import Data.Text (Text)
+import Data.Vector (fromList)
+
+array :: [Value] -&gt; Value
+array = Array . fromList
+
+main :: IO ()
+main = print (view (deep _Object) x)
+ where x = array [ object [ "name" .= ("Bob" :: Text) ]
+ , array [ object ["age" .= (64 :: Int) ]
+ , array [] ] ]
+#+END_SRC
+
+#+RESULTS:
+: fromList [("age",Number 64.0),("name",String "Bob")]
+</pre>
+</div>
+</div>
+
+<div id="outline-container-org2d7ef02" class="outline-2">
+<h2 id="org0b4e715"><a id="org2d7ef02"></a>Not Perfect</h2>
+<div class="outline-text-2" id="text-org0b4e715">
+<p>
+When doing any substantial programming, I use <a href="https://github.com/MaskRay/ccls/">ccls</a> or <a href="https://github.com/cquery-project/cquery">cquery</a> for C++, and <a href="https://github.com/commercialhaskell/intero">intero</a> for Haskell. I have not worked out how to directly wire such tools in to writing notes as shown above. The main challenge is that external tooling really wants to work with files on disk, while we're trying to move beyond that here.
+</p>
+
+<p>
+If you have your tooling setup to work for any files in your project directory, I recommend investigating <code>org-babel-tangle</code>. Making this work requires only that you add <code>:tangle my-example.hs :comments link</code> to your <code>runhaskell</code> source block header. Then you can use <code>org-babel-tangle</code> (<code>C-c C-v t</code>) to write your source block to the named file. That file will let you use a tool like <code>intero</code> to help you write more of your example program, and, when you're ready, you can run <code>org-babel-detangle</code> in the buffer where you edited the <code>my-example.hs</code> file to sync your changes back to the org file.
+</p>
+
+<p>
+Alternately, you can manually include a separate source file into your org notes like this:
+</p>
+
+<pre class="example">
+I wrote this example code with fancy tooling, but I'd like to talk
+about it here and see its output.
+
+#+INCLUDE: "test.hs" src runhaskell
+
+#+BEGIN_SRC runhaskell :exports results :prologue (with-temp-buffer (insert-file-contents "test.hs") (buffer-string))
+#+END_SRC
+
+#+RESULTS:
+: fromList [("age",Number 64.0),("name",String "Bob")]
+</pre>
+
+<p>
+When you export your org notes, the file's source will show up thanks to the <code>#+INCLUDE:</code> directive, and the output will show up thanks to the source block with the <code>:prologue</code> header. If you're doing this often, you will probably want to define a helper to make that <code>:prologue</code> a bit more terse, or define a snippet to generate the whole blob of boilerplate. That said, I find this option less appealing since you no longer see your source code and its output in the same file.
+</p>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2018-09-20</span>
+            <span title="last modification date" class="post-info">2018-09-20</span>
+            <span title="tags" class="post-info">:<a href="/tags/raw">raw</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-c7de1c50-88ed-412e-ae70-62694dd7dea5">lujun9972</a></span>
+        </div>
+    <script src="/media/js/jquery-2.1.3.min.js"></script>
+        <section>
+            <h1>Comments</h1>
+            <div id="comment-wrap">
+                    <a class="disqus_label">使用 Disqus 评论</a>
+    </ul>
+        <div id="disqus_thread"></div>
+        <script type="text/javascript">
+         //var disqus_developer = 1;
+         var preempt_signal=false;
+         var disqus_identifier = "/blog/2018/09/20/robust-notes-with-embedded-code/";
+         var disqus_url = "https://lujun9972.github.io/emacs-document/blog/2018/09/20/robust-notes-with-embedded-code/";
+         var disqus_shortname = 'emacs-document';
+         /* * * DON'T EDIT BELOW THIS LINE * * */
+         (function() {
+             var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+             dsq.src = 'https://' + disqus_shortname + '.disqus.com/embed.js';
+             (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+             $('#disqus_thread').css('display','none');
+         })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+    <script>
+     /* comments */
+     var ego_disqus_thread=$('#disqus_thread');
+     var ego_ds_label=$('.ds-thread');
+     $('.disqus_label').click(function(){
+         ego_disqus_thread.show();
+         ego_ds_label.hide();
+     });
+     $('.ds-label').click(function(){
+         ego_disqus_thread.hide();
+         ego_ds_label.show();
+     });
+    </script>
+        </section>
+    <script src="/media/js/main.js"></script>
+        <script type="text/javascript">
+         var _gaq = _gaq || [];
+         _gaq.push(['_setAccount', '7bac4fd0247f69c27887e0d4e3aee41e']);
+         _gaq.push(['_trackPageview']);
+         (function() {
+             var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+             ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+             var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-c7de1c50-88ed-412e-ae70-62694dd7dea5">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="//instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>

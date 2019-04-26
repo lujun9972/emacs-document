@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Emacs Lisp Readable Closures - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="LdBeth" />
+  <style>
+   #ds-thread #ds-reset .ds-comment-body p {color: #ffffff;}
+   #ds-thread #ds-reset .ds-comment-body p a {color: #ff0;}
+   #ds-thread #ds-reset .ds-comment-body p a:hover {color: #0ff;}
+   #disqus_thread a {color: #00ffff;}
+  </style>
+  <link rel="stylesheet" href="/media/css/main.css" type="text/css"/>
+  <link rel="stylesheet" href="/media/css/comment.css" type="text/css"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="/">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <div class="menu-icon">
+        <svg viewBox="0 0 18 15">
+          <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.031C17.335,0,18,0.665,18,1.484L18,1.484z" fill="#ffff00"/>
+          <path d="M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0c0-0.82,0.665-1.484,1.484-1.484 h15.031C17.335,6.031,18,6.696,18,7.516L18,7.516z" fill="#ffff00"/>
+          <path d="M18,13.516C18,14.335,17.335,15,16.516,15H1.484C0.665,15,0,14.335,0,13.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.031C17.335,12.031,18,12.696,18,13.516L18,13.516z" fill="#ffff00"/>
+        </svg>
+      </div>
+      <ul class="trigger">
+        <li><a href="/years/">Years</a></li>
+        <li><a href="/authors/">Authors</a></li>
+        <li><a href="/tags/">Tags</a></li>
+        <li><a href="/about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="/rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="http://www.google.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">Emacs Lisp Readable Closures</h1>
+<div id="table-of-contents">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#org6232ffa">1. 打印列表</a></li>
+<li><a href="#orga1c87b9">2. 无所不读，无所不印</a></li>
+<li><a href="#orgd004146">3. Elisp 闭包</a></li>
+<li><a href="#orgaa4559b">4. 可读闭包捕获</a></li>
+</ul>
+</div>
+</div>
+<p>
+我之前说过，Emacs Lisp 的特性之一就是它的闭包是可读的。闭包可以被 printer 列表化
+以后被 readr 读入。我不知道有其他哪些编程语言能这样做。事实上这是 Elisp 字节码编
+译的必需之一，因为字节码编译本质上就是读入源代码后把字节码 S 表达式写入字节码文
+件。
+</p>
+
+<div id="outline-container-org6232ffa" class="outline-2">
+<h2 id="org6232ffa"><span class="section-number-2">1</span> 打印列表</h2>
+<div class="outline-text-2" id="text-1">
+<p>
+Lisp 系语言因 S 表达式而具有同像性。由于编译器/解释器在程序运行时是可用的，读入
+输入和打印输出成为了 Lisp 的基本功能。一个数值传递给 printer 后会作为字符串被序
+列化成 S 表达式。之后 reader 将 S 表达式解析为等价数值。
+</p>
+
+<p>
+相比之下，原本 JavaScript 只这有一半的功能。JavaScript 有 JSON 可以方便定义关联
+列表。=eval= 函数可作为一个危险的 reader 来从 JSON 格式字符串读取数值。直到
+=JSON.stringfy()=成为标准，开发者需要自行实现 printer。Lisp S 表达式明显更强大而
+复杂，同时能维护标识和环形列表。
+</p>
+
+<p>
+不是所有数值都能读取。在 Common Lisp 中，不能被读取的值 (在 <code>*print-readbly*</code> 为
+<code>nil</code> 时)会以特殊语法给 reader 传错误信号： <code>#&lt;</code> 。举例，Emacs Lisp 的 buffer 不
+能被序列化，所以用如下语法：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(prin1-to-string (current-buffer))
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">=&gt; "#&lt;buffer *scratch*&gt;"</span>
+</pre>
+</div>
+
+<p>
+⻆括号里是什么不重要，它甚至不需要配对，因为 reader 在遇到 <code>#&lt;</code> 格式时立刻就会报错。
+</p>
+</div>
+</div>
+
+<div id="outline-container-orga1c87b9" class="outline-2">
+<h2 id="orga1c87b9"><span class="section-number-2">2</span> 无所不读，无所不印</h2>
+<div class="outline-text-2" id="text-2">
+<p>
+Elisp 定义了一系列数据类型。其中可读的有:
+</p>
+
+<ul class="org-ul">
+<li>整数 integer <code>1024, ?a</code></li>
+<li>浮点数 float <code>1.7</code></li>
+<li>CONS/列表 cons/list <code>(...)</code></li>
+<li>向量 vector (一维) <code>[...]</code></li>
+<li>布尔向量 bool-vector <code>#&amp;n"...")</code></li>
+<li>字符串 string <code>"..."</code></li>
+<li>特征标表 char-table <code>#^[...]</code></li>
+<li>哈希表 hash-table (Emacs 23.3 之后可读) <code>#s(hash-table ...)</code></li>
+<li>字节码物件 function object <code>#[...]</code></li>
+<li>符号 symbol</li>
+</ul>
+
+<p>
+以下是所有不可读的类型，每个都有合理的原因。
+</p>
+
+<ul class="org-ul">
+<li>缓冲区 buffer</li>
+<li>迸程 process (外部状态)</li>
+<li>帧 frame (用户界面元素)</li>
+<li>标记 marker (动态刷新)</li>
+<li>叠层 overlay (buffer 子元素)</li>
+<li>内建函数 built-in functions (字节码)</li>
+<li>用户外部结构 user-ptr (Emacs 25 dynamic modules 的不透明指针)</li>
+</ul>
+
+<p>
+这就是了。其它所有 Elisp 数值都是基于以上原始类型中的一种或多秉种，包括 键位
+keymap，函数 functions，宏 macros，语法表 syntax tables，数据结构 defstruct，面
+向对象物件 EIEIO objects。这意味着只要这些物件未引用不可读的值就能被打印出来。
+</p>
+
+<p>
+值得注意的一点是，不像 Common Lisp Object System，EIEIO 的物件是默认可读的：它本
+质上还是 ELisp 向量。CLOS 物件需要通过定义每个类的打印方法才能被读取。
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgd004146" class="outline-2">
+<h2 id="orgd004146"><span class="section-number-2">3</span> Elisp 闭包</h2>
+<div class="outline-text-2" id="text-3">
+<p>
+2012 年 6 月发布 Emacs 24 之后 Elisp 增加了词法作用域，成为极少数同时具有动态/词
+法作用域的语言之一。同 Common Lisp， <code>defvar</code> 定义的变量仍保留动态作用域。为确保
+向后兼容，词法作用域默认关闭，需通过设置当前文件/缓冲区 <code>lexical-bing</code> 为真以启
+用。
+</p>
+
+<p>
+词法作用域中，匿名函数成为强大的函数式编程原型：闭包，即带有捕捉的环境变量的函数。
+静态作用域亦具性能优势。据本人测试，启用静态作用域字节编译后的 Elisp 速度能提升
+约10% 至 15%。
+</p>
+
+<p>
+Emacs Lisp 中的闭包长什么样？这取决于闭包是否被字节编译。举例，如下函数 <code>foo</code> 取
+两个参数并返回一个返回第一个参数的闭包。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp"><span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">-*- lexical-binding: t; -*-</span>
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">foo</span> (x y)
+  (<span style="font-weight: bold;">lambda</span> () x))
+
+(foo <span style="font-weight: bold;">:bar</span> <span style="font-weight: bold;">:ignored</span>)
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">=&gt; (closure ((y . :ignored) (x . :bar) t) () x)</span>
+</pre>
+</div>
+
+<p>
+未编译的闭包是个以 <code>closure</code> 符号开头的列表。第二个元素是词法环境，其余便是
+<code>lambda</code> 的参数。这里我们可看出 <code>x</code> 与 <code>y</code> 均被捕捉。这显得有些粗糙，因为 <code>y</code> 并
+未被使用。捕获未使用的变量主要会造成：
+</p>
+
+<ul class="org-ul">
+<li>闭包占用更多空间</li>
+<li>更长回收时间</li>
+<li>影响读入(之后会讲)</li>
+</ul>
+
+<p>
+可喜可贺的是，Elisp 编译器有足够的能力对此作出优化。编译 <code>foo</code> 以证明：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(foo <span style="font-weight: bold;">:bar</span> <span style="font-weight: bold;">:ignored</span>)
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">=&gt; #[0 "\300\207" [:bar] 1]</span>
+</pre>
+</div>
+
+<p>
+返回的是用 <code>#[...]</code> 语法的字节码物件，具有如下元素：
+</p>
+
+<ol class="org-ol">
+<li>参数列表(0个参数)</li>
+<li>单字节字符串形式的字节码</li>
+<li>常数向量</li>
+<li>所需栈空间</li>
+</ol>
+
+<p>
+可见词法环境定义在常数向量中，而 <code>:ignored</code> 并未被编译器捕捉。
+</p>
+
+<p>
+对于那些好奇字节码原理的人，简要地讲，字符串中的字节码是八迸制，表示指令 <code>192</code>
+和 <code>135</code> ，<a href="https://github.com/lujun9972/emacs-document/blob/master/elisp-common/Emacs%E5%AD%97%E8%8A%82%E7%A0%81%E5%86%85%E9%83%A8%E8%AF%B4%E6%98%8E.org">Elisp 的字节码解释器是基于栈的</a>。 <code>192</code> (constant 0) 将向量第一个常数
+入栈。 <code>135</code> 将取出栈顶元素并返回之。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(coerce <span style="font-style: italic;">"\300\207"</span> 'list)
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">=&gt; (192 135)</span>
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgaa4559b" class="outline-2">
+<h2 id="orgaa4559b"><span class="section-number-2">4</span> 可读闭包捕获</h2>
+<div class="outline-text-2" id="text-4">
+<p>
+因闭包皆可读字节码物件，你能在闭包中捕捉环境，将其序列化以后读入求值。这意味着闭
+包是可用于传递环境的。这个特性被用在 <a href="https://github.com/nicferrier/elnode">Elnode</a>, <a href="https://github.com/jwiegley/emacs-async">Async</a> 等多任务处理中。
+</p>
+
+<p>
+而捕捉的问题是𣎴可读数值易被意外捕获，尤其是 缓冲区。如下函数 <code>bar</code> 用一临时缓冲
+区建立字符串，返回一返回结果的闭包。(有点诡异，但这只是个例子)
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">bar</span> (n)
+  (<span style="font-weight: bold;">with-temp-buffer</span>
+    (<span style="font-weight: bold;">let</span> ((standard-output (current-buffer)))
+      (<span style="font-weight: bold;">loop</span> for i from 0 to n do (princ i))
+      (<span style="font-weight: bold;">let</span> ((string (buffer-string)))
+        (<span style="font-weight: bold;">lambda</span> () string)))))
+</pre>
+</div>
+
+<p>
+编译的版本看起来没问题，
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(bar 3)<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">&#35793;&#32773;&#27880;&#65306;&#21407;&#25991;&#26159; (foo 3)&#65292;&#30097;&#20026; Typo&#65292;&#19979;&#21516;</span>
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">=&gt; #[0 "\300\207" ["0123"] 1]</span>
+</pre>
+</div>
+
+<p>
+然而未编译的版本由于 <code>with-temp-buffer</code> 静默绑定了变量导致抽象泄漏。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(bar 3)
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">=&gt; (closure ((string . "0123")</span>
+<span style="font-weight: bold; font-style: italic;">;;              </span><span style="font-weight: bold; font-style: italic;">(temp-buffer . #&lt;killed buffer&gt;)</span>
+<span style="font-weight: bold; font-style: italic;">;;              </span><span style="font-weight: bold; font-style: italic;">(n . 3) t)</span>
+<span style="font-weight: bold; font-style: italic;">;;      </span><span style="font-weight: bold; font-style: italic;">() string)</span>
+</pre>
+</div>
+
+<p>
+临时缓冲区被误捕获使闭包不可读，但编译之后却无问题。这产生了一个<a href="https://github.com/lujun9972/emacs-document/blob/master/elisp-common/%E9%9D%99%E6%80%81%E4%BD%9C%E7%94%A8%E5%9F%9F%E7%9A%84%E6%80%A7%E8%83%BD%E4%BC%98%E5%8A%BF.org">必须被编译成字节
+码才能够得到正确的结果的特例</a>。
+</p>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2019-04-26</span>
+            <span title="last modification date" class="post-info">2017-11-20</span>
+            <span title="tags" class="post-info">:N/A:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-c7de1c50-88ed-412e-ae70-62694dd7dea5">LdBeth</a></span>
+        </div>
+    <script src="/media/js/jquery-2.1.3.min.js"></script>
+        <section>
+            <h1>Comments</h1>
+            <div id="comment-wrap">
+                    <a class="disqus_label">使用 Disqus 评论</a>
+    </ul>
+        <div id="disqus_thread"></div>
+        <script type="text/javascript">
+         //var disqus_developer = 1;
+         var preempt_signal=false;
+         var disqus_identifier = "/blog/2019/04/26/emacs-lisp-readable-closures/";
+         var disqus_url = "https://lujun9972.github.io/emacs-document/blog/2019/04/26/emacs-lisp-readable-closures/";
+         var disqus_shortname = 'emacs-document';
+         /* * * DON'T EDIT BELOW THIS LINE * * */
+         (function() {
+             var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+             dsq.src = 'https://' + disqus_shortname + '.disqus.com/embed.js';
+             (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+             $('#disqus_thread').css('display','none');
+         })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+    <script>
+     /* comments */
+     var ego_disqus_thread=$('#disqus_thread');
+     var ego_ds_label=$('.ds-thread');
+     $('.disqus_label').click(function(){
+         ego_disqus_thread.show();
+         ego_ds_label.hide();
+     });
+     $('.ds-label').click(function(){
+         ego_disqus_thread.hide();
+         ego_ds_label.show();
+     });
+    </script>
+        </section>
+    <script src="/media/js/main.js"></script>
+        <script type="text/javascript">
+         var _gaq = _gaq || [];
+         _gaq.push(['_setAccount', '7bac4fd0247f69c27887e0d4e3aee41e']);
+         _gaq.push(['_trackPageview']);
+         (function() {
+             var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+             ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+             var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-c7de1c50-88ed-412e-ae70-62694dd7dea5">LdBeth</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="//instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>

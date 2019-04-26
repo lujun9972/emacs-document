@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Options for Structured Data in Emacs Lisp « null program - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="raw" />
+  <style>
+   #ds-thread #ds-reset .ds-comment-body p {color: #ffffff;}
+   #ds-thread #ds-reset .ds-comment-body p a {color: #ff0;}
+   #ds-thread #ds-reset .ds-comment-body p a:hover {color: #0ff;}
+   #disqus_thread a {color: #00ffff;}
+  </style>
+  <link rel="stylesheet" href="/media/css/main.css" type="text/css"/>
+  <link rel="stylesheet" href="/media/css/comment.css" type="text/css"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="/">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <div class="menu-icon">
+        <svg viewBox="0 0 18 15">
+          <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.031C17.335,0,18,0.665,18,1.484L18,1.484z" fill="#ffff00"/>
+          <path d="M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0c0-0.82,0.665-1.484,1.484-1.484 h15.031C17.335,6.031,18,6.696,18,7.516L18,7.516z" fill="#ffff00"/>
+          <path d="M18,13.516C18,14.335,17.335,15,16.516,15H1.484C0.665,15,0,14.335,0,13.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.031C17.335,12.031,18,12.696,18,13.516L18,13.516z" fill="#ffff00"/>
+        </svg>
+      </div>
+      <ul class="trigger">
+        <li><a href="/years/">Years</a></li>
+        <li><a href="/authors/">Authors</a></li>
+        <li><a href="/tags/">Tags</a></li>
+        <li><a href="/about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="/rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="http://www.google.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">Options for Structured Data in Emacs Lisp « null program</h1>
+<div id="table-of-contents">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#defining-a-data-structure-from-scratch">Defining a data structure from scratch</a>
+<ul>
+<li><a href="#two-pitfalls">Two pitfalls</a></li>
+</ul>
+</li>
+<li><a href="#dynamic-dispatch">Dynamic dispatch</a></li>
+</ul>
+</div>
+</div>
+<p>
+So your Emacs package has grown beyond a dozen or so lines of code, and
+the data it manages is now structured and heterogeneous. Informal plain
+old lists, the bread and butter of any lisp, are not longer cutting it.
+You really need to cleanly abstract this structure, both for your own
+organizational sake any for anyone reading your code.
+</p>
+
+<p>
+With informal lists as structures, you might regularly ask questions
+like, “Was the ‘name' slot stored in the third list element, or was
+it the fourth element?” A plist or alist helps with this problem, but
+those are better suited for informal, externally-supplied data, not
+for internal structures with fixed slots. Occasionally someone
+suggests using hash tables as structures, but Emacs Lisp's hash tables
+are much too heavy for this. Hash tables are more appropriate when
+keys themselves are data.
+</p>
+
+<div id="outline-container-org32be5a8" class="outline-2">
+<h2 id="defining-a-data-structure-from-scratch"><a id="org32be5a8"></a>Defining a data structure from scratch</h2>
+<div class="outline-text-2" id="text-defining-a-data-structure-from-scratch">
+<p>
+Imagine a refrigerator package that manages a collection of food in a
+refrigerator. A food item could be structured as a plain old list,
+with slots at specific positions.
+</p>
+
+<pre class="example">
+(defun fridge-item-create (name expiry weight)
+ (list name expiry weight))
+</pre>
+
+<p>
+A function that computes the mean weight of a list of food items might
+look like this:
+</p>
+
+<pre class="example">
+(defun fridge-mean-weight (items)
+ (if (null items)
+ 0.0
+ (let ((sum 0.0)
+ (count 0))
+ (dolist (item items (/ sum count))
+ (setf count (1+ count)
+ sum (+ sum (nth 2 item)))))))
+</pre>
+
+<p>
+Note the use of <code>(nth 2 item)</code> at the end, used to get the item's
+weight. That magic number 2 is easy to mess up. Even worse, if lots of
+code accesses “weight” this way, then future extensions will be
+inhibited. Defining some accessor functions solves this problem.
+</p>
+
+<pre class="example">
+(defsubst fridge-item-name (item)
+ (nth 0 item))
+
+(defsubst fridge-item-expiry (item)
+ (nth 1 item))
+
+(defsubst fridge-item-weight (item)
+ (nth 2 item))
+</pre>
+
+<p>
+The <code>defsubst</code> defines an inline function, so there's effectively no
+additional run-time costs for these accessors compared to a bare
+<code>nth</code>. Since these only cover getting slots, we should also define
+some setters using the built-in gv (generalized variable) package.
+</p>
+
+<pre class="example">
+(require 'gv)
+
+(gv-define-setter fridge-item-name (value item)
+ `(setf (nth 0 ,item) ,value))
+
+(gv-define-setter fridge-item-expiry (value item)
+ `(setf (nth 1 ,item) ,value))
+
+(gv-define-setter fridge-item-weight (value item)
+ `(setf (nth 2 ,item) ,value))
+</pre>
+
+<p>
+This makes each slot setf-able. Generalized variables are great for
+simplifying APIs, since otherwise there would need to be an equal
+number of setter functions (<code>fridge-item-set-name</code>, etc.). With
+generalized variables, both are at the same entrypoint:
+</p>
+
+<pre class="example">
+(setf (fridge-item-name item) "Eggs")
+</pre>
+
+<p>
+There are still two more significant improvements.
+</p>
+
+<ol class="org-ol">
+<li>As far as Emacs Lisp is concerned, this isn't a real type. The
+type-ness of it is just a fiction created by the conventions of the
+package. It would be easy to make the mistake of passing an
+arbitrary list to these <code>fridge-item</code> functions, and the mistake
+wouldn't be caught so long as that list has at least three items.
+An common solution is to add a type tag: a symbol at the
+beginning of the structure that identifies it.</li>
+
+<li>It's still a linked list, and <code>nth</code> has to walk the list (i.e.
+<code>O(n)</code>) to retrieve items. It would be much more efficient to use a
+vector, turning this into an efficient <code>O(1)</code> operation.</li>
+</ol>
+
+<p>
+Addressing both of these at once:
+</p>
+
+<pre class="example">
+(defun fridge-item-create (name expiry weight)
+ (vector 'fridge-item name expiry weight))
+
+(defsubst fridge-item-p (object)
+ (and (vectorp object)
+ (= (length object) 4)
+ (eq 'fridge-item (aref object 0))))
+
+(defsubst fridge-item-name (item)
+ (unless (fridge-item-p item)
+ (signal 'wrong-type-argument (list 'fridge-item item)))
+ (aref item 1))
+
+(defsubst fridge-item-name--set (item value)
+ (unless (fridge-item-p item)
+ (signal 'wrong-type-argument (list 'fridge-item item)))
+ (setf (aref item 1) value))
+
+(gv-define-setter fridge-item-name (value item)
+ `(fridge-item-name--set ,item ,value))
+
+;; And so on for expiry and weight...
+</pre>
+
+<p>
+As long as <code>fridge-mean-weight</code> uses the <code>fridge-item-weight</code>
+accessor, it continues to work unmodified across all these changes.
+But, whew, that's quite a lot of boilerplate to write and maintain
+for each data structure in our package! Boilerplate code generation is
+a perfect candidate for a macro definition. Luckily for us, Emacs
+already defines a macro to generate all this code: <code>cl-defstruct</code>.
+</p>
+
+<pre class="example">
+(require 'cl)
+
+(cl-defstruct fridge-item
+ name expiry weight)
+</pre>
+
+<p>
+In Emacs 25 and earlier, this innocent looking definition expands into
+essentially all the above code. The code it generates is expressed in
+<a href="file:///blog/2017/01/30/">the most optimal form</a> for its version of Emacs, and it
+exploits many of the available optimizations by using function
+declarations such as <code>side-effect-free</code> and <code>error-free</code>. It's
+configurable, too, allowing for the exclusion of a type tag (<code>:named</code>)
+--- discarding all the type checks --- or using a list rather than a
+vector as the underlying structure (<code>:type</code>). As a crude form of
+structural inheritance, it even allows for directly embedding other
+structures (<code>:include</code>).
+</p>
+</div>
+
+<div id="outline-container-org17c9b11" class="outline-3">
+<h3 id="two-pitfalls"><a id="org17c9b11"></a>Two pitfalls</h3>
+<div class="outline-text-3" id="text-two-pitfalls">
+<p>
+There a couple pitfalls, though. First, for historical reasons, *the
+macro will define two namespace-unfriendly functions: <code>make-NAME</code> and
+<code>copy-NAME=*. I always override these, preferring the =-create</code>
+convention for the constructor, and tossing the copier since it's
+either useless or, worse, semantically wrong.
+</p>
+
+<pre class="example">
+(cl-defstruct (fridge-item (:constructor fridge-item-create)
+ (:copier nil))
+ name expiry weight)
+</pre>
+
+<p>
+If the constructor needs to be more sophisticated than just setting
+slots, it's common to define a “private” constructor (double dash in
+the name) and wrap it with a “public” constructor that has some
+behavior.
+</p>
+
+<pre class="example">
+(cl-defstruct (fridge-item (:constructor fridge-item--create)
+ (:copier nil))
+ name expiry weight entry-time)
+
+(cl-defun fridge-item-create (&amp;rest args)
+ (apply #'fridge-item--create :entry-time (float-time) args))
+</pre>
+
+<p>
+The other pitfall is related to printing. In Emacs 25 and earlier,
+types defined by <code>cl-defstruct</code> are still only types by convention.
+They're really just vectors as far as Emacs Lisp is concerned. One
+benefit from this is that <a href="file:///blog/2013/12/30/">printing and reading</a> these
+structures is “free” because vectors are printable. It's trivial to
+serialize <code>cl-defstruct</code> structures out to a file. This is <a href="file:///blog/2013/09/09/">exactly
+how the Elfeed database works</a>.
+</p>
+
+<p>
+The pitfall is that <b>once a structure has been serialized, there's no
+more changing the <code>cl-defstruct</code> definition.</b> It's now a file format
+definition, so the slots are locked in place. Forever.
+</p>
+
+<p>
+Emacs 26 throws a wrench in all this, though it's worth it in the long
+run. There's a new primitive type in Emacs 26 with its own reader
+syntax: records. This is similar to hash tables <a href="file:///blog/2010/06/07/">becoming first class
+in the reader in Emacs 23.2</a>. In Emacs 26, <code>cl-defstruct</code> uses
+records instead of vectors.
+</p>
+
+<pre class="example">
+;; Emacs 25:
+(fridge-item-create :name "Eggs" :weight 11.1)
+;; =&gt; [cl-struct-fridge-item "Eggs" nil 11.1]
+
+;; Emacs 26:
+(fridge-item-create :name "Eggs" :weight 11.1)
+;; =&gt; #s(fridge-item "Eggs" nil 11.1)
+</pre>
+
+<p>
+So far slots are still accessed using <code>aref</code>, and all the type
+checking still happens in Emacs Lisp. The only practical change is the
+<code>record</code> function is used in place of the <code>vector</code> function when
+allocating a structure. But it does pave the way for more interesting
+things in the future.
+</p>
+
+<p>
+The major short-term downside is that this breaks printed compatibility
+across the Emacs 25/26 boundary. The <code>cl-old-struct-compat-mode</code>
+function can be used for some degree of backwards, but not forwards,
+compatibility. Emacs 26 can read and use some structures printed by
+Emacs 25 and earlier, but the reverse will never be true. This issue
+initially <a href="https://debbugs.gnu.org/cgi/bugreport.cgi?bug=27617">tripped up Emacs' built-in packages</a>, and when Emacs 26
+is released we'll see more of these issues arise in external packages.
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgc972302" class="outline-2">
+<h2 id="dynamic-dispatch"><a id="orgc972302"></a>Dynamic dispatch</h2>
+<div class="outline-text-2" id="text-dynamic-dispatch">
+<p>
+Prior to Emacs 25, the major built-in package for dynamic dispatch ---
+functions that specialize on the run-time type of their arguments --- was
+EIEIO, though it only supported single dispatch (specializing on a
+single argument). EIEIO brought much of the Common Lisp Object System
+(CLOS) to Emacs Lisp, including classes and methods.
+</p>
+
+<p>
+Emacs 25 introduced a more sophisticated dynamic dispatch package
+called cl-generic. It focuses only on dynamic dispatch and supports
+multiple dispatch, completely replacing the dynamic dispatch portion
+of EIEIO. Since <code>cl-defstruct</code> does inheritance and cl-generic does
+dynamic dispatch, there's not really much left for EIEIO --- besides bad
+ideas like multiple inheritance and method combination.
+</p>
+
+<p>
+Without either of these packages, the most direct way to build single
+dispatch on top of <code>cl-defstruct</code> would be to <a href="file:///blog/2014/10/21/">shove a function in one
+of the slots</a>. Then the “method” is just a wrapper that call this
+function.
+</p>
+
+<pre class="example">
+;; Base "class"
+
+(cl-defstruct greeter
+ greeting)
+
+(defun greet (thing)
+ (funcall (greeter-greeting thing) thing))
+
+;; Cow "class"
+
+(cl-defstruct (cow (:include greeter)
+ (:constructor cow--create)))
+
+(defun cow-create ()
+ (cow--create :greeting (lambda (_) "Moo!")))
+
+;; Bird "class"
+
+(cl-defstruct (bird (:include greeter)
+ (:constructor bird--create)))
+
+(defun bird-create ()
+ (bird--create :greeting (lambda (_) "Chirp!")))
+
+;; Usage:
+
+(greet (cow-create))
+;; =&gt; "Moo!"
+
+(greet (bird-create))
+;; =&gt; "Chirp!"
+</pre>
+
+<p>
+Since cl-generic is aware of the types created by <code>cl-defstruct</code>,
+functions can specialize on them as if they were native types. It's a
+lot simpler to let cl-generic do all the hard work. The people reading
+your code will appreciate it, too:
+</p>
+
+<pre class="example">
+(require 'cl-generic)
+
+(cl-defgeneric greet (greeter))
+
+(cl-defstruct cow)
+
+(cl-defmethod greet ((_ cow))
+ "Moo!")
+
+(cl-defstruct bird)
+
+(cl-defmethod greet ((_ bird))
+ "Chirp!")
+
+(greet (make-cow))
+;; =&gt; "Moo!"
+
+(greet (make-bird))
+;; =&gt; "Chirp!"
+</pre>
+
+<p>
+The majority of the time a simple <code>cl-defstruct</code> will fulfill your
+needs, keeping in mind the gotcha with the constructor and copier
+names. Its use should feel almost as natural as defining functions.
+</p>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2018-03-22</span>
+            <span title="last modification date" class="post-info">2018-03-22</span>
+            <span title="tags" class="post-info">:<a href="/tags/raw">raw</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-c7de1c50-88ed-412e-ae70-62694dd7dea5">lujun9972</a></span>
+        </div>
+    <script src="/media/js/jquery-2.1.3.min.js"></script>
+        <section>
+            <h1>Comments</h1>
+            <div id="comment-wrap">
+                    <a class="disqus_label">使用 Disqus 评论</a>
+    </ul>
+        <div id="disqus_thread"></div>
+        <script type="text/javascript">
+         //var disqus_developer = 1;
+         var preempt_signal=false;
+         var disqus_identifier = "/blog/2018/03/22/options-for-structured-data-in-emacs-lisp-«-null-program/";
+         var disqus_url = "https://lujun9972.github.io/emacs-document/blog/2018/03/22/options-for-structured-data-in-emacs-lisp-«-null-program/";
+         var disqus_shortname = 'emacs-document';
+         /* * * DON'T EDIT BELOW THIS LINE * * */
+         (function() {
+             var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+             dsq.src = 'https://' + disqus_shortname + '.disqus.com/embed.js';
+             (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+             $('#disqus_thread').css('display','none');
+         })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+    <script>
+     /* comments */
+     var ego_disqus_thread=$('#disqus_thread');
+     var ego_ds_label=$('.ds-thread');
+     $('.disqus_label').click(function(){
+         ego_disqus_thread.show();
+         ego_ds_label.hide();
+     });
+     $('.ds-label').click(function(){
+         ego_disqus_thread.hide();
+         ego_ds_label.show();
+     });
+    </script>
+        </section>
+    <script src="/media/js/main.js"></script>
+        <script type="text/javascript">
+         var _gaq = _gaq || [];
+         _gaq.push(['_setAccount', '7bac4fd0247f69c27887e0d4e3aee41e']);
+         _gaq.push(['_trackPageview']);
+         (function() {
+             var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+             ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+             var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-c7de1c50-88ed-412e-ae70-62694dd7dea5">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="//instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>

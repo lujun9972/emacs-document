@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>BBDB on EIEIO - Emacs Lisp 面向对象编程简介 - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="LdBeth" />
+  <style>
+   #ds-thread #ds-reset .ds-comment-body p {color: #ffffff;}
+   #ds-thread #ds-reset .ds-comment-body p a {color: #ff0;}
+   #ds-thread #ds-reset .ds-comment-body p a:hover {color: #0ff;}
+   #disqus_thread a {color: #00ffff;}
+  </style>
+  <link rel="stylesheet" href="/media/css/main.css" type="text/css"/>
+  <link rel="stylesheet" href="/media/css/comment.css" type="text/css"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="/">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <div class="menu-icon">
+        <svg viewBox="0 0 18 15">
+          <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.031C17.335,0,18,0.665,18,1.484L18,1.484z" fill="#ffff00"/>
+          <path d="M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0c0-0.82,0.665-1.484,1.484-1.484 h15.031C17.335,6.031,18,6.696,18,7.516L18,7.516z" fill="#ffff00"/>
+          <path d="M18,13.516C18,14.335,17.335,15,16.516,15H1.484C0.665,15,0,14.335,0,13.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.031C17.335,12.031,18,12.696,18,13.516L18,13.516z" fill="#ffff00"/>
+        </svg>
+      </div>
+      <ul class="trigger">
+        <li><a href="/years/">Years</a></li>
+        <li><a href="/authors/">Authors</a></li>
+        <li><a href="/tags/">Tags</a></li>
+        <li><a href="/about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="/rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="http://www.google.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">BBDB on EIEIO - Emacs Lisp 面向对象编程简介</h1>
+<div id="table-of-contents">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#org3891bdc">1. 为什么重写？</a></li>
+<li><a href="#orgdd8d30b">2. 基本知识</a></li>
+<li><a href="#org1925ec3">3. 类和广义函数</a></li>
+<li><a href="#orgbdae25a">4. 传递多个消息</a></li>
+<li><a href="#orgd800915">5. 方法组成</a></li>
+<li><a href="#orgb54982f">6. 修饰符</a></li>
+<li><a href="#org6c48e72">7. 现有问题</a></li>
+</ul>
+</div>
+</div>
+<p>
+BBDB on EIEIO – An Introduction to Object-Oriented Emacs Lisp
+</p>
+
+<p>
+这是 EBDB，即 EIEIO 重构 BBDB 的简要介绍。
+</p>
+
+<blockquote>
+<p>
+这是什么意思？
+</p>
+</blockquote>
+
+<p>
+BBDB，即 <a href="http://savannah.nongnu.org/projects/bbdb/">insidious Big Brother DataBase</a>，Emacs 的主流信息管理／地址簿扩展包。
+<a href="https://www.gnu.org/software/emacs/manual/html_mono/eieio.html">EIEIO</a> 则很显然是 “Enhanced Implementation of Emacs Interpreted Objects” 的缩写，
+也就是 Emacs Lisp 版本的 Common Lisp <a href="https://www.gnu.org/software/emacs/manual/html_mono/eieio.html">CLOS</a>, Common Lisp Object System。因此 EBDB
+就是 “Enhanced implementation of emacs interpreted objects/common lisp object
+system version of the insidious big Brother DataBase“。
+</p>
+
+<div id="outline-container-org3891bdc" class="outline-2">
+<h2 id="org3891bdc"><span class="section-number-2">1</span> 为什么重写？</h2>
+<div class="outline-text-2" id="text-1">
+<p>
+为什么要这样呢？有两个原因：首先是面向对象系统很适合数据库，BBDB 能用子类做更多
+扩展；其次是为了练习使用 EIEIO。
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgdd8d30b" class="outline-2">
+<h2 id="orgdd8d30b"><span class="section-number-2">2</span> 基本知识</h2>
+<div class="outline-text-2" id="text-2">
+<blockquote>
+<p>
+译者注：下面的例子中，类 = class，方法 = method，消息传递／分发 = dispatch，多重分发 = multiple dispatch。
+</p>
+</blockquote>
+
+<p>
+EBDB 中有三个主类：
+</p>
+
+<ol class="org-ol">
+<li>数据库（Database），用于保存记录</li>
+<li>记录项目（Records），代表人或组织</li>
+<li>字段（Fields），代表记载的数据，如 E-mail 地址或电话号码。</li>
+</ol>
+
+<p>
+每个类都包含众多实例，以及可供第三方扩展的空间。主要思想就是将主要框架尽可能用类
+进行抽象：那些类本身已经代表了几乎所有的行为，并从用户的配置中接受基本消息。相当
+标准的面向对象项目。不过，CLOS/EIEIO 在底层和其它的面向对象系统完全不同。
+</p>
+</div>
+</div>
+
+<div id="outline-container-org1925ec3" class="outline-2">
+<h2 id="org1925ec3"><span class="section-number-2">3</span> 类和广义函数</h2>
+<div class="outline-text-2" id="text-3">
+<p>
+作为一个自以为是的 Lisp 粉，我目前只能给出一个蹩脚的例子：传递多个消息的通用方
+法。我想 <a href="http://www.gigamonkeys.com/book/object-reorientation-generic-functions.html">Peter Seibel</a> (Pratical Common Lisp) 对 Lisp 面向对象编程的解释已经很
+好了，不过如果你懒得读它，我可以简要解释一下：Lisp 的面向对象把方法作为最顶层
+的对象（我很好奇它是不是从别的语言里借鉴了一些思想）（译者：Lisp 的确从
+Smalltalk 借鉴了面向对象思想）。它们不再从属于类，而是像普通的函数一样。用
+Python 你或许会写：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-python"><span style="font-weight: bold;">class</span> <span style="font-weight: bold; text-decoration: underline;">ThingOne</span>():
+
+    <span style="font-weight: bold;">def</span> <span style="font-weight: bold;">foo</span>(<span style="font-weight: bold;">self</span>):
+        <span style="font-weight: bold;">print</span>(<span style="font-style: italic;">"calling thing one foo on %s"</span> % <span style="font-weight: bold;">self</span>)
+
+<span style="font-weight: bold;">class</span> <span style="font-weight: bold; text-decoration: underline;">ThingTwo</span>():
+
+    <span style="font-weight: bold;">def</span> <span style="font-weight: bold;">foo</span>(<span style="font-weight: bold;">self</span>):
+        <span style="font-weight: bold;">print</span>(<span style="font-style: italic;">"calling thing two foo on %s"</span> % <span style="font-weight: bold;">self</span>)
+
+ThingOne().foo()
+ThingTwo().foo()
+</pre>
+</div>
+
+<p>
+在 Lisp 中你会把等价的实现写成：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defclass</span> <span style="font-weight: bold; text-decoration: underline;">thing-one</span> ()
+  nil)
+
+(<span style="font-weight: bold;">defclass</span> <span style="font-weight: bold; text-decoration: underline;">thing-two</span> ()
+  nil)
+
+(<span style="font-weight: bold;">cl-defmethod</span> <span style="font-weight: bold;">foo</span> ((obj thing-one))
+  (message <span style="font-style: italic;">"calling thing one foo on %s"</span> obj))
+
+(<span style="font-weight: bold;">cl-defmethod</span> <span style="font-weight: bold;">foo</span> ((obj thing-two))
+  (message <span style="font-style: italic;">"calling thing two foo on %s"</span> obj))
+
+(foo (make-instance 'thing-one))
+(foo (make-instance 'thing-two))
+</pre>
+</div>
+
+<p>
+注意，两者之间唯一的差别就是 <code>cl-defmethod</code> 的定义是顶层的。它和类的唯一关心
+在于它需要将一个类作为第一个参数。
+</p>
+
+<p>
+这暗示着方法是和类相分离的。广义函数不止基于所指定的类，也基于参数的种类来传
+递消息。它们甚至可以在没有指定类的情况下使用：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">cl-defmethod</span> <span style="font-weight: bold;">type-test</span> ((arg string))
+  (message <span style="font-style: italic;">"I was called with string argument %s"</span> arg))
+
+(<span style="font-weight: bold;">cl-defmethod</span> <span style="font-weight: bold;">type-test</span> ((arg integer))
+  (message <span style="font-style: italic;">"I was called with integer argument %d"</span> arg))
+
+(<span style="font-weight: bold;">cl-defmethod</span> <span style="font-weight: bold;">type-test</span> (arg)
+  (message <span style="font-style: italic;">"I don't know what %s is"</span> arg))
+</pre>
+</div>
+
+<p>
+最后一个是个“捕捉全部”的方法定义。在“常规”的 Emacs Lisp 中，你会用一个
+<code>cond</code> 来实现类似的事：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">type-test</span> (arg)
+  (<span style="font-weight: bold;">cond</span> ((stringp arg)
+         (message <span style="font-style: italic;">"I was called with string argument %s"</span> arg))
+        ((integerp arg)
+         (message <span style="font-style: italic;">"I was called with integer argument %d"</span> arg))
+        (t (message <span style="font-style: italic;">"I don't know what %s is"</span> arg))))
+</pre>
+</div>
+
+<p>
+完全等价，和面向对象方法唯一的区别在于你可以在任何地方进行定义一个方法。
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgbdae25a" class="outline-2">
+<h2 id="orgbdae25a"><span class="section-number-2">4</span> 传递多个消息</h2>
+<div class="outline-text-2" id="text-4">
+<p>
+所以：方法是顶层的东西，能根据参数给出具体的定义，也能接受多个参数。结果就是你
+能得到基于建立在多个对象上的类来决定行为的方法，也就是“多重分发“，看起来就像
+这样：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">cl-defmethod</span> <span style="font-weight: bold;">bar</span> ((obj1 thing-one)
+                   (obj2 thing-two))
+  (message <span style="font-style: italic;">"bar called with thing-one %s and thing-two %s"</span> obj1 obj2))
+</pre>
+</div>
+
+<p>
+方法能通过检验一定数量的参数所属的类，数据类型，或者其它的技巧来发送消息。特化
+程度高的参数特化符能覆盖特化程度低的特化符。
+</p>
+
+<p>
+EBDB 在所有地方都用“多重分发”，比如，在编辑一个项目里的字段的时候。当用户按
+下 <code>e</code> 来开始编辑的时候，最终导致如下方法被调用（当然，是简化过的）：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">cl-defmethod</span> <span style="font-weight: bold;">ebdb-record-change-field</span> ((record ebdb-record)
+                                        (old-field ebdb-field)
+                                        <span style="font-weight: bold; text-decoration: underline;">&amp;optional</span> new-field)
+  <span style="font-style: italic;">"Change the value of FIELD belonging to RECORD."</span>
+  (<span style="font-weight: bold;">let*</span> ((fieldclass (eieio-object-class old-field))
+         (new-field (<span style="font-weight: bold;">or</span> new-field (ebdb-read fieldclass nil old-field))))
+    (ebdb-record-delete-field record old-field)
+    (ebdb-record-insert-field record new-field)))
+</pre>
+</div>
+
+<p>
+由于 <code>ebdb-record</code> 和 <code>ebdb-field</code> 都是底层基本类，这个调用对数据库的所有内容
+都起作用。新的字段被读取，旧的字段作为默认值，新字段代替旧字段。这个代码不懂任
+何记录或字段，只在产生新字段的时候调用 <code>ebdb-read</code> ，然后用
+<code>ebdb-record-insert-field</code> 加入记录。
+</p>
+
+<p>
+当然实际操作是更加复杂的。
+</p>
+
+<p>
+比如，个人记录会有“职位”字段在组织记录里。职位包括一个标签，一个电子邮件地址，
+以及一定数量的其它字段。在这个数据库中，职位保存在个人记录的插槽里。但是当你想
+看一个组织的信息时，你或许也会想看有多少人在那里有职位，对吧？所以在显示组织的
+时候，哈希表被用来逆向查找，并把职位作为组织的一个子项目来展示。
+</p>
+
+<p>
+当职位字段在组织记录中显示的时候，用户或许会想编辑它们。从实际上讲职位字段并不
+属于组织，所以这时候需要用一些特殊技巧了：我们需要写一个特例来处理这样的情况。
+这其实很简单，加个方法的事儿嘛：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">cl-defmethod</span> <span style="font-weight: bold;">ebdb-record-change-field</span> ((org ebdb-record-organization)
+                                        (old-field ebdb-field-role)
+                                        <span style="font-weight: bold; text-decoration: underline;">&amp;optional</span> new-field)
+  (<span style="font-weight: bold;">let</span> ((person (ebdb-gethash (slot-value old-field 'record-uuid) 'uuid)))
+    (cl-call-next-method person old-field new-field)))
+</pre>
+</div>
+
+<p>
+我们用更加具体的记录和字段子类来做特化参数符，所以这个方法只在编辑组织记录里的
+职位字段的时候起作用。这个方法查找职位记录实际从属的个人记录，从组织切换到个人
+记录，然后用 <code>cl-call-next-method</code> （Python super 的 Lisp 等价）来把参数传递给
+通用方法。
+</p>
+
+<p>
+我对这能成功起作用感到吃惊。调用方法顶部的代码把组织当作要编辑的记录：这改变了
+运行的钩子（Hook），然后在编辑完成后刷新显示。而底部的代码认为个人是要修改的记
+录：插槽变了，相应的数据库也更改了。
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgd800915" class="outline-2">
+<h2 id="orgd800915"><span class="section-number-2">5</span> 方法组成</h2>
+<div class="outline-text-2" id="text-5">
+<p>
+调用一摞从子类到父类的方法是常见的过程，而且 EBDB 确实也经常用
+<code>ebdb-record-field-slot-query</code> 来这样做。比如，这里就有一个简化过的
+<code>ebdb-record-field-slot-query</code> 方法，用于分辨一个字段在哪个插槽里。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">cl-defmethod</span> <span style="font-weight: bold;">ebdb-record-field-slot-query</span> ((class (subclass ebdb-record-person))
+                                            <span style="font-weight: bold; text-decoration: underline;">&amp;optional</span> query alist)
+  (cl-call-next-method
+   class
+   query
+   (append
+    '((aka . ebdb-field-name-complex)
+      (relations . ebdb-field-relation)
+      (organizations . ebdb-field-role))
+    alist)))
+
+(<span style="font-weight: bold;">cl-defmethod</span> <span style="font-weight: bold;">ebdb-record-field-slot-query</span> ((class (subclass ebdb-record-entity))
+                                            <span style="font-weight: bold; text-decoration: underline;">&amp;optional</span> query alist)
+  (cl-call-next-method
+   class
+   query
+   (append
+    `((mail . ebdb-field-mail)
+      (phone . ebdb-field-phone)
+      (address . ebdb-field-address))
+    alist)))
+
+(<span style="font-weight: bold;">cl-defmethod</span> <span style="font-weight: bold;">ebdb-record-field-slot-query</span> ((class (subclass ebdb-record))
+                                            <span style="font-weight: bold; text-decoration: underline;">&amp;optional</span> query alist)
+  (<span style="font-weight: bold;">let</span> ((alist (append
+                '((notes . ebdb-field-notes)
+                  (image . ebdb-field-image))
+                alist)))
+    (<span style="font-weight: bold;">pcase</span> query
+      (`(nil . ,class)
+       (<span style="font-weight: bold;">or</span> (rassq class alist)
+           (<span style="font-weight: bold;">signal</span> 'ebdb-unacceptable-field (list class))))
+      (`(,slot . nil)
+       (<span style="font-weight: bold;">or</span> (assq slot alist)
+           (<span style="font-weight: bold;">signal</span> 'ebdb-unacceptable-field (list slot))))
+      (_ alist))))
+</pre>
+</div>
+
+<p>
+这个方法以具体到通用的方式来调度： <code>ebdb-record-person</code> 属于
+<code>ebdb-record-entity</code> ，而后者属于 <code>ebdb-record</code> 。每个子类的方法都把属于自己的
+字段加入参数列表里，然后把参数传递到父类，直到最底层实际调用查询方法的部分：它
+返回一个字段类属于哪个插槽或者能被哪个插槽接受，或者（如果 query 设置为空）返
+回一个记录能接受的插槽和字段类的列表。
+</p>
+
+<p>
+同样这展示了 EIEIO 是如何利用子类特化符提供类级别的方法。
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgb54982f" class="outline-2">
+<h2 id="orgb54982f"><span class="section-number-2">6</span> 修饰符</h2>
+<div class="outline-text-2" id="text-6">
+<p>
+通用方法最复杂的部分就是修饰符了。除了主要方法以外，EIEIO 也提供了可以在主方法
+前后运行或者替代主方法的补充方法。你可以用 <code>:before, :after, :around</code> 这些修饰
+标签来声明补充方法。缺省的默认标签则是 <code>:primary</code> 主要方法。
+</p>
+
+<p>
+调用方法的时候，先是 <code>:around</code> 的“前一半”运行，然后是 <code>:before</code> ，接着是
+<code>:primary</code> ，最后就是剩下的 <code>:around</code> 部分。
+</p>
+
+<p>
+<code>:around</code> 和 <code>:primary</code> 方法主体中能用 <code>cl-call-next-method</code> 来决定下一个调用
+的方法。
+</p>
+
+<p>
+不懂？没关系，上例子。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defclass</span> <span style="font-weight: bold; text-decoration: underline;">parent</span> ()
+  nil)
+
+(<span style="font-weight: bold;">defclass</span> <span style="font-weight: bold; text-decoration: underline;">child</span> (parent)
+  nil)
+
+(<span style="font-weight: bold;">cl-defmethod</span> <span style="font-weight: bold;">foo</span> <span style="font-weight: bold;">:around</span> ((obj child))
+              (message <span style="font-style: italic;">"one"</span>)
+              (cl-call-next-method)
+              (message <span style="font-style: italic;">"eleven"</span>))
+
+(<span style="font-weight: bold;">cl-defmethod</span> <span style="font-weight: bold;">foo</span> <span style="font-weight: bold;">:around</span> ((obj parent))
+              (message <span style="font-style: italic;">"two"</span>)
+              (cl-call-next-method)
+              (message <span style="font-style: italic;">"ten"</span>))
+
+(<span style="font-weight: bold;">cl-defmethod</span> <span style="font-weight: bold;">foo</span> <span style="font-weight: bold;">:before</span> ((obj child))
+              (message <span style="font-style: italic;">"three"</span>))
+
+(<span style="font-weight: bold;">cl-defmethod</span> <span style="font-weight: bold;">foo</span> <span style="font-weight: bold;">:before</span> ((obj parent))
+              (message <span style="font-style: italic;">"four"</span>))
+
+(<span style="font-weight: bold;">cl-defmethod</span> <span style="font-weight: bold;">foo</span> ((obj child))
+  (message <span style="font-style: italic;">"five"</span>)
+  (cl-call-next-method)
+  (message <span style="font-style: italic;">"seven"</span>))
+
+(<span style="font-weight: bold;">cl-defmethod</span> <span style="font-weight: bold;">foo</span> ((obj parent))
+  (message <span style="font-style: italic;">"six"</span>))
+
+(<span style="font-weight: bold;">cl-defmethod</span> <span style="font-weight: bold;">foo</span> <span style="font-weight: bold;">:after</span> ((obj child))
+              (message <span style="font-style: italic;">"nine"</span>))
+
+(<span style="font-weight: bold;">cl-defmethod</span> <span style="font-weight: bold;">foo</span> <span style="font-weight: bold;">:after</span> ((obj parent))
+              (message <span style="font-style: italic;">"eight"</span>))
+
+(foo (make-instance 'child))
+</pre>
+</div>
+
+<p>
+大量使用方法修饰符是能让你了解具体发生了什么的一个很好的方法。但是需要注意的几
+点有：
+</p>
+
+<ol class="org-ol">
+<li>在 <code>:before :after</code> 方法中不能用 <code>cl-call-next-method</code> 。这代表它们总是会以
+具体到抽象的顺序运行，独立于其它代码。</li>
+<li>因此， <code>:before :after</code> 方法是无法和其它方法交互的。所以它们用来做通用设置
+或销毁，比如一个 <code>:before</code> 方法出现错误时，之后的所有方法都不会生效。以及如
+果一个 <code>:primary</code> 方法出现问题， <code>:after</code> 方法也不会运行。</li>
+<li><code>cl-call-next-method</code> 可以用来改变调用的方法。可以传递参数给调用的方法，也
+可以对返回的值进行处理。默认条件下传递所有参数。如果要改变传递的参数，所有
+参数需要做显式声明。你可以在 <code>ebdb-record-field-slot-query</code> 中看到具体的用
+法。</li>
+<li>在 <code>:around</code> 之后接着运行的是 <code>:before :primary :after</code> ， <code>:around</code> 中必须
+有 <code>cl-call-next-method</code> 。</li>
+<li><code>:primary</code> 方法中可以用 <code>cl-call-next-method</code> 来调用下一个 <code>:primary</code> 方法，
+否则覆盖更加抽象的方法。</li>
+</ol>
+
+<p>
+在实践中我发现太多的 <code>:around</code> 方法是很烦人的，所以我尽量避免使用它们，并把它
+们留给用户作为可以自定义的部分。
+</p>
+
+<p>
+我有提到 <code>:extra</code> 方法吗？没有。
+</p>
+
+<p>
+<code>:extra</code> 修饰符是用来把多个方法塞进一个特化符中（不然它们会互相覆盖到只剩一个
+方法），每个 <code>:extra</code> 方法用文档字符串作区分，它们在 <code>:primary</code> 方法之前运行，
+在里面用 <code>cl-call-next-method</code> 会依次调用 <code>:extra</code> 方法栈。
+</p>
+
+<p>
+这使得实现一个国际化的 EBDB 变得非常容易。
+</p>
+
+<p>
+BBDB 对多国语言习惯的支持不是很好，默认的习惯有一些来自北美的偏见。我希望 EBDB
+能提供让开发者根据当地语言习惯写出针对的扩展，并根据用户的偏好来加载。比如，如
+果知道一个电话号码的国家区号，就应该可以根据那个国家／地区的规范来显示电话号码。
+</p>
+
+<p>
+于是我们就有了 <code>ebdb-i18n</code> 库，它专门用来扩展和具体国家／地区有关的库。鉴于
+EBDB 仍在开发中，我目前只根据自己需要开发了中文为主的部分。
+</p>
+
+<p>
+在 BBDB 中，中文名字总是以【名】【空格】【姓】，比如“锦涛 胡”，而不是【姓】
+【名】，“胡锦涛”，如果你指定了名字格式，或许会得到“胡, 锦涛”，这稍微好上一
+点，但是并不是完全正确的。（其他人也为此作出了<a href="https://github.com/tumashu/bbdb-china">解决办法：bbdb-china</a>）
+</p>
+
+<p>
+加载 <code>ebdb-i18n</code> 会得到如下方法：
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">cl-defmethod</span> <span style="font-weight: bold;">ebdb-string</span> <span style="font-weight: bold;">:extra</span> <span style="font-style: italic;">"i18n"</span> ((name ebdb-field-name-complex))
+              (<span style="font-weight: bold;">let*</span> ((str (cl-call-next-method name))
+                     (script (aref char-script-table (aref str 0))))
+                (<span style="font-weight: bold;">unless</span> (memq script ebdb-i18n-ignorable-scripts)
+                  (<span style="font-weight: bold;">condition-case</span> nil
+                      (<span style="font-weight: bold;">setq</span> str (ebdb-string-i18n name script))
+                    (cl-no-applicable-method nil)))
+                str))
+</pre>
+</div>
+
+<blockquote>
+<p>
+This method shadows the primary method. The first thing it does
+is to call that :primary method, using cl-call-next-method, so it can examine
+the results. It looks at the first character of the name, looks up the script
+the character is written in, and attempts to call ebdb-string-i18n with the
+name field and the script symbol as arguments. If no country-specific
+libraries have been loaded, there will be no method that can catch these
+particular arguments, in which case the original string is returned. 
+</p>
+</blockquote>
+
+<p>
+这个方法覆盖了主要方法。它先用 <code>cl-call-next-method</code> 调用主方法来得到结果。它
+查看结果的第一个字母并推测出语言，并把参数传递给下面的 <code>ebdb-string-i18n</code> 。如
+果没有针对这个语言的库被使用，那么返回的就是原来的字符串。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">cl-defmethod</span> <span style="font-weight: bold;">ebdb-string-i18n</span> ((field ebdb-field-name-complex)
+                                (_script (eql han)))
+  (<span style="font-weight: bold;">with-slots</span> (surname given-names) field
+    (format <span style="font-style: italic;">"%s%s"</span> surname (car given-names))))
+</pre>
+</div>
+
+<blockquote>
+<p>
+Chinese characters register as the ’han script. So we specialize on the symbol
+’han (using (<sub>script</sub> (eql han))), and if it matches, format the name the way
+it’s usually formatted in China.
+</p>
+
+<p>
+If :extra methods didn’t exist, the internationalized ebdb-string method would
+clobber the primary method completely. We’d have to replicate that primary
+method here, or continually check some variable and funcall different
+functions, or even subclass the name field class with a new
+“internationalized” version. None of those options are as elegant as the
+:extra trick.
+</p>
+
+<p>
+The ebdb-chn.el library defines many other internationalized methods, notably
+some that memoize Chinese characters as romanized “pinyin”, so you can search
+for contacts with Chinese names without having to switch input methods. Very
+nice.
+</p>
+
+<p>
+Other internationalized methods allow for dispatch on the country code of
+phone numbers, or the symbol names of countries (as per <a href="https://en.wikipedia.org/wiki/ISO_3166-1_alpha-3">ISO 3166-1 alpha 3</a>).
+</p>
+</blockquote>
+
+<p>
+中文字被识别为 'han 字符，所以我们用 <code>(_script (eql han))</code> 来检查，如果符合，
+就用中文的方法显示名字。
+</p>
+
+<p>
+如果没有 <code>:extra</code> 方法，这个用于国际化字符串的方法会完全覆盖主要方法，要实现同
+样的效果就要增加不少复杂性。
+</p>
+
+<p>
+<code>ebdb-chn.el</code> 定义了不少其它多语言化的方法，比如汉字被记录为拼音，之后用户可以
+直接用拼音来检索。
+</p>
+
+<p>
+以及还有一些针对国际区号和国家名称缩写（<a href="https://en.wikipedia.org/wiki/ISO_3166-1_alpha-3">ISO 3166-1 alpha 3</a>）的方法。
+</p>
+</div>
+</div>
+
+<div id="outline-container-org6c48e72" class="outline-2">
+<h2 id="org6c48e72"><span class="section-number-2">7</span> 现有问题</h2>
+<div class="outline-text-2" id="text-7">
+<blockquote>
+<p>
+Apart from bird’s-nests of :around methods, I’ve found two other ways to make
+yourself miserable with generic methods. One is combinatorial explosion: if
+you have a method that dispatches on three arguments, and each argument has
+three potential values, you may be writing 27 different method definitions.
+Obviously one tries to avoid this, but sometimes it creeps up on you. EBDB’s
+formatting routines come close to drowning in this way – I suspect the whole
+formatting system is overengineered.
+</p>
+
+<p>
+The system’s other weakness is a byproduct of its strength: you don’t know
+where code is defined. The same flexibility that allows you to alter
+fundamental object behavior by defining new methods outside the codebase means
+that you don’t necessarily know where those definitions are.
+</p>
+
+<p>
+The original BBDB code “did polymorphism” the way that most Elisp code does
+polymorphism: with great big cond branches. This has the disadvantage that
+every function needs to be aware of every type of object it might encounter.
+But it has the advantage that everything is right there where you can see it
+(and it almost certainly goes faster).
+</p>
+
+<p>
+There’s not much to be done about this, it’s a trade-off that has to be
+accepted. Emacs’ self-documenting features do an okay job of showing you all
+the implementations of a particular method, but that’s all the help you get.
+Otherwise you need to keep your code under control, not pile the methods up
+too high, and always know where your towel is.
+</p>
+
+<p>
+I think it’s worth it.
+</p>
+</blockquote>
+<p>
+除了 <code>:around</code> 方法导致的困惑，我发现还有两个糟糕的地方，一个是组合爆炸：如果
+你有一个对三个参数传递消息的方法， 每个参数可能有三种类型，你可能就需要写 27
+个不同的方法。当然这是可以稍微避免的。但是 EBDB 的格式化功能的结构就出现了这样
+的情况&#x2013;我怀疑可能有点设计过度了。
+</p>
+
+<p>
+以及面向对象系统带来的副作用：你不知道代码的定义到底在哪里。不过你可能不需要了
+解定义在哪里就能改变方法的行为。
+</p>
+
+<p>
+原本的 BBDB 代码和传统的 ELisp 代码一样，通过大量的条件分支来处理多种情况。这
+导致了每个函数都要考虑到可能接收到的参数类型，但是你可以清楚地知道发生了什么
+（以及这样能提升运行速度）。
+</p>
+
+<p>
+这方面能做的改进不多，毕竟这是两者间的平衡。Emacs 的文档功能能正确定位具体方法
+的定义，但也只能做的这么多。另外你也需要对自己的代码进行控制，不要滥用面向对象
+方法。
+</p>
+
+<p>
+我觉得这样是值得的。
+</p>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2019-04-26</span>
+            <span title="last modification date" class="post-info">2017-06-16</span>
+            <span title="tags" class="post-info">:N/A:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-c7de1c50-88ed-412e-ae70-62694dd7dea5">LdBeth</a></span>
+        </div>
+    <script src="/media/js/jquery-2.1.3.min.js"></script>
+        <section>
+            <h1>Comments</h1>
+            <div id="comment-wrap">
+                    <a class="disqus_label">使用 Disqus 评论</a>
+    </ul>
+        <div id="disqus_thread"></div>
+        <script type="text/javascript">
+         //var disqus_developer = 1;
+         var preempt_signal=false;
+         var disqus_identifier = "/blog/2019/04/26/bbdb-on-eieio---emacs-lisp-面向对象编程简介/";
+         var disqus_url = "https://lujun9972.github.io/emacs-document/blog/2019/04/26/bbdb-on-eieio---emacs-lisp-面向对象编程简介/";
+         var disqus_shortname = 'emacs-document';
+         /* * * DON'T EDIT BELOW THIS LINE * * */
+         (function() {
+             var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+             dsq.src = 'https://' + disqus_shortname + '.disqus.com/embed.js';
+             (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+             $('#disqus_thread').css('display','none');
+         })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+    <script>
+     /* comments */
+     var ego_disqus_thread=$('#disqus_thread');
+     var ego_ds_label=$('.ds-thread');
+     $('.disqus_label').click(function(){
+         ego_disqus_thread.show();
+         ego_ds_label.hide();
+     });
+     $('.ds-label').click(function(){
+         ego_disqus_thread.hide();
+         ego_ds_label.show();
+     });
+    </script>
+        </section>
+    <script src="/media/js/main.js"></script>
+        <script type="text/javascript">
+         var _gaq = _gaq || [];
+         _gaq.push(['_setAccount', '7bac4fd0247f69c27887e0d4e3aee41e']);
+         _gaq.push(['_trackPageview']);
+         (function() {
+             var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+             ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+             var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-c7de1c50-88ed-412e-ae70-62694dd7dea5">LdBeth</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="//instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>

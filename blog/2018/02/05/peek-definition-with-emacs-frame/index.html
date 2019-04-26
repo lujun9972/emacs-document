@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Peek definition with Emacs frame - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="raw" />
+  <style>
+   #ds-thread #ds-reset .ds-comment-body p {color: #ffffff;}
+   #ds-thread #ds-reset .ds-comment-body p a {color: #ff0;}
+   #ds-thread #ds-reset .ds-comment-body p a:hover {color: #0ff;}
+   #disqus_thread a {color: #00ffff;}
+  </style>
+  <link rel="stylesheet" href="/media/css/main.css" type="text/css"/>
+  <link rel="stylesheet" href="/media/css/comment.css" type="text/css"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="/">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <div class="menu-icon">
+        <svg viewBox="0 0 18 15">
+          <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.031C17.335,0,18,0.665,18,1.484L18,1.484z" fill="#ffff00"/>
+          <path d="M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0c0-0.82,0.665-1.484,1.484-1.484 h15.031C17.335,6.031,18,6.696,18,7.516L18,7.516z" fill="#ffff00"/>
+          <path d="M18,13.516C18,14.335,17.335,15,16.516,15H1.484C0.665,15,0,14.335,0,13.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.031C17.335,12.031,18,12.696,18,13.516L18,13.516z" fill="#ffff00"/>
+        </svg>
+      </div>
+      <ul class="trigger">
+        <li><a href="/years/">Years</a></li>
+        <li><a href="/authors/">Authors</a></li>
+        <li><a href="/tags/">Tags</a></li>
+        <li><a href="/about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="/rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="http://www.google.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">Peek definition with Emacs frame</h1>
+<p>
+In many IDEs, peek definition is a feature that opens a definition (of a function, a class, a
+symbol, etc) in a popup window without leaving the current buffer. Most of the time, jumping
+into a definition, then jump back, is enough, so why bother leaving the current buffer to
+reload a whole new buffer, then go back for another reload. This is distracting. 
+</p>
+
+<p>
+An example of peek definition: 
+</p>
+
+<p>
+<a href="http://tuhdo.github.io/static/peek-definition-vs.png">peek-definition-vs.png</a>
+(Source: Microsoft) 
+</p>
+
+<p>
+I already searched for an alternative in Emacs, but apparently, all the solutions that involve a
+popup is slow and lacking. The space for displaying text is limited, and there is no font
+locking. You can't even search, or if it does, search is difficult and slow. 
+</p>
+
+<p>
+Recently, while jumping around code definitions, I lost track of the original buffer I start the
+jump chain, e.g. I started at file1.c, then jumped to file2.c, file3.h, file4.c, and so on, until I
+forgot that I started at file1.c (file1.c can be a long and hard to remember name). It makes
+me want to do this whole code hopping process in another separated frame/buffer instead of
+messing with my current buffer. I tried improved the process: 
+</p>
+
+<p>
+,* Using a different buffer: Initially, I create another buffer and start from there. However,
+ it is usually the case that the other buffer is also a useful buffer. 
+,* Using a different workspace: I am using <a href="https://github.com/wasamasa/eyebrowse">eyebrowse</a>, a package that can create a whole
+ new workspace and save the previous window configuration as another workspace.
+ Effectively, you can switch between different window configurations with ease. This
+ solution quickly becomes cumbersome, because I must remember which workspace is for
+ browsing code, not to mention it is quite common for me to create 5 other workspaces for
+ other purposes. It quickly becomes a burden to manage the workspaces. 
+</p>
+
+<p>
+It is at this point that I suddenly remember frames. That's right, Emacs frames! It is perfect
+for this use case. I can do whatever I want in this frame, and when done, simply close it with
+C-x 5 0. With frames, the number of my workspaces (using eyebrowse) is kept at a
+manageable number. 
+</p>
+
+<p>
+But wait, if an Emacs frame is small enough, isn't it the same as a popup window, but with
+every feature of a buffer (syntax highlighting, code jumping, etc) available? Not to mention,
+making a frame is much more lightweight than other popup solutions. 
+</p>
+
+<p>
+At this point, implementing a peek definition in Emacs is simply automating these steps: 
+</p>
+
+<p>
+1 Find the absolute position of the current beginning of the symbol at point, in pixels. 
+2 Create a new invisible frame, with the current buffer in it. 
+3 Position the new frame right under the beginning of the symbol at point. 
+4 Jump to the symbol at point. 
+5 Make frame visible again. 
+</p>
+
+<p>
+That's all for a peek definition popup: 
+</p>
+
+<p>
+<a href="http://tuhdo.github.io/static/peek-definition-emacs.gif">peek-definition-emacs.gif</a>
+</p>
+
+<p>
+In the example, I used rtags-find-symbol-at-point function for jumping. But you can use any
+function that finds a definition, as long as it jumps to a buffer. Finally, here is the code: 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">rtags-peek-definition</span> ()
+  <span style="font-style: italic;">"Peek at definition at point using rtags."</span>
+  (<span style="font-weight: bold;">interactive</span>)
+  (<span style="font-weight: bold;">let</span> ((func (<span style="font-weight: bold;">lambda</span> ()
+                (rtags-find-symbol-at-point)
+                (rtags-location-stack-forward))))
+    (rtags-start-process-unless-running)
+    (make-peek-frame func)))
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">make-peek-frame</span> (find-definition-function <span style="font-weight: bold; text-decoration: underline;">&amp;rest</span> args)
+  <span style="font-style: italic;">"Make a new frame for peeking definition"</span>
+  (<span style="font-weight: bold;">when</span> (<span style="font-weight: bold;">or</span> (not (rtags-called-interactively-p)) (rtags-sandbox-id-matches))
+    (<span style="font-weight: bold;">let</span> (summary
+          doc-frame
+          x y
+          <span style="font-weight: bold; font-style: italic;">;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;</span>
+          <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">1. Find the absolute position of the current beginning of the symbol at point, ;;</span>
+          <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">in pixels.                                                                     ;;</span>
+          <span style="font-weight: bold; font-style: italic;">;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;</span>
+          (abs-pixel-pos (<span style="font-weight: bold;">save-excursion</span>
+                           (beginning-of-thing 'symbol)
+                           (window-absolute-pixel-position))))
+      (<span style="font-weight: bold;">setq</span> x (car abs-pixel-pos))
+      <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">(setq y (cdr abs-pixel-pos))</span>
+      (<span style="font-weight: bold;">setq</span> y (+ (cdr abs-pixel-pos) (frame-char-height)))
+
+      <span style="font-weight: bold; font-style: italic;">;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;</span>
+      <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">2. Create a new invisible frame, with the current buffer in it. ;;</span>
+      <span style="font-weight: bold; font-style: italic;">;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;</span>
+      (<span style="font-weight: bold;">setq</span> doc-frame (make-frame '((minibuffer . nil)
+                                    (name . <span style="font-style: italic;">"*RTags Peek*"</span>)
+                                    (width . 80)
+                                    (visibility . nil)
+                                    (height . 15))))
+
+      <span style="font-weight: bold; font-style: italic;">;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;</span>
+      <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">3. Position the new frame right under the beginning of the symbol at point. ;;</span>
+      <span style="font-weight: bold; font-style: italic;">;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;</span>
+      (set-frame-position doc-frame x y)
+
+      <span style="font-weight: bold; font-style: italic;">;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;</span>
+      <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">4. Jump to the symbol at point. ;;</span>
+      <span style="font-weight: bold; font-style: italic;">;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;</span>
+      (<span style="font-weight: bold;">with-selected-frame</span> doc-frame
+        (apply find-definition-function args)
+        (read-only-mode)
+        (<span style="font-weight: bold;">when</span> semantic-stickyfunc-mode (semantic-stickyfunc-mode -1))
+        (recenter-top-bottom 0))
+
+      <span style="font-weight: bold; font-style: italic;">;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;</span>
+      <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">5. Make frame visible again ;;</span>
+      <span style="font-weight: bold; font-style: italic;">;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;</span>
+      (make-frame-visible doc-frame))))
+</pre>
+</div>
+
+<p>
+Then, bind the new command to a key and try it out: 
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(global-set-key (kbd <span style="font-style: italic;">"C-c p"</span>) 'rtags-peek-definition)
+</pre>
+</div>
+
+<p>
+To close the peek frame, simply use C-x 5 0 (runs delete-frame command). You can bind it to
+another key to close frame easier, e.g. f12 key. 
+</p>
+
+<p>
+The more I use Emacs, the more I start realizing how useful frames are. Especially with
+Emacs 26 onward, there is an option to remove a frame from OS taskbar, effectively you
+cannot use Alt+Tab to switch to any child frame created in Emacs. With this feature, you can
+create many Emacs frames without creating a mess that renders Alt+tab unusable. Perhaps
+it is the time to embrace the frames. 
+</p>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2018-02-05</span>
+            <span title="last modification date" class="post-info">2018-02-05</span>
+            <span title="tags" class="post-info">:<a href="/tags/raw">raw</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-c7de1c50-88ed-412e-ae70-62694dd7dea5">lujun9972</a></span>
+        </div>
+    <script src="/media/js/jquery-2.1.3.min.js"></script>
+        <section>
+            <h1>Comments</h1>
+            <div id="comment-wrap">
+                    <a class="disqus_label">使用 Disqus 评论</a>
+    </ul>
+        <div id="disqus_thread"></div>
+        <script type="text/javascript">
+         //var disqus_developer = 1;
+         var preempt_signal=false;
+         var disqus_identifier = "/blog/2018/02/05/peek-definition-with-emacs-frame/";
+         var disqus_url = "https://lujun9972.github.io/emacs-document/blog/2018/02/05/peek-definition-with-emacs-frame/";
+         var disqus_shortname = 'emacs-document';
+         /* * * DON'T EDIT BELOW THIS LINE * * */
+         (function() {
+             var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+             dsq.src = 'https://' + disqus_shortname + '.disqus.com/embed.js';
+             (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+             $('#disqus_thread').css('display','none');
+         })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+    <script>
+     /* comments */
+     var ego_disqus_thread=$('#disqus_thread');
+     var ego_ds_label=$('.ds-thread');
+     $('.disqus_label').click(function(){
+         ego_disqus_thread.show();
+         ego_ds_label.hide();
+     });
+     $('.ds-label').click(function(){
+         ego_disqus_thread.hide();
+         ego_ds_label.show();
+     });
+    </script>
+        </section>
+    <script src="/media/js/main.js"></script>
+        <script type="text/javascript">
+         var _gaq = _gaq || [];
+         _gaq.push(['_setAccount', '7bac4fd0247f69c27887e0d4e3aee41e']);
+         _gaq.push(['_trackPageview']);
+         (function() {
+             var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+             ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+             var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-c7de1c50-88ed-412e-ae70-62694dd7dea5">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="//instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>

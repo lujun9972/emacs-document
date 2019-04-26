@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Marcin Borkowski: 2018-11-03 A few remarks about defining minor modes - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="raw" />
+  <style>
+   #ds-thread #ds-reset .ds-comment-body p {color: #ffffff;}
+   #ds-thread #ds-reset .ds-comment-body p a {color: #ff0;}
+   #ds-thread #ds-reset .ds-comment-body p a:hover {color: #0ff;}
+   #disqus_thread a {color: #00ffff;}
+  </style>
+  <link rel="stylesheet" href="/media/css/main.css" type="text/css"/>
+  <link rel="stylesheet" href="/media/css/comment.css" type="text/css"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="/">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <div class="menu-icon">
+        <svg viewBox="0 0 18 15">
+          <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.031C17.335,0,18,0.665,18,1.484L18,1.484z" fill="#ffff00"/>
+          <path d="M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0c0-0.82,0.665-1.484,1.484-1.484 h15.031C17.335,6.031,18,6.696,18,7.516L18,7.516z" fill="#ffff00"/>
+          <path d="M18,13.516C18,14.335,17.335,15,16.516,15H1.484C0.665,15,0,14.335,0,13.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.031C17.335,12.031,18,12.696,18,13.516L18,13.516z" fill="#ffff00"/>
+        </svg>
+      </div>
+      <ul class="trigger">
+        <li><a href="/years/">Years</a></li>
+        <li><a href="/authors/">Authors</a></li>
+        <li><a href="/tags/">Tags</a></li>
+        <li><a href="/about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="/rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="http://www.google.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">Marcin Borkowski: 2018-11-03 A few remarks about defining minor modes</h1>
+<p>
+Today's post is extremely technical and niche, but I just wanted to share an interesting story I had a few days ago.
+</p>
+
+<p>
+So I have this minor mode I defined, using the classical construction:<br />
+</p>
+
+<pre class="example">
+(defun cool-start ()
+ "Start the cool-mode.")
+
+(defun cool-stop ()
+ "Stop the cool-mode.")
+
+(define-minor-mode my-cool-minor-mode
+ "Toggle a mode for doing cool stuff."
+ :init-value nil
+ :lighter " 8-)"
+ (if my-cool-minor-mode
+ (cool-start)
+ (cool-stop)))
+</pre>
+
+<p>
+What I wanted to know is whether I could use the prefix argument to decide what to do when starting the mode. This seems a bit risky, since the prefix argument is already used to turn the mode on or off.
+</p>
+
+<p>
+Actually, the documentation is a bit misleading on the treatment of the argument to <code>my-cool-minor-mode</code> command. Here an excerpt from what the Emacs manual says:
+</p>
+
+<ul class="org-ul">
+<li>If you invoke the mode command directly with no prefix argument (either via ‘M-x', or by binding it to a key and typing that key [...]), that “toggles” the minor mode. The minor mode is turned on if it was off, and turned off if it was on.</li>
+<li>If you invoke the mode command with a prefix argument, the minor mode is unconditionally turned off if that argument is zero or negative; otherwise, it is unconditionally turned on.</li>
+<li>If the mode command is called via Lisp, the minor mode is unconditionally turned on if the argument is omitted or ‘nil'. This makes it easy to turn on a minor mode from a major mode's mode hook [...]. A non-‘nil' argument is handled like an interactive prefix argument, as described above.</li>
+</ul>
+
+<p>
+And here is a quote from the Elisp manual:
+</p>
+
+<p>
+The toggle command takes one optional (prefix) argument. If called interactively with no argument it toggles the mode on or off. A positive prefix argument enables the mode, any other prefix argument disables it. From Lisp, an argument of ‘toggle' toggles the mode, whereas an omitted or ‘nil' argument enables the mode. This makes it easy to enable the minor mode in a major mode hook, for example. If DOC is ‘nil', the macro supplies a default documentation string explaining the above.
+</p>
+
+<p>
+As you can see, from the Elisp manual it is not entirely clear whether you can supply numeric arguments from your code (obviously, you can't supply a <code>'toggle</code> argument interactively).
+</p>
+
+<p>
+It turns out that the <code>define-minor-mode</code> macro defines the function responsible for turning the mode on and off, and does it in a pretty complicated way.
+</p>
+
+<p>
+First of all, the macro contains this snippet:<br />
+</p>
+
+<pre class="example">
+(interactive (list (or current-prefix-arg 'toggle)))
+</pre>
+
+<p>
+which means that no argument (when called interactively) is precisely equivalent to an argument of <code>'toggle</code>.
+</p>
+
+<p>
+One of the next things that follow is this trick:<br />
+</p>
+
+<pre class="example">
+(,@setter
+ (if (eq arg 'toggle)
+ (not ,getter)
+ ;; A nil argument also means ON now.
+ (&gt; (prefix-numeric-value arg) 0)))
+</pre>
+
+<p>
+Earlier, <code>define-minor-mode</code> sets <code>setter</code> to <code>(setq &lt;mode-name&gt;)</code> and <code>getter</code> to just <code>&lt;mode-name&gt;</code>. This is quite clever: <code>getter</code> is just the variable named after the mode, and <code>setter</code> is the beginning of the Elisp form setting that variable to some value. (In case you think this is too much abstraction, let me tell you that my account is a bit simplified: for global modes, for instance, both <code>setter</code> and <code>getter</code> are a bit different.)
+</p>
+
+<p>
+As you can see from the trick above, my initial problem has an easy answer: yes, we can supply numerical arguments in Elisp code, in fact, supplying a negative argument is the only way to turn the mode off programmatically.
+</p>
+
+<p>
+Knowing this, we may now tackle the initial question. Since any positive prefix argument means “turn the mode on”, can we use its actual value to do various stuff?
+</p>
+
+<p>
+The answer is (of course) yes. We may do one of two things. First of all, our mode's body may inspect <code>current-prefix-arg</code>. We also have another option, which is using <code>arg</code>. (This is what <code>define-minor-mode</code> macro calls the argument to the newly defined toggling function.) The latter is obviously much less clean (especially since it depends on an implementation detail that might be changed in another Emacs version), so let's forget about it. (Actually, instead of using the <code>arg</code> symbol, it would probably be better to use something like Common Lisp's <code>gensym</code>. Elisp does not have such a function. The <code>cl</code> package has <code>cl-gensym</code>, but understandably built-in features do not rely on <code>cl</code>.)
+</p>
+
+<p>
+But this is not the end of the story. There are quite a few keyword arguments of <code>define-minor-mode</code> not mentioned in the docstring nor in the manual, and one of them is <code>:extra-args</code>. (Funny sidenote: this <code>:extra-args</code> keyword is only mentioned three times in the whole Emacs sources. One is the definition, which (according to <code>git blame</code>) is last touched by Stefan Monnier on 2012-06-10. The second one is in the <code>use-hard-newlines</code> minor mode, last touched by Stefan Monnier on 2001-10-30. The third one is commented out in <code>global-font-lock-mode</code>, with a commentary saying<br />
+What was this :extra-args thingy for? --Stef<br />
+last touched on 2009-09-13, by guess who.)
+</p>
+
+<p>
+Here is how you can use it. The value after the <code>:extra-args</code> keyword should be an (unqouted) list which is just appended to the first argument of the function turning the mode on (i.e., the one which is the prefix argument when the mode command is called interactively). All these arguments (including the first one) are optional, and you can't supply the <code>:extra-args</code> on an interactive call. You can, however, supply them from Elisp code. Here is an example.
+</p>
+
+<pre class="example">
+(define-minor-mode my-cool-minor-mode
+ "Toggle a mode for doing cool stuff."
+ :init-value nil
+ :lighter " 8-)"
+ :extra-args (cool-arg-1 cool-arg-2)
+ (if my-cool-minor-mode
+ (progn
+    (cool-start)
+    (message "cool-arg-1: %s, cool-arg-2: %s" cool-arg-1 cool-arg-2))
+ (cool-stop)))
+</pre>
+
+<p>
+Try saying e.g. <code>M-: (my-cool-minor-mode 1 "this")</code> to see how <code>cool-arg-1</code> becomes <code>"this"</code> and <code>cool-arg-2</code> becomes nil.
+</p>
+
+<p>
+The last interesting tidbit I have about <code>define-minor-mode</code> is the default message of <code>My-Cool minor mode enabled in current buffer</code>. I noticed that when I put the <code>message</code> function in the mode starting code, this message stopped appearing. To understand why, at first I grepped the Emacs sources for the words “enabled” (2774 hits) and “disabled” (1324 hits). Hmmm. Then, I <a href="http://mbork.pl/2016-05-15_debug-on-whatever">recalled</a> the <code>debug-on-message</code> variable, and it turned out that my grepping was useless anyway. Here's the thing (simplified a bit):<br />
+</p>
+
+<pre class="example">
+(message
+ "Some-mode %sabled"
+ (if mode-variable "en" "dis"))
+</pre>
+
+<p>
+Well, that made me cringe (especially that I have to deal a bit with i18n of software), but I admit that it is sweet in a way.
+</p>
+
+<p>
+What's more interesting is that the “enabled/disabled” message is indeed turned off if the code responsible for initializing (or shutting down) the mode provides its own <code>message</code>. This is done with the help of the <code>current-message</code> function, which returns whatever is currently shown in the echo area.
+</p>
+
+<p>
+All in all, I only touched the surface. It you head to the file <code>easy-mmode.el</code> where all this code resides, you will find quite a few niceties (like about a dozen lines of code of the function <code>easy-mmode-pretty-mode-name</code> devoted only to the task of converting the symbol for the mode to a human-friendly version, using the mode lighter to infer capitalization!). This is yet another example of Emacs developers paying immense attention to details, even if there are a few questionable practices along the way. <img src="http://mbork.pl/smileys/24/mb-wink.gif" alt="mb-wink.gif" />
+</p>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2018-12-10</span>
+            <span title="last modification date" class="post-info">2018-12-10</span>
+            <span title="tags" class="post-info">:<a href="/tags/raw">raw</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-c7de1c50-88ed-412e-ae70-62694dd7dea5">lujun9972</a></span>
+        </div>
+    <script src="/media/js/jquery-2.1.3.min.js"></script>
+        <section>
+            <h1>Comments</h1>
+            <div id="comment-wrap">
+                    <a class="disqus_label">使用 Disqus 评论</a>
+    </ul>
+        <div id="disqus_thread"></div>
+        <script type="text/javascript">
+         //var disqus_developer = 1;
+         var preempt_signal=false;
+         var disqus_identifier = "/blog/2018/12/10/marcin-borkowski-2018-11-03-a-few-remarks-about-defining-minor-modes/";
+         var disqus_url = "https://lujun9972.github.io/emacs-document/blog/2018/12/10/marcin-borkowski-2018-11-03-a-few-remarks-about-defining-minor-modes/";
+         var disqus_shortname = 'emacs-document';
+         /* * * DON'T EDIT BELOW THIS LINE * * */
+         (function() {
+             var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+             dsq.src = 'https://' + disqus_shortname + '.disqus.com/embed.js';
+             (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+             $('#disqus_thread').css('display','none');
+         })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+    <script>
+     /* comments */
+     var ego_disqus_thread=$('#disqus_thread');
+     var ego_ds_label=$('.ds-thread');
+     $('.disqus_label').click(function(){
+         ego_disqus_thread.show();
+         ego_ds_label.hide();
+     });
+     $('.ds-label').click(function(){
+         ego_disqus_thread.hide();
+         ego_ds_label.show();
+     });
+    </script>
+        </section>
+    <script src="/media/js/main.js"></script>
+        <script type="text/javascript">
+         var _gaq = _gaq || [];
+         _gaq.push(['_setAccount', '7bac4fd0247f69c27887e0d4e3aee41e']);
+         _gaq.push(['_trackPageview']);
+         (function() {
+             var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+             ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+             var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-c7de1c50-88ed-412e-ae70-62694dd7dea5">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="//instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>

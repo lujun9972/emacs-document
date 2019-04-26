@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Searching A Million Lines Of Lisp - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="raw" />
+  <style>
+   #ds-thread #ds-reset .ds-comment-body p {color: #ffffff;}
+   #ds-thread #ds-reset .ds-comment-body p a {color: #ff0;}
+   #ds-thread #ds-reset .ds-comment-body p a:hover {color: #0ff;}
+   #disqus_thread a {color: #00ffff;}
+  </style>
+  <link rel="stylesheet" href="/media/css/main.css" type="text/css"/>
+  <link rel="stylesheet" href="/media/css/comment.css" type="text/css"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="/">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <div class="menu-icon">
+        <svg viewBox="0 0 18 15">
+          <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.031C17.335,0,18,0.665,18,1.484L18,1.484z" fill="#ffff00"/>
+          <path d="M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0c0-0.82,0.665-1.484,1.484-1.484 h15.031C17.335,6.031,18,6.696,18,7.516L18,7.516z" fill="#ffff00"/>
+          <path d="M18,13.516C18,14.335,17.335,15,16.516,15H1.484C0.665,15,0,14.335,0,13.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.031C17.335,12.031,18,12.696,18,13.516L18,13.516z" fill="#ffff00"/>
+        </svg>
+      </div>
+      <ul class="trigger">
+        <li><a href="/years/">Years</a></li>
+        <li><a href="/authors/">Authors</a></li>
+        <li><a href="/tags/">Tags</a></li>
+        <li><a href="/about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="/rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="http://www.google.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">Searching A Million Lines Of Lisp</h1>
+<div id="table-of-contents">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#searching-a-million-lines-of-lisp">Searching A Million Lines Of Lisp</a>
+<ul>
+<li><a href="#parsing">Parsing</a></li>
+<li><a href="#analysing">Analysing</a></li>
+<li><a href="#performance">Performance</a></li>
+<li><a href="#display">Display</a></li>
+<li><a href="#wrap-up">Wrap-Up</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-orga7a62ce" class="outline-2">
+<h2 id="searching-a-million-lines-of-lisp"><a id="orga7a62ce"></a>Searching A Million Lines Of Lisp</h2>
+<div class="outline-text-2" id="text-searching-a-million-lines-of-lisp">
+<p>
+<br />
+</p>
+
+<p>
+9 minute read
+</p>
+
+<p>
+Time for another Emacs adventure!
+</p>
+
+<p>
+In Emacs today, there's no way to find all the callers of a function
+or macro. Most Emacsers just grab their favourite text search tool.
+Sadly, dumb text search knows nothing of syntax.
+</p>
+
+<p>
+We can do better. It just wouldn't be Emacs without a little fanatical
+tool building. Let's make this happen.
+</p>
+</div>
+
+<div id="outline-container-org4edb75c" class="outline-3">
+<h3 id="parsing"><a id="org4edb75c"></a>Parsing</h3>
+<div class="outline-text-3" id="text-parsing">
+<p>
+Everyone know how to parse lisp, right? It's just <code>read</code>.
+</p>
+
+<p>
+It turns out that a homoiconic language is hard to parse when you want
+to know where you found the code in the first place. In a language
+with a separate AST, the AST type includes file positions. In
+lisp, you just have... a list. No frills.
+</p>
+
+<p>
+I briefly explored writing my own parser before coming to my
+senses. Did you know the following is legal elisp?
+</p>
+
+<pre class="example">
+;; Variables can start with numbers:
+(let ((0x0 1))
+ ;; And a backquote does not have to immediately precede the
+ ;; expression it's quoting:
+ `
+ ;; foo
+ (+ ,0x0))
+</pre>
+
+<p>
+Cripes.
+</p>
+
+<p>
+Anyway, I totally ripped off was inspired by similar functionality
+in <a href="https://elpa.gnu.org/packages/el-search.html">el-search</a>. <code>read</code>
+moves point to the end of the expression read, and you can use
+<code>scan-sexps</code> to find the beginning. Using this technique
+recursively, you can find the position of every form in a file.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org596753a" class="outline-3">
+<h3 id="analysing"><a id="org596753a"></a>Analysing</h3>
+<div class="outline-text-3" id="text-analysing">
+<p>
+OK, we've parsed our code, preserving positions. Which forms actually
+look like function calls?
+</p>
+
+<p>
+This requires a little thought. Here are some tricky examples:
+</p>
+
+<pre class="example">
+;; Not references to `foo' as a function.
+(defun some-func (foo))
+(lambda (foo))
+(let (foo))
+(let ((foo)))
+
+;; Calls to `foo'.
+(foo)
+(lambda (x) (foo))
+(let (x) (foo))
+(let ((x (foo))) (foo))
+(funcall 'foo)
+;; Not necessarily a call, but definitely a reference to 
+;; the function `foo'.
+(a-func #'foo)
+</pre>
+
+<p>
+We can't simply walk the list: <code>(foo)</code> may or may not be a function
+call, depending on context. To model context, we build a ‘path' that
+describes the contextual position of the current form.
+</p>
+
+<p>
+A path is just a list that shows the first element of all the
+enclosing forms, plus our position within it. For example, given the
+code <code>(let (x) (bar) (setq x (foo)))</code>, we build a path <code>((setq . 2) (let . 3))</code> when looking at the <code>(foo)</code>.
+</p>
+
+<p>
+This gives us enough context to recognise function calls in normal
+code. “Aha!”, says the experienced lisper. “What about macros?”
+</p>
+
+<p>
+Well, elisp-refs understands a few common macros. Most macros just
+evaluate most of their arguments. This means we can just walk the
+form and spot most function calls.
+</p>
+
+<p>
+This isn't perfect, but it works very well in practice. We also
+provide an <code>elisp-refs-symbol</code> command that finds all references to a
+symbol, regardless of its position in forms.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgcacaa6c" class="outline-3">
+<h3 id="performance"><a id="orgcacaa6c"></a>Performance</h3>
+<div class="outline-text-3" id="text-performance">
+<p>
+It turns out that Emacs has a <b>ton</b> of elisp. My current instance
+has loaded three quarters of a million lines of code. Emacs actually
+lazily loads files, so that's only the functionality that I use!
+</p>
+
+<p>
+So, uh, a little optimisation was needed. I wrote a benchmark script
+and learnt how to make elisp fast.
+</p>
+
+<p>
+Firstly, <b>avoid doing work</b>. elisp-refs needs to calculate form
+positions, so users can jump to the file at the correct
+location. However, if a form doesn't contain any matches, we don't
+need to do this expensive calculation at all.
+</p>
+
+<p>
+Secondly, <b>find shortcuts</b>. Emacs has a little-known variable
+called <code>read-with-symbol-positions</code>. This variable reports all the
+symbols read when parsing a form. If we're looking for function calls
+to <code>some-func</code>, and there's no reference to the symbol <code>some-func</code>, we
+can skip that form entirely.
+</p>
+
+<p>
+Thirdly, <b>use C functions</b>. CS algorithms says that building a hash
+map gives you fast lookup. In elisp-refs, we use <code>assoc</code> with small
+alists, because C functions are fast and most lists weren't big enough
+to benefit from the O(1) lookup.
+</p>
+
+<p>
+Fourthly, <b>write impure functions</b>. Elisp provides various ways to
+preserve the state of the current buffer, particularly
+<code>save-excursion</code> and <code>with-current-buffer</code>. This bookkeeping is
+expensive, so elisp-refs just creates its own temporary buffers and
+dirties them.
+</p>
+
+<p>
+When all else fails, <b>cheat</b>. elisp-refs reports its progress, which
+doesn't make it faster, but it certainly feels like it.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgbb1f669" class="outline-3">
+<h3 id="display"><a id="orgbb1f669"></a>Display</h3>
+<div class="outline-text-3" id="text-display">
+<p>
+We have something that works, and we can search in all the code in in
+the current Emacs instance in less than 10 seconds. How do we display
+results?
+</p>
+
+<p>
+<img src="file:///assets/refs_proto.png" alt="refs_proto.png" />
+first prototype, showing the matching forms in isolation
+</p>
+
+<p>
+Initially, I just displayed each form in the results buffer. It turns
+out that the context is useful, so added the rest of the matching lines
+too. To avoid confusion, I underlined the section of the code that
+matched the search.
+</p>
+
+<p>
+<img src="file:///assets/refs_proto2.png" alt="refs_proto2.png" />
+second prototype, adding context and custom faces
+</p>
+
+<p>
+The second prototype also had some custom faces for styling. This was
+an improvement, but it forces all Emacs theme authors to add support
+for the faces defined in our package.
+</p>
+
+<p>
+It still didn't work as well as I'd hoped. When I get stuck with UI,
+I ask ‘what would magit do?'. I decided that magit would take
+advantage of existing Emacs faces.
+</p>
+
+<p>
+<img src="file:///assets/refs_screenshot.png" alt="refs_screenshot.png" />
+final UI, using normal syntax highlighting
+</p>
+
+<p>
+The final version uses standard elisp highlighting, but highlights the
+surrounding context as comments. This means it will match your
+favourite colour scheme, and new users should find the UI familiar.
+</p>
+
+<p>
+I added a few other flourishes too. You can see that results in the
+second prototype were often very indented. The final version unindents
+each result, to make the matches easier to read quickly.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org60bf51f" class="outline-3">
+<h3 id="wrap-up"><a id="org60bf51f"></a>Wrap-Up</h3>
+<div class="outline-text-3" id="text-wrap-up">
+<p>
+elisp-refs is <a href="https://github.com/Wilfred/elisp-refs.el">available on GitHub</a>, <a href="http://melpa.org/#/elisp-refs">available on MELPA</a>, and it's ready for your use! Go forth, and search your elisp!
+</p>
+</div>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2018-12-28</span>
+            <span title="last modification date" class="post-info">2018-12-28</span>
+            <span title="tags" class="post-info">:<a href="/tags/raw">raw</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-c7de1c50-88ed-412e-ae70-62694dd7dea5">lujun9972</a></span>
+        </div>
+    <script src="/media/js/jquery-2.1.3.min.js"></script>
+        <section>
+            <h1>Comments</h1>
+            <div id="comment-wrap">
+                    <a class="disqus_label">使用 Disqus 评论</a>
+    </ul>
+        <div id="disqus_thread"></div>
+        <script type="text/javascript">
+         //var disqus_developer = 1;
+         var preempt_signal=false;
+         var disqus_identifier = "/blog/2018/12/28/searching-a-million-lines-of-lisp/";
+         var disqus_url = "https://lujun9972.github.io/emacs-document/blog/2018/12/28/searching-a-million-lines-of-lisp/";
+         var disqus_shortname = 'emacs-document';
+         /* * * DON'T EDIT BELOW THIS LINE * * */
+         (function() {
+             var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+             dsq.src = 'https://' + disqus_shortname + '.disqus.com/embed.js';
+             (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+             $('#disqus_thread').css('display','none');
+         })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+    <script>
+     /* comments */
+     var ego_disqus_thread=$('#disqus_thread');
+     var ego_ds_label=$('.ds-thread');
+     $('.disqus_label').click(function(){
+         ego_disqus_thread.show();
+         ego_ds_label.hide();
+     });
+     $('.ds-label').click(function(){
+         ego_disqus_thread.hide();
+         ego_ds_label.show();
+     });
+    </script>
+        </section>
+    <script src="/media/js/main.js"></script>
+        <script type="text/javascript">
+         var _gaq = _gaq || [];
+         _gaq.push(['_setAccount', '7bac4fd0247f69c27887e0d4e3aee41e']);
+         _gaq.push(['_trackPageview']);
+         (function() {
+             var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+             ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+             var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-c7de1c50-88ed-412e-ae70-62694dd7dea5">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="//instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>

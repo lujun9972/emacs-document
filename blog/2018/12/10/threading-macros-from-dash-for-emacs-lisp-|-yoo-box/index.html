@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>threading macros from dash for Emacs Lisp | Yoo Box - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="raw" />
+  <style>
+   #ds-thread #ds-reset .ds-comment-body p {color: #ffffff;}
+   #ds-thread #ds-reset .ds-comment-body p a {color: #ff0;}
+   #ds-thread #ds-reset .ds-comment-body p a:hover {color: #0ff;}
+   #disqus_thread a {color: #00ffff;}
+  </style>
+  <link rel="stylesheet" href="/media/css/main.css" type="text/css"/>
+  <link rel="stylesheet" href="/media/css/comment.css" type="text/css"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="/">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <div class="menu-icon">
+        <svg viewBox="0 0 18 15">
+          <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.031C17.335,0,18,0.665,18,1.484L18,1.484z" fill="#ffff00"/>
+          <path d="M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0c0-0.82,0.665-1.484,1.484-1.484 h15.031C17.335,6.031,18,6.696,18,7.516L18,7.516z" fill="#ffff00"/>
+          <path d="M18,13.516C18,14.335,17.335,15,16.516,15H1.484C0.665,15,0,14.335,0,13.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.031C17.335,12.031,18,12.696,18,13.516L18,13.516z" fill="#ffff00"/>
+        </svg>
+      </div>
+      <ul class="trigger">
+        <li><a href="/years/">Years</a></li>
+        <li><a href="/authors/">Authors</a></li>
+        <li><a href="/tags/">Tags</a></li>
+        <li><a href="/about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="/rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="http://www.google.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">threading macros from dash for Emacs Lisp | Yoo Box</h1>
+<div id="table-of-contents">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#sec-1">1. what are threading macros? where do they come from?</a></li>
+<li><a href="#sec-2">2. how to use the dash library</a></li>
+<li><a href="#sec-3">3. thread-first nesting and the thread-first macro</a></li>
+<li><a href="#sec-4">4. example uses of the thread-first macro</a></li>
+<li><a href="#sec-5">5. side note on fear of deeply nested forms</a></li>
+<li><a href="#sec-6">6. thread-last nesting and the thread-last macro</a></li>
+<li><a href="#sec-7">7. example uses of the thread-last macro</a></li>
+<li><a href="#sec-8">8. thread-middle macro</a></li>
+<li><a href="#sec-9">9. rewriting some deeply nested form as a serial binding</a></li>
+<li><a href="#sec-10">10. threading macros are more than serial binding</a></li>
+<li><a href="#sec-11">11. closing notes</a></li>
+<li><a href="#sec-12">12. optional reading</a>
+<ul>
+<li><a href="#sec-12-1">12.1. sum under reciprocal</a></li>
+<li><a href="#sec-12-2">12.2. art of minimizing use of thread-middle macro</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-orgaf3a6ff" class="outline-2">
+<h2 id="sec-1"><a id="orgaf3a6ff"></a>1. what are threading macros? where do they come from?</h2>
+<div class="outline-text-2" id="text-sec-1">
+<p>
+For example, what is this
+</p>
+
+<pre class="example">
+(-&gt; 2 (expt 0.2) (* 2017) sin) ; ⇒ -1.0
+</pre>
+
+<p>
+The Clojure language has some neat macros (such as <code>-&gt;</code> and <code>-&gt;&gt;</code>) which are called <i>threading macros</i> (nothing to do with <a href="http://en.wikipedia.org/wiki/Thread_(computing)">these threads</a>) which let you unwrap some types of deeply nested forms. The <a href="https://github.com/magnars/dash.el">dash library</a> for Emacs Lisp implements some of those threading macros. While I do not use threading macros in my elisp code, I know that elisp beginners would love using these macros, so I wrote this article.
+</p>
+
+<p>
+Prerequisites: Readers are <i>not</i> required to be familiar with Clojure or dash, but you are assumed to be able to install the dash library. Unwillingness to check the length of the word humuhumunukunukuapuaa by hand is required.
+</p>
+
+<p>
+Common Lisp Note: These threading macros can be defined in Common Lisp too. When you define them, don't forget that threading macros are more than just function call chaining. What I mean by that? I'll get to that soon.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgd7d1421" class="outline-2">
+<h2 id="sec-2"><a id="orgd7d1421"></a>2. how to use the dash library</h2>
+<div class="outline-text-2" id="text-sec-2">
+<p>
+After you install the dash library, you will have to put <code>(require 'dash)</code> somewhere in your init file. Where?
+</p>
+
+<p>
+You probably have something like the following two lines in your init file.
+</p>
+
+<pre class="example">
+(package-initialize)
+(setq package-enable-at-startup nil)
+</pre>
+
+<p>
+You want to make sure that the line <code>(require 'dash)</code> runs after <code>(package-initialize)</code> runs, but before any code that relies on functions or macros from the dash library runs. Simplest way to do that is to put <code>(require 'dash)</code> right after the package-initialize lines so that your init file code looks like:
+</p>
+
+<pre class="example">
+...
+
+(package-initialize)
+(setq package-enable-at-startup nil)
+
+(require 'dash)
+
+...
+</pre>
+</div>
+</div>
+
+<div id="outline-container-org79aecb9" class="outline-2">
+<h2 id="sec-3"><a id="org79aecb9"></a>3. thread-first nesting and the thread-first macro</h2>
+<div class="outline-text-2" id="text-sec-3">
+<p>
+Before we begin, let's talk about deeply nested forms.
+</p>
+
+<p>
+Let's start with:
+</p>
+
+<pre class="example">
+(f3 (f2 (f1 x c1 d1) c2 d2) c3 d3)
+</pre>
+
+<p>
+That is an f1 form within an f2 form within an f3 form. If f1, f2, f3 were functions (as opposed to macros), that could mean “take object x, apply f1 to it with additional arguments c1 and d1, then apply f2 to the result with additional arguments c2 and c2, then apply f3 to the result ...”.
+</p>
+
+<p>
+To help make your code more readable, you could write that form in multiple lines as:
+</p>
+
+<pre class="example">
+(f3 (f2 (f1 x
+ c1 d1)
+ c2 d2)
+ c3 d3)
+</pre>
+
+<p>
+or:
+</p>
+
+<pre class="example">
+(f3 (f2 (f1 x
+ c1
+ d1)
+ c2
+ d2)
+ c3
+ d3)
+</pre>
+
+<p>
+or in combination of both styles depending on which arguments are complex forms themselves.
+</p>
+
+<p>
+Alternatively, you can use the macro <code>-&gt;</code> (the “thread-first” macro from the dash library) to write this instead:
+</p>
+
+<pre class="example">
+(-&gt; x
+ (f1 c1 d1)
+ (f2 c2 d2)
+ (f3 c3 d3))
+</pre>
+</div>
+</div>
+
+<div id="outline-container-orgc961d84" class="outline-2">
+<h2 id="sec-4"><a id="orgc961d84"></a>4. example uses of the thread-first macro</h2>
+<div class="outline-text-2" id="text-sec-4">
+<p>
+There is a saying,”never date anyone under half your age plus seven”. Suppose you are a 200 year old turtle. You are not supposed to date turtles under age 107. You take the number 200, divide it by 2, then add 7, that's 107. You can compute that with this form which you must read inside-out:
+</p>
+
+<pre class="example">
+(+ (/ 200 2) 7)
+</pre>
+
+<p>
+You can also write the same computation using the <code>-&gt;</code> macro like this which you can read from left to right rather than inside-out:
+</p>
+
+<pre class="example">
+(-&gt; 200 (/ 2) (+ 7))
+</pre>
+
+<p>
+Some argue that writing an inside-out expression is unnatural for humans, but I heard from somewhere that the English expression “Sum the balance of all savings accounts” is a perfectly natural inside-out expression (inside-out from a procedural perspective). The threading macros (and serial binding forms that I will get to) give you choice: you can either write an inside-out expression or an expression to be read from left to right (or from top to bottom).
+</p>
+
+<p>
+You've seen an example of a <code>-&gt;</code> form that you read left to right. Now let's see an example that you read from top to bottom. The following code starts with a long list, then removes duplicates from the list, then removes 0s and 1s, and then sorts it.
+</p>
+
+<pre class="example">
+(-&gt; (list 9 9 9 1 0 1 0 3 3)
+ (cl-remove-duplicates)
+ (cl-set-difference (list 0 1))
+ (sort '&lt;))
+;; ⇒ (3 9)
+</pre>
+
+<p>
+You could take the length of the final list instead like this:
+</p>
+
+<pre class="example">
+(-&gt; (list 9 9 9 1 0 1 0 3 3)
+ (cl-remove-duplicates)
+ (cl-set-difference (list 0 1))
+ (length))
+;; ⇒ 2
+</pre>
+
+<p>
+That in turn can be written simpler like this:
+</p>
+
+<pre class="example">
+(-&gt; (list 9 9 9 1 0 1 0 3 3)
+ cl-remove-duplicates
+ (cl-set-difference (list 0 1))
+ length) ; &lt;-- instead of (length)
+</pre>
+</div>
+</div>
+
+<div id="outline-container-org9a98b09" class="outline-2">
+<h2 id="sec-5"><a id="org9a98b09"></a>5. side note on fear of deeply nested forms</h2>
+<div class="outline-text-2" id="text-sec-5">
+<p>
+Some Lisp beginners tend to fear reading and writing of deeply nested forms (even three or four levels of nesting could feel too deep). Since this article tend to attract those beginners, I'd like to include my explanation for why you should not fear.
+</p>
+
+<p>
+For reading deeply nested forms, sometimes keybindings for structural movement (for example, <code>C-M-u</code>) help a lot when reading from indentation seems not enough. For writing, with paredit you will be able to figure out a way to write a nested form from inside out, or from outside in, or whatever order you choose to write. With these tips in mind, one can eventually overcome fear of something like:
+</p>
+
+<pre class="example">
+;; from color.el
+(defun color-saturate-name (name percent)
+ "Make a color with a specified NAME more saturated by PERCENT."
+ (apply 'color-rgb-to-hex
+ (apply 'color-hsl-to-rgb
+ (apply 'color-saturate-hsl
+ (append
+ (apply 'color-rgb-to-hsl
+ (color-name-to-rgb name))
+ (list percent))))))
+</pre>
+
+<p>
+Maybe read my previous articles on <a href="https://yoo2080.wordpress.com/2014/07/04/it-is-not-hard-to-read-lisp-code/">how to read Lisp code easily</a> and <a href="https://yoo2080.wordpress.com/2014/07/20/it-is-not-hard-to-edit-lisp-code/">how to edit Lisp code easily</a>. End of side note.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orga908b0c" class="outline-2">
+<h2 id="sec-6"><a id="orga908b0c"></a>6. thread-last nesting and the thread-last macro</h2>
+<div class="outline-text-2" id="text-sec-6">
+<pre class="example">
+(f3 a3 b3 (f2 a2 b2 (f1 a1 b1 x)))
+</pre>
+
+<p>
+can be written in multiline as:
+</p>
+
+<pre class="example">
+(f3 a3 b3
+ (f2 a2 b2
+ (f1 a1 b1
+ x)))
+</pre>
+
+<p>
+or as:
+</p>
+
+<pre class="example">
+(f3 a3
+ b3
+ (f2 a2
+ b2
+ (f1 a1
+ b1
+ x)))
+</pre>
+
+<p>
+or you can use the macro <code>-&gt;&gt;</code> (the “thread-last” macro from the dash library) to write that instead as:
+</p>
+
+<pre class="example">
+(-&gt;&gt; x
+ (f1 a1 b1)
+ (f2 a2 b2)
+ (f3 a3 b3))
+</pre>
+</div>
+</div>
+
+<div id="outline-container-org1ac8136" class="outline-2">
+<h2 id="sec-7"><a id="org1ac8136"></a>7. example uses of the thread-last macro</h2>
+<div class="outline-text-2" id="text-sec-7">
+<pre class="example">
+(-&gt;&gt; "1 3 5 7 9 11 13 15 17 19"
+ split-string
+ (mapcar 'string-to-int)
+ (cl-reduce '+))
+;; ⇒ 100
+</pre>
+
+<p>
+That splits the string to get a list of strings, then maps <code>string-to-int</code> to the list in order to get a list of numbers, then sums the numbers.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org90614fd" class="outline-2">
+<h2 id="sec-8"><a id="org90614fd"></a>8. thread-middle macro</h2>
+<div class="outline-text-2" id="text-sec-8">
+<p>
+This deeply nested Lisp form
+</p>
+
+<pre class="example">
+(f3 a3 b3 (f2 a2 b2 (f1 a1 b1 x c1 d1) c2 d2) c3 d3)
+</pre>
+
+<p>
+can be indented like
+</p>
+
+<pre class="example">
+(f3 a3 b3
+ (f2 a2 b2
+ (f1 a1 b1
+ x
+ c1 d1)
+ c2 d2)
+ c3 d3)
+</pre>
+
+<p>
+or like
+</p>
+
+<pre class="example">
+(f3 a3
+ b3
+ (f2 a2
+ b2
+ (f1 a1
+ b1
+ x
+ c1
+ d1)
+ c2
+ d2)
+ c3
+ d3)
+</pre>
+
+<p>
+That can be written using the macro <code>--&gt;</code> as:
+</p>
+
+<pre class="example">
+(--&gt; x
+ (f1 a1 b1 it c1 d1)
+ (f2 a2 b2 it c2 d2)
+ (f3 a3 b3 it c3 d3))
+</pre>
+
+<p>
+Clojure Note: Clojure users who want to use thread-middle macro in Clojure code should see <a href="http://stackoverflow.com/questions/10068398/generalized-threading-macro-in-clojure">Generalized Threading Macro in Clojure</a>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgd13c647" class="outline-2">
+<h2 id="sec-9"><a id="orgd13c647"></a>9. rewriting some deeply nested form as a serial binding</h2>
+<div class="outline-text-2" id="text-sec-9">
+<p>
+If f1, f2, f3 are functions (as opposed to macros), one can also simply write this:
+</p>
+
+<pre class="example">
+(let ((it x))
+ (setq it (f1 a1 b1 it c1 d1)
+ it (f2 a2 b2 it c2 d2))
+ (f3 a3 b3 it c3 d3))
+</pre>
+
+<p>
+or this:
+</p>
+
+<pre class="example">
+(let* ((it x)
+ (it (f1 a1 b1 it c1 d1))
+ (it (f2 a2 b2 it c2 d2)))
+ (f3 a3 b3 it c3 d3))
+</pre>
+
+<p>
+or you can use the threading macro.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgb0e889a" class="outline-2">
+<h2 id="sec-10"><a id="orgb0e889a"></a>10. threading macros are more than serial binding</h2>
+<div class="outline-text-2" id="text-sec-10">
+<p>
+Threading macros can be more than just chaining function calls because you can use them with other macros like loop macros or conditionals. For example, you can write your own REPL (Read Eval Print Loop) like this:
+</p>
+
+<pre class="example">
+(-&gt; (read t) ; Read
+ eval ; Eval
+ print ; Print
+ (cl-loop (sit-for 1))) ; Loop
+</pre>
+
+<p>
+which expands to:
+</p>
+
+<pre class="example">
+(cl-loop
+ (print (eval (read t)))
+ (sit-for 1))
+</pre>
+
+<p>
+(Try it. You can get out of the infinite loop by pressing <code>C-g</code>)
+</p>
+
+<p>
+Is humuhumunukunukuapuaa a long word? I would consider words longer than 20 letters as long words.
+</p>
+
+<pre class="example">
+(--&gt; "humuhumunukunukuapuaa"
+ (length it)
+ (&lt; it 20)
+ (if it 'short 'long))
+;; ⇒ long
+</pre>
+
+<p>
+Yes, it is long.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgde83bc9" class="outline-2">
+<h2 id="sec-11"><a id="orgde83bc9"></a>11. closing notes</h2>
+<div class="outline-text-2" id="text-sec-11">
+<ul class="org-ul">
+<li>This article is part of the <a href="https://yoo2080.wordpress.com/2013/08/07/living-with-emacs-lisp/">Living with Emacs Lisp</a> series.</li>
+<li>Why are they called threading macros? I do not know.</li>
+</ul>
+
+<p>
+Everything I want beginners to know for this topic is covered now. The rest is optional reading.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org26dd239" class="outline-2">
+<h2 id="sec-12"><a id="org26dd239"></a>12. optional reading</h2>
+<div class="outline-text-2" id="text-sec-12">
+</div>
+
+<div id="outline-container-org940545e" class="outline-3">
+<h3 id="sec-12-1"><a id="org940545e"></a>12.1. sum under reciprocal</h3>
+<div class="outline-text-3" id="text-sec-12-1">
+<p>
+Alice takes 30 minutes to finish a bowl of jjajangmyeon. Bob takes 40 minutes to finish the same. With Alice and Bob working together on the same one bowl of jjajangmyeon, how many minutes does it take to finish the bowl? Sum of 30 minutes and 40 minutes <a href="http://prog21.dadgum.com/121.html">under reciprocal</a>. To calculate it,
+</p>
+
+<pre class="example">
+(-&gt;&gt; (list 30 40)
+ (--map (/ 1.0 it))
+ (-reduce '+)
+ (/ 1.0))
+;; ⇒ 17.142857142857142
+</pre>
+
+<p>
+So it takes about 17 minutes.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orge49b0ce" class="outline-3">
+<h3 id="sec-12-2"><a id="orge49b0ce"></a>12.2. art of minimizing use of thread-middle macro</h3>
+<div class="outline-text-3" id="text-sec-12-2">
+<p>
+In Clojure, consensus seems to be that Clojure libraries should be designed in such a way that users usually only have to use just one of the thread-first macro and the thread-last macro just once for a group of steps. The dash library and the <a href="https://github.com/magnars/s.el">s library</a> are two Emacs Lisp libraries that sticks to that Clojure consensus and that is a sort of selling point of the two libraries. For example, many functions from dash that work on lists consistently take the list as the last argument so that you can use just the thread-last macro with them. If you want to get the most out of threading macros, you may want to start depending on functions from the two libraries.
+</p>
+
+<p>
+My examples in this article show some reliance on <a href="http://www.gnu.org/software/emacs/manual/html_node/cl/">CL-LIB</a> functions (rather than functions from the two libraries: dash and s) because I tend to depend on CL-LIB functions and also because I am not assuming the readers to be familiar with functions from the two libraries. (I tend to use CL-LIB more because it's shipped with Emacs.)
+</p>
+
+<p>
+Clojure programmers sometimes come to a situation where they have to write a form that seems to require two or three times last-argument threading and just one first-argument or middle-argument threading. In that case, some of them tend to use a neat trick to manage to write it with the thread-last macro (rather than write it with the thread-middle macro). An Emacs Lisp equivalent would be, for example, you might be using the s library and you want to take a list of strings, trim them, then join them with comma, and then wrap the result in curly braces using just the threading-last macro, but you are wondering what to do with the last step. You can just do this:
+</p>
+
+<pre class="example">
+(require 's)
+(-&gt;&gt; (list " bacon " "milk" "tofu")
+ (-map 's-trim)
+ (s-join ", ")
+ ((lambda (s) (concat "{" s "}"))))
+</pre>
+
+<p>
+That's the trick (the use of lambda in the last step). Actually in this particular case, you don't need that trick, you can just write:
+</p>
+
+<pre class="example">
+(-&gt;&gt; (list " bacon " "milk" "tofu")
+ (-map 's-trim)
+ (s-join ", ")
+ (s-prepend "{")
+ (s-append "}"))
+</pre>
+
+<p>
+Or you can use <a href="https://kotka.de/blog/2010/04/Did_you_know_II.html">this trick</a> too.
+</p>
+</div>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2018-12-10</span>
+            <span title="last modification date" class="post-info">2018-12-10</span>
+            <span title="tags" class="post-info">:<a href="/tags/raw">raw</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-c7de1c50-88ed-412e-ae70-62694dd7dea5">lujun9972</a></span>
+        </div>
+    <script src="/media/js/jquery-2.1.3.min.js"></script>
+        <section>
+            <h1>Comments</h1>
+            <div id="comment-wrap">
+                    <a class="disqus_label">使用 Disqus 评论</a>
+    </ul>
+        <div id="disqus_thread"></div>
+        <script type="text/javascript">
+         //var disqus_developer = 1;
+         var preempt_signal=false;
+         var disqus_identifier = "/blog/2018/12/10/threading-macros-from-dash-for-emacs-lisp-|-yoo-box/";
+         var disqus_url = "https://lujun9972.github.io/emacs-document/blog/2018/12/10/threading-macros-from-dash-for-emacs-lisp-|-yoo-box/";
+         var disqus_shortname = 'emacs-document';
+         /* * * DON'T EDIT BELOW THIS LINE * * */
+         (function() {
+             var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+             dsq.src = 'https://' + disqus_shortname + '.disqus.com/embed.js';
+             (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+             $('#disqus_thread').css('display','none');
+         })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+    <script>
+     /* comments */
+     var ego_disqus_thread=$('#disqus_thread');
+     var ego_ds_label=$('.ds-thread');
+     $('.disqus_label').click(function(){
+         ego_disqus_thread.show();
+         ego_ds_label.hide();
+     });
+     $('.ds-label').click(function(){
+         ego_disqus_thread.hide();
+         ego_ds_label.show();
+     });
+    </script>
+        </section>
+    <script src="/media/js/main.js"></script>
+        <script type="text/javascript">
+         var _gaq = _gaq || [];
+         _gaq.push(['_setAccount', '7bac4fd0247f69c27887e0d4e3aee41e']);
+         _gaq.push(['_trackPageview']);
+         (function() {
+             var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+             ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+             var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-c7de1c50-88ed-412e-ae70-62694dd7dea5">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="//instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>

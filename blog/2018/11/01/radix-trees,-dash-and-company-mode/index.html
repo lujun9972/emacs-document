@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Radix trees, Dash and Company mode - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="raw" />
+  <style>
+   #ds-thread #ds-reset .ds-comment-body p {color: #ffffff;}
+   #ds-thread #ds-reset .ds-comment-body p a {color: #ff0;}
+   #ds-thread #ds-reset .ds-comment-body p a:hover {color: #0ff;}
+   #disqus_thread a {color: #00ffff;}
+  </style>
+  <link rel="stylesheet" href="/media/css/main.css" type="text/css"/>
+  <link rel="stylesheet" href="/media/css/comment.css" type="text/css"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="/">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <div class="menu-icon">
+        <svg viewBox="0 0 18 15">
+          <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.031C17.335,0,18,0.665,18,1.484L18,1.484z" fill="#ffff00"/>
+          <path d="M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0c0-0.82,0.665-1.484,1.484-1.484 h15.031C17.335,6.031,18,6.696,18,7.516L18,7.516z" fill="#ffff00"/>
+          <path d="M18,13.516C18,14.335,17.335,15,16.516,15H1.484C0.665,15,0,14.335,0,13.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.031C17.335,12.031,18,12.696,18,13.516L18,13.516z" fill="#ffff00"/>
+        </svg>
+      </div>
+      <ul class="trigger">
+        <li><a href="/years/">Years</a></li>
+        <li><a href="/authors/">Authors</a></li>
+        <li><a href="/tags/">Tags</a></li>
+        <li><a href="/about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="/rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="http://www.google.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">Radix trees, Dash and Company mode</h1>
+<div id="table-of-contents">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#radix-trees">Radix trees</a>
+<ul>
+<li><a href="#what-are-radix-trees">What are radix trees?</a></li>
+<li><a href="#exploring-radix-trees-in-emacs">Exploring radix trees in Emacs</a></li>
+<li><a href="#reducing-a-list-and-the-dash-list-api">Reducing a list and the Dash list API</a></li>
+<li><a href="#reading-words-from-a-file-and-making-a-radix-tree">Reading words from a file and making a radix tree</a></li>
+<li><a href="#speeding-it-up">Speeding it up</a></li>
+</ul>
+</li>
+<li><a href="#company-mode">Company Mode</a></li>
+<li><a href="#a-note-on-case-matching">A note on case matching</a></li>
+<li><a href="#final-notes">Final notes</a></li>
+<li><a href="#corrections">Corrections</a></li>
+</ul>
+</div>
+</div>
+<div id="outline-container-org171008d" class="outline-2">
+<h2 id="radix-trees"><a id="org171008d"></a>Radix trees</h2>
+<div class="outline-text-2" id="text-radix-trees">
+<p>
+In the <a href="https://www.gnu.org/software/emacs/news/NEWS.26.1">Emacs 26.1 release notes</a> there's a reference to a new library:
+</p>
+
+<p>
+New Elisp data-structure library ‘radix-tree'
+</p>
+
+<p>
+I checked and the radix-tree data structure does not yet appear in the info documentation, but there is of course documentation for each of the functions in the implementation <code>radix-tree.el</code>. In this post I'll show how to use radix trees, along with company mode (an auto complete library, the name comes from COMplete ANYthing), to implement a custom dictionary of words that you would like to be able to auto-complete when typing.
+</p>
+
+
+<div class="figure">
+<p><img src="http://justinhj.github.io/images/autocomplete.png" alt="autocomplete.png" />
+</p>
+</div>
+
+<p>
+The source code and dictionary used in this post can be found in this bitbucket <a href="https://bitbucket.org/justinhj/company-custom-dictionary/src/master/">repo</a>
+</p>
+</div>
+
+<div id="outline-container-org064a6d5" class="outline-3">
+<h3 id="what-are-radix-trees"><a id="org064a6d5"></a>What are radix trees?</h3>
+<div class="outline-text-3" id="text-what-are-radix-trees">
+<p>
+Rather than go into the implementation and detailed explanation of Radix trees check them out on <a href="https://en.wikipedia.org/wiki/Radix_tree">Wikipedia</a> or your favourite algorithms textbook . For the purposes of this post let's go with a super imprecise explanation. When you store a map of keys that are associated with some value there are a number of ways to represent that as a data structure. What Radix Trees offer is that when the key is a sequence of some kind (say a string of characters or a list of numbers) we can store the keys in a much abbreviated format, taking advantage of the shared prefixes amongst many keys. For example most Vancouver phone numbers begin with 778 or 604. Most of the numbers in a radix tree can be stored under one of those three digit prefixes rather than in three levels of tree (7,7,8...). If that's confusing never mind, it will become clear as we progress...
+</p>
+</div>
+</div>
+
+<div id="outline-container-org07248aa" class="outline-3">
+<h3 id="exploring-radix-trees-in-emacs"><a id="org07248aa"></a>Exploring radix trees in Emacs</h3>
+<div class="outline-text-3" id="text-exploring-radix-trees-in-emacs">
+<p>
+A small example... say we want to store the following keys in a key value store: application, appetizer, applicative, apple.
+</p>
+
+<p>
+To start with we need an empty radix tree, which is just defined as nil:
+</p>
+
+<pre class="example">
+(require 'radix-tree)
+
+radix-tree-empty
+</pre>
+
+<p>
+You add key/values to the map like this:
+</p>
+
+<pre class="example">
+(setq tree-1 (radix-tree-insert radix-tree-empty "application" t))
+;; (("application" . t))
+</pre>
+
+<p>
+Note that inserting returns a new tree that contains just the single key “application”. For the purposes of our program we don't need to store an actualy value, we're just interested in the keys which represent valid English words, so we just store `t' which is true in Emacs Lisp.
+</p>
+
+<p>
+Next we'll make a new tree by inserting the next word into `tree-1':
+</p>
+
+<pre class="example">
+(setq tree-2 (radix-tree-insert tree-1 "appetizer" t))
+
+;; (("app" ("lication" . t) ("etizer" . t)))
+</pre>
+
+<p>
+As you can see the radix tree split the key up into the shared prefixes between the two words. We can query how many words the tree has in total like this:
+</p>
+
+<pre class="example">
+(radix-tree-count tree-2)
+
+;; 2 (#o2, #x2, ?\C-b)
+</pre>
+</div>
+</div>
+
+<div id="outline-container-orgbefc66e" class="outline-3">
+<h3 id="reducing-a-list-and-the-dash-list-api"><a id="orgbefc66e"></a>Reducing a list and the Dash list API</h3>
+<div class="outline-text-3" id="text-reducing-a-list-and-the-dash-list-api">
+<p>
+We've seen how to add elements one at a time to the tree, but our goal is to take a list of words and add them to a dictionary. For that we will need to use the `seq-reduce' function; a functional programming construct for reducing a sequence to a single value using some function that accumulates results:
+</p>
+
+<pre class="example">
+(seq-reduce (lambda (acc it) (radix-tree-insert acc it t)) '("application" "appetizer" "applicative" "apple") radix-tree-empty)
+
+;; (("app" ("l" ("icati" ... ...) ("e" . t)) ("etizer" . t)))
+</pre>
+
+<p>
+In the output you can see that the four words have been neatly split into their shared and non-shared parts.
+</p>
+
+<p>
+<code>seq-reduce</code> is fine for our purposes, but when working with Emacs lisp lists I prefer to use <a href="https://github.com/magnars/dash.el">Dash</a> which is a package providing a more modern list API. All Dash functions begin with a dash hence the name. We can replace the code above using Dash as follows:
+</p>
+
+<pre class="example">
+(require 'dash)
+(-reduce-from (lambda (tree word) (radix-tree-insert tree word t)) radix-tree-empty '("application" "appetizer" "applicative" "apple"))
+
+;; (("app" ("l" ("icati" ... ...) ("e" . t)) ("etizer" . t)))
+</pre>
+
+<p>
+In English when you refer to a word used earlier in the conversation you will say “it” instead, and this is called anaphora. Dash provides “anaphoric” versions of many of its functions that begin with two dashes that let you abbreviate the lambda form we used above and refer to each item as it. In the case of the <code>--reduce-from</code> we get both it and acc (for the accumulated result):
+</p>
+
+<pre class="example">
+(--reduce-from (radix-tree-insert acc it t) radix-tree-empty '("application" "appetizer" "applicative" "apple"))
+
+;; (("app" ("l" ("icati" ... ...) ("e" . t)) ("etizer" . t)))
+</pre>
+
+<p>
+That's nicer! Now we need a function that takes a sequence of words and adds them to a radix tree:
+</p>
+
+<pre class="example">
+(defun list-to-radix-tree(l)
+ (--reduce-from (radix-tree-insert acc it t) radix-tree-empty l))
+
+(setq small (list-to-radix-tree '("application" "appetizer" "applicative" "apple")))
+
+;; (("app" ("l" ("icati" ... ...) ("e" . t)) ("etizer" . t)))
+</pre>
+</div>
+</div>
+
+<div id="outline-container-org2dc91ab" class="outline-3">
+<h3 id="reading-words-from-a-file-and-making-a-radix-tree"><a id="org2dc91ab"></a>Reading words from a file and making a radix tree</h3>
+<div class="outline-text-3" id="text-reading-words-from-a-file-and-making-a-radix-tree">
+<p>
+Our next step is to load the words for our custom dictionary from a file. The one in the github repo <code>dictionary.txt</code> contains 172k words. We can load it and turn it into a list of words, and finally build a radix tree as follows:
+</p>
+
+<pre class="example">
+(defun radix-tree-from-file(file-path)
+(-&gt; 
+(with-temp-buffer
+(insert-file-contents-literally file-path)
+(buffer-substring-no-properties (point-min) (point-max)))
+split-string
+list-to-radix-tree))
+
+(radix-tree-from-file "dictionary.txt")
+</pre>
+
+<p>
+Note the use of “-&gt;” which is a threading macro from Dash. It lets us put a list of operations together and “threads” the result from one step to the next, making things a bit easier to read. You'll see a similar operator in Clojure.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org1a9105d" class="outline-3">
+<h3 id="speeding-it-up"><a id="org1a9105d"></a>Speeding it up</h3>
+<div class="outline-text-3" id="text-speeding-it-up">
+<p>
+Hmm, that was kinda slow. When we start using the Company mode we need to load the file and we don't want a delay like that. Let's use the emacs benchmark facility to see just how slow it is:
+</p>
+
+<pre class="example">
+(require 'benchmark)
+(benchmark-elapse (radix-tree-from-file "dictionary.txt"))
+
+;; 6.021951
+</pre>
+
+<p>
+Six seconds is a bit too much. How about we just write the radix tree to a file instead, then load that? First we need to write the tree to a string using <code>print1-to-string</code>, then we can stick that in a buffer and write it to a file.
+</p>
+
+<pre class="example">
+(defun write-text-to-file(text file-path)
+(save-excursion
+(let ((buffer (find-file file-path)))
+(switch-to-buffer buffer)
+(erase-buffer)
+(insert text)
+(save-buffer)
+(kill-buffer))))
+
+(setq dictionary (radix-tree-from-file "dictionary.txt"))
+
+(write-text-to-file (prin1-to-string dictionary) "dictionary.el")
+
+;; (write-text-to-file (prin1-to-string small) "dictionary.el")
+</pre>
+
+<p>
+Now let's see how much faster it is to simply load the data structure rather than build it:
+</p>
+
+<pre class="example">
+(defun tree-from-file(file-path)
+(save-excursion 
+(let* ((buffer (find-file file-path))
+(tree (read buffer)))
+(kill-buffer buffer)
+tree)))
+
+(benchmark-elapse
+(progn
+(setq loaded-dictionary (tree-from-file "dictionary.el"))
+t))
+
+;; 0.198365
+</pre>
+
+<p>
+Great! The first time we run the program it will take 6 seconds to build, but subsequently we can load the radix tree data from disk which takes 0.2 seconds. That means if we prepare the <code>dictionary.el</code> file we can simply load that when the system starts without a noticable slowdown. The next step is to be able to find all the keys given a prefix. <code>radix-tree-subtree</code> does the job, returning a subtree rooted at the given prefix. Given the relevant subtree we can then iterate all of the keys and values using the function <code>radix-tree-iter-mappings</code>. Here we use the destructive <code>!cons</code> (also from Dash) to build up a list of all the keys, which we then return. This is now all the functionality we need to return for our auto-complete functionality:
+</p>
+
+<pre class="example">
+(defun radix-tree-keys(subtree prefix)
+(let (keys '())
+(radix-tree-iter-mappings (radix-tree-subtree subtree prefix)
+            (lambda (key val)
+                (!cons (concat prefix key) keys)))
+keys))
+
+(radix-tree-keys loaded-dictionary "antidi")
+
+;; ("antidiscrimination" "antidilution" "antidiarrheal" "antidiabetic")
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org76af4fa" class="outline-2">
+<h2 id="company-mode"><a id="org76af4fa"></a>Company Mode</h2>
+<div class="outline-text-2" id="text-company-mode">
+<p>
+<a href="http://company-mode.github.io">Company Mode</a> is one of the two most popular completion frameworks for emacs (the other being <a href="https://github.com/auto-complete/auto-complete">Auto-Complete</a>). In order to make our own custom dictionary auto completion we just need to implement a single function to implement a “backend”.
+</p>
+
+<p>
+The best documentation for how to write a backend is in the docstring for `company-backends' so I'd recommend reading that in full to see the capabilities of Company mode.
+</p>
+
+<p>
+First, the code, I'll explain each part below:
+</p>
+
+<p>
+<code>C-h v company-backends</code>
+</p>
+
+<pre class="example">
+(require 'company)
+
+(defun get-candidates (prefix)
+ "Given a prefix return a list of matching words that begin with it"
+ (when (&gt; (length prefix) 2)
+ (radix-tree-keys company-custom-dictionary--words-tree (downcase prefix))))
+
+(defun company-custom-dictionary (command &amp;optional arg &amp;rest ignored)
+ "Company mode backend for a custom dictionary stored as a radix tree."
+ (case command
+ ('init 
+ (unless (boundp 'company-custom-dictionary--words-tree)
+ (setq company-custom-dictionary--words-tree (tree-from-file "dictionary.el"))))
+ ('prefix
+ (company-grab-word))
+ ('candidates
+ (radix-tree-keys company-custom-dictionary--words-tree (downcase arg)))
+ ('ignore-case
+ 'keep-prefix)))
+
+;; (provide 'company-custom-dictionary) 
+
+;; Push the mode to the list of company backends
+(push 'company-custom-dictionary company-backends)
+
+;; If you want to change the dictionary, rewrite dictionary.el and unintern the symbol
+;; (unintern 'company-custom-dictionary--words-tree)
+</pre>
+
+<p>
+The few lines above are, believe it or not, all you need to make our custom dictionary backend work! We are just making a callback which implements the Company mode API by sending us commands for us to handle. Let's look at each one:
+</p>
+
+<ul class="org-ul">
+<li><code>init</code> Init is called when company mode is initially enabled. This could be when emacs loads, or if you enable manually it will be called whenever you enable it. It could be called multiple times in a session so keep that in mind when implementing. In this case our implementation checks whether we loaded the dictionary or not. If we did then nothing happens, otherwise we load it.</li>
+<li><code>prefix</code> - This is the text the user has typed so far that we want to complete. I call the built in function <code>company-grab-word</code> which does what you'd expect in most cases. You can write your own depending on your needs. I also check if there are any potential candidates. If not we should return nil that enables other company backends further on in the list to try and match.</li>
+<li><code>candidates</code> - We are given <code>arg</code> which contains the word to be completed and must return the list of candidates that will show up in the menu for the user to pick from. We simply use radix-tree-keys to get the list of words based on the prefix. Note that we make the completion to lower case as we want to match words ignoring that the user may have capitalized the word.</li>
+<li><code>ignore-case</code> - We return a special response `keep-prefix' which maintains the users original capitalization.</li>
+</ul>
+
+<p>
+Note that we don't want the performance penalty of returning the entire dictionary when matching an empty string, or a couple of characters, so the function <code>get-candidates</code> handles only words greater than 3 in length.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgd297b9f" class="outline-2">
+<h2 id="a-note-on-case-matching"><a id="orgd297b9f"></a>A note on case matching</h2>
+<div class="outline-text-2" id="text-a-note-on-case-matching">
+<p>
+In this example I wanted the user dictionary to use only lower case letters. Capitalization is up to then up to the user; if you want to capitalize a word you can do so and it will match correctly. If instead you want a dictionary where case is important (perhaps function calls in a camel case API) you can set <code>ignore-case</code> to <code>nil</code> and remove the call to <code>downcase</code> when generating the candidates.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org8009202" class="outline-2">
+<h2 id="final-notes"><a id="org8009202"></a>Final notes</h2>
+<div class="outline-text-2" id="text-final-notes">
+<p>
+So that's all folks! This is a fairly simple auto complete mode, but you can easily modify the code to come up with your own based on your needs. For example:
+</p>
+
+<ul class="org-ul">
+<li>Common mispelled words list (Do you have trouble with necessary or disappoint? Add all your most hated words to the list)</li>
+<li>Domain words. Do you work in a domain with specialist terminology not in a dictionary?</li>
+<li>Phone numbers, server names, IP addresses and so on</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-org4ac5d91" class="outline-2">
+<h2 id="corrections"><a id="org4ac5d91"></a>Corrections</h2>
+<div class="outline-text-2" id="text-corrections">
+<p>
+Thanks to Reddit user MCHerb for pointing out a couple of things including a typo which have been corrected in this update, and Herbert Jones for noticing and fixing a potential bug with matching words not in the dictionary. See the comments below for more.
+</p>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2018-11-01</span>
+            <span title="last modification date" class="post-info">2018-11-01</span>
+            <span title="tags" class="post-info">:<a href="/tags/raw">raw</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-c7de1c50-88ed-412e-ae70-62694dd7dea5">lujun9972</a></span>
+        </div>
+    <script src="/media/js/jquery-2.1.3.min.js"></script>
+        <section>
+            <h1>Comments</h1>
+            <div id="comment-wrap">
+                    <a class="disqus_label">使用 Disqus 评论</a>
+    </ul>
+        <div id="disqus_thread"></div>
+        <script type="text/javascript">
+         //var disqus_developer = 1;
+         var preempt_signal=false;
+         var disqus_identifier = "/blog/2018/11/01/radix-trees,-dash-and-company-mode/";
+         var disqus_url = "https://lujun9972.github.io/emacs-document/blog/2018/11/01/radix-trees,-dash-and-company-mode/";
+         var disqus_shortname = 'emacs-document';
+         /* * * DON'T EDIT BELOW THIS LINE * * */
+         (function() {
+             var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+             dsq.src = 'https://' + disqus_shortname + '.disqus.com/embed.js';
+             (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+             $('#disqus_thread').css('display','none');
+         })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+    <script>
+     /* comments */
+     var ego_disqus_thread=$('#disqus_thread');
+     var ego_ds_label=$('.ds-thread');
+     $('.disqus_label').click(function(){
+         ego_disqus_thread.show();
+         ego_ds_label.hide();
+     });
+     $('.ds-label').click(function(){
+         ego_disqus_thread.hide();
+         ego_ds_label.show();
+     });
+    </script>
+        </section>
+    <script src="/media/js/main.js"></script>
+        <script type="text/javascript">
+         var _gaq = _gaq || [];
+         _gaq.push(['_setAccount', '7bac4fd0247f69c27887e0d4e3aee41e']);
+         _gaq.push(['_trackPageview']);
+         (function() {
+             var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+             ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+             var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-c7de1c50-88ed-412e-ae70-62694dd7dea5">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="//instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>

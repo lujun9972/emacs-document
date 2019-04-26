@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>如何写出更高效的EmacsLisp代码 - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="elisp-common" />
+  <style>
+   #ds-thread #ds-reset .ds-comment-body p {color: #ffffff;}
+   #ds-thread #ds-reset .ds-comment-body p a {color: #ff0;}
+   #ds-thread #ds-reset .ds-comment-body p a:hover {color: #0ff;}
+   #disqus_thread a {color: #00ffff;}
+  </style>
+  <link rel="stylesheet" href="/media/css/main.css" type="text/css"/>
+  <link rel="stylesheet" href="/media/css/comment.css" type="text/css"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="/">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <div class="menu-icon">
+        <svg viewBox="0 0 18 15">
+          <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.031C17.335,0,18,0.665,18,1.484L18,1.484z" fill="#ffff00"/>
+          <path d="M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0c0-0.82,0.665-1.484,1.484-1.484 h15.031C17.335,6.031,18,6.696,18,7.516L18,7.516z" fill="#ffff00"/>
+          <path d="M18,13.516C18,14.335,17.335,15,16.516,15H1.484C0.665,15,0,14.335,0,13.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.031C17.335,12.031,18,12.696,18,13.516L18,13.516z" fill="#ffff00"/>
+        </svg>
+      </div>
+      <ul class="trigger">
+        <li><a href="/years/">Years</a></li>
+        <li><a href="/authors/">Authors</a></li>
+        <li><a href="/tags/">Tags</a></li>
+        <li><a href="/about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="/rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="http://www.google.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">如何写出更高效的EmacsLisp代码</h1>
+<div id="table-of-contents">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#orgbd32595">(1) Use lexical scope</a></li>
+<li><a href="#orgd0ed0e2">(2) Prefer built-in functions</a></li>
+<li><a href="#org2a34845">(3) Avoid unnecessary lambda functions</a></li>
+<li><a href="#org39d9e20">(4) Prefer using functions with dedicated opcodes</a></li>
+<li><a href="#org94c069d">(5) Unroll loops using and/or</a></li>
+</ul>
+</div>
+</div>
+<p>
+不是所有的EmacsLisp代码都需要优化速度. Emacs本身就有大约82%是由EmacsLisp来实现的,这些用EmacsLisp实现的功能一般都对性能不敏感. 那些对性能有要求的函数都用C来实现了.
+对Emacs的扩展,即时对性能有要求,也只能用EmacsLisp来实现,别无他法(当然 <a href="http://nullprogram.com/blog/2016/11/05/">dynamic modules</a> 和 调用外部程序这两种方法除外).
+一般自动缩进, <a href="https://github.com/mooz/js2-mode">语法树分析</a>, 以及 <a href="http://nullprogram.com/blog/2016/12/11/">自动补全</a> 这几大类插件对性能要求都较高.
+</p>
+
+<p>
+有5条针对EmacsLisp的准则可以改善代码性能. 这些准则并不会为了性能而牺牲掉代码的可读性.
+</p>
+
+<p>
+需要说明的是: 这些准则只是针对 Emacs 25.1 及相近的版本来说的. Emacs不断的在改进. 对<a href="http://nullprogram.com/blog/2014/01/04/">虚拟机</a> 和 字节码编译器的修改可能会将当前运行很慢的表达式优化成快速的字节码,从而使得这些准则变得过时.
+未来如果真的有这种情况发生的话,我会再对本文做出修改.
+</p>
+
+<div id="outline-container-orgbd32595" class="outline-2">
+<h2 id="orgbd32595">(1) Use lexical scope</h2>
+<div class="outline-text-2" id="text-orgbd32595">
+<p>
+本准则要求你在写EmacsLisp时始终将下面这行内容作为文件的首行.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp"><span style="font-weight: bold; font-style: italic;">;;; </span><span style="font-weight: bold; font-style: italic;">-*- lexical-binding: t; -*-</span>
+</pre>
+</div>
+
+<p>
+无论怎么强调这点都不过分. 这不仅仅使得<a href="http://nullprogram.com/blog/2016/12/22/">你的代码更健壮</a> 还能显著地提高代码的运行速度.
+而且对于那些特殊变量(译者注:defvar,defconst,defcustom定义的变量)来说,它们依然是处于动态作用域下的,所以完全没有什么理由不用静态作用域.
+你在动态作用域下编写的代码即时切换到动态作用域下也不会影响到它的功能.
+</p>
+
+<p>
+特殊变量要比局部变量和静态作用域下的变量慢得多,因此请只在必要的时候才用.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgd0ed0e2" class="outline-2">
+<h2 id="orgd0ed0e2">(2) Prefer built-in functions</h2>
+<div class="outline-text-2" id="text-orgd0ed0e2">
+<p>
+内建函数使用C写的,当然会比用EmacsLisp写得同类函数要快得多. 请尽量用内建函数来完成工作,即使因此会增加代码语句.
+</p>
+
+<p>
+举个例子, 创建一个累加队列的最快方法是什么? 也就是说新元素要不断累加到列表的末尾,而且应算法的要求,列表必须从头部开始组建.
+</p>
+
+<p>
+你可能会尝试追踪列表的末尾位置,然后使用 <code>setcdr(由下面的setf来调用)</code> 来将新元素直接添加到列表的末尾处.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">fib-track-tail</span> (n)
+  (<span style="font-weight: bold;">let*</span> ((a 0)
+         (b 1)
+         (head (list 1))
+         (tail head))
+    (<span style="font-weight: bold;">dotimes</span> (_ n head)
+      (<span style="font-weight: bold;">psetf</span> a b
+             b (+ a b))
+      (<span style="font-weight: bold;">setf</span> (cdr tail) (list b)
+            tail (cdr tail)))))
+
+(fib-track-tail 8)
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">=&gt; (1 1 2 3 5 8 13 21 34)</span>
+</pre>
+</div>
+
+<p>
+然而实际上,先创建一个逆序的列表,然后反转它要快得多.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">fib-nreverse</span> (n)
+  (<span style="font-weight: bold;">let*</span> ((a 0)
+         (b 1)
+         (list (list 1)))
+    (<span style="font-weight: bold;">dotimes</span> (_ n (nreverse list))
+      (<span style="font-weight: bold;">psetf</span> a b
+             b (+ a b))
+      (<span style="font-weight: bold;">push</span> b list))))
+</pre>
+</div>
+
+<p>
+你可能不相信,但是 <code>nreverse</code> 非常的快. 不仅仅因为它是内建函数,它甚至有自己的操作码!
+在循环中使用push然后在最用用nreverse反转列表是创建累加列表的最快方法.
+</p>
+
+<p>
+在 fib-track-tail 中, 用EmacsLisp追中列表尾部,不仅增加了复杂度而且要比用C遍历两次列表要慢得多.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org2a34845" class="outline-2">
+<h2 id="org2a34845">(3) Avoid unnecessary lambda functions</h2>
+<div class="outline-text-2" id="text-org2a34845">
+<p>
+这部分内容跟 <code>mapcar</code> 家族的函数比较相关了.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp"><span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Slower</span>
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">expt-list</span> (list e)
+  (mapcar (<span style="font-weight: bold;">lambda</span> (x) (expt x e)) list))
+</pre>
+</div>
+
+<p>
+很多人喜欢用 <a href="https://github.com/magnars/dash.el">dash.el</a> 也喜欢用高阶函数, 但其代价可不菲.
+编译器并不知道该如何内联这些匿名函数,因此必然会产生一次函数调用的消耗.
+</p>
+
+<p>
+更糟的是, 如果你遵照我前面的建议使用了静态作用域, 上面的例子会创建一个捕获e变量的闭包. 也就是说,每次调用 <code>expt-list</code> 的时候都会用诸如 <code>make-byte-code</code> 这类函数创建一个新的函数对象.
+请注意,我并没有说在mapcar中每一次lambda语句都会被重新编译一次 — 所有同样lambda实例都是共用同一个字节码字符串的.
+但每次调用 <code>expt-list</code> 确实都会分配和初始化一个唯一的函数数组(#[...])以及多个常量数组.
+</p>
+
+<p>
+这就引入了一个更泛化的规则: 不要在性能相关的代码中产生不必要的垃圾.
+</p>
+
+<p>
+让我们把上面的例子改成明确的循环来看看.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">expt-list-fast</span> (list e)
+  (<span style="font-weight: bold;">let</span> ((result ()))
+    (<span style="font-weight: bold;">dolist</span> (x list (nreverse result))
+      (<span style="font-weight: bold;">push</span> (expt x e) result))))
+</pre>
+</div>
+
+<p>
+相比之下,它有以下好处
+</p>
+<ul class="org-ul">
+<li>不会创建非必须的垃圾对象.</li>
+<li>没有函数调用的消耗.</li>
+</ul>
+
+<p>
+这可能是该函数的最快实现了,你应该在性能敏感的代码中使用这个版本的实现.
+</p>
+
+<p>
+不过就个人来说,我比较喜欢使用cl-lib中的 <code>cl-loop</code>.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">expt-list-fast</span> (list e)
+  (<span style="font-weight: bold;">cl-loop</span> for x in list
+           collect (expt x e)))
+</pre>
+</div>
+
+<p>
+<code>cl-loop</code> 宏的扩展结果跟上面的定义差不多,这两种写法在效果上是等价的,就看你习惯怎么写了.
+不过使用 <code>cl-loop</code> 来实现高效的循环会更容易一些.
+</p>
+
+<p>
+在 Emacs 24.4 及其早期的版本中, <code>catch/throw</code> 会将 <code>catch</code> 中的body转换成一个匿名函数然后在执行这个匿名函数.
+如果 <code>catch</code> 中的代码会引用到 <code>catch</code> 之外的变量的话(这很有可能), 那么在静态作用域下,这个lambda函数会转换成一个闭包,结果就像上面说的,会产生待回收的函数对象.
+</p>
+
+<p>
+在 Emacs 24.5 及更新的版本中, 编译器启用了一个权限的操作码, pushcatch.
+这极大地提高了 <code>catch/throw</code> 的效率,因此你也可以在性能敏感的代码中使用 <code>catch/throw</code> 了.
+这很有用,因为 <code>catch/throw</code> 是唯一的处理异常的机制.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org39d9e20" class="outline-2">
+<h2 id="org39d9e20">(4) Prefer using functions with dedicated opcodes</h2>
+<div class="outline-text-2" id="text-org39d9e20">
+<p>
+有时你可能会发现要在多个内置函数中选择一个函数来用. 这种情况下尽量选择那些有专用虚拟机操作码的函数,这些函数的调用速度要更加快的多.
+</p>
+
+<p>
+那么,你怎么能知道哪些函数是有专门的操作码的呢? 可以看看 <a href="https://github.com/emacs-mirror/emacs/blob/master/lisp/emacs-lisp/bytecomp.el">bytecomp.el</a> 中列出的那些 <code>byte-defop</code> 语句. 
+Optimization often involves getting into
+the weeds, so don’t be shy.
+</p>
+
+<p>
+比方说, <code>assq</code> 和 <code>assoc</code> 这两个函数都会在一个alist中搜索匹配key的元素. 两个函数都是内建函数,唯一的区别是 <code>assq</code> 使用 <code>eq</code> 来比较key,而 <code>assoc</code> 使用 <code>equal</code> 来比较key.
+然而这两者的效率是不一样的: <code>assq</code> 有它自己的操作码(158).
+</p>
+
+<p>
+也就是说,在效率敏感的代码中,你应该尽可能使用 <code>assq</code>, 甚至于你的alist也应该尽可能使用 <code>eq</code> 能比较的类型来作为key. 当然是否真的需要做出这个改变,还是要通过性能测试后才能决定.
+</p>
+
+<p>
+另一个类似的例子是 <code>eq</code>, <code>=</code>, <code>eql</code>, 以及 <code>equal</code>. 有些宏/函数默认使用 <code>eql</code> 来进行比较, 尤其是 <code>cl-lib</code> package,它从Common Lisp中继承了使用 <code>eql</code> 来比较的这种行为.
+比如 <code>cl-case</code> 就是用 <code>eql</code> 来进行比较的,它跟C语言中的 <code>switch</code> 语句很类似.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">op-apply</span> (op a b)
+  (<span style="font-weight: bold;">cl-case</span> op
+    (<span style="font-weight: bold;">:norm</span> (+ (* a a) (* b b)))
+    (<span style="font-weight: bold;">:disp</span> (abs (- a b)))
+    (<span style="font-weight: bold;">:isin</span> (/ b (sin a)))))
+</pre>
+</div>
+
+<p>
+<code>cl-case</code> 会扩展成为一条 <code>cond</code> 语句. 由于Emacs字节码并不支持 jump tables,因此实际上也没有什么优化的空间.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">op-apply</span> (op a b)
+  (<span style="font-weight: bold;">cond</span>
+   ((eql op <span style="font-weight: bold;">:norm</span>) (+ (* a a) (* b b)))
+   ((eql op <span style="font-weight: bold;">:disp</span>) (abs (- a b)))
+   ((eql op <span style="font-weight: bold;">:isin</span>) (/ b (sin a)))))
+</pre>
+</div>
+
+<p>
+然而实际上,在 <code>cl-case</code> 中使用 <code>eql</code> 几乎可以说是最差劲的选择. 在我上面列出的4个判断相等的函数中,只有 <code>eql</code> 是没有自己的操作码的.
+相比来说,使用 <code>eq</code> 的速度就要快的多. (理论上, <code>cl-case</code> 完全可以在发现所有比较的key都是symbol的时候,改成用 <code>eq</code> 来作比较.)
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">op-apply</span> (op a b)
+  (<span style="font-weight: bold;">cond</span>
+   ((eq op <span style="font-weight: bold;">:norm</span>) (+ (* a a) (* b b)))
+   ((eq op <span style="font-weight: bold;">:disp</span>) (abs (- a b)))
+   ((eq op <span style="font-weight: bold;">:isin</span>) (/ b (sin a)))))
+</pre>
+</div>
+
+<p>
+在EmacsLisp中,你还可以用 <code>eq</code> 来比较整数. 只有在你需要让symbol,整数和浮点数相互进行比较时才需要用到 <code>eql</code>,而这种情况十分罕见.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org94c069d" class="outline-2">
+<h2 id="org94c069d">(5) Unroll loops using and/or</h2>
+<div class="outline-text-2" id="text-org94c069d">
+<p>
+让我们来看一下下面这个函数,这个函数在一个数字列表中搜索能整除参数的数字,并返回第一个匹配. 我这里使用 <code>%</code> 而不是 <code>mod</code> 的原因在于, <code>%</code> 有它自己的操作码(166),而 <code>mod</code> 没有.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">detect</span> (x)
+  (<span style="font-weight: bold;">catch</span> '<span style="font-weight: bold; text-decoration: underline;">found</span>
+    (<span style="font-weight: bold;">dolist</span> (f '(2 3 5 7 11 13 17 19 23 29 31))
+      (<span style="font-weight: bold;">when</span> (= 0 (% x f))
+        (<span style="font-weight: bold;">throw</span> '<span style="font-weight: bold; text-decoration: underline;">found</span> f)))))
+</pre>
+</div>
+
+<p>
+编译器本身并不知道如何展开循环式. 不过我们完全可以自己用 <code>and</code> 和 <code>or</code> 将其展开.
+然后编译器就能生成干净高效的字节码了.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">detect-unrolled</span> (x)
+  (<span style="font-weight: bold;">or</span> (<span style="font-weight: bold;">and</span> (= 0 (% x 2)) 2)
+      (<span style="font-weight: bold;">and</span> (= 0 (% x 3)) 3)
+      (<span style="font-weight: bold;">and</span> (= 0 (% x 5)) 5)
+      (<span style="font-weight: bold;">and</span> (= 0 (% x 7)) 7)
+      (<span style="font-weight: bold;">and</span> (= 0 (% x 11)) 11)
+      (<span style="font-weight: bold;">and</span> (= 0 (% x 13)) 13)
+      (<span style="font-weight: bold;">and</span> (= 0 (% x 17)) 17)
+      (<span style="font-weight: bold;">and</span> (= 0 (% x 19)) 19)
+      (<span style="font-weight: bold;">and</span> (= 0 (% x 23)) 23)
+      (<span style="font-weight: bold;">and</span> (= 0 (% x 29)) 29)
+      (<span style="font-weight: bold;">and</span> (= 0 (% x 31)) 31)))
+</pre>
+</div>
+
+<p>
+在Emacs 24.4及其更早的版本中,那时候 <code>catch</code> 还用得是基于 <code>lambda</code> 的实现, 展开后的实现要比循环的实现快了7倍.
+而即使是后来使用了基于 <code>pushcatch</code> 指令的 <code>catch</code> 实现, 展开后的实现速度也是循环的实现的两倍.
+也就是说,在第一个实现的函数中,有一半的性能消耗都花费在了循环上了.
+</p>
+
+<p>
+应用这条规则时请确定你写得代码真的是对性能有特殊要求. 毕竟,手工展开循环是一件无聊而又易错的工作.
+</p>
+
+<p>
+不过我一般不会真的去手工展开这些循环, <a href="http://nullprogram.com/blog/2016/12/27/">使用宏</a> <a href="http://nullprogram.com/blog/2016/12/11/">之类的技术</a>, 来自动生成展开式是一个不错的选择.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defmacro</span> <span style="font-weight: bold;">with-detect</span> (var list)
+  (<span style="font-weight: bold;">cl-loop</span> for e in list
+           collect `(<span style="font-weight: bold;">and</span> (= 0 (% ,var ,e)) ,e) into conditions
+           finally return `(<span style="font-weight: bold;">or</span> ,@conditions)))
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">detect-unrolled</span> (x)
+  (with-detect x (2 3 5 7 11 13 17 19 23 29 31)))
+</pre>
+</div>
+
+<p>
+那么我要如何发现还有哪些地方可以优化呢?
+</p>
+
+<p>
+使用 <code>M-x disassemble</code> 来看看你的热点代码会产生什么样的字节码. 修改一下你的函数然后看看字节码是怎么随之改变的.
+关注哪些能产生最好字节码的编码形式,然后尽可能地使用这种编码形式进行编码.
+</p>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2017-02-15</span>
+            <span title="last modification date" class="post-info">2017-02-15</span>
+            <span title="tags" class="post-info">:<a href="/tags/elisp-common">elisp-common</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-c7de1c50-88ed-412e-ae70-62694dd7dea5">lujun9972</a></span>
+        </div>
+    <script src="/media/js/jquery-2.1.3.min.js"></script>
+        <section>
+            <h1>Comments</h1>
+            <div id="comment-wrap">
+                    <a class="disqus_label">使用 Disqus 评论</a>
+    </ul>
+        <div id="disqus_thread"></div>
+        <script type="text/javascript">
+         //var disqus_developer = 1;
+         var preempt_signal=false;
+         var disqus_identifier = "/blog/2017/02/15/如何写出更高效的emacslisp代码/";
+         var disqus_url = "https://lujun9972.github.io/emacs-document/blog/2017/02/15/如何写出更高效的emacslisp代码/";
+         var disqus_shortname = 'emacs-document';
+         /* * * DON'T EDIT BELOW THIS LINE * * */
+         (function() {
+             var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+             dsq.src = 'https://' + disqus_shortname + '.disqus.com/embed.js';
+             (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+             $('#disqus_thread').css('display','none');
+         })();
+        </script>
+        <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+    <script>
+     /* comments */
+     var ego_disqus_thread=$('#disqus_thread');
+     var ego_ds_label=$('.ds-thread');
+     $('.disqus_label').click(function(){
+         ego_disqus_thread.show();
+         ego_ds_label.hide();
+     });
+     $('.ds-label').click(function(){
+         ego_disqus_thread.hide();
+         ego_ds_label.show();
+     });
+    </script>
+        </section>
+    <script src="/media/js/main.js"></script>
+        <script type="text/javascript">
+         var _gaq = _gaq || [];
+         _gaq.push(['_setAccount', '7bac4fd0247f69c27887e0d4e3aee41e']);
+         _gaq.push(['_trackPageview']);
+         (function() {
+             var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+             ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+             var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-c7de1c50-88ed-412e-ae70-62694dd7dea5">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="//instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>
