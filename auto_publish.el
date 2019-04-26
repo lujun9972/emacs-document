@@ -46,4 +46,4 @@ There are two things you can do about this warning:
 (setq org-export-use-babel nil)
 (setq debug-on-error t)
 (setq org-src-fontify-natively t)
-(ego-do-publication "emacs-document" nil nil nil)
+(ego-do-publication "emacs-document" t nil nil)
