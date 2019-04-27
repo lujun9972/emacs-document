@@ -1,0 +1,43 @@
+#+TITLE: 让Emacs shell命令发送桌面通知
+#+URL: https://blog.hoetzel.info/post/eshell-notifications/
+#+AUTHOR: lujun9972
+#+TAGS: elisp-common
+#+DATE: [2019-04-27 六 22:12]
+#+LANGUAGE:  zh-CN
+#+STARTUP:  inlineimages
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+我总是使用 [[https://www.gnu.org/software/emacs/manual/html_mono/eshell.html][Eshell]] 来与操作系统进行交互,因为它与Emacs无缝整合、支持处理 (远程) [[https://www.gnu.org/software/tramp/][TRAMP]] 文件 而且在Windows上也能工作得很好.
+
+启动 shell 命令后 (比如耗时严重的构建任务) 我进程会由于切换buffer而忘了最终任务的运行状态.
+
+多亏了 Emacs 的 [[https://www.gnu.org/software/emacs/manual/html_node/emacs/Hooks.html][hooks]] 机制,你可以配置 Emacs 在某个外部命令完成后调用一个elisp函数.
+
+我使用 [[https://github.com/jwiegley][John Wiegleys]] 所编写的超棒的 [[https://github.com/jwiegley/alert][alert]] 包来发送桌面通知:
+
+#+begin_src emacs-lisp
+    (require 'alert)
+
+    (defun eshell-command-alert (process status)
+     "Send `alert' with severity based on STATUS when PROCESS finished."
+     (let* ((cmd (process-command process))
+         (buffer (process-buffer process))
+         (msg (format "%s: %s" (mapconcat 'identity cmd " ") status)))
+     (if (string-prefix-p "finished" status)
+         (alert msg :buffer buffer :severity 'normal)
+        (alert msg :buffer buffer :severity 'urgent))))
+
+    (add-hook 'eshell-kill-hook #'eshell-command-alert)
+#+end_src
+
+[[https://github.com/jwiegley/alert][alert]] 的规则可以用程序来设置. 就我这个情况来看，我只需要当对应的buffer不可见时被通知:
+
+#+begin_src shell
+    (alert-add-rule :status '(buried) ;only send alert when buffer not visible
+             :mode 'eshell-mode
+             :style 'notifications)
+#+end_src
+
+这甚至对于 [[https://www.gnu.org/software/tramp/][TRAMP]] 也一样生效. 下面这个截屏展示了失败的 =make= 命令产生的 Gnome 桌面通知.
+
+[[https://blog.hoetzel.info/img/eshell.png]]
