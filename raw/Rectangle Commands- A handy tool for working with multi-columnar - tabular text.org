@@ -1,0 +1,170 @@
+#+TITLE: Rectangle Commands: A handy tool for working with multi-columnar / tabular text
+#+URL: https://emacsnotes.wordpress.com/2019/05/19/rectangle-commands-a-handy-tool-for-working-with-multi-columnar-tabular-text/
+#+AUTHOR: lujun9972
+#+TAGS: raw
+#+DATE: [2019年 06月 13日 星期四 15:23:14 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+* A Problem ... and a Solution
+   :PROPERTIES:
+   :CUSTOM_ID: a-problem-and-a-solution
+   :END:
+
+You are given this [[https://github.com/emacksnotes/emacsnotes.wordpress.com/blob/a382a312e2472937e95624a33f06bb4a9cacb7b6/my-rect-menu.el#L1][(1)]]
+
+#+BEGIN_EXAMPLE
+    a b c
+    aaaa bb ccccc
+    aaa bbb cccc
+    aa bb ccc
+#+END_EXAMPLE
+
+How would you generate this
+
+#+BEGIN_EXAMPLE
+    [ a , b , c ]
+    [ aaaa, bb , ccccc ]
+    [ aaa , bbb, cccc ]
+    [ aa , bb , ccc ]
+#+END_EXAMPLE
+
+A answer is you use Emacs' built-in =rectangle= commands.
+
+[[[https://emacsnotes.files.wordpress.com/2019/05/rect-goal-2019-05-19.gif][CLICK HERE FOR UNSCALED GIF]]]
+
+[[https://emacsnotes.files.wordpress.com/2019/05/rect-goal-2019-05-19.gif?w=740]]
+
+[[[https://emacsnotes.files.wordpress.com/2019/05/rect-goal-2019-05-19.gif][CLICK HERE FOR UNSCALED GIF]]]
+
+* What do =rectangle= commands do?
+   :PROPERTIES:
+   :CUSTOM_ID: what-do-rectangle-commands-do
+   :END:
+
+The Emacs manual says [[https://www.gnu.org/software/emacs/manual/html_node/emacs/Rectangles.html][(1)]]
+
+#+BEGIN_QUOTE
+  “Rectangle” commands operate on rectangular areas of the text: all the\\
+  characters between a certain pair of columns, in a certain range of\\
+  lines.  They  are useful with text in multi-column formats, and for\\
+  changing text into or out of such formats.
+#+END_QUOTE
+
+The above description is too terse, and doesn't tell you what the commands do in a simple and relatable way.   In my opinion,
+
+#+BEGIN_QUOTE
+  =rectangle= commands are primitive tools to create pretty tables from a region of text and convert those tables in to different table formats like =TSV= [[https://en.wikipedia.org/wiki/Tab-separated_values][(1)]], =CSV= [[https://en.wikipedia.org/wiki/Comma-separated_values][(1)]], =Org= [[https://www.gnu.org/software/emacs/manual/html_node/org/Built_002din-table-editor.html#Built_002din-table-editor][(1)]], =LaTeX= [[https://en.wikibooks.org/wiki/LaTeX/Mathematics#Matrices_and_arrays][(1)]], =GFM= [[https://docs.gitlab.com/ee/user/markdown.html#tables][(1)]], [[https://help.github.com/articles/organizing-information-with-tables/][ (2)]]  or any other makeshift format that you may come up with.
+#+END_QUOTE
+
+Note that =rectangle= commands are primitive i.e., you can create pretty tables, but NOT in a single-shot but in multiple steps.
+
+* Step 1: Create a menu
+   :PROPERTIES:
+   :CUSTOM_ID: step-1-create-a-menu
+   :END:
+
+Copy the =Emacs Lisp= snippet [[https://raw.githubusercontent.com/emacksnotes/emacsnotes.wordpress.com/master/my-rect-menu.el][(1)]] below to your =.emacs= and restart your =Emacs=.
+
+#+BEGIN_EXAMPLE
+    (require 'easymenu)
+
+    (dolist
+     (item
+     '((begin-tabify menu-item "--")
+     ["Tabify" tabify :help "(tabify START END &optional ARG)\n\nConvert multiple spaces in region to tabs when possible.\nA group of spaces is partially replaced by tabs\nwhen this can be done without changing the column they end at.\nIf called interactively with prefix ARG, convert for the entire\nbuffer.\n\nCalled non-interactively, the region is specified by arguments\nSTART and END, rather than by the position of point and mark.\nThe variable `tab-width' controls the spacing of tab stops."]
+     ["Untabify" untabify :help "(untabify START END &optional ARG)\n\nConvert all tabs in region to multiple spaces, preserving columns.\nIf called interactively with prefix ARG, convert for the entire\nbuffer.\n\nCalled non-interactively, the region is specified by arguments\nSTART and END, rather than by the position of point and mark.\nThe variable `tab-width' controls the spacing of tab stops."]
+     (after-tabify menu-item "--")))
+     (easy-menu-add-item global-map
+     '("menu-bar" "edit")
+     item "bookmark"))
+
+    (easy-menu-add-item global-map
+     '("menu-bar" "edit")
+     ["Rectangle Mark Mode" rectangle-mark-mode :style toggle :selected rectangle-mark-mode :help "(rectangle-mark-mode &optional ARG)\n\nToggle the region as rectangular.\nActivates the region if needed. Only lasts until the region is deactivated."]
+     "bookmark")
+
+    (with-eval-after-load 'rect
+     (easy-menu-define my-rectangle-mark-mode-map-menu rectangle-mark-mode-map "Menu for Rectangle Mark Mode Map."
+     '("Rectangle"
+     ["String Rectangle" string-rectangle :help "(string-rectangle START END STRING)\n\nReplace rectangle contents with STRING on each line.\nThe length of STRING need not be the same as the rectangle width.\n\nWhen called interactively and option `rectangle-preview' is\nnon-nil, display the result as the user enters the string into\nthe minibuffer.\n\nCalled from a program, takes three args; START, END and STRING."]
+     ["Delete Rectangle" delete-rectangle :help "(delete-rectangle START END &optional FILL)\n\nDelete (don't save) text in the region-rectangle.\nThe same range of columns is deleted in each line starting with the\nline where the region begins and ending with the line where the region\nends.\n\nWhen called from a program the rectangle's corners are START and END.\nWith a prefix (or a FILL) argument, also fill lines where nothing has\nto be deleted."]
+     "--"
+     ["Kill Rectangle" kill-rectangle :help "(kill-rectangle START END &optional FILL)\n\nDelete the region-rectangle and save it as the last killed one.\n\nWhen called from a program the rectangle's corners are START and END.\nYou might prefer to use `delete-extract-rectangle' from a program.\n\nWith a prefix (or a FILL) argument, also fill lines where nothing has to be\ndeleted.\n\nIf the buffer is read-only, Emacs will beep and refrain from deleting\nthe rectangle, but put it in `killed-rectangle' anyway. This means that\nyou can use this command to copy text from a read-only buffer.\n(If the variable `kill-read-only-ok' is non-nil, then this won't\neven beep.)"]
+     ["Copy Rectangle As Kill" copy-rectangle-as-kill :help "(copy-rectangle-as-kill START END)\n\nCopy the region-rectangle and save it as the last killed one."]
+     ["Yank Rectangle" yank-rectangle :help "(yank-rectangle)\n\nYank the last killed rectangle with upper left corner at point."]
+     "--"
+     ["Open Rectangle" open-rectangle :help "(open-rectangle START END &optional FILL)\n\nBlank out the region-rectangle, shifting text right.\n\nThe text previously in the region is not overwritten by the blanks,\nbut instead winds up to the right of the rectangle.\n\nWhen called from a program the rectangle's corners are START and END.\nWith a prefix (or a FILL) argument, fill with blanks even if there is\nno text on the right side of the rectangle."]
+     ["Close Rectangle" close-rectangle :help "(close-rectangle START END &optional FILL)\n\nDelete all whitespace following a specified column in each line.\nThe left edge of the rectangle specifies the position in each line\nat which whitespace deletion should begin. On each line in the\nrectangle, all contiguous whitespace starting at that column is deleted.\n\nWhen called from a program the rectangle's corners are START and END.\nWith a prefix (or a FILL) argument, also fill too short lines."]
+     ["Clear Rectangle" clear-rectangle :help "(clear-rectangle START END &optional FILL)\n\nBlank out the region-rectangle.\nThe text previously in the region is overwritten with blanks.\n\nWhen called from a program the rectangle's corners are START and END.\nWith a prefix (or a FILL) argument, also fill with blanks the parts of the\nrectangle which were empty."]
+     "--"
+     ["Rectangle Number Lines" rectangle-number-lines :help "(rectangle-number-lines START END START-AT &optional FORMAT)\n\nInsert numbers in front of the region-rectangle.\n\nSTART-AT, if non-nil, should be a number from which to begin\ncounting. FORMAT, if non-nil, should be a format string to pass\nto `format' along with the line count. When called interactively\nwith a prefix argument, prompt for START-AT and FORMAT."]
+     "--"
+     ["Rectangle Exchange Point And Mark" rectangle-exchange-point-and-mark :help "(rectangle-exchange-point-and-mark &optional ARG)\n\nLike `exchange-point-and-mark' but cycles through the rectangle's corners."]
+     "--"
+     ["Quit" keyboard-quit :help "(keyboard-quit)\n\nSignal a `quit' condition.\nDuring execution of Lisp code, this character causes a quit directly.\nAt top-level, as an editor command, this simply beeps."])))
+
+    (dolist
+     (item
+     '((begin-rect menu-item "--")
+     ["Rectangle Mark Mode" rectangle-mark-mode :style toggle :selected rectangle-mark-mode :help "(rectangle-mark-mode &optional ARG)\n\nToggle the region as rectangular.\nActivates the region if needed. Only lasts until the region is deactivated."]
+     (after-rect menu-item "--")))
+     (easy-menu-add-item global-map
+     '("menu-bar" "edit")
+     item "bookmark"))
+#+END_EXAMPLE
+
+This snippet does the following
+
+1. adds a menu entry for =rectangle-mark-mode= to =Edit= menu.
+2. adds a menu entry for =tabify= and =untabify= commands to =Edit= menu
+3. adds a menu named =Rectangle= which gets activated when in =rectangle-mark-mode=.==
+
+* Step 2:  Ensure that you have set up the above snippet correctly
+   :PROPERTIES:
+   :CUSTOM_ID: step-2-ensure-that-you-have-set-up-the-above-snippet-correctly
+   :END:
+
+Once you restart you Emacs,  you should see menu entries mentioned in previous steps.  See the GIF below for details. If you aren't seeing what you see below, repeat the earlier steps.
+
+[[[https://emacsnotes.files.wordpress.com/2019/05/rect-overview-2019-05-19.gif][CLICK HERE FOR UNSCALED GIF]]]
+
+[[https://emacsnotes.files.wordpress.com/2019/05/rect-overview-2019-05-19.gif?w=740]]
+
+[[[https://emacsnotes.files.wordpress.com/2019/05/rect-overview-2019-05-19.gif][CLICK HERE FOR UNSCALED GIF]]]
+
+Spend some time reviewing the above menus.   The items there give a good overview of  what the =rectangle= commands do.
+
+* Step 3: Copy the input table in to an Emacs buffer
+   :PROPERTIES:
+   :CUSTOM_ID: step-3-copy-the-input-table-in-to-an-emacs-buffer
+   :END:
+
+Copy the input table either from this article, or from here [[https://github.com/emacksnotes/emacsnotes.wordpress.com/blob/a382a312e2472937e95624a33f06bb4a9cacb7b6/my-rect-menu.el#L1][(1)]].  Note that the table scraped from this article will have spaces (and not tabs), but the one from the snippet will have tabs.
+
+* Step 4:   Do the conversion
+   :PROPERTIES:
+   :CUSTOM_ID: step-4-do-the-conversion
+   :END:
+
+See the GIF below for details.  The GIF not only shows how to solve the original problem, but also demonstrates the lesser known facet of =rectangle= commands:  To indent and de-dent text.
+
+[[[https://emacsnotes.files.wordpress.com/2019/05/rect-2019-05-19.gif][CLICK HERE FOR UNSCALED GIF]]]
+
+[[https://emacsnotes.files.wordpress.com/2019/05/rect-2019-05-19.gif?w=740]]
+
+[[[https://emacsnotes.files.wordpress.com/2019/05/rect-2019-05-19.gif][CLICK HERE FOR UNSCALED GIF]]]
+
+* Concluding Words
+   :PROPERTIES:
+   :CUSTOM_ID: concluding-words
+   :END:
+
+To many users, =rectangle= commands may seem like esoteric set of commands that  are of little use in day-to-day editing.   This was also my opinion when I learnt these commands a decade or so ago.  Retrospectively,  I couldn't have been more wrong.  In my experience, I use =rectangle= commands on a very regular basis.  These commands once mastered, keeps on giving.
+
+* Appendix
+   :PROPERTIES:
+   :CUSTOM_ID: appendix
+   :END:
+
+Regular users of this blog will remember an earlier article which posed the same problem as this article, but suggested =delim-col= as a solution. [[https://emacsnotes.wordpress.com/2018/09/24/delim-col-a-handy-tool-for-creating-pretty-tables-and-converting-those-to-different-table-formats/][(1)]] You may want to review that article, and compare and contrast the relative merits and de-merits of =delim-col= and =rectangle= based approaches.
