@@ -1,0 +1,66 @@
+#+TITLE: Working with Coding Systems and Unicode in Emacs
+#+URL: https://www.masteringemacs.org/article/working-coding-systems-unicode-emacs
+#+AUTHOR: lujun9972
+#+TAGS: raw
+#+DATE: [2019年 06月 14日 星期五 18:27:58 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+* Working with Coding Systems and Unicode in Emacs
+  :PROPERTIES:
+  :CUSTOM_ID: working-with-coding-systems-and-unicode-in-emacs
+  :CLASS: text-center
+  :END:
+
+[[https://www.masteringemacs.org/static/img/fleuron2.gif]]
+
+Dealing with unicode in Emacs is a daily task for me. Unfortunately, I don't have the luxury of sticking to just =UTF-8= or =iso-8859-1=; my work involves a lot of fidgeting with a lot of coding systems local to particular regions, so I need a flexible editor that has the right defaults that will cover my most common use-cases. Unsurprisingly, Emacs is more than capable of fulfilling that role.
+
+Emacs has facilities in place for changing the coding system for a variety of things, such as processes, buffers and files. You can also force Emacs to invoke a command with a certain coding system, a concept I will get to in a moment.
+
+The most important change (for me, anyway) is to force Emacs to default to =UTF-8=. It's practically a standard, at least in the West, as it is dominant on the Web; has a one-to-one mapping with ASCII; and is flexible enough to represent any unicode character, making it a world-readable format. But enough nattering about that. The biggest issue is convincing Emacs to treat files as UTF-8 by default, when no information in the file explicitly says it is.
+
+I use the following code snippet to enforce UTF-8 as the default coding system for all files, comint processes and buffers. You're free to replace =utf-8= below with your own preferred coding system.
+
+#+BEGIN_SRC lisp
+    (prefer-coding-system 'utf-8)
+    (set-default-coding-systems 'utf-8)
+    (set-terminal-coding-system 'utf-8)
+    (set-keyboard-coding-system 'utf-8)
+    ;; backwards compatibility as default-buffer-file-coding-system
+    ;; is deprecated in 23.2.
+    (if (boundp 'buffer-file-coding-system)
+     (setq-default buffer-file-coding-system 'utf-8)
+     (setq default-buffer-file-coding-system 'utf-8))
+
+    ;; Treat clipboard input as UTF-8 string first; compound text next, etc.
+    (setq x-select-request-type '(UTF8_STRING COMPOUND_TEXT TEXT STRING))
+#+END_SRC
+
+Once evaluated, Emacs will treat new files, buffers, processes, and so on as though they are UTF-8. Emacs will *still* use a different coding system if the file has a file-local variable like this =-*- coding: euc-tw -*-= near the top of the file. (See =48.2.4 Local Variables in Files= in the Emacs manual.)
+
+OK, so Emacs will default to UTF-8 for everything. That's great, but not everything is in UTF-8; how do you deal with cases where it isn't? How do you make an exception to the proverbial rule? Well, Emacs has got it covered. The command =M-x universal-coding-system-argument=, bound to the handy =C-x RET c=, takes as an argument the coding system you want to use, and a command to execute it with. That makes it possible to open files, shells or run Emacs commands as though you were using a different coding system. Very, very useful. This command is a must-have if you have to deal with stuff encoded in strange coding systems.
+
+One problem with the universal coding system argument is that it only cares about Emacs's settings, not those of your shell or system. That's a problem, because tools like Python use the environment variable =PYTHONIOENCODING= to set the coding system for the Python interpreter.
+
+I have written the following code that advises the =universal-coding-system-argument= function so it also, temporarily for just that command, sets a user-supplied list of environment variables to the coding system.
+
+#+BEGIN_SRC lisp
+    (defvar universal-coding-system-env-list '("PYTHONIOENCODING")
+     "List of environment variables \\[universal-coding-system-argument] should set")
+
+    (defadvice universal-coding-system-argument (around provide-env-handler activate)
+     "Augments \\[universal-coding-system-argument] so it also sets environment variables
+
+    Naively sets all environment variables specified in
+    `universal-coding-system-env-list' to the literal string
+    representation of the argument `coding-system'.
+
+    No guarantees are made that the environment variables set by this advice support
+    the same coding systems as Emacs."
+     (let ((process-environment (copy-alist process-environment)))
+     (dolist (extra-env universal-coding-system-env-list)
+     (setenv extra-env (symbol-name (ad-get-arg 0))))
+     ad-do-it))
+#+END_SRC
+
+Insert the code into your emacs file and evaluate it, and now Emacs will also set the environment variables listed in =universal-coding-system-env-list=. One important thing to keep in mind is that Python and Emacs do not share a one-to-one correspondence of coding systems. There will probably be instances where obscure coding systems exist in one and not the other, or that the spelling or punctuation differ; the mapping of such names is left as an exercise to the reader.
