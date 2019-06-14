@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Working with Coding Systems and Unicode in Emacs - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="raw" />
+  <!-- <link rel="stylesheet" href="../../../../../media/css/main.css" type="text/css"/>
+       <link rel="stylesheet" href="../../../../../media/css/comment.css" type="text/css"/> -->
+  <link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/kognise/water.css@latest/dist/dark.css'>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="../../../../../">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <ul class="trigger">
+        <li><a href="../../../../../years/">Years</a></li>
+        <li><a href="../../../../../authors/">Authors</a></li>
+        <li><a href="../../../../../tags/">Tags</a></li>
+        <li><a href="../../../../../about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="../../../../../rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="https://www.bing.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">Working with Coding Systems and Unicode in Emacs</h1>
+<div id="table-of-contents">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#working-with-coding-systems-and-unicode-in-emacs">Working with Coding Systems and Unicode in Emacs</a></li>
+</ul>
+</div>
+</div>
+<div id="outline-container-org7adea7c" class="outline-2">
+<h2 id="working-with-coding-systems-and-unicode-in-emacs"><a id="org7adea7c"></a>Working with Coding Systems and Unicode in Emacs</h2>
+<div class="outline-text-2" id="text-working-with-coding-systems-and-unicode-in-emacs">
+
+<div class="figure">
+<p><img src="https://www.masteringemacs.org/static/img/fleuron2.gif" alt="fleuron2.gif" />
+</p>
+</div>
+
+<p>
+Dealing with unicode in Emacs is a daily task for me. Unfortunately, I don't have the luxury of sticking to just <code>UTF-8</code> or <code>iso-8859-1</code>; my work involves a lot of fidgeting with a lot of coding systems local to particular regions, so I need a flexible editor that has the right defaults that will cover my most common use-cases. Unsurprisingly, Emacs is more than capable of fulfilling that role.
+</p>
+
+<p>
+Emacs has facilities in place for changing the coding system for a variety of things, such as processes, buffers and files. You can also force Emacs to invoke a command with a certain coding system, a concept I will get to in a moment.
+</p>
+
+<p>
+The most important change (for me, anyway) is to force Emacs to default to <code>UTF-8</code>. It's practically a standard, at least in the West, as it is dominant on the Web; has a one-to-one mapping with ASCII; and is flexible enough to represent any unicode character, making it a world-readable format. But enough nattering about that. The biggest issue is convincing Emacs to treat files as UTF-8 by default, when no information in the file explicitly says it is.
+</p>
+
+<p>
+I use the following code snippet to enforce UTF-8 as the default coding system for all files, comint processes and buffers. You're free to replace <code>utf-8</code> below with your own preferred coding system.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-lisp">(prefer-coding-system 'utf-8)
+(set-default-coding-systems 'utf-8)
+(set-terminal-coding-system 'utf-8)
+(set-keyboard-coding-system 'utf-8)
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">backwards compatibility as default-buffer-file-coding-system</span>
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">is deprecated in 23.2.</span>
+(<span style="font-weight: bold;">if</span> (boundp 'buffer-file-coding-system)
+ (setq-default buffer-file-coding-system 'utf-8)
+ (setq default-buffer-file-coding-system 'utf-8))
+
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Treat clipboard input as UTF-8 string first; compound text next, etc.</span>
+(setq x-select-request-type '(UTF8_STRING COMPOUND_TEXT TEXT STRING))
+</pre>
+</div>
+
+<p>
+Once evaluated, Emacs will treat new files, buffers, processes, and so on as though they are UTF-8. Emacs will <b>still</b> use a different coding system if the file has a file-local variable like this <code>-*- coding: euc-tw -*-</code> near the top of the file. (See <code>48.2.4 Local Variables in Files</code> in the Emacs manual.)
+</p>
+
+<p>
+OK, so Emacs will default to UTF-8 for everything. That's great, but not everything is in UTF-8; how do you deal with cases where it isn't? How do you make an exception to the proverbial rule? Well, Emacs has got it covered. The command <code>M-x universal-coding-system-argument</code>, bound to the handy <code>C-x RET c</code>, takes as an argument the coding system you want to use, and a command to execute it with. That makes it possible to open files, shells or run Emacs commands as though you were using a different coding system. Very, very useful. This command is a must-have if you have to deal with stuff encoded in strange coding systems.
+</p>
+
+<p>
+One problem with the universal coding system argument is that it only cares about Emacs's settings, not those of your shell or system. That's a problem, because tools like Python use the environment variable <code>PYTHONIOENCODING</code> to set the coding system for the Python interpreter.
+</p>
+
+<p>
+I have written the following code that advises the <code>universal-coding-system-argument</code> function so it also, temporarily for just that command, sets a user-supplied list of environment variables to the coding system.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-lisp">(<span style="font-weight: bold;">defvar</span> <span style="font-weight: bold; font-style: italic;">universal-coding-system-env-list</span> '(<span style="font-style: italic;">"PYTHONIOENCODING"</span>)
+ <span style="font-style: italic;">"List of environment variables \\[universal-coding-system-argument] should set"</span>)
+
+(defadvice universal-coding-system-argument (around provide-env-handler activate)
+ <span style="font-style: italic;">"Augments \\[universal-coding-system-argument] so it also sets environment variables</span>
+
+<span style="font-style: italic;">Naively sets all environment variables specified in</span>
+<span style="font-style: italic;">`</span><span style="font-weight: bold; font-style: italic; text-decoration: underline;">universal-coding-system-env-list</span><span style="font-style: italic;">' to the literal string</span>
+<span style="font-style: italic;">representation of the argument `</span><span style="font-weight: bold; font-style: italic; text-decoration: underline;">coding-system</span><span style="font-style: italic;">'.</span>
+
+<span style="font-style: italic;">No guarantees are made that the environment variables set by this advice support</span>
+<span style="font-style: italic;">the same coding systems as Emacs."</span>
+ (<span style="font-weight: bold;">let</span> ((process-environment (copy-alist process-environment)))
+ (<span style="font-weight: bold;">dolist</span> (extra-env universal-coding-system-env-list)
+ (setenv extra-env (symbol-name (ad-get-arg 0))))
+ ad-do-it))
+</pre>
+</div>
+
+<p>
+Insert the code into your emacs file and evaluate it, and now Emacs will also set the environment variables listed in <code>universal-coding-system-env-list</code>. One important thing to keep in mind is that Python and Emacs do not share a one-to-one correspondence of coding systems. There will probably be instances where obscure coding systems exist in one and not the other, or that the spelling or punctuation differ; the mapping of such names is left as an exercise to the reader.
+</p>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2019-06-14</span>
+            <span title="last modification date" class="post-info">2019-06-14</span>
+            <span title="tags" class="post-info">:<a href="../../../../../tags/raw">raw</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-d7f0a1ae-ef3b-4df5-9239-3a07a42ac518">lujun9972</a></span>
+        </div>
+    <script src="../../../../../media/js/jquery-2.1.3.min.js"></script>
+    <script src="../../../../../media/js/md5.min.js"></script>
+        <section>
+            <div id="gitalk-container"></div>
+            <script type="text/javascript">
+             var gitalk = new Gitalk({
+                 clientID: 'fdcb5d9da3f4acb4862c',
+                 clientSecret: 'dd0a16312a206782cb7669dcec5e96874ab48170',
+                 repo: 'lujun9972.github.com',
+                 owner: 'lujun9972',
+                 admin: ['lujun9972'],
+                 id: md5(location.pathname),      // Ensure uniqueness and length less than 50
+                 distractionFreeMode: false  // Facebook-like distraction free mode
+             })
+             gitalk.render('gitalk-container')
+            </script>
+        </section>
+    <script src="../../../../../media/js/main.js"></script>
+        <script>
+         var _hmt = _hmt || [];
+         (function() {
+             var hm = document.createElement("script");
+             hm.src = "https://hm.baidu.com/hm.js?7bac4fd0247f69c27887e0d4e3aee41e";
+             var s = document.getElementsByTagName("script")[0]; 
+             s.parentNode.insertBefore(hm, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-d7f0a1ae-ef3b-4df5-9239-3a07a42ac518">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="../../../../../instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>
