@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>New link features in org 9 - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="raw" />
+  <!-- <link rel="stylesheet" href="../../../../../media/css/main.css" type="text/css"/>
+       <link rel="stylesheet" href="../../../../../media/css/comment.css" type="text/css"/> -->
+  <link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/kognise/water.css@latest/dist/dark.css'>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="../../../../../">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <ul class="trigger">
+        <li><a href="../../../../../years/">Years</a></li>
+        <li><a href="../../../../../authors/">Authors</a></li>
+        <li><a href="../../../../../tags/">Tags</a></li>
+        <li><a href="../../../../../about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="../../../../../rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="https://www.bing.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">New link features in org 9</h1>
+<p>
+You may want to do some additional things when a link is activated. For example, maybe it makes sense for different parts of the link to have different actions, or colors. Here is an example where we make an rgb link of three numbers, and color each number, and make the link color dynamic.
+</p>
+
+<p>
+We make a keymap so C-up increments a color, and C-down decrements a color.
+</p>
+
+<pre class="example">
+(require 'color)
+
+(defun rgb-face (path)
+ (let* ((f (split-string path ","))
+ (red (/ (string-to-number (nth 0 f)) 255.0))
+ (green (/ (string-to-number (nth 1 f)) 255.0))
+ (blue (/ (string-to-number (nth 2 f)) 255.0))
+ (hex (color-rgb-to-hex red green blue)))
+ (list :foreground hex)))
+
+
+(defun rgb-func (start end path bracketp)
+ (save-excursion
+ (goto-char start)
+ (save-match-data
+ (cl-loop for num in (split-string path ",")
+ for face in (list '(:foreground "red")
+ '(:foreground "green")
+ '(:foreground "blue"))
+ do
+ (progn
+ (re-search-forward num end t)
+ (add-text-properties
+ (match-beginning 0)
+ (match-end 0)
+ (list 'face face)))))))
+
+(defun ninc ()
+ (interactive)
+ (skip-chars-backward "0-9")
+ (or (looking-at "[0-9]+")
+ (error "No number at point"))
+ (replace-match (number-to-string (1+ (string-to-number (match-string 0))))))
+
+
+(defun NINC ()
+ (interactive)
+ (let* ((link (org-element-context))
+ (path (org-element-property :path link))
+ (beg (org-element-property :begin link))
+ (end (org-element-property :end link))
+ (rgb (mapcar 'string-to-number (split-string path ","))))
+ (setq rgb (mapcar (lambda (x) (+ x 10)) rgb))
+ (setf (buffer-substring beg end)
+ (format "rgb:%s" (mapconcat 'identity (mapcar 'number-to-string rgb) ",")))))
+
+(defun NDEC ()
+ (interactive)
+ (let* ((link (org-element-context))
+ (path (org-element-property :path link))
+ (beg (org-element-property :begin link))
+ (end (org-element-property :end link))
+ (rgb (mapcar 'string-to-number (split-string path ","))))
+ (setq rgb (mapcar (lambda (x) (- x 10)) rgb))
+ (setf (buffer-substring beg end)
+ (format "rgb:%s" (mapconcat 'identity (mapcar 'number-to-string rgb) ",")))))
+
+
+(defun ndec ()
+ (interactive)
+ (skip-chars-backward "0-9")
+ (or (looking-at "[0-9]+")
+ (error "No number at point"))
+ (replace-match (number-to-string (1- (string-to-number (match-string 0))))))
+
+(org-link-set-parameters "rgb" :face 'rgb-face
+ :activate-func 'rgb-func
+ :keymap (let ((map (copy-keymap org-mouse-map)))
+ (define-key map (kbd "C-&lt;up&gt;") 'ninc)
+ (define-key map (kbd "C-&lt;down&gt;") 'ndec)
+ (define-key map (kbd "s-&lt;up&gt;") 'NINC)
+ (define-key map (kbd "s-&lt;down&gt;") 'NDEC)
+ map))
+</pre>
+
+<p>
+<a href="83,29,238">83,29,238</a> This is a violet color. <a href="112,17,19">112,17,19</a>
+</p>
+
+<p>
+This is an rgb link with three comma separated numbers. We color each number accordingly, and set the rgb link to the color represented by the RGB pair.
+</p>
+
+<p>
+<a href="225,225,225">225,225,225</a> This is a light gray.
+</p>
+
+<p>
+A subtle point in this example is the need to save-match-data. Some functions modify the match-data, and this will mess up the whole font-lock system. I learned that by trial and error.
+</p>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2019-06-14</span>
+            <span title="last modification date" class="post-info">2019-06-14</span>
+            <span title="tags" class="post-info">:<a href="../../../../../tags/raw">raw</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-4dc44811-2038-4f87-bbd6-2348a903a8d7">lujun9972</a></span>
+        </div>
+    <script src="../../../../../media/js/jquery-2.1.3.min.js"></script>
+    <script src="../../../../../media/js/md5.min.js"></script>
+        <section>
+            <div id="gitalk-container"></div>
+            <script type="text/javascript">
+             var gitalk = new Gitalk({
+                 clientID: 'fdcb5d9da3f4acb4862c',
+                 clientSecret: 'dd0a16312a206782cb7669dcec5e96874ab48170',
+                 repo: 'lujun9972.github.com',
+                 owner: 'lujun9972',
+                 admin: ['lujun9972'],
+                 id: md5(location.pathname),      // Ensure uniqueness and length less than 50
+                 distractionFreeMode: false  // Facebook-like distraction free mode
+             })
+             gitalk.render('gitalk-container')
+            </script>
+        </section>
+    <script src="../../../../../media/js/main.js"></script>
+        <script>
+         var _hmt = _hmt || [];
+         (function() {
+             var hm = document.createElement("script");
+             hm.src = "https://hm.baidu.com/hm.js?7bac4fd0247f69c27887e0d4e3aee41e";
+             var s = document.getElementsByTagName("script")[0]; 
+             s.parentNode.insertBefore(hm, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-4dc44811-2038-4f87-bbd6-2348a903a8d7">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="../../../../../instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>
