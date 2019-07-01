@@ -198,6 +198,15 @@
    此外，你也可以定义相应的函数来简化按键操作：
    #+BEGIN_SRC emacs-lisp
      (defmacro def-pairs (pairs)
+       "Define functions for pairing. PAIRS is an alist of (NAME . STRING)
+     conses, where NAME is the function name that will be created and
+     STRING is a single-character string that marks the opening character.
+
+       (def-pairs ((paren . \"(\")
+                   (bracket . \"[\"))
+
+     defines the functions WRAP-WITH-PAREN and WRAP-WITH-BRACKET,
+     respectively."
        `(progn
           ,@(loop for (key . val) in pairs
                   collect
@@ -335,6 +344,34 @@ blah [foo bar]
   下面的代码片段汇总了我在文章中提及的快捷键。此外，我使用 *bind-key* 来更方便地映射
   我的快捷键;我已经在之前的[[http://ebzzry.io/emacs-hacks-2.html][文章]] 里讨论过快捷键这个问题了。
   #+BEGIN_SRC emacs-lisp
+    (defmacro def-pairs (pairs)
+      "Define functions for pairing. PAIRS is an alist of (NAME . STRING)
+    conses, where NAME is the function name that will be created and
+    STRING is a single-character string that marks the opening character.
+
+      (def-pairs ((paren . \"(\")
+                  (bracket . \"[\"))
+
+    defines the functions WRAP-WITH-PAREN and WRAP-WITH-BRACKET,
+    respectively."
+      `(progn
+         ,@(loop for (key . val) in pairs
+                 collect
+                 `(defun ,(read (concat
+                                 "wrap-with-"
+                                 (prin1-to-string key)
+                                 "s"))
+                      (&optional arg)
+                    (interactive "p")
+                    (sp-wrap-with-pair ,val)))))
+
+    (def-pairs ((paren . "(")
+                (bracket . "[")
+                (brace . "{")
+                (single-quote . "'")
+                (double-quote . "\"")
+                (back-quote . "`")))
+
     (bind-keys
      :map smartparens-mode-map
      ("C-M-a" . sp-beginning-of-sexp)
