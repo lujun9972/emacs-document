@@ -1,0 +1,309 @@
+#+TITLE: Emacs Blogging for Fun and Profit
+#+URL: https://loomcom.com/blog/0110_emacs_blogging_for_fun_and_profit.html
+#+AUTHOR: lujun9972
+#+TAGS: raw
+#+DATE: [2019年 07月 08日 星期一 17:08:55 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+You may notice something quite different about this blog if you've
+been here before. The look and feel is different, yes, but it's more
+than just skin deep.
+
+For the last nine years, I've kept my blog in WordPress, a very
+capable blogging platform. But, starting today, I've switched my
+entire website to a technology from the 1970s: Emacs, the venerable
+text editor.
+
+Am I crazy? No, I just think it suits my workflow better.
+
+* Background
+   :PROPERTIES:
+   :CUSTOM_ID: orgaf8ffa8
+   :END:
+
+I've been an Emacs user for many years. Emacs is more than just a text
+editor: It's a swiss army knife, an extensible tool made of other
+tools. One of those tools is Org Mode, a mode that lets you organize
+thoughts, write outlines, keep notes, do budgets, keep agendas and
+timelines, write documentation, and much more.
+
+Org Mode is so powerful that many people who have come to Emacs in
+recent years have done so specifically because they wanted to use Org
+Mode. [[https://orgmode.org/manual/index.html][The on-line manual]] and [[https://orgmode.org/worg/][user-written docs]] are comprehensive and
+give a full sense of Org Mode's capabilities.
+
+One thing that Org Mode is especially good at is /writing
+documentation/. Once a document has been captured in Org Mode,
+complete with markup and links, it can be exported to an HTML document
+(or a LaTeX document, or a PDF, or...)
+
+* Setup
+   :PROPERTIES:
+   :CUSTOM_ID: orgf2c958a
+   :END:
+
+Each page on this site, including all the blog entries, is in its own
+file. They're all published together with a single setup and a single
+command, using the =org-publish= feature of Org Mode.
+
+You can see the source code in its entirety [[https://github.com/sethm/loomcom/][here on GitHub]].
+
+Configuration wasn't too difficult. Basically, the whole config is in
+one elisp file that I load into my master =init.el= file. I keep the
+entire site checked out into a working directory,
+=~/Projects/loomcom=.
+
+I'll go through my config bit by bit, but first, I must acknowledge
+Dennis Ogbe's website ([[https://ogbe.net/]]), and his blog post [[https://ogbe.net/blog/blogging_with_org.html][“Blogging
+using org-mode (and nothing else)”]], for being the inspiration for my
+setup.
+
+** Emacs Config
+    :PROPERTIES:
+    :CUSTOM_ID: orgd821461
+    :END:
+
+The first thing I do is define a symbol, =loomcom/project-dir=, that
+I'll use elsewhere. This is the parent folder, where my website is
+checked out from GitHub.
+
+#+BEGIN_EXAMPLE
+  (setq loomcom/project-dir "~/Projects/loomcom/")
+#+END_EXAMPLE
+
+Then I set up org-publish to use a local directory for caching, so it
+doesn't pollute my home directory. I conveniently put this directory
+into my =.gitignore= file.
+
+#+BEGIN_EXAMPLE
+  (setq org-publish-timestamp-directory (concat loomcom/project-dir "cache/"))
+#+END_EXAMPLE
+
+Next, I set another symbol, =loomcom/extra-head=. I'll use this below
+to set an extra bit of HTML set in each page's =<head>...</head>=
+element. This bit just says that it should load CSS from the
+=/res/style.css= resource.
+
+#+BEGIN_EXAMPLE
+  (setq loomcom/extra-head
+   "<link rel=\"stylesheet\" type=\"text/css\" href=\"/res/style.css\">")
+#+END_EXAMPLE
+
+Then I define two more symbols, =loomcom/header-file= and
+=loomcom/footer=, that inject two blocks of HTML: The first is a
+static snippet file that gets injected before the content, and the
+second is in the form of a string that gets injected after the
+content.
+
+#+BEGIN_EXAMPLE
+  (setq loomcom/header-file
+   (concat loomcom/project-dir "pages/header.html"))
+
+  (setq loomcom/footer
+   (concat
+   "<div id=\"footer\">\n"
+   "<p>Seth Morabito</p>\n"
+   "<p>Proudly published with "
+   "<a href=\"https://www.gnu.org/software/emacs/\">Emacs</a> and "
+   "<a href=\"https://orgmode.org/\">Org Mode</a>"
+   "</div>"))
+#+END_EXAMPLE
+
+Then I turn on the HTML5 fancy variable, so that Org Mode will use
+new HTML5 features.
+
+#+BEGIN_EXAMPLE
+  (setq org-html-html5-fancy t)
+#+END_EXAMPLE
+
+Now we get into the good stuff.
+
+On my blog, I don't want to render every /full/ post all on one page.
+Instead, I'd like to include just a preview, and offer readers the
+ability to click on a /“Read More...”/ link if they wish to link to
+the full post and read the rest. To do this, I define a function,
+=loomcom/get-preview=, that returns just the part of each blog
+document that should be shown on the main blog page.
+
+Org Mode has no built-in facility for this, so I had to roll my own.
+Since there's no built-in syntax, I use a special (but meaningless)
+org-mode block in any blog post that I want to use just a snippet of
+on the front page, using the syntax:
+
+#+BEGIN_EXAMPLE
+  #+BEGIN_more
+  #+END_more
+#+END_EXAMPLE
+
+The function below opens the file, looks for this marker, and returns
+only the blog text between the header and the the marker. If there's
+no marker, it will return the whole post.
+
+It also returns a little bit of metadata: A boolean indicating whether
+the /“Read More...”/ link should be rendered or not.
+
+#+BEGIN_EXAMPLE
+  (defun loomcom/get-preview (filename)
+   "Returns a list: '(<needs-more> <preview-string>) where
+  <needs-more> is t or nil, indicating whether a \"Read More...\"
+  link is needed."
+   (with-temp-buffer
+   (insert-file-contents (concat loomcom/project-dir "blog/" filename))
+   (goto-char (point-min))
+   (let ((content-start (or
+   ;; Look for the first non-keyword line
+   (and (re-search-forward "^[^#]" nil t)
+   (match-beginning 0))
+   ;; Failing that, assume we're malformed and
+   ;; have no content
+   (buffer-size)))
+   (marker (or
+   (and (re-search-forward "^#\\+BEGIN_more$" nil t)
+   (match-beginning 0))
+   (buffer-size))))
+   ;; Return a pair of '(needs-more preview-string)
+   (list (not (= marker (buffer-size)))
+   (buffer-substring content-start marker)))))
+#+END_EXAMPLE
+
+Next is the function that actually generates the main blog page.
+Org Mode's publish functionality refers to this as a “Site Map”,
+but for the purposes of my site, it's a blog page.
+
+By default, Org Mode will publish the entries as a bulleted list.
+We don't want that, so we override the default publishing function.
+All it does is put a title on the page and return each entry separated
+by =\n\n=.
+
+#+BEGIN_EXAMPLE
+  (defun loomcom/sitemap (title list)
+   "Generate the sitemap (Blog Main Page)"
+   (concat "#+TITLE: " title "\n" "--------\n"
+   (string-join (mapcar #'car (cdr list)) "\n\n")))
+#+END_EXAMPLE
+
+Then, I define a function that generates each entry for the sitemap /
+blog page.
+
+This function takes a file name, passes it to =(loomcom/get-preview)=
+to get the preview text, adds a /“Read More...”/ link if needed, and
+returns the Org Mode markup for the entry.
+
+#+BEGIN_EXAMPLE
+  (defun loomcom/sitemap-entry (entry style project)
+   "Sitemap (Blog Main Page) Entry Formatter"
+   (when (not (directory-name-p entry))
+   (format (string-join
+   '("* [[file:%s][%s]]\n"
+   "#+BEGIN_published\n"
+   "%s\n"
+   "#+END_published\n\n"
+   "%s\n"
+   "--------\n"))
+   entry
+   (org-publish-find-title entry project)
+   (format-time-string "%A, %B %_d %Y at %l:%M %p %Z" (org-publish-find-date entry project))
+   (let* ((preview (loomcom/get-preview entry))
+   (needs-more (car preview))
+   (preview-text (cadr preview)))
+   (if needs-more
+   (format
+   (concat
+   "%s\n\n"
+   "#+BEGIN_morelink\n"
+   "[[file:%s][Read More...]]\n"
+   "#+END_morelink\n")
+   preview-text entry)
+   (format "%s" preview-text))))))
+#+END_EXAMPLE
+
+Next I define a function to be used by org-publish to load the HTML
+header file snippet. This function just opens the header file in a
+temp buffer and returns the contents.
+
+#+BEGIN_EXAMPLE
+  (defun loomcom/header (arg)
+   (with-temp-buffer
+   (insert-file-contents loomcom/header-file)
+   (buffer-string)))
+#+END_EXAMPLE
+
+Finally, the meat of the matter. I set up the org-publish project
+with the =org-publish-project-alist= variable.
+
+It defines four components:
+
+- *blog* - The directory containing all blog entries
+- *pages* - Static pages that define the rest of the site
+- *res* - Resources like CSS and JavaScript files
+- *images* - Static images
+
+#+BEGIN_EXAMPLE
+  (setq org-publish-project-alist
+   `(("loomcom"
+   :components ("blog" "pages" "res" "images"))
+   ("blog"
+   :base-directory ,(concat loomcom/project-dir "blog/")
+   :base-extension "org"
+   :publishing-directory ,(concat loomcom/project-dir "www/blog/")
+   :publishing-function org-html-publish-to-html
+   :with-author t
+   :with-creator nil
+   :with-date t
+   :section-numbers nil
+   :with-title t
+   :with-toc nil
+   :with-drawers t
+   :with-sub-superscript nil
+   :html-doctype "html5"
+   :html-link-home "/"
+   :html-head nil
+   :html-head-extra ,loomcom/extra-head
+   :html-head-include-default-style nil
+   :html-head-include-scripts nil
+   :html-viewport nil
+   :html-link-up ""
+   :html-link-home ""
+   :html-preamble loomcom/header
+   :html-postamble ,loomcom/footer
+   :auto-sitemap t
+   :sitemap-function loomcom/sitemap
+   :sitemap-format-entry loomcom/sitemap-entry
+   :sitemap-filename "index.org"
+   :sitemap-title "A Weblog"
+   :sitemap-sort-files anti-chronologically)
+   ("pages"
+   :base-directory ,(concat loomcom/project-dir "pages/")
+   :base-extension "org"
+   :publishing-directory ,(concat loomcom/project-dir "www/")
+   :publishing-function org-html-publish-to-html
+   :section-numbers nil
+   :recursive t
+   :with-title t
+   :with-toc nil
+   :with-drawers t
+   :with-sub-superscript nil
+   :html-link-home "/"
+   :html-head nil
+   :html-doctype "html5"
+   :html-head-extra ,loomcom/extra-head
+   :html-head-include-default-style nil
+   :html-head-include-scripts nil
+   :html-link-up ""
+   :html-link-home ""
+   :html-preamble loomcom/header
+   :html-postamble ,loomcom/footer
+   :html-viewport nil)
+   ("res"
+   :base-directory ,(concat loomcom/project-dir "res/")
+   :base-extension ".*"
+   :publishing-directory ,(concat loomcom/project-dir "www/res/")
+   :publishing-function org-publish-attachment)
+   ("images"
+   :base-directory ,(concat loomcom/project-dir "images/")
+   :base-extension ".*"
+   :publishing-directory ,(concat loomcom/project-dir "www/images/")
+   :publishing-function org-publish-attachment)))
+#+END_EXAMPLE
+
+Whew. That's all there is to it.
