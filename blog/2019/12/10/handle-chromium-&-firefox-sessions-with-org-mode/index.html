@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Handle Chromium &amp; Firefox sessions with org-mode - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="raw" />
+  <!-- <link rel="stylesheet" href="../../../../../media/css/main.css" type="text/css"/>
+       <link rel="stylesheet" href="../../../../../media/css/comment.css" type="text/css"/> -->
+  <link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/kognise/water.css@latest/dist/dark.css'>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="../../../../../">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <ul class="trigger">
+        <li><a href="../../../../../years/">Years</a></li>
+        <li><a href="../../../../../authors/">Authors</a></li>
+        <li><a href="../../../../../tags/">Tags</a></li>
+        <li><a href="../../../../../about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="../../../../../rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="https://www.bing.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">Handle Chromium &amp; Firefox sessions with org-mode</h1>
+<div id="table-of-contents">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#what_about_firefox?">What about Firefox?</a></li>
+</ul>
+</div>
+</div>
+<p>
+I was big fan of <a href="https://chrome.google.com/webstore/detail/session-manager/mghenlmbmjcpehccoangkdpagbcbkdpc?hl=en-US">Session Manager</a>, small addon for Chrome and Chromium that will save all open tabs, assign the name to session and, when is needed, restore it.
+</p>
+
+<p>
+Very useful, especially if you are like me, switching between multiple "mind sessions" during the day - research, development or maybe news reading. Or simply, you'd like to remember workflow (and tabs) you had few days ago.
+</p>
+
+<p>
+After I decided to ditch all extensions from Chromium except <a href="https://chrome.google.com/webstore/detail/ublock-origin/cjpalhdlnbpafiamejdnhcphjbkeiagm?hl=en">uBlock Origin</a>, it was time to look for alternative. My main goal was it to be browser agnostic and session links had to be stored in text file, so I can enjoy all the goodies of plain text file. What would be better for that than good old <a href="https://orgmode.org/">org-mode</a> ;)
+</p>
+
+<p>
+Long time ago I found this trick: <a href="https://superuser.com/a/1310873">Get the currently open tabs in Google Chrome via the command line</a> and with some elisp sugar and coffee, here is the code:
+</p>
+
+<pre class="example">
+(require 'cl-lib)
+
+(defun save-chromium-session ()
+ "Reads chromium current session and generate org-mode heading with items."
+ (interactive)
+ (save-excursion
+ (let* ((cmd "strings ~/'.config/chromium/Default/Current Session' | 'grep' -E '^https?://' | sort | uniq")
+ (ret (shell-command-to-string cmd)))
+ (insert
+ (concat
+ "* "
+ (format-time-string "[%Y-%m-%d %H:%M:%S]")
+ "\n"
+ (mapconcat 'identity
+ (cl-reduce (lambda (lst x)
+ (if (and x (not (string= "" x)))
+ (cons (concat " - " x) lst)
+ lst))
+ (split-string ret "\n")
+ :initial-value (list))
+ "\n"))))))
+
+(defun restore-chromium-session ()
+ "Restore session, by openning each link in list with (browse-url).
+Make sure to put cursor on date heading that contains list of urls."
+ (interactive)
+ (save-excursion
+ (beginning-of-line)
+ (when (looking-at "^\\*")
+ (forward-line 1)
+ (while (looking-at "^[ ]+-[ ]+\\(http.?+\\)$")
+ (let* ((ln (thing-at-point 'line t))
+ (ln (replace-regexp-in-string "^[ ]+-[ ]+" "" ln))
+ (ln (replace-regexp-in-string "\n" "" ln)))
+ (browse-url ln))
+ (forward-line 1)))))
+</pre>
+
+<p>
+So, how does it work?
+</p>
+
+<p>
+Evaluate above code, open new org-mode file and call <code>M-x save-chromium-session</code>. It will create something like this:
+</p>
+
+<pre class="example">
+* [2019-12-04 12:14:02]
+ - https://www.reddit.com/r/emacs/comments/...
+ - https://www.reddit.com/r/Clojure
+ - https://news.ycombinator.com
+</pre>
+
+<p>
+or whatever urls are running in Chromium instance. To restore it back, put cursor on desired date and run <code>M-x restore-chromium-session</code>. All tabs should be back.
+</p>
+
+<p>
+Here is how I use it, with randomly generated data for the purpose of this text:
+</p>
+
+<pre class="example">
+#+TITLE: Browser sessions
+
+* [2019-12-01 23:15:00]...
+* [2019-12-02 18:10:20]...
+* [2019-12-03 19:00:12]
+ - https://www.reddit.com/r/emacs/comments/...
+ - https://www.reddit.com/r/Clojure
+ - https://news.ycombinator.com
+
+* [2019-12-04 12:14:02]
+ - https://www.reddit.com/r/emacs/comments/...
+ - https://www.reddit.com/r/Clojure
+ - https://news.ycombinator.com
+</pre>
+
+<p>
+Note that hack for reading Chromium session isn't perfect: <code>strings</code> will read whatever looks like string and url from binary database and sometimes that will yield small artifacts in urls. But, you can easily edit those and keep session file lean and clean.
+</p>
+
+<p>
+To actually open tabs, elisp code will use <a href="https://www.gnu.org/software/emacs/manual/html_node/emacs/Browse_002dURL.html">browse-url</a> and it can be further customized to run Chromium, Firefox or any other browser with <code>browse-url-browser-function</code> variable. Make sure to read documentation for this variable.
+</p>
+
+<p>
+Don't forget to put session file in git, mercurial or svn and enjoy the fact that you will never loose your session history again :)
+</p>
+
+<div id="outline-container-org5b4fe75" class="outline-2">
+<h2 id="what_about_firefox?"><a id="org5b4fe75"></a>What about Firefox?</h2>
+<div class="outline-text-2" id="text-what_about_firefox?">
+<p>
+If you are using Firefox (recent versions) and would like to pull session urls, here is how to do it.
+</p>
+
+<p>
+First, download and compile <a href="https://github.com/andikleen/lz4json">lz4json</a>, small tool that will decompress Mozilla lz4json format, where Firefox stores session data. Session data (at the time of writing this post) is stored in <code>$HOME/.mozilla/firefox/&lt;unique-name&gt;/sessionstore-backups/recovery.jsonlz4</code>.
+</p>
+
+<p>
+If Firefox is not running, <code>recovery.jsonlz4</code> will not be present, but use <code>previous.jsonlz4</code> instead.
+</p>
+
+<p>
+To extract urls, try this in terminal:
+</p>
+
+<pre class="example">
+$ lz4jsoncat recovery.jsonlz4 | grep -oP '"(http.+?)"' | sed 's/"//g' | sort | uniq
+</pre>
+
+<p>
+and update <code>save-chromium-session</code> with:
+</p>
+
+<pre class="example">
+(defun save-chromium-session ()
+ "Reads chromium current session and converts it to org-mode chunk."
+ (interactive)
+ (save-excursion
+ (let* ((path "~/.mozilla/firefox/&lt;unique-name&gt;/sessionstore-backups/recovery.jsonlz4")
+ (cmd (concat "lz4jsoncat " path " | grep -oP '\"(http.+?)\"' | sed 's/\"//g' | sort | uniq"))
+ (ret (shell-command-to-string cmd)))
+...
+;; rest of the code is unchanged
+</pre>
+
+<p>
+Updating documentation strings, function name and any further refactoring is left for exercise.
+</p>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2019-12-10</span>
+            <span title="last modification date" class="post-info">2019-12-10</span>
+            <span title="tags" class="post-info">:<a href="../../../../../tags/raw">raw</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-c93a913c-2253-4ed3-ac2b-752c2b7e6990">lujun9972</a></span>
+        </div>
+    <script src="../../../../../media/js/jquery-2.1.3.min.js"></script>
+    <script src="../../../../../media/js/md5.min.js"></script>
+        <section>
+            <div id="gitalk-container"></div>
+            <script type="text/javascript">
+             var gitalk = new Gitalk({
+                 clientID: 'fdcb5d9da3f4acb4862c',
+                 clientSecret: 'dd0a16312a206782cb7669dcec5e96874ab48170',
+                 repo: 'lujun9972.github.com',
+                 owner: 'lujun9972',
+                 admin: ['lujun9972'],
+                 id: md5(location.pathname),      // Ensure uniqueness and length less than 50
+                 distractionFreeMode: false  // Facebook-like distraction free mode
+             })
+             gitalk.render('gitalk-container')
+            </script>
+        </section>
+    <script src="../../../../../media/js/main.js"></script>
+        <script>
+         var _hmt = _hmt || [];
+         (function() {
+             var hm = document.createElement("script");
+             hm.src = "https://hm.baidu.com/hm.js?7bac4fd0247f69c27887e0d4e3aee41e";
+             var s = document.getElementsByTagName("script")[0]; 
+             s.parentNode.insertBefore(hm, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-c93a913c-2253-4ed3-ac2b-752c2b7e6990">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="../../../../../instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>
