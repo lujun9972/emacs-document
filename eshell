@@ -1,0 +1,62 @@
+#+TITLE: Emacs eshell中的Wizard zines漫画
+#+URL: http://xenodium.com/wizard-zines-comics-eshell-util/index.html
+#+AUTHOR: lujun9972
+#+TAGS: raw
+#+DATE: [2019年 12月 11日 星期三 20:05:33 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+在 [[http://wizardzines.com][wizardzines.com]] 网站上,[[https://jvns.ca][Julia Evans]] 撰写了git, 网络, linux, 命令行工具等主题的超棒电子杂志. 其中有些杂志是付费的,有些杂志是免费的. 我这里不是托，只是个粉丝而已.
+
+不久前, Julia [[https://twitter.com/b0rk/status/1192304892435738624][在tweet上l公布了]] 她创建的一个用来阅读相关主题漫画的工具. 我立即想到，这个有趣的工具很适合用 Emacs [[https://www.gnu.org/software/emacs/manual/html_mono/eshell.html][eshell]] 来实现.
+
+自那以后, 我订阅了 [[https://wizardzines.com/saturday-comics/][wizardzines.com/saturday-comics]] 并收到了一些漫画 (awk, tar, 以及 bash 技巧). 我将这些漫画保存在本地 (以去掉文件扩展名的主题命名).
+
+#+begin_src shell
+  ls -1 ~/Downloads/wizardzines-comics/
+#+end_src
+
+#+BEGIN_EXAMPLE
+  awk
+  bash
+  tar
+#+END_EXAMPLE
+
+
+虽然没有经过实战测试, 但是下面这个elisp片段定义了一个 /ecomic/ 命令. 它会在eshell中以内联的方式显示漫画.
+
+#+begin_src emacs-lisp
+  (require 'eshell)
+  (require 'iimage)
+
+  (defvar wizardzines-comics-path "~/Downloads/wizardzines-comics")
+
+  (defun eshell/ecomic (&rest args)
+    "Display command comic in ARGS.
+    Note: ensure comic images live in `wizardzines-comics-path', named with
+    command name and no extension."
+    (eshell-eval-using-options
+     "ecomic" args
+     '((?h "help" nil nil "show this usage screen")
+       :external "ecomic"
+       :show-usage
+       :usage "COMMAND
+
+    Show COMMAND comic from Julia Evans' https://wizardzines.com/saturday-comics")
+     (let* ((command (nth 0 (eshell-stringify-list (eshell-flatten-list args))))
+            (image-fpath (concat (file-name-as-directory
+                                  (expand-file-name wizardzines-comics-path))
+                                 command)))
+       (unless (file-exists-p image-fpath)
+         (error "comic: \"%s\" not found :-(" command))
+       (eshell-buffered-print "\n")
+       (add-text-properties 0 (length image-fpath)
+                            `(display ,(create-image image-fpath)
+                                      modification-hooks
+                                      (iimage-modification-hook))
+                            image-fpath)
+       (eshell-buffered-print image-fpath)
+       (eshell-flush))))
+#+end_src
+
+[[http://xenodium.com/images/wizard-zines-comics-eshell-util/ecomic.gif]]
