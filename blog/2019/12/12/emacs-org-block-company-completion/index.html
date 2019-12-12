@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <title>Emacs swiper and multiple cursors - EMACS-DOCUMENT</title>
+  <title>Emacs org block company completion - EMACS-DOCUMENT</title>
   <meta charset="utf-8" />
   <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
   <meta name="viewport"
@@ -39,35 +39,112 @@
 
 <div>
 <div class="post">
-<h1 class="title">Emacs swiper and multiple cursors</h1>
+<h1 class="title">Emacs org block company completion</h1>
 <p>
-Emacs <a href="https://github.com/abo-abo/swiper">swiper</a> is awesome. I bound <i>swiper-isearch</i> to <i>C-s</i>. Also a big fan of <a href="https://github.com/magnars/multiple-cursors.el">multiple cursors</a>. I use it regularly (it's fun).
+Back in 2015, I bound the "&lt;" key to a hydra for quickly inserting org blocks. The idea came from Oleg's post on <a href="https://oremacs.com/2015/03/07/hydra-org-templates/">org-mode block templates in Hydra</a>. The suggested binding settled in my muscle memory without much effort.
 </p>
 
 <p>
-I had totally missed Ole's post back in 2015: <a href="https://oremacs.com/2015/10/14/swiper-mc/">A simple multiple-cursors extension to swiper</a>. Turns out, swiper has multiple cursors support out of the box (bound to <i>C-7</i> by default). Yay!
+Fast forward to Febrary 2019. I replaced the hydra with <i><a href="https://orgmode.org/manual/Easy-templates.html">org-insert-structure-template</a></i> when <i>org-try-structure-completion</i> was removed from org mode. No biggie, as I kept the same binding to "&lt;" and hardly noticed the change.
 </p>
 
 <p>
-UPDATE: Thanks to <a href="https://irreal.org/blog/?p=8370">irreal's post</a>, please remember to add <i>swiper-mc</i> to <i>mc/cmds-to-run-once</i> list (or things won't work as expected). This typically happens interactively when you invoke C-7 the first time around. Make sure you answer "n" when you see a prompt like:
+Since my primary use-case for easy templates is inserting <a href="https://orgmode.org/manual/Working-with-source-code.html">source blocks</a>, I was keen to expedite choosing the source language as well as inserting the source block itself.
+</p>
+
+<p>
+Writing a small <a href="https://company-mode.github.io/">company mode</a> completion backend fits my primary use-case pretty well.
 </p>
 
 
 <div class="figure">
-<p><img src="http://xenodium.com/images/emacs-swiper-and-multiple-cursors/swiper-mc-no.png" alt="swiper-mc-no.png" />
+<p><img src="http://xenodium.com/images/emacs-org-block-company-completion/company-org-block.gif" alt="company-org-block.gif" />
 </p>
 </div>
 
 <p>
-If you happen to choose "y" by mistake, take a look at <b>~/.emacs.d/.mc-lists.el</b> to correct it. Remove <i>swiper-mc</i> from <i>mc/cmds-to-run-for-all</i>
-and add it to <i>mc/cmds-to-run-once</i>. Invoke <i>m-x eval-buffer</i> to reset the values and you're good to go.
+The company backend looks as follow (<b>Warning:</b> <a href="https://twitter.com/tpanum/status/1197772426072997888">Snippet needs Org v9.2</a>):
 </p>
 
+<pre class="example">
+(require 'map)
+(require 'org)
+(require 'seq)
 
-<div class="figure">
-<p><img src="http://xenodium.com/images/emacs-swiper-and-multiple-cursors/swipermc.gif" alt="swipermc.gif" />
+(defvar company-org-block-bol-p t "If t, detect completion when at
+begining of line, otherwise detect completion anywhere.")
+
+(defvar company-org--regexp "&lt;\\([^ ]*\\)")
+
+(defun company-org-block (command &amp;optional arg &amp;rest ignored)
+ "Complete org babel languages into source blocks."
+ (interactive (list 'interactive))
+ (cl-case command
+ (interactive (company-begin-backend 'company-org-block))
+ (prefix (when (derived-mode-p 'org-mode)
+ (company-org-block--grab-symbol-cons)))
+ (candidates (company-org-block--candidates arg))
+ (post-completion
+ (company-org-block--expand arg))))
+
+(defun company-org-block--candidates (prefix)
+ "Return a list of org babel languages matching PREFIX."
+ (seq-filter (lambda (language)
+ (string-prefix-p prefix language))
+ ;; Flatten `org-babel-load-languages' and
+ ;; `org-structure-template-alist', join, and sort.
+ (seq-sort
+ #'string-lessp
+ (append
+ (mapcar #'prin1-to-string
+ (map-keys org-babel-load-languages))
+ (map-values org-structure-template-alist)))))
+
+(defun company-org-block--template-p (template)
+ (seq-contains (map-values org-structure-template-alist)
+ template))
+
+(defun company-org-block--expand (insertion)
+ "Replace INSERTION with actual source block."
+ (delete-region (point) (- (point) (1+ ;; Include "&lt;" in length.
+ (length insertion))))
+ (if (company-org-block--template-p insertion)
+ (company-org-block--wrap-point insertion
+ ;; May be multiple words.
+ ;; Take the first one.
+ (nth 0 (split-string insertion)))
+ (company-org-block--wrap-point (format "src %s" insertion)
+ "src")))
+
+(defun company-org-block--wrap-point (begin end)
+ "Wrap point with block using BEGIN and END. For example:
+#+begin_BEGIN
+ |
+#+end_END"
+ (insert (format "#+begin_%s\n" begin))
+ (insert (make-string org-edit-src-content-indentation ?\s))
+ ;; Saving excursion restores point to location inside code block.
+ (save-excursion
+ (insert (format "\n#+end_%s" end))))
+
+(defun company-org-block--grab-symbol-cons ()
+ "Return cons with symbol and t whenever prefix of &lt; is found.
+For example: \"&lt;e\" -&gt; (\"e\" . t)"
+ (when (looking-back (if company-org-block-bol-p
+ (concat "^" company-org--regexp)
+ company-org--regexp)
+ (line-beginning-position))
+ (cons (match-string-no-properties 1) t)))
+</pre>
+
+<p>
+To use, add the backend enable <i>company-mode</i> in <i>org-mode</i>:
 </p>
-</div>
+
+<pre class="example">
+(add-to-list 'company-backends 'company-org-block)
+(company-mode +1)
+</pre>
 
 </div>
 </div>
@@ -76,7 +153,7 @@ and add it to <i>mc/cmds-to-run-once</i>. Invoke <i>m-x eval-buffer</i> to reset
             <span title="post date" class="post-info">2019-12-12</span>
             <span title="last modification date" class="post-info">2019-12-12</span>
             <span title="tags" class="post-info">:<a href="../../../../../tags/raw">raw</a>:</span>
-            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-26ed1ef5-807b-4c3b-943a-0407f25dbfab">lujun9972</a></span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-b6ca029b-8bf2-429b-a1e2-818588f8ead5">lujun9972</a></span>
         </div>
     <script src="../../../../../media/js/jquery-2.1.3.min.js"></script>
     <script src="../../../../../media/js/md5.min.js"></script>
@@ -108,7 +185,7 @@ and add it to <i>mc/cmds-to-run-once</i>. Invoke <i>m-x eval-buffer</i> to reset
     <div class="footer">
         <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
         <p>
-            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-26ed1ef5-807b-4c3b-943a-0407f25dbfab">lujun9972</a>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-b6ca029b-8bf2-429b-a1e2-818588f8ead5">lujun9972</a>
             &nbsp;&nbsp;-&nbsp;&nbsp;
             Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
             <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
