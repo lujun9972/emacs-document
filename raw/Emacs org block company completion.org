@@ -1,0 +1,96 @@
+#+TITLE: Emacs org block company completion
+#+URL: http://xenodium.com/emacs-org-block-company-completion/
+#+AUTHOR: lujun9972
+#+TAGS: raw
+#+DATE: [2019年 12月 12日 星期四 14:49:13 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+Back in 2015, I bound the "<" key to a hydra for quickly inserting org blocks. The idea came from Oleg's post on [[https://oremacs.com/2015/03/07/hydra-org-templates/][org-mode block templates in Hydra]]. The suggested binding settled in my muscle memory without much effort.
+
+Fast forward to Febrary 2019. I replaced the hydra with /[[https://orgmode.org/manual/Easy-templates.html][org-insert-structure-template]]/ when /org-try-structure-completion/ was removed from org mode. No biggie, as I kept the same binding to "<" and hardly noticed the change.
+
+Since my primary use-case for easy templates is inserting [[https://orgmode.org/manual/Working-with-source-code.html][source blocks]], I was keen to expedite choosing the source language as well as inserting the source block itself.
+
+Writing a small [[https://company-mode.github.io/][company mode]] completion backend fits my primary use-case pretty well.
+
+[[http://xenodium.com/images/emacs-org-block-company-completion/company-org-block.gif]]
+
+The company backend looks as follow (*Warning:* [[https://twitter.com/tpanum/status/1197772426072997888][Snippet needs Org v9.2]]):
+
+#+BEGIN_EXAMPLE
+  (require 'map)
+  (require 'org)
+  (require 'seq)
+
+  (defvar company-org-block-bol-p t "If t, detect completion when at
+  begining of line, otherwise detect completion anywhere.")
+
+  (defvar company-org--regexp "<\\([^ ]*\\)")
+
+  (defun company-org-block (command &optional arg &rest ignored)
+   "Complete org babel languages into source blocks."
+   (interactive (list 'interactive))
+   (cl-case command
+   (interactive (company-begin-backend 'company-org-block))
+   (prefix (when (derived-mode-p 'org-mode)
+   (company-org-block--grab-symbol-cons)))
+   (candidates (company-org-block--candidates arg))
+   (post-completion
+   (company-org-block--expand arg))))
+
+  (defun company-org-block--candidates (prefix)
+   "Return a list of org babel languages matching PREFIX."
+   (seq-filter (lambda (language)
+   (string-prefix-p prefix language))
+   ;; Flatten `org-babel-load-languages' and
+   ;; `org-structure-template-alist', join, and sort.
+   (seq-sort
+   #'string-lessp
+   (append
+   (mapcar #'prin1-to-string
+   (map-keys org-babel-load-languages))
+   (map-values org-structure-template-alist)))))
+
+  (defun company-org-block--template-p (template)
+   (seq-contains (map-values org-structure-template-alist)
+   template))
+
+  (defun company-org-block--expand (insertion)
+   "Replace INSERTION with actual source block."
+   (delete-region (point) (- (point) (1+ ;; Include "<" in length.
+   (length insertion))))
+   (if (company-org-block--template-p insertion)
+   (company-org-block--wrap-point insertion
+   ;; May be multiple words.
+   ;; Take the first one.
+   (nth 0 (split-string insertion)))
+   (company-org-block--wrap-point (format "src %s" insertion)
+   "src")))
+
+  (defun company-org-block--wrap-point (begin end)
+   "Wrap point with block using BEGIN and END. For example:
+  #+begin_BEGIN
+   |
+  #+end_END"
+   (insert (format "#+begin_%s\n" begin))
+   (insert (make-string org-edit-src-content-indentation ?\s))
+   ;; Saving excursion restores point to location inside code block.
+   (save-excursion
+   (insert (format "\n#+end_%s" end))))
+
+  (defun company-org-block--grab-symbol-cons ()
+   "Return cons with symbol and t whenever prefix of < is found.
+  For example: \"<e\" -> (\"e\" . t)"
+   (when (looking-back (if company-org-block-bol-p
+   (concat "^" company-org--regexp)
+   company-org--regexp)
+   (line-beginning-position))
+   (cons (match-string-no-properties 1) t)))
+#+END_EXAMPLE
+
+To use, add the backend enable /company-mode/ in /org-mode/:
+
+#+BEGIN_EXAMPLE
+  (add-to-list 'company-backends 'company-org-block)
+  (company-mode +1)
+#+END_EXAMPLE
