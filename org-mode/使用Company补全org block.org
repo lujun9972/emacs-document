@@ -1,0 +1,98 @@
+#+TITLE: 使用Company补全org block
+#+URL: http://xenodium.com/emacs-org-block-company-completion/
+#+AUTHOR: lujun9972
+#+TAGS: org
+#+DATE: [2019年 12月 12日 星期四 14:49:13 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+早在 2015 年, 我将 "<" 键绑定到 hydra 中以便快速插入 org blocks. 这个想法来源于 Oleg 的那篇讲述 [[https://oremacs.com/2015/03/07/hydra-org-templates/][Hydra中的org-mode block 模板的文章]]. 
+我毫不费力就将这项快捷键变成了肌肉记忆.
+
+快进到 2019 年 2 月. 当 =org-try-structure-completion= 被从org mode中移除后，我用 [[https://orgmode.org/manual/Easy-templates.html][org-insert-structure-template]] 替代了 hydra. 
+没什么大不了的, 因为我依然可以使用 "<" 作为快捷键，而几乎感觉不到什么变化.
+
+由于我使用 easy templates 的主要场景就是插入 [[https://orgmode.org/manual/Working-with-source-code.html][代码 blocks]]，除了插入代码块本身，我还希望能够快速选择源码语言。
+
+通过一小段 [[https://company-mode.github.io/][company mode]] 的补全后端可以很好地满足我的主要场景.
+
+[[http://xenodium.com/images/emacs-org-block-company-completion/company-org-block.gif]]
+
+company 后端如下所示(*警告:* [[https://twitter.com/tpanum/status/1197772426072997888][需要 Org v9.2]]):
+
+#+begin_src emacs-lisp
+  (require 'map)
+  (require 'org)
+  (require 'seq)
+
+  (defvar company-org-block-bol-p t "If t, detect completion when at
+    begining of line, otherwise detect completion anywhere.")
+
+  (defvar company-org--regexp "<\\([^ ]*\\)")
+
+  (defun company-org-block (command &optional arg &rest ignored)
+    "Complete org babel languages into source blocks."
+    (interactive (list 'interactive))
+    (cl-case command
+      (interactive (company-begin-backend 'company-org-block))
+      (prefix (when (derived-mode-p 'org-mode)
+                (company-org-block--grab-symbol-cons)))
+      (candidates (company-org-block--candidates arg))
+      (post-completion
+       (company-org-block--expand arg))))
+
+  (defun company-org-block--candidates (prefix)
+    "Return a list of org babel languages matching PREFIX."
+    (seq-filter (lambda (language)
+                  (string-prefix-p prefix language))
+                ;; Flatten `org-babel-load-languages' and
+                ;; `org-structure-template-alist', join, and sort.
+                (seq-sort
+                 #'string-lessp
+                 (append
+                  (mapcar #'prin1-to-string
+                          (map-keys org-babel-load-languages))
+                  (map-values org-structure-template-alist)))))
+
+  (defun company-org-block--template-p (template)
+    (seq-contains (map-values org-structure-template-alist)
+                  template))
+
+  (defun company-org-block--expand (insertion)
+    "Replace INSERTION with actual source block."
+    (delete-region (point) (- (point) (1+ ;; Include "<" in length.
+                                       (length insertion))))
+    (if (company-org-block--template-p insertion)
+        (company-org-block--wrap-point insertion
+                                       ;; May be multiple words.
+                                       ;; Take the first one.
+                                       (nth 0 (split-string insertion)))
+      (company-org-block--wrap-point (format "src %s" insertion)
+                                     "src")))
+
+  (defun company-org-block--wrap-point (begin end)
+    "Wrap point with block using BEGIN and END. For example:
+    ,#+begin_BEGIN
+     |
+    ,#+end_END"
+    (insert (format "#+begin_%s\n" begin))
+    (insert (make-string org-edit-src-content-indentation ?\s))
+    ;; Saving excursion restores point to location inside code block.
+    (save-excursion
+      (insert (format "\n#+end_%s" end))))
+
+  (defun company-org-block--grab-symbol-cons ()
+    "Return cons with symbol and t whenever prefix of < is found.
+    For example: \"<e\" -> (\"e\" . t)"
+    (when (looking-back (if company-org-block-bol-p
+                            (concat "^" company-org--regexp)
+                          company-org--regexp)
+                        (line-beginning-position))
+      (cons (match-string-no-properties 1) t)))
+#+end_src
+
+要使用它, 则添加该补全后端，然后在 =org-mode= 中启用 =company-mode=:
+
+#+begin_src emacs-lisp
+  (add-to-list 'company-backends 'company-org-block)
+  (company-mode +1)
+#+end_src
