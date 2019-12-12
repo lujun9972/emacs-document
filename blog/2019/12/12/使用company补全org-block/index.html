@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>使用Company补全org block - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="org" />
+  <!-- <link rel="stylesheet" href="../../../../../media/css/main.css" type="text/css"/>
+       <link rel="stylesheet" href="../../../../../media/css/comment.css" type="text/css"/> -->
+  <link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/kognise/water.css@latest/dist/dark.css'>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="../../../../../">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <ul class="trigger">
+        <li><a href="../../../../../years/">Years</a></li>
+        <li><a href="../../../../../authors/">Authors</a></li>
+        <li><a href="../../../../../tags/">Tags</a></li>
+        <li><a href="../../../../../about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="../../../../../rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="https://www.bing.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">使用Company补全org block</h1>
+<p>
+早在 2015 年, 我将 "&lt;" 键绑定到 hydra 中以便快速插入 org blocks. 这个想法来源于 Oleg 的那篇讲述 <a href="https://oremacs.com/2015/03/07/hydra-org-templates/">Hydra中的org-mode block 模板的文章</a>. 
+我毫不费力就将这项快捷键变成了肌肉记忆.
+</p>
+
+<p>
+快进到 2019 年 2 月. 当 <code>org-try-structure-completion</code> 被从org mode中移除后，我用 <a href="https://orgmode.org/manual/Easy-templates.html">org-insert-structure-template</a> 替代了 hydra. 
+没什么大不了的, 因为我依然可以使用 "&lt;" 作为快捷键，而几乎感觉不到什么变化.
+</p>
+
+<p>
+由于我使用 easy templates 的主要场景就是插入 <a href="https://orgmode.org/manual/Working-with-source-code.html">代码 blocks</a>，除了插入代码块本身，我还希望能够快速选择源码语言。
+</p>
+
+<p>
+通过一小段 <a href="https://company-mode.github.io/">company mode</a> 的补全后端可以很好地满足我的主要场景.
+</p>
+
+
+<div class="figure">
+<p><img src="http://xenodium.com/images/emacs-org-block-company-completion/company-org-block.gif" alt="company-org-block.gif" />
+</p>
+</div>
+
+<p>
+company 后端如下所示(<b>警告:</b> <a href="https://twitter.com/tpanum/status/1197772426072997888">需要 Org v9.2</a>):
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">require</span> '<span style="font-weight: bold; text-decoration: underline;">map</span>)
+(<span style="font-weight: bold;">require</span> '<span style="font-weight: bold; text-decoration: underline;">org</span>)
+(<span style="font-weight: bold;">require</span> '<span style="font-weight: bold; text-decoration: underline;">seq</span>)
+
+(<span style="font-weight: bold;">defvar</span> <span style="font-weight: bold; font-style: italic;">company-org-block-bol-p</span> t <span style="font-style: italic;">"If t, detect completion when at</span>
+<span style="font-style: italic;">  begining of line, otherwise detect completion anywhere."</span>)
+
+(<span style="font-weight: bold;">defvar</span> <span style="font-weight: bold; font-style: italic;">company-org--regexp</span> <span style="font-style: italic;">"&lt;</span><span style="font-weight: bold; font-style: italic;">\\</span><span style="font-weight: bold; font-style: italic;">(</span><span style="font-style: italic;">[</span><span style="font-style: italic;">^</span><span style="font-style: italic;"> ]*</span><span style="font-weight: bold; font-style: italic;">\\</span><span style="font-weight: bold; font-style: italic;">)</span><span style="font-style: italic;">"</span>)
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">company-org-block</span> (command <span style="font-weight: bold; text-decoration: underline;">&amp;optional</span> arg <span style="font-weight: bold; text-decoration: underline;">&amp;rest</span> ignored)
+  <span style="font-style: italic;">"Complete org babel languages into source blocks."</span>
+  (<span style="font-weight: bold;">interactive</span> (list 'interactive))
+  (<span style="font-weight: bold;">cl-case</span> command
+    (<span style="font-weight: bold;">interactive</span> (company-begin-backend 'company-org-block))
+    (prefix (<span style="font-weight: bold;">when</span> (derived-mode-p 'org-mode)
+              (company-org-block--grab-symbol-cons)))
+    (candidates (company-org-block--candidates arg))
+    (post-completion
+     (company-org-block--expand arg))))
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">company-org-block--candidates</span> (prefix)
+  <span style="font-style: italic;">"Return a list of org babel languages matching PREFIX."</span>
+  (seq-filter (<span style="font-weight: bold;">lambda</span> (language)
+                (string-prefix-p prefix language))
+              <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Flatten `</span><span style="font-weight: bold; font-style: italic; text-decoration: underline;">org-babel-load-languages</span><span style="font-weight: bold; font-style: italic;">' and</span>
+              <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">`</span><span style="font-weight: bold; font-style: italic; text-decoration: underline;">org-structure-template-alist</span><span style="font-weight: bold; font-style: italic;">', join, and sort.</span>
+              (seq-sort
+               #'string-lessp
+               (append
+                (mapcar #'prin1-to-string
+                        (map-keys org-babel-load-languages))
+                (map-values org-structure-template-alist)))))
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">company-org-block--template-p</span> (template)
+  (seq-contains (map-values org-structure-template-alist)
+                template))
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">company-org-block--expand</span> (insertion)
+  <span style="font-style: italic;">"Replace INSERTION with actual source block."</span>
+  (delete-region (point) (- (point) (1+ <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Include "&lt;" in length.</span>
+                                     (length insertion))))
+  (<span style="font-weight: bold;">if</span> (company-org-block--template-p insertion)
+      (company-org-block--wrap-point insertion
+                                     <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">May be multiple words.</span>
+                                     <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Take the first one.</span>
+                                     (nth 0 (split-string insertion)))
+    (company-org-block--wrap-point (format <span style="font-style: italic;">"src %s"</span> insertion)
+                                   <span style="font-style: italic;">"src"</span>)))
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">company-org-block--wrap-point</span> (begin end)
+  <span style="font-style: italic;">"Wrap point with block using BEGIN and END. For example:</span>
+<span style="font-style: italic;">  #+begin_BEGIN</span>
+<span style="font-style: italic;">   |</span>
+<span style="font-style: italic;">  #+end_END"</span>
+  (insert (format <span style="font-style: italic;">"#+begin_%s\n"</span> begin))
+  (insert (make-string org-edit-src-content-indentation ?\s))
+  <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Saving excursion restores point to location inside code block.</span>
+  (<span style="font-weight: bold;">save-excursion</span>
+    (insert (format <span style="font-style: italic;">"\n#+end_%s"</span> end))))
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">company-org-block--grab-symbol-cons</span> ()
+  <span style="font-style: italic;">"Return cons with symbol and t whenever prefix of &lt; is found.</span>
+<span style="font-style: italic;">  For example: \"&lt;e\" -&gt; (\"e\" . t)"</span>
+  (<span style="font-weight: bold;">when</span> (looking-back (<span style="font-weight: bold;">if</span> company-org-block-bol-p
+                          (concat <span style="font-style: italic;">"^"</span> company-org--regexp)
+                        company-org--regexp)
+                      (line-beginning-position))
+    (cons (match-string-no-properties 1) t)))
+</pre>
+</div>
+
+<p>
+要使用它, 则添加该补全后端，然后在 <code>org-mode</code> 中启用 <code>company-mode</code>:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(add-to-list 'company-backends 'company-org-block)
+(company-mode +1)
+</pre>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2019-12-12</span>
+            <span title="last modification date" class="post-info">2019-12-12</span>
+            <span title="tags" class="post-info">:<a href="../../../../../tags/org">org</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-d7c8cb1d-7bb5-4e77-9108-872678967a8c">lujun9972</a></span>
+        </div>
+    <script src="../../../../../media/js/jquery-2.1.3.min.js"></script>
+    <script src="../../../../../media/js/md5.min.js"></script>
+        <section>
+            <div id="gitalk-container"></div>
+            <script type="text/javascript">
+             var gitalk = new Gitalk({
+                 clientID: 'fdcb5d9da3f4acb4862c',
+                 clientSecret: 'dd0a16312a206782cb7669dcec5e96874ab48170',
+                 repo: 'lujun9972.github.com',
+                 owner: 'lujun9972',
+                 admin: ['lujun9972'],
+                 id: md5(location.pathname),      // Ensure uniqueness and length less than 50
+                 distractionFreeMode: false  // Facebook-like distraction free mode
+             })
+             gitalk.render('gitalk-container')
+            </script>
+        </section>
+    <script src="../../../../../media/js/main.js"></script>
+        <script>
+         var _hmt = _hmt || [];
+         (function() {
+             var hm = document.createElement("script");
+             hm.src = "https://hm.baidu.com/hm.js?7bac4fd0247f69c27887e0d4e3aee41e";
+             var s = document.getElementsByTagName("script")[0]; 
+             s.parentNode.insertBefore(hm, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-d7c8cb1d-7bb5-4e77-9108-872678967a8c">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="../../../../../instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>
