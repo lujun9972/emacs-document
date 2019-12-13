@@ -1,0 +1,168 @@
+#+TITLE: Running SQL on org-mode tables
+#+URL: https://isamert.net/2019/11/14/running-sql-on-org-mode-tables.html
+#+AUTHOR: lujun9972
+#+TAGS: raw
+#+DATE: [2019年 12月 13日 星期五 11:01:15 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+* Running SQL on org-mode tables
+  :PROPERTIES:
+  :CUSTOM_ID: running-sql-on-org-mode-tables
+  :END:
+
+by isamert
+
+I was tracking some sleep related information about myself using org tables and I wanted to visualize them. I thought to myself, I know R! Let's do all that stuff in R!. Oh boy, I was wrong. I used R in the past for an undergraduate course and I wasn't heavily invested in taking notes at those times. (Now thanks to org-mode and zotero, I don't forget anything anymore) I quickly gave up using R for manipulating the data but I was going to use it for plotting anyway. At that point I was about to give up, firstly because I didn't want to have an overly-complex solution for such a worthless thing and secondly I was extremely lazy.
+
+Then I remembered about =sqldf=. It's an R package that manipulates R dataframes (basically tables, at least for our purposes in this post) using SQL. Behind the scenes it uses an SQL DB implementation for this. It handles all the dirty stuff for us; like creating tables, running the SQL and conversion between the formats. So I simply used =sqldf= and R's plot function to accomplish my goal (Yeah, =ob-R= package supports passing org tables to R code as variables). Then I thought it may be really nice to have an SQL backend for manipulating org tables. Because why not? Nearly every table-like technology have some kind of SQL-like query language.
+
+* Preparation
+  :PROPERTIES:
+  :CUSTOM_ID: preparation
+  :END:
+
+** R
+   :PROPERTIES:
+   :CUSTOM_ID: r
+   :END:
+
+You need to install R and =sqldf= package.
+
+#+BEGIN_EXAMPLE
+  pacman -S r # use your package manager for installing R, this is just an example for Arch
+#+END_EXAMPLE
+
+Now you need to install =sqldf=. But before that I recommend adding something like this to your environment variables (probably using =~/.profile= file, you know what's best), otherwise you will need root privileges to install R packages.
+
+#+BEGIN_EXAMPLE
+  export R_LIBS_USER="$HOME/.rlibs"
+#+END_EXAMPLE
+
+You also need to create that directory:
+
+#+BEGIN_EXAMPLE
+  mkdir ~/.rlibs
+  # BTW, run this too while you are here:
+  echo 'options(repos = c(CRAN = "https://cran.rstudio.com"))' > ~/.Rprofile
+#+END_EXAMPLE
+
+Now open the R console.
+
+#+BEGIN_EXAMPLE
+  R
+#+END_EXAMPLE
+
+And run this:
+
+#+BEGIN_EXAMPLE
+  install.packages("sqldf")
+#+END_EXAMPLE
+
+That's all for the R part.
+
+** Emacs
+   :PROPERTIES:
+   :CUSTOM_ID: emacs
+   :END:
+
+Enable running R code.
+
+#+BEGIN_EXAMPLE
+  (org-babel-do-load-languages
+   'org-babel-load-languages
+   '((R . t)))
+#+END_EXAMPLE
+
+This is optional but for R syntax highlighting and stuff you may want to install =ess= package. I recommend installing it with =use-package=:
+
+#+BEGIN_EXAMPLE
+  (use-package ess :ensure t)
+#+END_EXAMPLE
+
+* Running SQL on org tables
+  :PROPERTIES:
+  :CUSTOM_ID: running-sql-on-org-tables
+  :END:
+
+Now you can simply do this:
+
+#+BEGIN_EXAMPLE
+  #+tblname: tbltest
+  | col_a | col_b |
+  |-------+-------|
+  | 1 | 2 |
+  | 1 | 4 |
+  | 1 | 6 |
+  | 2 | 7 |
+  | 2 | 8 |
+  | 2 | 9 |
+
+  #+begin_src R :colnames yes :var tbltest=tbltest
+  library(sqldf)
+  sqldf("SELECT col_a, AVG(col_b) FROM tbltest GROUP BY col_a")
+  #+end_src
+#+END_EXAMPLE
+
+And as the result, you get this:
+
+#+BEGIN_EXAMPLE
+  #+RESULTS:
+  | col_a | AVG(col_b) |
+  |-------+------------|
+  | 1 | 4 |
+  | 2 | 8 |
+#+END_EXAMPLE
+
+Nice! But we don't have SQL syntax highlighting. We can get over it by doing something like this:
+
+#+BEGIN_EXAMPLE
+  #+name: tbltest-sql
+  #+begin_src sql
+  SELECT col_a, AVG(col_b) FROM tbltest GROUP BY col_a
+  #+end_src
+
+  #+begin_src R :noweb yes :var tbltest=tbltest
+  library(sqldf)
+  sqldf("<<tbltest-sql>>")
+  #+end_src
+#+END_EXAMPLE
+
+Now we have a nice syntax highlighting for our SQL. But for this you need to have at least 2 different code blocks every time.
+
+** Using SQL instead of table formulas
+   :PROPERTIES:
+   :CUSTOM_ID: using-sql-instead-of-table-formulas
+   :END:
+
+I found some obscure ways of doing this but here I present the most sane one:
+
+Firstly you need to have a named src block that calls =sqldf= with given SQL code, somewhere in your org file. Putting it under some section with =:noexport:= tag might be good idea if you are willing to export the document:
+
+#+BEGIN_EXAMPLE
+  #+name: table-sql
+  #+begin_src R :var sql="" :colnames yes
+  library(sqldf)
+  sqldf(sql)
+  #+end_src
+#+END_EXAMPLE
+
+#+BEGIN_EXAMPLE
+  #+tblname: sometbl
+  #+RESULTS: sometbl
+  | col_a | col_b | col_sum |
+  |-------+-------+---------|
+  | 1 | 2 | 3 |
+  | 1 | 4 | 5 |
+  | 1 | 6 | 7 |
+  | 2 | 7 | 9 |
+  | 2 | 8 | 10 |
+  | 2 | 9 | 11 |
+  #+NAME: sometbl
+  #+CALL: table-sql[:var sometbl=sometbl](sql="SELECT col_a, col_b, (col_a + col_b) as col_sum FROM sometbl")
+#+END_EXAMPLE
+
+When you =C-c C-c= on the =#+CALL= line, the table will be replaced with the result of given SQL.
+
+I believe things can be simplified with a little bit of elisp but it may not worth the effort, this seems already an OK solution for me.
+
