@@ -1,0 +1,171 @@
+#+TITLE: 在org表上运行SQL
+#+URL: https://isamert.net/2019/11/14/running-sql-on-org-mode-tables.html
+#+AUTHOR: lujun9972
+#+TAGS: org-mode
+#+DATE: [2019年 12月 13日 星期五 11:01:15 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+
+我使用org表格来追踪一些与睡眠有关的信息，并且我想把它们形象化。
+我心想，我会R啊! 让我们用R来做这些事吧!。天啊，然而我错了。
+我曾在本科课程中使用过R，但那时留下的笔记不多(现在多亏了org-mode和zotero，我不再遗忘任何内容了)。
+我很快就放弃了用R来处理数据，但我还是打算用它来绘图。
+曾经，我几乎要放弃了，因为我不想为这样一个价值不多的东西使用过于复杂的解决方案，而且我也很懒。
+
+然后我想起来了 =sqldf=.
+它是一个使用SQL操作R dataframes(基本上是表，至少对于本文来说是这样)的R包。
+在幕后，它使用了一个SQL DB实现来完成这项工作的。
+它为我们搞定诸如创建表、运行SQL和格式之间的转换等麻烦事。
+因此，我只需要使用 =sqldf= 和R的plot函数就可以完成我的目标了(是的， =ob-R= package支持将org表格作为变量传递给R代码)。
+然后，我想有一个用于操作org表的SQL后端这个主意太棒了。因为几乎每个类表的技术都有某种类似sql的查询语言。
+
+* 准备
+  :PROPERTIES:
+  :CUSTOM_ID: preparation
+  :END:
+
+** R
+:PROPERTIES:
+   :CUSTOM_ID: r
+   :END:
+
+你需要安装 R 和 =sqldf= package.
+
+#+begin_src shell
+  pacman -S r # use your package manager for installing R, this is just an example for Arch
+#+end_src
+
+然后需要安装 =sqldf=. 但在此之前我建议将下面内容加到环境变量中 (可能是在 =~/.profile= 中, 具体情况因人而定), 否则你需要 root 特权来安装 R packages.
+
+#+begin_src shell
+  export R_LIBS_USER="$HOME/.rlibs"
+#+end_src
+
+你还需要创建该目录:
+
+#+begin_src shell
+  mkdir ~/.rlibs
+  # BTW, run this too while you are here:
+  echo 'options(repos = c(CRAN = "https://cran.rstudio.com"))' > ~/.Rprofile
+#+end_src
+
+然后打开 R 终端.
+
+#+begin_src shell
+  R
+#+end_src
+
+并且运行下面内容:
+
+#+begin_src r
+  install.packages("sqldf")
+#+end_src
+
+R 部分就到此结束了.
+
+** Emacs
+   :PROPERTIES:
+   :CUSTOM_ID: emacs
+   :END:
+
+允许运行R代码.
+
+#+begin_src emacs-lisp
+  (org-babel-do-load-languages
+   'org-babel-load-languages
+   '((R . t)))
+#+end_src
+
+下面这部分是可选的，但是为了能高亮显示R语法等其他功能，你可能会想要安装 =ess= package. 我建议用 =use-package= 来安装:
+
+#+begin_src emacs-lisp
+  (use-package ess :ensure t)
+#+end_src
+
+* 在org表上运行SQL
+  :PROPERTIES:
+  :CUSTOM_ID: running-sql-on-org-tables
+  :END:
+
+现在你可以这样干了:
+
+#+begin_src org
+  ,#+tblname: tbltest
+  | col_a | col_b |
+  |-------+-------|
+  | 1 | 2 |
+  | 1 | 4 |
+  | 1 | 6 |
+  | 2 | 7 |
+  | 2 | 8 |
+  | 2 | 9 |
+
+  ,#+begin_src R :colnames yes :var tbltest=tbltest
+    library(sqldf)
+    sqldf("SELECT col_a, AVG(col_b) FROM tbltest GROUP BY col_a")
+  ,#+end_src
+#+end_src
+
+结果为:
+
+#+begin_src org
+  ,#+RESULTS:
+  | col_a | AVG(col_b) |
+  |-------+------------|
+  |     1 |          4 |
+  |     2 |          8 |
+#+end_src
+
+太棒了! 但是我们的SQL语法没有高亮. 我们可以通过下面方法来解决:
+
+#+begin_src org
+  ,#+name: tbltest-sql
+  ,#+begin_src sql
+    SELECT col_a, AVG(col_b) FROM tbltest GROUP BY col_a
+  ,#+end_src
+
+  ,#+begin_src R :noweb yes :var tbltest=tbltest
+    library(sqldf)
+    sqldf("<<tbltest-sql>>")
+  ,#+end_src
+#+end_src
+
+现在我们的SQL也有了不错的语法高亮. 但是作为代价每次你都需要至少两个不同的代码块.
+
+** 使用 SQL 代替 table 公式
+   :PROPERTIES:
+   :CUSTOM_ID: using-sql-instead-of-table-formulas
+   :END:
+
+我摸索除了一些剑走偏锋的方法但是这里我向你展示最正常的一种方法:
+
+首先你需要一个命名代码块来调用 =sqldf= 和指定的SQL代码. 
+若你需要导出该文档，那么建议把它放在标记了 =:noexport:= 标签的部分下:
+
+#+begin_src org
+  ,#+name: table-sql
+  ,#+begin_src R :var sql="" :colnames yes
+    library(sqldf)
+    sqldf(sql)
+  ,#+end_src
+#+end_src
+
+#+begin_src org
+  ,#+tblname: sometbl
+  ,#+RESULTS: sometbl
+  | col_a | col_b | col_sum |
+  |-------+-------+---------|
+  |     1 |     2 |       3 |
+  |     1 |     4 |       5 |
+  |     1 |     6 |       7 |
+  |     2 |     7 |       9 |
+  |     2 |     8 |      10 |
+  |     2 |     9 |      11 |
+  ,#+NAME: sometbl
+  ,#+CALL: table-sql[:var sometbl=sometbl](sql="SELECT col_a, col_b, (col_a + col_b) as col_sum FROM sometbl")
+#+end_src
+
+当你在 =#+CALL= 这一行按下 =C-c C-c= 后, 该表格会被指定SQL的执行结果所替代.
+
+我相信通过一些elisp代码能够简化一些工作，但这个付出不值得，对我来说这已经是一个可行的解决方案了。
