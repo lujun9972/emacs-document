@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Running SQL on org-mode tables - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="raw" />
+  <!-- <link rel="stylesheet" href="../../../../../media/css/main.css" type="text/css"/>
+       <link rel="stylesheet" href="../../../../../media/css/comment.css" type="text/css"/> -->
+  <link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/kognise/water.css@latest/dist/dark.css'>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="../../../../../">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <ul class="trigger">
+        <li><a href="../../../../../years/">Years</a></li>
+        <li><a href="../../../../../authors/">Authors</a></li>
+        <li><a href="../../../../../tags/">Tags</a></li>
+        <li><a href="../../../../../about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="../../../../../rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="https://www.bing.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">Running SQL on org-mode tables</h1>
+<div id="table-of-contents">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#running-sql-on-org-mode-tables">Running SQL on org-mode tables</a></li>
+<li><a href="#preparation">Preparation</a>
+<ul>
+<li><a href="#r">R</a></li>
+<li><a href="#emacs">Emacs</a></li>
+</ul>
+</li>
+<li><a href="#running-sql-on-org-tables">Running SQL on org tables</a>
+<ul>
+<li><a href="#using-sql-instead-of-table-formulas">Using SQL instead of table formulas</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-org31ef56e" class="outline-2">
+<h2 id="running-sql-on-org-mode-tables"><a id="org31ef56e"></a>Running SQL on org-mode tables</h2>
+<div class="outline-text-2" id="text-running-sql-on-org-mode-tables">
+<p>
+by isamert
+</p>
+
+<p>
+I was tracking some sleep related information about myself using org tables and I wanted to visualize them. I thought to myself, I know R! Let's do all that stuff in R!. Oh boy, I was wrong. I used R in the past for an undergraduate course and I wasn't heavily invested in taking notes at those times. (Now thanks to org-mode and zotero, I don't forget anything anymore) I quickly gave up using R for manipulating the data but I was going to use it for plotting anyway. At that point I was about to give up, firstly because I didn't want to have an overly-complex solution for such a worthless thing and secondly I was extremely lazy.
+</p>
+
+<p>
+Then I remembered about <code>sqldf</code>. It's an R package that manipulates R dataframes (basically tables, at least for our purposes in this post) using SQL. Behind the scenes it uses an SQL DB implementation for this. It handles all the dirty stuff for us; like creating tables, running the SQL and conversion between the formats. So I simply used <code>sqldf</code> and R's plot function to accomplish my goal (Yeah, <code>ob-R</code> package supports passing org tables to R code as variables). Then I thought it may be really nice to have an SQL backend for manipulating org tables. Because why not? Nearly every table-like technology have some kind of SQL-like query language.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org8bcfdaa" class="outline-2">
+<h2 id="preparation"><a id="org8bcfdaa"></a>Preparation</h2>
+<div class="outline-text-2" id="text-preparation">
+</div>
+
+<div id="outline-container-org19eab86" class="outline-3">
+<h3 id="r"><a id="org19eab86"></a>R</h3>
+<div class="outline-text-3" id="text-r">
+<p>
+You need to install R and <code>sqldf</code> package.
+</p>
+
+<pre class="example">
+pacman -S r # use your package manager for installing R, this is just an example for Arch
+</pre>
+
+<p>
+Now you need to install <code>sqldf</code>. But before that I recommend adding something like this to your environment variables (probably using <code>~/.profile</code> file, you know what's best), otherwise you will need root privileges to install R packages.
+</p>
+
+<pre class="example">
+export R_LIBS_USER="$HOME/.rlibs"
+</pre>
+
+<p>
+You also need to create that directory:
+</p>
+
+<pre class="example">
+mkdir ~/.rlibs
+# BTW, run this too while you are here:
+echo 'options(repos = c(CRAN = "https://cran.rstudio.com"))' &gt; ~/.Rprofile
+</pre>
+
+<p>
+Now open the R console.
+</p>
+
+<pre class="example">
+R
+</pre>
+
+<p>
+And run this:
+</p>
+
+<pre class="example">
+install.packages("sqldf")
+</pre>
+
+<p>
+That's all for the R part.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgff20eb3" class="outline-3">
+<h3 id="emacs"><a id="orgff20eb3"></a>Emacs</h3>
+<div class="outline-text-3" id="text-emacs">
+<p>
+Enable running R code.
+</p>
+
+<pre class="example">
+(org-babel-do-load-languages
+ 'org-babel-load-languages
+ '((R . t)))
+</pre>
+
+<p>
+This is optional but for R syntax highlighting and stuff you may want to install <code>ess</code> package. I recommend installing it with <code>use-package</code>:
+</p>
+
+<pre class="example">
+(use-package ess :ensure t)
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org9517029" class="outline-2">
+<h2 id="running-sql-on-org-tables"><a id="org9517029"></a>Running SQL on org tables</h2>
+<div class="outline-text-2" id="text-running-sql-on-org-tables">
+<p>
+Now you can simply do this:
+</p>
+
+<pre class="example">
+#+tblname: tbltest
+| col_a | col_b |
+|-------+-------|
+| 1 | 2 |
+| 1 | 4 |
+| 1 | 6 |
+| 2 | 7 |
+| 2 | 8 |
+| 2 | 9 |
+
+#+begin_src R :colnames yes :var tbltest=tbltest
+library(sqldf)
+sqldf("SELECT col_a, AVG(col_b) FROM tbltest GROUP BY col_a")
+#+end_src
+</pre>
+
+<p>
+And as the result, you get this:
+</p>
+
+<pre class="example">
+#+RESULTS:
+| col_a | AVG(col_b) |
+|-------+------------|
+| 1 | 4 |
+| 2 | 8 |
+</pre>
+
+<p>
+Nice! But we don't have SQL syntax highlighting. We can get over it by doing something like this:
+</p>
+
+<pre class="example">
+#+name: tbltest-sql
+#+begin_src sql
+SELECT col_a, AVG(col_b) FROM tbltest GROUP BY col_a
+#+end_src
+
+#+begin_src R :noweb yes :var tbltest=tbltest
+library(sqldf)
+sqldf("&lt;&lt;tbltest-sql&gt;&gt;")
+#+end_src
+</pre>
+
+<p>
+Now we have a nice syntax highlighting for our SQL. But for this you need to have at least 2 different code blocks every time.
+</p>
+</div>
+
+<div id="outline-container-orgb40257e" class="outline-3">
+<h3 id="using-sql-instead-of-table-formulas"><a id="orgb40257e"></a>Using SQL instead of table formulas</h3>
+<div class="outline-text-3" id="text-using-sql-instead-of-table-formulas">
+<p>
+I found some obscure ways of doing this but here I present the most sane one:
+</p>
+
+<p>
+Firstly you need to have a named src block that calls <code>sqldf</code> with given SQL code, somewhere in your org file. Putting it under some section with <code>:noexport:</code> tag might be good idea if you are willing to export the document:
+</p>
+
+<pre class="example">
+#+name: table-sql
+#+begin_src R :var sql="" :colnames yes
+library(sqldf)
+sqldf(sql)
+#+end_src
+</pre>
+
+<pre class="example">
+#+tblname: sometbl
+#+RESULTS: sometbl
+| col_a | col_b | col_sum |
+|-------+-------+---------|
+| 1 | 2 | 3 |
+| 1 | 4 | 5 |
+| 1 | 6 | 7 |
+| 2 | 7 | 9 |
+| 2 | 8 | 10 |
+| 2 | 9 | 11 |
+#+NAME: sometbl
+#+CALL: table-sql[:var sometbl=sometbl](sql="SELECT col_a, col_b, (col_a + col_b) as col_sum FROM sometbl")
+</pre>
+
+<p>
+When you <code>C-c C-c</code> on the <code>#+CALL</code> line, the table will be replaced with the result of given SQL.
+</p>
+
+<p>
+I believe things can be simplified with a little bit of elisp but it may not worth the effort, this seems already an OK solution for me.
+</p>
+</div>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2019-12-13</span>
+            <span title="last modification date" class="post-info">2019-12-13</span>
+            <span title="tags" class="post-info">:<a href="../../../../../tags/raw">raw</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-5f2a8692-51bd-4092-a4f2-c8b98aed5a17">lujun9972</a></span>
+        </div>
+    <script src="../../../../../media/js/jquery-2.1.3.min.js"></script>
+    <script src="../../../../../media/js/md5.min.js"></script>
+        <section>
+            <div id="gitalk-container"></div>
+            <script type="text/javascript">
+             var gitalk = new Gitalk({
+                 clientID: 'fdcb5d9da3f4acb4862c',
+                 clientSecret: 'dd0a16312a206782cb7669dcec5e96874ab48170',
+                 repo: 'lujun9972.github.com',
+                 owner: 'lujun9972',
+                 admin: ['lujun9972'],
+                 id: md5(location.pathname),      // Ensure uniqueness and length less than 50
+                 distractionFreeMode: false  // Facebook-like distraction free mode
+             })
+             gitalk.render('gitalk-container')
+            </script>
+        </section>
+    <script src="../../../../../media/js/main.js"></script>
+        <script>
+         var _hmt = _hmt || [];
+         (function() {
+             var hm = document.createElement("script");
+             hm.src = "https://hm.baidu.com/hm.js?7bac4fd0247f69c27887e0d4e3aee41e";
+             var s = document.getElementsByTagName("script")[0]; 
+             s.parentNode.insertBefore(hm, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-5f2a8692-51bd-4092-a4f2-c8b98aed5a17">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="../../../../../instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>
