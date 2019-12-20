@@ -1,13 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <title>YouTube Subscriptions in Emacs with elfeed - EMACS-DOCUMENT</title>
+  <title>在Emacs中用elfeed查看YouTube订阅 - EMACS-DOCUMENT</title>
   <meta charset="utf-8" />
   <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
   <meta name="viewport"
         content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
   <meta name="author" content="lujun9972" />
-  <meta name="keywords" content="raw" />
+  <meta name="keywords" content="emacs-common" />
   <!-- <link rel="stylesheet" href="../../../../../media/css/main.css" type="text/css"/>
        <link rel="stylesheet" href="../../../../../media/css/comment.css" type="text/css"/> -->
   <link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/kognise/water.css@latest/dist/dark.css'>
@@ -39,84 +39,99 @@
 
 <div>
 <div class="post">
-<h1 class="title">YouTube Subscriptions in Emacs with elfeed</h1>
+<h1 class="title">在Emacs中用elfeed查看YouTube订阅</h1>
 <div id="table-of-contents">
 <h2>&#30446;&#24405;</h2>
 <div id="text-table-of-contents">
 <ul>
-<li><a href="#goal">Goal</a></li>
-<li><a href="#dependencies">Dependencies</a></li>
-<li><a href="#preparation">Preparation</a></li>
-<li><a href="#use">Use</a></li>
-<li><a href="#screenshots">Screenshots</a></li>
+<li><a href="#goal">目标</a></li>
+<li><a href="#dependencies">依赖</a></li>
+<li><a href="#preparation">准备</a></li>
+<li><a href="#use">使用</a></li>
+<li><a href="#screenshots">展示</a></li>
 </ul>
 </div>
 </div>
-<div id="outline-container-org9faf5e5" class="outline-2">
-<h2 id="goal"><a id="org9faf5e5"></a>Goal</h2>
+<div id="outline-container-org56e26df" class="outline-2">
+<h2 id="goal"><a id="org56e26df"></a>目标</h2>
 <div class="outline-text-2" id="text-goal">
 <p>
-To be able to get all newly uploaded videos from your subscribed channels in elfeed, and have them downloaded if so desired.
+在 elfeed 中获取订阅频道的所有上传视频，并且如果需要的话可以进行下载。
 </p>
 </div>
 </div>
 
-<div id="outline-container-org10daa25" class="outline-2">
-<h2 id="dependencies"><a id="org10daa25"></a>Dependencies</h2>
+<div id="outline-container-orged4807f" class="outline-2">
+<h2 id="dependencies"><a id="orged4807f"></a>依赖</h2>
 <div class="outline-text-2" id="text-dependencies">
+<ol class="org-ol">
+<li>Emacs</li>
+<li><a href="https://github.com/skeeto/elfeed">elfeed</a></li>
+<li><a href="https://youtube-dl.org/">youtube-dl</a></li>
+</ol>
 </div>
 </div>
 
-<div id="outline-container-org03edd61" class="outline-2">
-<h2 id="preparation"><a id="org03edd61"></a>Preparation</h2>
+<div id="outline-container-org4b71af6" class="outline-2">
+<h2 id="preparation"><a id="org4b71af6"></a>准备</h2>
 <div class="outline-text-2" id="text-preparation">
 <p>
-Download the <code>xml</code> file of your subscriptions from <a href="https://www.youtube.com/subscription_manager">subscrition manager</a>. The link should be near the bottom of the page, saying “Export subscriptions”.
+从  <a href="https://www.youtube.com/subscription_manager">subscrition manager</a> 处下载订阅的 <code>xml</code> 文件. 这个链接位于页面靠近底部的位置，名叫 “Export subscriptions”.
 </p>
 
 <p>
-Add the URLs to <code>elfeed-feeds</code>:
+添加URL到 <code>elfeed-feeds</code> 中:
 </p>
 
-<pre class="example">
-(setq elfeed-feeds
- '("https://www.youtube.com/feeds/videos.xml?channel_id=UC0sytTpk1adR_cfjHhiJ08Q"))
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">setq</span> elfeed-feeds
+      '(<span style="font-style: italic;">"https://www.youtube.com/feeds/videos.xml?channel_id=UC0sytTpk1adR_cfjHhiJ08Q"</span>))
 </pre>
+</div>
 
-<pre class="example">
-;; Set executable path
-(setq youtube-dl-path "/usr/bin/youtube-dl")
-;; Set video storage path
-(setq youtube-dl-output-dir "~/Videos/")
+<p>
+更新初始化文件
+</p>
 
-(defun elfeed-download-video ()
- "Download a video using youtube-dl."
- (interactive)
- (async-shell-command (format "%s -o \"%s%s\" -f bestvideo+bestaudio %s"
- youtube-dl-path
- youtube-dl-output-dir
- "%(title)s.%(ext)s"
- (elfeed-entry-link elfeed-show-entry))))
+<div class="org-src-container">
+<pre class="src src-emacs-lisp"><span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Set executable path</span>
+(<span style="font-weight: bold;">setq</span> youtube-dl-path <span style="font-style: italic;">"/usr/bin/youtube-dl"</span>)
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Set video storage path</span>
+(<span style="font-weight: bold;">setq</span> youtube-dl-output-dir <span style="font-style: italic;">"~/Videos/"</span>)
 
-;; Add `youtube` tag to all videos
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">elfeed-download-video</span> ()
+  <span style="font-style: italic;">"Download a video using youtube-dl."</span>
+  (<span style="font-weight: bold;">interactive</span>)
+  (async-shell-command (format <span style="font-style: italic;">"%s -o \"%s%s\" -f bestvideo+bestaudio %s"</span>
+                               youtube-dl-path
+                               youtube-dl-output-dir
+                               <span style="font-style: italic;">"%(title)s.%(ext)s"</span>
+                               (elfeed-entry-link elfeed-show-entry))))
+
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Add `youtube` tag to all videos</span>
 (add-hook 'elfeed-new-entry-hook
- (elfeed-make-tagger :feed-url "youtube\\.com"
- :add '(video youtube)))
+          (elfeed-make-tagger <span style="font-weight: bold;">:feed-url</span> <span style="font-style: italic;">"youtube\\.com"</span>
+                              <span style="font-weight: bold;">:add</span> '(video youtube)))
+</pre>
+</div>
+<pre class="example">
+
 </pre>
 </div>
 </div>
 
-<div id="outline-container-orgfed0d4b" class="outline-2">
-<h2 id="use"><a id="orgfed0d4b"></a>Use</h2>
+<div id="outline-container-org8e1233e" class="outline-2">
+<h2 id="use"><a id="org8e1233e"></a>使用</h2>
 <div class="outline-text-2" id="text-use">
 <p>
-After updating your feeds, you will see the videos from your subscriptions. <code>&lt;ret&gt;</code> on one of the videos, and do <code>M-x elfeed-download-video &lt;ret&gt;</code>. Wait for the command to finish, and you will have the video stored locally.
+更新 feed 后, 你就能看到订阅的视频了. 在某个视频上按下 <code>回车</code>, 然后运行 <code>M-x elfeed-download-video &lt;ret&gt;</code>. 
+等待命令结束, 视频就会保存到本地了.
 </p>
 </div>
 </div>
 
-<div id="outline-container-org5995f60" class="outline-2">
-<h2 id="screenshots"><a id="org5995f60"></a>Screenshots</h2>
+<div id="outline-container-orgd157ade" class="outline-2">
+<h2 id="screenshots"><a id="orgd157ade"></a>展示</h2>
 <div class="outline-text-2" id="text-screenshots">
 
 <div class="figure">
@@ -137,9 +152,9 @@ After updating your feeds, you will see the videos from your subscriptions. <cod
 <div>
         <div class="post-meta">
             <span title="post date" class="post-info">2019-06-14</span>
-            <span title="last modification date" class="post-info">2019-06-14</span>
-            <span title="tags" class="post-info">:<a href="../../../../../tags/raw">raw</a>:</span>
-            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-4dc44811-2038-4f87-bbd6-2348a903a8d7">lujun9972</a></span>
+            <span title="last modification date" class="post-info">2019-12-20</span>
+            <span title="tags" class="post-info">:<a href="../../../../../tags/emacs-common">emacs-common</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-19be8b11-9982-4946-abc0-8ae1e1c439fd">lujun9972</a></span>
         </div>
     <script src="../../../../../media/js/jquery-2.1.3.min.js"></script>
     <script src="../../../../../media/js/md5.min.js"></script>
@@ -171,7 +186,7 @@ After updating your feeds, you will see the videos from your subscriptions. <cod
     <div class="footer">
         <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
         <p>
-            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-4dc44811-2038-4f87-bbd6-2348a903a8d7">lujun9972</a>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-19be8b11-9982-4946-abc0-8ae1e1c439fd">lujun9972</a>
             &nbsp;&nbsp;-&nbsp;&nbsp;
             Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
             <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
