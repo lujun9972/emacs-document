@@ -1,0 +1,78 @@
+#+TITLE: 在Emacs中用elfeed查看YouTube订阅
+#+URL: https://codingquark.com/emacs/2019/05/16/emacs-elfeed-youtube.html
+#+AUTHOR: lujun9972
+#+TAGS: emacs-common
+#+DATE: [2019年 06月 14日 星期五 18:23:48 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+* 目标
+:PROPERTIES:
+:CUSTOM_ID: goal
+:END:
+
+在 elfeed 中获取订阅频道的所有上传视频，并且如果需要的话可以进行下载。
+
+* 依赖
+:PROPERTIES:
+:CUSTOM_ID: dependencies
+:END:
+
+1. Emacs
+2. [[https://github.com/skeeto/elfeed][elfeed]]
+3. [[https://youtube-dl.org/][youtube-dl]]
+
+* 准备
+:PROPERTIES:
+:CUSTOM_ID: preparation
+:END:
+
+从  [[https://www.youtube.com/subscription_manager][subscrition manager]] 处下载订阅的 =xml= 文件. 这个链接位于页面靠近底部的位置，名叫 “Export subscriptions”.
+
+添加URL到 =elfeed-feeds= 中:
+
+#+begin_src emacs-lisp
+  (setq elfeed-feeds
+        '("https://www.youtube.com/feeds/videos.xml?channel_id=UC0sytTpk1adR_cfjHhiJ08Q"))
+#+end_src
+
+更新初始化文件
+
+#+begin_src emacs-lisp
+  ;; Set executable path
+  (setq youtube-dl-path "/usr/bin/youtube-dl")
+  ;; Set video storage path
+  (setq youtube-dl-output-dir "~/Videos/")
+
+  (defun elfeed-download-video ()
+    "Download a video using youtube-dl."
+    (interactive)
+    (async-shell-command (format "%s -o \"%s%s\" -f bestvideo+bestaudio %s"
+                                 youtube-dl-path
+                                 youtube-dl-output-dir
+                                 "%(title)s.%(ext)s"
+                                 (elfeed-entry-link elfeed-show-entry))))
+
+  ;; Add `youtube` tag to all videos
+  (add-hook 'elfeed-new-entry-hook
+            (elfeed-make-tagger :feed-url "youtube\\.com"
+                                :add '(video youtube)))
+#+end_src
+#+BEGIN_EXAMPLE
+#+END_EXAMPLE
+
+* 使用
+:PROPERTIES:
+:CUSTOM_ID: use
+:END:
+
+更新 feed 后, 你就能看到订阅的视频了. 在某个视频上按下 =回车=, 然后运行 =M-x elfeed-download-video <ret>=. 
+等待命令结束, 视频就会保存到本地了.
+
+* 展示
+:PROPERTIES:
+:CUSTOM_ID: screenshots
+:END:
+
+[[https://codingquark.com/images/elfeed_feeds_list_1.png]]
+
+[[https://codingquark.com/images/elfeed_video_download_1.png]]
