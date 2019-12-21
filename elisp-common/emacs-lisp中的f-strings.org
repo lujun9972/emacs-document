@@ -1,0 +1,110 @@
+#+TITLE:  emacs-lisp中的f-strings
+#+URL: http://kitchingroup.cheme.cmu.edu/blog/2018/05/14/f-strings-in-emacs-lisp/
+#+AUTHOR: lujun9972
+#+TAGS: raw
+#+DATE: [2018年 05月 15日 星期二 10:34:36 CST]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+我非常喜欢Python 3中的f-string。它们允许您将变量名和表达式放在一个字符串模板中，然后展开该模板来创建新的字符串。下面是一个简单的例子:
+
+#+begin_src python
+  username = 'John Kitchin'
+  somevar = 5**0.5
+  print(f'{username:30s}{somevar:1.2f}')
+#+end_src
+
+#+BEGIN_EXAMPLE
+John Kitchin 2.24
+
+#+END_EXAMPLE
+
+相比之下，emacs-lisp中的字符串格式化就没那么有趣和简单了。初始状态下我们有:
+
+#+begin_src emacs-lisp
+  (let ((username "John Kitchin")
+        (somevar (sqrt 5)))
+    (format "%-30s%1.2f" username somevar))
+#+end_src
+#+BEGIN_EXAMPLE
+John Kitchin 2.24
+#+END_EXAMPLE
+
+That is still three lines of code, but it is ugly and hard to read like the old python code:
+都是三行代码，但它很难看，像旧的python代码一样难以阅读:
+
+#+begin_src python
+  print('%-30s%1.2f' % (username, somevar))
+#+end_src
+
+#+BEGIN_EXAMPLE
+John Kitchin 2.24
+
+#+END_EXAMPLE
+
+我的经验表明，字符串越大，这个值就越难看出来，而f-string则更容易阅读。
+
+如果您不想要这些格式化字段，那么神奇的[[https://github.com/magnars/s.el]['s]]库为emacs-lisp提供了一些帮助。您可以像这样引用词法环境中的变量。
+
+#+begin_src emacs-lisp
+  (let ((username "John Kitchin")
+        (somevar (sqrt 5)))
+    (s-lex-format "${username}${somevar}"))
+#+end_src
+
+#+BEGIN_EXAMPLE
+John Kitchin2.23606797749979
+#+END_EXAMPLE
+
+今天，我决定做点什么，于是写了这个宏。它是 =s-lex-format= 的变体，引入了一个稍微新一点的语法。你现在可以添加一个可选的格式字段，该字段与变量名之间用空格分隔。
+
+#+begin_src emacs-lisp
+  (defmacro f-string (fmt)
+    "Like `s-format' but with format fields in it.
+  FMT is a string to be expanded against the current lexical
+  environment. It is like what is used in `s-lex-format', but has
+  an expanded syntax to allow format-strings. For example:
+  ${user-full-name 20s} will be expanded to the current value of
+  the variable `user-full-name' in a field 20 characters wide.
+  (let ((f (sqrt 5))) (f-string "${f 1.2f}"))
+  will render as: 2.24
+  This function is inspired by the f-strings in Python 3.6, which I
+  enjoy using a lot.
+  "
+    (let* ((matches (s-match-strings-all"${\(?3:\(?1:[^} ]+\) *\(?2:[^}]*\)\)}" fmt))
+           (agetter (loop for (m0 m1 m2 m3) in matches
+                          collect `(,m3 . ,(format (format "%%%s" (if (string= m2 "")
+                                                                      (if s-lex-value-as-lisp "S" "s")
+                                                                    m2))
+                                                   (symbol-value (intern m1)))))))
+
+      `(s-format ,fmt 'aget ',agetter)))
+#+end_src
+
+#+BEGIN_EXAMPLE
+f-string
+#+END_EXAMPLE
+
+这就是它的用法。
+
+#+begin_src emacs-lisp
+  (let ((username "John Kitchin")
+        (somevar (sqrt 5)))
+    (f-string "${username -30s}${somevar 1.2f}"))
+#+end_src
+
+#+BEGIN_EXAMPLE
+John Kitchin 2.24
+#+END_EXAMPLE
+
+它仍然缺乏python中f-string的一些功能，例如，在python中，待展开的模板参数将被求值。上面解决方案相比就显得太简单了，因为它只使用了一个正则表达式，并且仅限于词法环境中的变量值。
+
+#+begin_src python
+  print(f'{5**0.5:1.3f}')
+#+end_src
+
+#+BEGIN_EXAMPLE
+2.236
+
+#+END_EXAMPLE
+
+尽管如此，这个简单的解决方案与我大多数时候的做法是一致的，所以我仍然认为它是一个改进!
