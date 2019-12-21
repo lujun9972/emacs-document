@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Emacs中的分形渲染 - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="elisp-common" />
+  <!-- <link rel="stylesheet" href="../../../../../media/css/main.css" type="text/css"/>
+       <link rel="stylesheet" href="../../../../../media/css/comment.css" type="text/css"/> -->
+  <link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/kognise/water.css@latest/dist/dark.css'>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="../../../../../">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <ul class="trigger">
+        <li><a href="../../../../../years/">Years</a></li>
+        <li><a href="../../../../../authors/">Authors</a></li>
+        <li><a href="../../../../../tags/">Tags</a></li>
+        <li><a href="../../../../../about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="../../../../../rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="https://www.bing.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">Emacs中的分形渲染</h1>
+<p>
+借助 Emacs' <code>image-mode</code> 以及方便的 <a href="http://en.wikipedia.org/wiki/Netpbm_format">Netpbm 格式</a> 可以在Emacs中用Elisp来生成并渲染图像. 下面这个函数会生成一个 <a href="http://en.wikipedia.org/wiki/Sierpi%C5%84ski_carpet">Sierpinski 地毯</a> 并在buffer中显示.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">sierpinski</span> (s)
+  (pop-to-buffer (get-buffer-create <span style="font-style: italic;">"*sierpinski*"</span>))
+  (fundamental-mode) (erase-buffer)
+  (<span style="font-weight: bold;">labels</span> ((fill-p (x y)
+                   (<span style="font-weight: bold;">cond</span> ((<span style="font-weight: bold;">or</span> (zerop x) (zerop y)) <span style="font-style: italic;">"0"</span>)
+                         ((<span style="font-weight: bold;">and</span> (= 1 (mod x 3)) (= 1 (mod y 3))) <span style="font-style: italic;">"1"</span>)
+                         (t (fill-p (/ x 3) (/ y 3))))))
+    (insert (format <span style="font-style: italic;">"P1\n%d %d\n"</span> s s))
+    (<span style="font-weight: bold;">dotimes</span> (y s) (<span style="font-weight: bold;">dotimes</span> (x s) (insert (fill-p x y) <span style="font-style: italic;">" "</span>))))
+  (image-mode))
+</pre>
+</div>
+
+<p>
+建议用三次暮作为参数来调用它,
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(sierpinski (expt 3 5))
+</pre>
+</div>
+
+
+<div class="figure">
+<p><a href="http://nullprogram.com/img/fractal/sierpinski.png"><img src="http://nullprogram.com/img/fractal/sierpinski-thumb.png" alt="sierpinski-thumb.png" /></a>
+</p>
+</div>
+
+<p>
+下面这个例子你应该会 <a href="https://nullprogram.com/blog/2007/10/01/">比较眼熟</a>. 使用的是一样的技术,
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">mandelbrot</span> ()
+  (pop-to-buffer (get-buffer-create <span style="font-style: italic;">"*mandelbrot*"</span>))
+  (<span style="font-weight: bold;">let</span> ((w 400) (h 300) (d 32))
+    (fundamental-mode) (erase-buffer)
+    (set-buffer-multibyte nil)
+    (insert (format <span style="font-style: italic;">"P6\n%d %d\n255\n"</span> w h))
+    (<span style="font-weight: bold;">dotimes</span> (y h)
+      (<span style="font-weight: bold;">dotimes</span> (x w)
+        (<span style="font-weight: bold;">let*</span> ((cx (* 1.5 (/ (- x (/ w 1.45)) w 0.45)))
+               (cy (* 1.5 (/ (- y (/ h 2.0)) h 0.5)))
+               (zr 0) (zi 0)
+               (v (<span style="font-weight: bold;">dotimes</span> (i d d)
+                    (<span style="font-weight: bold;">if</span> (&gt; (+ (* zr zr) (* zi zi)) 4) (<span style="font-weight: bold;">return</span> i)
+                      (<span style="font-weight: bold;">psetq</span> zr (+ (* zr zr) (- (* zi zi)) cx)
+                             zi (+ (* (* zr zi) 2) cy))))))
+          (insert-char (floor (* 256 (/ v 1.0 d))) 3))))
+    (image-mode)))
+</pre>
+</div>
+
+
+<div class="figure">
+<p><img src="https://nullprogram.com/img/fractal/elisp-mandelbrot.png" alt="elisp-mandelbrot.png" />
+</p>
+</div>
+
+<p>
+我们可以用colormap函数为它染上色,
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">colormap</span> (v)
+  <span style="font-style: italic;">"Given a value between 0 and 1.0, insert a P6 color."</span>
+  (<span style="font-weight: bold;">dotimes</span> (i 3)
+    (insert-char (floor (* 256 (min 0.99 (sqrt (* (- 3 i) v))))) 1)))
+</pre>
+</div>
+
+
+<div class="figure">
+<p><img src="https://nullprogram.com/img/fractal/elisp-mandelbrot-color.png" alt="elisp-mandelbrot-color.png" />
+</p>
+</div>
+
+<p>
+我脑中一直有一个想法（但是可能永远不会去实现它了）就是创建一个Elisp的小型图库. 它的实现基础就是该技术. 若这种支持被编译在Emacs内, 则Emacs甚至可以在buffer中渲染 SVG 图片, 这样创建一个丰富的图形库并不困难. 而且, 不像纯 Elisp, 它会很快.
+</p>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2018-03-07</span>
+            <span title="last modification date" class="post-info">2019-12-21</span>
+            <span title="tags" class="post-info">:<a href="../../../../../tags/elisp-common">elisp-common</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-b32a1881-9b9d-4337-a806-1034875cbc71">lujun9972</a></span>
+        </div>
+    <script src="../../../../../media/js/jquery-2.1.3.min.js"></script>
+    <script src="../../../../../media/js/md5.min.js"></script>
+        <section>
+            <div id="gitalk-container"></div>
+            <script type="text/javascript">
+             var gitalk = new Gitalk({
+                 clientID: 'fdcb5d9da3f4acb4862c',
+                 clientSecret: 'dd0a16312a206782cb7669dcec5e96874ab48170',
+                 repo: 'lujun9972.github.com',
+                 owner: 'lujun9972',
+                 admin: ['lujun9972'],
+                 id: md5(location.pathname),      // Ensure uniqueness and length less than 50
+                 distractionFreeMode: false  // Facebook-like distraction free mode
+             })
+             gitalk.render('gitalk-container')
+            </script>
+        </section>
+    <script src="../../../../../media/js/main.js"></script>
+        <script>
+         var _hmt = _hmt || [];
+         (function() {
+             var hm = document.createElement("script");
+             hm.src = "https://hm.baidu.com/hm.js?7bac4fd0247f69c27887e0d4e3aee41e";
+             var s = document.getElementsByTagName("script")[0]; 
+             s.parentNode.insertBefore(hm, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-b32a1881-9b9d-4337-a806-1034875cbc71">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="../../../../../instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>
