@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>git: 用post-commit hook来探测Org-mode中的大量被删除的行 - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="org-mode" />
+  <!-- <link rel="stylesheet" href="../../../../../media/css/main.css" type="text/css"/>
+       <link rel="stylesheet" href="../../../../../media/css/comment.css" type="text/css"/> -->
+  <link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/kognise/water.css@latest/dist/dark.css'>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="../../../../../">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <ul class="trigger">
+        <li><a href="../../../../../years/">Years</a></li>
+        <li><a href="../../../../../authors/">Authors</a></li>
+        <li><a href="../../../../../tags/">Tags</a></li>
+        <li><a href="../../../../../about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="../../../../../rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="https://www.bing.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">git: 用post-commit hook来探测Org-mode中的大量被删除的行</h1>
+<p>
+可能你也遇到过相同的问题: 当大型 <a href="http://orgmode.org">Org-mode</a> 层级架构被折叠时, 你可能会无意中覆盖或删除 Org-mode 文件中的大量内容.
+</p>
+
+<p>
+若你切好用 <a href="http://git-scm.com/">git</a> 仓库来管理 Org-mode 文件，那这没有什么大不了的. 我甚至使用 <a href="https://github.com/nevik/gitwatch">gitwatch</a> 来自动提交 Org-mode 文件的所有更改.
+任何Org-mode文件中的更改都可以被回撤. 只不过, 你需要 <b>认出</b> 被删掉的这些行以便能够恢复之.
+</p>
+
+<p>
+下面这个技巧可以帮到你: 使用下面这个 <a href="http://git-scm.com/book/en/Customizing-Git-Git-Hooks">post-commit hook</a> , 当你签入一个超过一定行数的提交时就会在日常agenda中产生一个警告.
+</p>
+
+<p>
+你需要修改下面的代码才能使之工作. 请将内容中的 <code>OUTFILE</code> 修改为你 <code>org-agenda-files</code> 中的某个文件. 任何该脚本产生的警告信息会添加到该文件中.
+警告信息报告当前(提交)的时间戳, 你不可能会遗漏这条信息: 它放在你的日常agenda中.
+</p>
+
+<p>
+你也可能需要修改 <code>THRESHOLD</code> 的值. 该值的意思是单个文件在不产生任何警告的情况下最多能删除多少行.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell"><span style="font-weight: bold; font-style: italic;">#</span><span style="font-weight: bold; font-style: italic;">!/bin/</span><span style="font-weight: bold;">sh</span>
+<span style="font-weight: bold; font-style: italic;">#</span>
+<span style="font-weight: bold; font-style: italic;"># </span><span style="font-weight: bold; font-style: italic;">An example hook script that is called after a successful</span>
+<span style="font-weight: bold; font-style: italic;"># </span><span style="font-weight: bold; font-style: italic;">commit is made.</span>
+<span style="font-weight: bold; font-style: italic;">#</span>
+<span style="font-weight: bold; font-style: italic;"># </span><span style="font-weight: bold; font-style: italic;">To enable this hook, rename this file to "post-commit".</span>
+
+<span style="font-weight: bold; font-style: italic;">## </span><span style="font-weight: bold; font-style: italic;">current/last commit:</span>
+<span style="font-weight: bold; font-style: italic;">CURRENT_HASH</span>=<span style="font-weight: bold;">`git rev-parse HEAD`</span>
+
+<span style="font-weight: bold; font-style: italic;">## </span><span style="font-weight: bold; font-style: italic;">the commit before:</span>
+<span style="font-weight: bold; font-style: italic;">PREVIOUS_HASH</span>=<span style="font-weight: bold;">`git rev-parse HEAD^1`</span>
+
+<span style="font-weight: bold; font-style: italic;">## </span><span style="font-weight: bold; font-style: italic;">the file where the message(s) are being written to:</span>
+<span style="font-weight: bold; font-style: italic;">OUTFILE</span>=<span style="font-style: italic;">"${HOME}/org/errors_orgmode_commits.org"</span>
+
+<span style="font-weight: bold; font-style: italic;">## </span><span style="font-weight: bold; font-style: italic;">number of lines that are OK to be deleted in one single file:</span>
+<span style="font-weight: bold; font-style: italic;">THRESHOLD</span>=250
+
+
+<span style="font-weight: bold; font-style: italic;">MESSAGE</span>=<span style="font-style: italic;">"** commit ${CURRENT_HASH} deleted more than ${THRESHOLD} lines in a file!"</span>
+
+<span style="font-weight: bold; font-style: italic;">DETAILS</span>=<span style="font-style: italic;">"#+BEGIN_SRC sh :results output</span>
+<span style="font-style: italic;">    cd ${HOME}/org</span>
+<span style="font-style: italic;">    echo \"commit ${CURRENT_HASH}\"</span>
+<span style="font-style: italic;">    git diff --stat \"${PREVIOUS_HASH}\" \"${CURRENT_HASH}\"</span>
+<span style="font-style: italic;">    #+END_SRC"</span>
+
+
+<span style="font-weight: bold; font-style: italic;">## </span><span style="font-weight: bold; font-style: italic;">manual test with:</span>
+<span style="font-weight: bold; font-style: italic;">## </span><span style="font-weight: bold; font-style: italic;">git diff --stat `git rev-parse HEAD^1` `git rev-parse HEAD`</span>
+
+git diff --numstat <span style="font-style: italic;">"${PREVIOUS_HASH}"</span> <span style="font-style: italic;">"${CURRENT_HASH}"</span> | <span style="font-style: italic;">\</span>
+cut -f 2 | <span style="font-style: italic;">\</span>
+<span style="font-weight: bold;">while </span><span style="font-weight: bold;">read</span> line
+<span style="font-weight: bold;">do </span><span style="font-weight: bold;">test</span> <span style="font-style: italic;">"$line"</span> -gt <span style="font-style: italic;">"${THRESHOLD}"</span> &amp;&amp; <span style="font-style: italic;">\</span>
+<span style="font-weight: bold;">echo</span> <span style="font-style: italic;">"${MESSAGE}\n&lt;`date '+%Y-%m-%d %H:%M'` +1d&gt;\n\n${DETAILS}\n"</span> &gt;&gt; <span style="font-style: italic;">\</span>
+<span style="font-style: italic;">"${OUTFILE}"</span>; <span style="font-style: italic;">\</span>
+<span style="font-weight: bold;">done</span>
+
+<span style="font-weight: bold; font-style: italic;">#</span><span style="font-weight: bold; font-style: italic;">end     </span>
+</pre>
+</div>
+
+<p>
+这样当你在agenda中发现一个警告时, 点击它，甚至可以在标题下的babel代码片段上按下 <code>C-c C-c</code> 进行执行. 它会告诉你提交的详细信息.
+</p>
+
+<p>
+解决问题之后，只需手动删除error-Org-mode文件中已解决错误的标题就行了。
+</p>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2018-10-25</span>
+            <span title="last modification date" class="post-info">2019-12-21</span>
+            <span title="tags" class="post-info">:<a href="../../../../../tags/org-mode">org-mode</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-aa7b4557-0b5f-4dcb-a209-9dd898d13dc8">lujun9972</a></span>
+        </div>
+    <script src="../../../../../media/js/jquery-2.1.3.min.js"></script>
+    <script src="../../../../../media/js/md5.min.js"></script>
+        <section>
+            <div id="gitalk-container"></div>
+            <script type="text/javascript">
+             var gitalk = new Gitalk({
+                 clientID: 'fdcb5d9da3f4acb4862c',
+                 clientSecret: 'dd0a16312a206782cb7669dcec5e96874ab48170',
+                 repo: 'lujun9972.github.com',
+                 owner: 'lujun9972',
+                 admin: ['lujun9972'],
+                 id: md5(location.pathname),      // Ensure uniqueness and length less than 50
+                 distractionFreeMode: false  // Facebook-like distraction free mode
+             })
+             gitalk.render('gitalk-container')
+            </script>
+        </section>
+    <script src="../../../../../media/js/main.js"></script>
+        <script>
+         var _hmt = _hmt || [];
+         (function() {
+             var hm = document.createElement("script");
+             hm.src = "https://hm.baidu.com/hm.js?7bac4fd0247f69c27887e0d4e3aee41e";
+             var s = document.getElementsByTagName("script")[0]; 
+             s.parentNode.insertBefore(hm, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-aa7b4557-0b5f-4dcb-a209-9dd898d13dc8">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="../../../../../instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>
