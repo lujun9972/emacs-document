@@ -1,0 +1,62 @@
+#+TITLE: 口袋中的org-mode
+#+URL: https://nakkaya.com/2010/03/19/org-mode-in-your-pocket-setting-up-mobileorg/
+#+AUTHOR: lujun9972
+#+TAGS: org-mode
+#+DATE: [2018年 09月 12日 星期三 19:02:19 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+ This post documents the steps required to configure org-mode so it can sync with MobileOrg.
+
+[[http://mobileorg.ncogni.to][MobileOrg]] 是一个iPhone应用程序，它可以让你随时查看，修改org文件的行动。
+这是一个很好的应用程序，但是文档很少，而且有点混乱。这篇文章记录了配置org-mode以便让它就可以与MobileOrg同步所需的步骤。
+
+org-mode默认查看 =~/org/= 文件夹中的org文件，如果你把它们放在其他地方，设置 =org-directory= 变了指向它，
+
+#+begin_src emacs-lisp
+  (setq org-directory "~/Documents/org/")
+  (setq org-mobile-inbox-for-pull "~/Documents/org/from-mobile.org")
+#+end_src
+
+MobileOrg使用WebDav来同步文件，如果你把WebDav挂载成一个磁盘，你需要设置 =org-mobile-directory= 指向它，你也可以使用org-mobile push/pull钩子和scp代替。
+
+#+begin_src emacs-lisp
+  (setq org-mobile-directory "/Volumes/nakkaya.com/org/")
+#+end_src
+
+在默认情况下，没有文件会被暂存到WebDav中，你需要将 =org-mobile-files= 设置为你想在iPhone上访问的文件列表，
+
+#+begin_src emacs-lisp
+  (setq org-mobile-files (quote ("gtd.org")))
+#+end_src
+
+当你同步org文件时，org-mobile会给你的文件添加一个属性抽屉(property drawer)，如果你不想要它，你可以这么设置，
+
+#+begin_src emacs-lisp
+  (setq org-mobile-force-id-on-agenda-items nil)
+#+end_src
+
+但是要注意，如果你有像这样的文件结构，
+
+#+begin_src org
+   ,* Task
+   ,** SubTask
+   ,* Task
+   ,** SubTask
+#+end_src
+#+BEGIN_EXAMPLE
+#+END_EXAMPLE
+
+如果你编辑其中一个 =SubTask= ，org-mobile将无法确定编辑的是哪一个子任务，除此之外没有其他问题了。
+至于agenda,只有你自定义的agenda视图会被同步，我还建议将 =org-agenda-show-all-date= 设置为nil，以便过滤没有内容的日期，使查看agenda更方便。
+
+ #+begin_src emacs-lisp
+   (setq org-agenda-custom-commands
+         '(("w" todo "TODO")
+           ("h" agenda "" ((org-agenda-show-all-dates nil)))
+           ("W" agenda "" ((org-agenda-ndays 21)
+                           (org-agenda-show-all-dates nil)))
+           ("A" agenda ""
+            ((org-agenda-ndays 1)
+             (org-agenda-overriding-header "Today")))))
+ #+end_src
