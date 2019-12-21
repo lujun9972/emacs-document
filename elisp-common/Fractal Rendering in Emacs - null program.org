@@ -1,0 +1,69 @@
+#+TITLE: Emacs中的分形渲染
+#+URL: http://nullprogram.com/blog/2012/09/14/
+#+AUTHOR: lujun9972
+#+TAGS: elisp-common
+#+DATE: [2018年 03月 07日 星期三 17:12:42 CST]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+借助 Emacs' =image-mode= 以及方便的 [[http://en.wikipedia.org/wiki/Netpbm_format][Netpbm 格式]] 可以在Emacs中用Elisp来生成并渲染图像. 下面这个函数会生成一个 [[http://en.wikipedia.org/wiki/Sierpi%C5%84ski_carpet][Sierpinski 地毯]] 并在buffer中显示.
+
+#+begin_src emacs-lisp
+  (defun sierpinski (s)
+    (pop-to-buffer (get-buffer-create "*sierpinski*"))
+    (fundamental-mode) (erase-buffer)
+    (labels ((fill-p (x y)
+                     (cond ((or (zerop x) (zerop y)) "0")
+                           ((and (= 1 (mod x 3)) (= 1 (mod y 3))) "1")
+                           (t (fill-p (/ x 3) (/ y 3))))))
+      (insert (format "P1\n%d %d\n" s s))
+      (dotimes (y s) (dotimes (x s) (insert (fill-p x y) " "))))
+    (image-mode))
+#+end_src
+
+建议用三次暮作为参数来调用它,
+
+#+begin_src emacs-lisp
+  (sierpinski (expt 3 5))
+#+end_src
+
+[[http://nullprogram.com/img/fractal/sierpinski.png][http://nullprogram.com/img/fractal/sierpinski-thumb.png]]
+
+下面这个例子你应该会 [[https://nullprogram.com/blog/2007/10/01/][比较眼熟]]. 使用的是一样的技术,
+
+#+begin_src emacs-lisp
+  (defun mandelbrot ()
+    (pop-to-buffer (get-buffer-create "*mandelbrot*"))
+    (let ((w 400) (h 300) (d 32))
+      (fundamental-mode) (erase-buffer)
+      (set-buffer-multibyte nil)
+      (insert (format "P6\n%d %d\n255\n" w h))
+      (dotimes (y h)
+        (dotimes (x w)
+          (let* ((cx (* 1.5 (/ (- x (/ w 1.45)) w 0.45)))
+                 (cy (* 1.5 (/ (- y (/ h 2.0)) h 0.5)))
+                 (zr 0) (zi 0)
+                 (v (dotimes (i d d)
+                      (if (> (+ (* zr zr) (* zi zi)) 4) (return i)
+                        (psetq zr (+ (* zr zr) (- (* zi zi)) cx)
+                               zi (+ (* (* zr zi) 2) cy))))))
+            (insert-char (floor (* 256 (/ v 1.0 d))) 3))))
+      (image-mode)))
+#+end_src
+
+[[https://nullprogram.com/img/fractal/elisp-mandelbrot.png]]
+
+我们可以用colormap函数为它染上色,
+
+#+begin_src emacs-lisp
+  (defun colormap (v)
+    "Given a value between 0 and 1.0, insert a P6 color."
+    (dotimes (i 3)
+      (insert-char (floor (* 256 (min 0.99 (sqrt (* (- 3 i) v))))) 1)))
+#+end_src
+
+[[https://nullprogram.com/img/fractal/elisp-mandelbrot-color.png]]
+
+我脑中一直有一个想法（但是可能永远不会去实现它了）就是创建一个Elisp的小型图库. 它的实现基础就是该技术. 若这种支持被编译在Emacs内, 则Emacs甚至可以在buffer中渲染 SVG 图片, 这样创建一个丰富的图形库并不困难. 而且, 不像纯 Elisp, 它会很快.
+
+
