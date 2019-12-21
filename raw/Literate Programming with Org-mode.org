@@ -4,192 +4,234 @@
 #+TAGS: raw
 #+DATE: [2018年 07月 06日 星期五 13:05:45 CST]
 #+LANGUAGE:  zh-CN
-#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
 I've [[/2016/9/my-workflow-org-agenda/][described at length]] how I use Emacs and Org as a project management tool. As part of my process, I frequently use Org as a lab notebook, in which I keep track of various bits of data and record both the code I run and various parameters I used in the process. My workflow requires (1) running code, (2) logging the results, and (3) including my own thoughts and analysis in between, a programming paradigm known more generally as [[https://en.wikipedia.org/wiki/Literate_programming][literate programming]]A number of folks [[https://www.reddit.com/r/emacs/comments/8tmsfj/literate_programming_with_orgmode/][on Reddit]] and [[http://irreal.org/blog/?p=7301][irreal.com]] have pointed out that I don't dive deep enough to really call the content in this post literate programming. Perhaps a more appropriate title would include Literate Scripting; regardless, the content I present here is still an integral part of my Emacs-based workflow. .
+我已经[[/2016/9/my-workflow-org-agenda/][详细描述]]我如何使用Emacs和Org作为项目管理工具。作为过程的一部分，我经常使用Org作为实验笔记本，在其中我跟踪各种数据，记录我运行的代码和过程中使用的各种参数。我的工作流程需要(1)运行代码，(2)记录结果，(3)包括我自己的想法和分析，编程范式更普遍被称为[[https://en.wikipedia.org/wiki/Literate_programming][文学编程]]的人[[https://www.reddit.com/r/emacs/comments/8tmsfj/literate_programming_with_orgmode/][在Reddit]]和[[http://irreal.org/blog/?p=7301] [irreal.com]]指出,我不潜水深度足以在这篇文章中所说的内容本编程书籍。也许一个更合适的标题应该包括文字脚本;无论如何，我在这里展示的内容仍然是基于emacs的工作流的一个重要部分。
 
 A number of folks [[https://www.reddit.com/r/emacs/comments/8tmsfj/literate_programming_with_orgmode/][on Reddit]] and [[http://irreal.org/blog/?p=7301][irreal.com]] have pointed out that I don't dive deep enough to really call the content in this post literate programming. Perhaps a more appropriate title would include Literate Scripting; regardless, the content I present here is still an integral part of my Emacs-based workflow.
+许多人[[https://www.reddit.com/r/emacs/comments/8tmsfj/literate_programming_with_orgmode/][Reddit]]和[[http://irreal.org/blog/?也许一个更合适的标题应该包括文字脚本;无论如何，我在这里展示的内容仍然是基于emacs的工作流的一个组成部分。
 
 Org makes it easy to asynchronously execute code for multiple programming languages (and even allows for remote code execution over ssh). For instance, on a recent project of mine I had a few shell scripts that I would occasionally run that would loop through some data files I was generating on a remote machine and return some statistics about them; Org makes it possible for me to do this without having to leave my notes. In this article, I'll go over a few use-cases that illustrate the utility of using Emacs with Org for coding projects and walk you through some of the functionality I couldn't live without.
+Org使异步执行多种编程语言的代码变得很容易(甚至允许通过ssh执行远程代码)。例如，在我最近的一个项目中，我有一些shell脚本，我偶尔会运行这些脚本，它们会循环遍历我在远程机器上生成的一些数据文件，并返回关于它们的一些统计信息;Org让我不必留下笔记就能做到这一点。在本文中，我将介绍几个用例，这些用例演示了将Emacs与Org一起用于编码项目的实用程序，并向您介绍了一些我离不开的功能。
 
 * Org-Babel Basics & Remote code execution
-   :PROPERTIES:
-   :CUSTOM_ID: org-babel-basics-remote-code-execution
-   :END:
+* Org-Babel基础和远程代码执行
+:PROPERTIES:
+属性:
+:CUSTOM_ID: org-babel-basics-remote-code-execution
+:CUSTOM_ID org-babel-basics-remote-code-execution
+:END:
+结束:
 
 Org makes it easy to include source code blocks alongside text passages and then execute it with [[https://orgmode.org/worg/org-contrib/babel/][=Org Babel=]]. Setting up Babel is pretty simple:
+Org使得在文本段落中包含源代码块变得很容易，然后使用[[https://orgmode.org/worg/org-contrib/babel/][=Org Babel=]]执行它。建立巴别塔很简单:
 
 A simple configuration for using org-babel. =lisp=
+使用org-babel的简单配置。lisp = =
 
 A simple configuration for using org-babel.
+使用org-babel的简单配置。
 
 =lisp=
+lisp = = = =
 
 #+BEGIN_EXAMPLE
-    ;; Run/highlight code using babel in org-mode
-    (org-babel-do-load-languages
-     'org-babel-load-languages
-     '(
-     (python . t)
-     (ipython . t)
-     (sh . t)
-     (shell . t)
-     ;; Include other languages here...
-     ))
-    ;; Syntax highlight in #+BEGIN_SRC blocks
-    (setq org-src-fontify-natively t)
-    ;; Don't prompt before running code in org
-    (setq org-confirm-babel-evaluate nil)
-    ;; Fix an incompatibility between the ob-async and ob-ipython packages
-    (setq ob-async-no-async-languages-alist '("ipython"))
+;; Run/highlight code using babel in org-mode
+(org-babel-do-load-languages
+'org-babel-load-languages
+'(
+(python . t)
+(ipython . t)
+(sh . t)
+(shell . t)
+;; Include other languages here...
+))
+;; Syntax highlight in #+BEGIN_SRC blocks
+(setq org-src-fontify-natively t)
+;; Don't prompt before running code in org
+(setq org-confirm-babel-evaluate nil)
+;; Fix an incompatibility between the ob-async and ob-ipython packages
+(setq ob-async-no-async-languages-alist '("ipython"))
 #+END_EXAMPLE
 
 The anatomy of a source code block is reasonably simple: each begins with =#+BEGIN_SRC=, followed immediately by the name of the language, then the code you wish to include, and finally closes with =#+END_SRC=. Here's a simple example in Python:
+对源代码块的剖析相当简单:每个代码块以=#+BEGIN_SRC=开头，紧接着是语言名称，然后是希望包含的代码，最后以=#+END_SRC=结尾。下面是Python中的一个简单例子:
 
 #+BEGIN_EXAMPLE
-    #+BEGIN_SRC python :results output
-     import random
-     random.seed(1)
-     print("Hello World! Here's a random number: %f" % random.random())
-    #+END_SRC
-    
-    #+RESULTS:
-    : Hello World! Here's a random number: 0.134364
+#+BEGIN_SRC python :results output
+import random
+random.seed(1)
+print("Hello World! Here's a random number: %f" % random.random())
+#+END_SRC
+
+#+RESULTS:
+: Hello World! Here's a random number: 0.134364
 #+END_EXAMPLE
 
 Running =C-c C-c= while the cursor is inside the source block will execute the Python code block in place and produce the result you see above.Setting =:results output= captures the printed output of executing the code block; an exhaustive list of arguments for src blocks can be found [[https://org-babel.readthedocs.io/en/latest/header-args/][in this Org Babel reference card]]. If you pasted this src block into an Org file, you should notice that it is automatically syntax highlighted as well. Executing =C-c '= inside the block will open a separate buffer in which you can edit the block.
+当光标位于源块内部时，运行=C-c C-c=将在适当的位置执行Python代码块并生成您在上面看到的结果。设置=:结果输出=捕获执行代码块的打印输出;可以找到src块的完整参数列表[[https://org-babel.readthedocs]。io/en/latest/head -args/][在这个组织巴别塔参考卡]]。如果将这个src块粘贴到一个Org文件中，您应该注意到它也会自动突出显示语法。在块内执行=C-c '=将打开一个单独的缓冲区，您可以在其中编辑块。
 
 Setting =:results output= captures the printed output of executing the code block; an exhaustive list of arguments for src blocks can be found [[https://org-babel.readthedocs.io/en/latest/header-args/][in this Org Babel reference card]].
+设置=:结果输出=捕获执行代码块的打印输出;可以找到src块的完整参数列表[[https://org-babel.readthedocs]。io/en/latest/head -args/][在这个组织巴别塔参考卡]]。
 
 Setting the arguments of a src block is a powerful tool. For instance, changing the =:dir= argument changes the base directory in which the code is run. This is useful for running simple bash scripts:
+设置src块的参数是一个强大的工具。例如，更改=:dir=参数将更改运行代码的基本目录。这对于运行简单的bash脚本非常有用:
 
 #+BEGIN_EXAMPLE
-    #+BEGIN_SRC bash :dir ~/Desktop
-     pwd
-    #+END_SRC
-    
-    #+RESULTS:
-    : /Users/Greg/Desktop
+#+BEGIN_SRC bash :dir ~/Desktop
+pwd
+#+END_SRC
+
+#+RESULTS:
+: /Users/Greg/Desktop
 #+END_EXAMPLE
 
 Where this functionality really shines is in the ability to execute code on remote servers. The =:dir= argument can be set to paths using =scp= syntax, and Emacs will take care of the =ssh= into the remote machine, running the code, recording the output, and inserting it into the buffer.
+该功能真正的亮点在于能够在远程服务器上执行代码。可以使用=scp=语法将=:dir=参数设置为路径，Emacs将负责将=ssh=插入远程机器，运行代码，记录输出，并将其插入缓冲区。
 
 #+BEGIN_EXAMPLE
-    #+BEGIN_SRC bash :dir /user@127.0.0.1:
-     pwd
-     echo $USER
-     hostname -I
-    #+END_SRC
-    
-    #+RESULTS:
-    : /home/user
-    : user
-    : 127.0.0.1
+#+BEGIN_SRC bash :dir /user@127.0.0.1:
+pwd
+echo $USER
+hostname -I
+#+END_SRC
+
+#+RESULTS:
+: /home/user
+: user
+: 127.0.0.1
 #+END_EXAMPLE
 
 Of course, you should replace =user@127.0.0.1= with a username and IP address of your choosing. Note: I would highly recommend that you use the remote code execution functionality only for machine in which you have an ssh key installed. Emacs will prompt you with a password whenever the keys are not installed, but I've had it hang on occasion, which can be frustrating when I'm in the middle of a task.
+当然，您应该将=user@127.0.0.1=替换为您选择的用户名和IP地址。注意:我强烈建议您只对安装了ssh密钥的机器使用远程代码执行功能。每当没有安装密钥时，Emacs都会提示您输入密码，但我有时会挂起它，这在我执行任务时很令人沮丧。
 
 Code execution in Emacs is synchronous by default, meaning that you will be locked out of editing while the code is being run. Fortunately, the fantastic [[https://github.com/astahlman/ob-async][=ob-async= package]] allows for asynchronous code execution with the =:async= arg, meaning that you can still use Emacs while the code snippet is run in the backgroundThere are some small things you give up by using the =ob-async= package. In particular, the =:session= functionality is [[https://github.com/astahlman/ob-async/issues/1][absent in general]], which otherwise allows variables and function definitions to persist across blocks of code. . Once the package is installed, simply include =:async t= to the source code block and run it again:
+默认情况下，Emacs中的代码执行是同步的，这意味着在代码运行时，您将被锁定在编辑之外。幸运的是,神奇的[[https://github.com/astahlman/ob-async] [= ob-async =包]]允许异步代码执行=:异步=参数,这意味着你仍然可以使用Emacs而运行的代码片段backgroundThere有些小事你放弃使用= ob-async =包。特别地，=:session= function是[[https://github.com/astahlman/ob-async/issues/1][缺席]]，否则允许变量和函数定义在代码块之间持久化。一旦包被安装，简单地包含=:async t=到源代码块，并再次运行它:
 
 There are some small things you give up by using the =ob-async= package. In particular, the =:session= functionality is [[https://github.com/astahlman/ob-async/issues/1][absent in general]], which otherwise allows variables and function definitions to persist across blocks of code.
+通过使用=ob-async=包，可以放弃一些小事。特别地，=:session= function是[[https://github.com/astahlman/ob-async/issues/1][缺席]]，否则将允许变量和函数定义跨代码块持久化。
 
 #+BEGIN_EXAMPLE
-    #+BEGIN_SRC bash :dir /user@127.0.0.1: :async t
-     pwd
-     echo $USER
-     hostname -I
-    #+END_SRC
-    
-    #+RESULTS:
-    : 0ddf0124c8fcb26d53fdba83dc4773f6
+#+BEGIN_SRC bash :dir /user@127.0.0.1: :async t
+pwd
+echo $USER
+hostname -I
+#+END_SRC
+
+#+RESULTS:
+: 0ddf0124c8fcb26d53fdba83dc4773f6
 #+END_EXAMPLE
 
 While the code block is running, the =RESULTS= drawer is populated with a random hash. When the block is finished executing, the hash will be replaced with the actual result.
+当代码块运行时，=RESULTS=折叠项将使用随机散列填充。当块完成执行时，哈希将被实际结果替换。
 
 * Example: Setting up a Python virtual environment
-   :PROPERTIES:
-   :CUSTOM_ID: example-setting-up-a-python-virtual-environment
-   :END:
+*示例:设置Python虚拟环境
+:PROPERTIES:
+属性:
+:CUSTOM_ID: example-setting-up-a-python-virtual-environment
+:CUSTOM_ID example-setting-up-a-python-virtual-environment
+:END:
+结束:
 
 Most examples that use Org Babel seem to focus on a particular language, yet many of the projects I set up actually involve the interplay between multiple languages. Here, we'll set up a Python virtual environment (in =bash=), set up an iPython workbook, and then use the resulting environment to generate a plot, which we can view inline. Package management in Python can be a pain, which is why using a [[https://virtualenv.pypa.io/en/stable/][virtual environment]] is important for making reusable development environments. If you want to follow along, be sure to install [[https://github.com/astahlman/ob-async][=ob-async=]], [[https://github.com/jorgenschaefer/pyvenv][=pyvenv=]], and [[https://github.com/gregsexton/ob-ipython][=ob-ipython=]] within Emacs. As one might expect, I wrote this entire section using my literate programming setup. Since my blog's syntax highlighting didn't play nice with the Org syntax, I've broken the code blocks into manageable chunks.
+大多数使用Org Babel的例子似乎都集中在一种特定的语言上，但是我设置的许多项目实际上都涉及到多种语言之间的相互作用。在这里，我们将设置一个Python虚拟环境(在=bash=中)，设置一个iPython工作簿，然后使用生成的环境生成一个可以内联查看的图。Python中的包管理可能很麻烦，这就是为什么要使用[[https://virtualenv.pypa。io/en/stable/][虚拟环境]对开发环境的可重用性非常重要。如果您想要跟随本文，请确保在Emacs中安装[[https://github.com/astahlman/ob-async][=ob-async=]]、[[https://github.com/jorgenschaefer/pyvenv][=pyvenv=]]和[[https://github.com/gregsexton/ob-ipython][=ob-ipython=]]。正如您所预料的，我使用读写编程设置编写了整个部分。由于我的博客的语法高亮显示不适合Org语法，所以我把代码块分成了可管理的块。
 
 Rather than set the properties of each =BEGIN_SRC= block individually, I often find it useful to set certain properties at the level of each Org header, which I do in the =:PROPERTIES:= drawer:
+我没有单独设置每个=BEGIN_SRC=块的属性，我经常发现在每个Org头的级别设置某些属性很有用，我在=:properties:= drawer:
 
 #+BEGIN_EXAMPLE
-     0_sync_master.sh 1_add_new_article_manual.sh 1_add_new_article_newspaper.sh 2_start_translating.sh 3_continue_the_work.sh 4_finish.sh 5_pause.sh base.sh parse_url_by_manual.sh parse_url_by_newspaper.py parse_url_by_newspaper.sh project.cfg reformat.sh texput.log urls_checker.sh Creating a Python virtual environment
-     :PROPERTIES:
-     :header-args: :eval never-export
-     :header-args:bash: :exports code
-     :header-args:elisp: :exports code
-     :header-args:ipython: :exports both
-     :END:
+0_sync_master.sh 1_add_new_article_manual.sh 1_add_new_article_newspaper.sh 2_start_translating.sh 3_continue_the_work.sh 4_finish.sh 5_pause.sh base.sh parse_url_by_manual.sh parse_url_by_newspaper.py parse_url_by_newspaper.sh project.cfg reformat.sh texput.log urls_checker.sh Creating a Python virtual environment
+:PROPERTIES:
+:header-args: :eval never-export
+:header-args:bash: :exports code
+:header-args:elisp: :exports code
+:header-args:ipython: :exports both
+:END:
 #+END_EXAMPLE
 
 Notice that, in addition to setting =:header-args:= I have also set a number of language-specific arguments as well. For instance, I have set =:header-args:elisp: :exports code=, which means that for any Emacs lisp code blocks, whenever I want to export this Org file to a different format (like a PDF) for sharing, only the code will be included in the export and the =RESULTS= drawer will be ignored.
+注意，除了设置=:head -args:=之外，我还设置了一些特定于语言的参数。例如,我=:header-args: elisp:: =出口代码,这意味着对于任何Emacs lisp代码块,每当我想这个组织文件导出到一个不同的格式(如PDF)分享,只有代码将被包含在出口和= =结果抽屉将被忽略。
 
 My first step is to set up the Python virtual environment. For convenience, I will put it on my Desktop, which I can do by setting =:dir ~/Desktop= in the src block properties, and name it =py2_venv=:
+我的第一步是设置Python虚拟环境。为了方便起见，我将它放在我的桌面上，我可以通过在src块属性中设置=:dir ~/Desktop=，并将其命名为=py2_venv=:
 
 #+BEGIN_EXAMPLE
-    #+BEGIN_SRC bash :dir ~/Desktop :results drawer
-     pwd
-     virtualenv py2_venv
-    #+END_SRC
-    
-    #+RESULTS:
-    :RESULTS:
-    /Users/Greg/Desktop
-    New python executable in /Users/Greg/Desktop/py2_venv/bin/python
-    Installing setuptools, pip, wheel...done.
-    :END:
+#+BEGIN_SRC bash :dir ~/Desktop :results drawer
+pwd
+virtualenv py2_venv
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+/Users/Greg/Desktop
+New python executable in /Users/Greg/Desktop/py2_venv/bin/python
+Installing setuptools, pip, wheel...done.
+:END:
 #+END_EXAMPLE
 
 The results suggest that everything finished as expected and that the virtual environment is now on my Desktop. With that complete, we need to activate the virtual environment within EmacsFor whatever reason, I found that installing packages in the virtual environment was only practical after activating the virtual environment inside Emacs, since this seems to modify the python path. . This is done with the =pyvenv-activate= command provided by the [[https://github.com/jorgenschaefer/pyvenv][=pyvenv= package]] as follows:
+结果表明，一切都如预期的那样完成了，虚拟环境现在就在我的桌面上。完成之后，我们需要激活Emacs中的虚拟环境，不管出于什么原因，我发现在虚拟环境中安装包只有在激活Emacs中的虚拟环境之后才是可行的，因为这似乎修改了python的路径。这是通过以下[[https://github.com/jorgenschaefer/pyvenv][=pyvenv= package]]提供的=pyvenv-activate=命令完成的:
 
 For whatever reason, I found that installing packages in the virtual environment was only practical after activating the virtual environment inside Emacs, since this seems to modify the python path.
+不管出于什么原因，我发现在虚拟环境中安装包只有在激活Emacs中的虚拟环境之后才是可行的，因为这似乎修改了python路径。
 
 #+BEGIN_EXAMPLE
-    #+BEGIN_SRC elisp :results silent
-     (pyvenv-activate "~/Desktop/py2_venv")
-    #+END_SRC
+#+BEGIN_SRC elisp :results silent
+(pyvenv-activate "~/Desktop/py2_venv")
+#+END_SRC
 #+END_EXAMPLE
 
 With the virtual environment activated, installing a few packages via pip is pretty simpleThe additional =ipython= and =jupyter= packages are for using iPython (instead of Python) with Babel. There are a couple niceties provided by the [[https://github.com/gregsexton/ob-ipython][=ob-ipython= package]] that you don't get from the base Python install, so I'd recommend looking at the documentation if you're interested in Python development. .
+激活虚拟环境后，通过pip安装几个包非常简单。附加的=ipython=和=jupyter=包是用于与Babel一起使用ipython(而不是Python)的。[[https://github.com/gregsexton/ob-ipython][=ob-ipython= package]]提供了一些基本Python安装中没有的细微之处，所以如果您对Python开发感兴趣，我建议您查看一下文档。
 
 The additional =ipython= and =jupyter= packages are for using iPython (instead of Python) with Babel. There are a couple niceties provided by the [[https://github.com/gregsexton/ob-ipython][=ob-ipython= package]] that you don't get from the base Python install, so I'd recommend looking at the documentation if you're interested in Python development.
+附加的=ipython=和=jupyter=包用于在Babel中使用ipython(而不是Python)。[[https://github.com/gregsexton/ob-ipython][=ob-ipython= package]]提供了一些基本Python安装中没有的细微之处，所以如果您对Python开发感兴趣，我建议您查看一下文档。
 
 #+BEGIN_EXAMPLE
-    #+BEGIN_SRC bash :results drawer :async t
-     pip install ipython jupyter_client jupyter_console numpy matplotlib
-    #+END_SRC
+#+BEGIN_SRC bash :results drawer :async t
+pip install ipython jupyter_client jupyter_console numpy matplotlib
+#+END_SRC
 #+END_EXAMPLE
 
 Since installing packages via =pip= can sometimes take a while, waiting for the code to finish can be a massive inconvenience, and I've included =:async t= in the arg list so that the installations will run in the background. Once this is done and the virtual environment is set up, running Python code within iPython is as straightforward as one might expect:
+由于通过=pip=安装包有时需要一段时间，因此等待代码完成可能会带来极大的不便，我在arg列表中包含了=:async t=，以便安装可以在后台运行。一旦完成并设置好虚拟环境，在iPython中运行Python代码就像预期的那样简单:
 
 #+BEGIN_EXAMPLE
-    #+BEGIN_SRC ipython :results drawer :async t :session py2session
-     %matplotlib inline
-     import numpy as np
-     import matplotlib.pyplot as plt
-    #+END_SRC
+#+BEGIN_SRC ipython :results drawer :async t :session py2session
+%matplotlib inline
+import numpy as np
+import matplotlib.pyplot as plt
+#+END_SRC
 #+END_EXAMPLE
 
 Notice that, in addition to running the code asynchronously, I have also provided =:session py2session= to the iPython src block. Sessions are extremely useful, since they allow you to set variables, define functions, import packages, etc. within one src block and have them persist to other src blocks with the same session name. Now, having imported the requisite packages, we can generate a plot:
+注意，除了异步运行代码外，我还为iPython src块提供了=:session py2session=。会话是非常有用的，因为它们允许您在一个src块中设置变量、定义函数、导入包等，并将它们持久化到具有相同会话名称的其他src块中。现在，已经导入了所需的包，我们可以生成一个图:
 
 #+BEGIN_EXAMPLE
-    #+BEGIN_SRC ipython :results drawer :async t :session py2session
-     fig=plt.figure(facecolor='white')
-     plt.hist(np.random.randn(500000), bins=100);
-    #+END_SRC
+#+BEGIN_SRC ipython :results drawer :async t :session py2session
+fig=plt.figure(facecolor='white')
+plt.hist(np.random.randn(500000), bins=100);
+#+END_SRC
 #+END_EXAMPLE
 
 Having set =%matplotlib inline= in the previous block, the resulting plot is saved to a temporary directory and appears inline. Expectedly, the histogram shows a Gaussian distribution:
+在前一个块中设置=%matplotlib inline=后，结果图将保存到一个临时目录中，并内联显示。不出所料，直方图呈高斯分布:
 
+[[http://cachestocaches.com/media/photologue/photos/cache/72597RmJ_display.png]]
 [[http://cachestocaches.com/media/photologue/photos/cache/72597RmJ_display.png]]
 
 * Additional Resources
-   :PROPERTIES:
-   :CUSTOM_ID: additional-resources
-   :END:
+*额外的资源
+:PROPERTIES:
+属性:
+:CUSTOM_ID: additional-resources
+:CUSTOM_ID:额外的资源
+:END:
+结束:
 
 There are plenty of other resources on using Emacs and Org Babel for literate programming. In addition to the [[https://orgmode.org/worg/org-contrib/babel/intro.html#literate-programming][guide to Org Babel]] there's also the fantastic [[http://howardism.org/Technical/Emacs/literate-devops.html][Literate DevOps guide]] and accompanying [[https://www.youtube.com/watch?v=dljNabciEGg][video summary]] by Howard Abrams. If you enjoyed this post and are left wanting more, I'd recommend checking out Howard's guides: both are fantastic. Also useful is the [[https://orgmode.org/manual/Working-with-source-code.html#Working-with-source-code][Org-mode guide to working with source code]].
+有很多其他的资源关于使用Emacs和Org Babel进行文学编程。除了[[https://orgmode.org/worg/org-contrib/babel/intro.html][Org Babel指南]]之外，还有精彩的[[http://howardism.org/technical/emacs/literdevops.html][读写DevOps指南]]和伴随的[[https://www.youtube.com/watch?[视频摘要]]霍华德·艾布拉姆斯。如果你喜欢这篇文章，还想看更多，我建议你看看霍华德的指南:都很棒。同样有用的是[[https://orgmode.org/manual/Working-with-source-code.html# working -with-source-code][Org-mode guide to working with source code]]。
 
 Feel free to let me know how this short guide may be improved in the comments below or [[https://www.reddit.com/r/emacs/comments/8tmsfj/literate_programming_with_orgmode/][on Reddit]].
+欢迎在下面的评论或[[https://www.reddit.com/r/emacs/comments/8tmsfj/literate_programming_with_orgmode/][Reddit]]中告诉我如何改进这篇简短的指南。

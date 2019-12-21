@@ -4,139 +4,156 @@
 #+TAGS: raw
 #+DATE: [2018年 06月 11日 星期一 12:42:26 CST]
 #+LANGUAGE:  zh-CN
-#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
 I am a big fan of org-mode links. Lately, I have had a need to modify how some links are exported, e.g. defining new exports for different backends, or fine-tuning a particular backend. This can be difficult, depending on how the link was set up. Here is a typical setup I am used to using, where the different options for the backends are handled in a conditional statement in a single function. I will just use a link that just serves to illustrate the issues here. These links are just sytactic sugar for markup, they don't do anything else. We start with an example that just converts text to italic text for different backends like html or latex.
+我是一个组织模式链接的超级粉丝。最近，我需要修改一些链接的导出方式，比如为不同的后端定义新的导出，或者对特定后端进行微调。这可能很困难，这取决于链接是如何建立的。这是我习惯使用的典型设置，其中后端不同的选项在单个函数的条件语句中处理。我将使用一个链接来说明这里的问题。这些链接只是用于标记的糖浆，它们没有做任何其他的事情。我们从一个例子开始，它只是将文本转换为斜体文本，用于不同的后端，如html或latex。
 
 #+BEGIN_EXAMPLE
-    (defun italic-link-export (path desc backend)
-     (cond
-     ((eq 'html backend)
-     (format "<em>%s</em>" path))
-     ((eq 'latex backend)
-     (format "\\textit{%s}" path))
-     ;; fall-through case for everything else
-     (t
-     path)))
+(defun italic-link-export (path desc backend)
+(cond
+((eq 'html backend)
+(format "<em>%s</em>" path))
+((eq 'latex backend)
+(format "\textit{%s}" path))
+;; fall-through case for everything else
+(t
+path)))
 
-    (org-link-set-parameters "italic" :export 'italic-link-export)
+(org-link-set-parameters "italic" :export 'italic-link-export)
 #+END_EXAMPLE
 
 :export
+:出口
+italic-link-export
 italic-link-export
 
 #+BEGIN_EXAMPLE
-    (org-export-string-as "italic:text" 'html t)
+(org-export-string-as "italic:text" 'html t)
 #+END_EXAMPLE
 
 #+BEGIN_EXAMPLE
-    <p>
-    <em>text</em></p>
+<p>
+<em>text</em></p>
 #+END_EXAMPLE
 
 #+BEGIN_EXAMPLE
-    (org-export-string-as "italic:text" 'latex t)
+(org-export-string-as "italic:text" 'latex t)
 #+END_EXAMPLE
 
 #+BEGIN_EXAMPLE
-    \textit{text}
+textit{text}
 #+END_EXAMPLE
 
 This falls through though to the default case.
+这是默认情况。
 
 #+BEGIN_EXAMPLE
-    (require 'ox-md)
-    (org-export-string-as "italic:text" 'md t)
+(require 'ox-md)
+(org-export-string-as "italic:text" 'md t)
 #+END_EXAMPLE
 
 #+BEGIN_EXAMPLE
 
-    # Table of Contents
+# Table of Contents
 
 
 
-    text
+text
 
 #+END_EXAMPLE
 
 The point I want to make here is that this is not easy to extend as a user. You have to either modify the italic-link-export function, advise it, or monkey-patch it. None of these are especially nice.
+我在这里想说的是，作为一个用户，扩展它并不容易。你要么修改斜体链接导出功能，要么给它提供建议，要么给它打补丁。这些都不是特别好。
 
 I could define italic-link-export in a way that it retrieves the function to use from an alist or hash-table using the backend, but then you have to do two things to modify the behavior: define a backend specific function /and/ register it in the lookup variable. It is also possible to just look up a function by a derived symbol, e.g. using fboundp, and then using funcall to execute it. This looks something like this:
+我可以定义斜体链接导出，其方式是使用后端从列表或散列表中检索要使用的函数，但是之后必须做两件事来修改行为:定义一个后端特定的函数/和/在查找变量中注册它。也可以通过派生符号查找一个函数，例如使用fboundp，然后使用funcall来执行它。它是这样的:
 
 #+BEGIN_EXAMPLE
-    ;; a user definable function for exporting to latex
-    (defun italic-link-export-latex (path desc backend)
-     (format "\\textit{%s}" path))
+;; a user definable function for exporting to latex
+(defun italic-link-export-latex (path desc backend)
+(format "\textit{%s}" path))
 
-    ;; generic export function that looks up functions or defaults to
-    (defun italic-link-exporter (path desc backend)
-     "Run `italic-link-export-BACKEND' if it exists, or return path."
-     (let ((func (intern-soft (format "italic-link-export-%s" backend))))
-     (if (fboundp func)
-     (funcall func path desc backend)
-     path)))
+;; generic export function that looks up functions or defaults to
+(defun italic-link-exporter (path desc backend)
+"Run `italic-link-export-BACKEND' if it exists, or return path."
+(let ((func (intern-soft (format "italic-link-export-%s" backend))))
+(if (fboundp func)
+(funcall func path desc backend)
+path)))
 #+END_EXAMPLE
 
 This has some indirection, but allows you to just define new functions to add new export backends, or replace single backend exports. It isn't bad, but there is room for improvement.
+这有一些间接，但允许您只定义新函数来添加新的导出后端，或替换单个后端导出。还不错，但还有改进的空间。
 
 In this [[https://github.com/jkitchin/org-ref/issues/492#issuecomment-387806180][comment]] in org-ref, I saw a new opportunity to address this issue using generic functions in elisp! The idea is to define a generic function that handles the general export case, and then define additional functions for each specific backend based on the signature of the export function. I will switch to bold markup for this.
+在这[[https://github.com/jkitchin/org-ref/issues/492# issuecom387806180][评论]]中，我看到了一个新的机会来解决这个问题，使用elisp中的通用函数!其思想是定义一个处理一般导出情况的通用函数，然后根据导出函数的签名为每个特定后端定义额外的函数。为此，我将切换到粗体标记。
 
 #+BEGIN_EXAMPLE
-    (cl-defgeneric bold-link-export (path desc backend)
-     "Generic function to export a bold link."
-     path)
+(cl-defgeneric bold-link-export (path desc backend)
+"Generic function to export a bold link."
+path)
 
-    ;; this one runs when the backend is equal to html
-    (cl-defmethod bold-link-export ((path t) (desc t) (backend (eql html)))
-     (format "<b>%s</b>" path))
+;; this one runs when the backend is equal to html
+(cl-defmethod bold-link-export ((path t) (desc t) (backend (eql html)))
+(format "<b>%s</b>" path))
 
-    ;; this one runs when the backend is equal to latex
-    (cl-defmethod bold-link-export ((path t) (desc t) (backend (eql latex)))
-     (format "\\textit{%s}" path))
+;; this one runs when the backend is equal to latex
+(cl-defmethod bold-link-export ((path t) (desc t) (backend (eql latex)))
+(format "\textit{%s}" path))
 
-    (org-link-set-parameters "bold" :export 'bold-link-export)
+(org-link-set-parameters "bold" :export 'bold-link-export)
 #+END_EXAMPLE
 
 :export
+:出口
+bold-link-export
 bold-link-export
 
 Here it is in action:
+它是这样的:
 
 #+BEGIN_EXAMPLE
-    (org-export-string-as "some bold:text" 'html t)
+(org-export-string-as "some bold:text" 'html t)
 #+END_EXAMPLE
 
 #+BEGIN_EXAMPLE
-    <p>
-    some <b>text</b></p>
+<p>
+some <b>text</b></p>
 #+END_EXAMPLE
 
 #+BEGIN_EXAMPLE
-    (org-export-string-as "some bold:text" 'latex t)
+(org-export-string-as "some bold:text" 'latex t)
 #+END_EXAMPLE
 
 This uses the generic function.
+它使用了泛型函数。
 
 #+BEGIN_EXAMPLE
-    (require 'ox-md)
-    (org-export-string-as "some bold:text" 'md t)
+(require 'ox-md)
+(org-export-string-as "some bold:text" 'md t)
 #+END_EXAMPLE
 
 #+BEGIN_EXAMPLE
 
-    # Table of Contents
+# Table of Contents
 
 
 
-    some text
+some text
 
 #+END_EXAMPLE
 
 The syntax for defining the generic function is pretty similar to a regular function. The specific methods are a little different since they have to provide the specific "signature" that triggers each method. Here we only differentiate on the type of the backend. It is nice these are all separate functions though. It makes it trivial to add new ones, and less intrusive to replace in my opinion.
+定义泛型函数的语法与常规函数非常相似。具体的方法略有不同，因为它们必须提供触发每个方法的特定“签名”。这里我们只区分后台的类型。很好，这些都是单独的函数。在我看来，添加新功能很简单，替换起来也不太麻烦。
 
 Generic functions have many other potential applications to replace functions that use lots of conditions to control flow, with a fall-through option at the end. You can learn more about them here: [[https://www.gnu.org/software/emacs/manual/html_node/elisp/Generic-Functions.html]]. There is a lot more to them than I have illustrated here.
+通用函数有许多其他潜在的应用程序，可以替换使用大量条件来控制流的函数，并在最后提供一个跳转选项。您可以在这里了解更多关于它们的信息:[[https://www.gnu.org/software/emacs/manual/html_node/elisp/Generic-Functions.html]]。它们比我在这里所描述的要多得多。
 
 Copyright (C) 2018 by John Kitchin. See the [[/copying.html][License]] for information about copying.
+John Kitchin版权所有(C) 2018看到[[/复制。关于复制的信息。
 
 [[/org/2018/05/09/Making-it-easier-to-extend-the-export-of-org-mode-links-with-generic-functions.org][org-mode source]]
+[[/org/2018/05/09/Making-it-easier-to-extend-the-export-of-org-mode-links-with-generic-functions.org] [org-mode来源]]
 
 Org-mode version = 9.1.13
+风球版本= 9

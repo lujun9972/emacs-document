@@ -4,130 +4,220 @@
 #+TAGS: raw
 #+DATE: [2018-02-05 一 15:28]
 #+LANGUAGE:  zh-CN
-#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
 
 
 In many IDEs, peek definition is a feature that opens a definition (of a function, a class, a
+在许多ide中，peek定义是一个打开定义(函数、类、对象)的功能
 symbol, etc) in a popup window without leaving the current buffer. Most of the time, jumping
+在不离开当前缓冲区的情况下在弹出窗口中显示符号等。大部分时间都在跳
 into a definition, then jump back, is enough, so why bother leaving the current buffer to
-reload a whole new buffer, then go back for another reload. This is distracting. 
+进入一个定义，然后跳回来，就足够了，所以为什么要离开目前的缓冲区
+reload a whole new buffer, then go back for another reload. This is distracting.
+重新加载一个全新的缓冲区，然后再回去重新加载一次。这是分心。
 
-An example of peek definition: 
+An example of peek definition:
+peek定义的一个例子:
 
 [[http://tuhdo.github.io/static/peek-definition-vs.png][peek-definition-vs.png]]
-(Source: Microsoft) 
+[[http://tuhdo.github.io/static/peek-definition-vs.png] [peek-definition-vs.png]]
+(Source: Microsoft)
+(来源:微软(Microsoft)。
 
 I already searched for an alternative in Emacs, but apparently, all the solutions that involve a
+我已经在Emacs中寻找了一个替代方案，但显然，所有的解决方案都涉及到a
 popup is slow and lacking. The space for displaying text is limited, and there is no font
-locking. You can't even search, or if it does, search is difficult and slow. 
+弹出式是缓慢和缺乏。显示文本的空间有限，而且没有字体
+locking. You can't even search, or if it does, search is difficult and slow.
+锁定。你甚至不能搜索，或者如果搜索，搜索是困难和缓慢的。
 
 Recently, while jumping around code definitions, I lost track of the original buffer I start the
+最近，在跳过代码定义时，我丢失了启动的原始缓冲区的踪迹
 jump chain, e.g. I started at file1.c, then jumped to file2.c, file3.h, file4.c, and so on, until I
+跳转链，例如我从file1开始。c，然后跳转到file2。c, file3。h, file4。c，等等，直到I
 forgot that I started at file1.c (file1.c can be a long and hard to remember name). It makes
+忘记我是从file1.c开始的(file1.c可能很长，很难记住它的名字)。它使
 me want to do this whole code hopping process in another separated frame/buffer instead of
-messing with my current buffer. I tried improved the process: 
+我想在另一个单独的帧/缓冲区中完成整个代码跳跃过程
+messing with my current buffer. I tried improved the process:
+把我现在的缓冲区弄乱了。我尝试改进流程:
 
 ,* Using a different buffer: Initially, I create another buffer and start from there. However,
- it is usually the case that the other buffer is also a useful buffer. 
+，*使用不同的缓冲区:最初，我创建另一个缓冲区，并从那里开始。然而,
+it is usually the case that the other buffer is also a useful buffer.
+通常情况下，另一个缓冲区也是一个有用的缓冲区。
 ,* Using a different workspace: I am using [[https://github.com/wasamasa/eyebrowse][eyebrowse]], a package that can create a whole
- new workspace and save the previous window configuration as another workspace.
- Effectively, you can switch between different window configurations with ease. This
- solution quickly becomes cumbersome, because I must remember which workspace is for
- browsing code, not to mention it is quite common for me to create 5 other workspaces for
- other purposes. It quickly becomes a burden to manage the workspaces. 
+我正在使用[[https://github.com/wasamasa/eyebrowse][eyebrowse]]，一个可以创建一个完整的包
+new workspace and save the previous window configuration as another workspace.
+创建新的工作空间，并将之前的窗口配置保存为另一个工作空间。
+Effectively, you can switch between different window configurations with ease. This
+有效地，您可以轻松地在不同的窗口配置之间切换。这
+solution quickly becomes cumbersome, because I must remember which workspace is for
+解决方案很快就变得很麻烦，因为我必须记住是哪个工作区
+browsing code, not to mention it is quite common for me to create 5 other workspaces for
+浏览代码，更不用说它是很常见的为我创建5个其他工作空间
+other purposes. It quickly becomes a burden to manage the workspaces.
+其他用途。它很快成为管理工作空间的负担。
 
 It is at this point that I suddenly remember frames. That's right, Emacs frames! It is perfect
+就在这时，我突然想起了框架。没错，Emacs帧!它是完美的
 for this use case. I can do whatever I want in this frame, and when done, simply close it with
+对于这个用例。我可以在这一帧中做任何我想做的事情，当完成时，简单地关闭它
 C-x 5 0. With frames, the number of my workspaces (using eyebrowse) is kept at a
-manageable number. 
+cx 5 0。对于框架，我的工作空间的数量(使用eyebrowse)保持在a
+manageable number.
+可控的号码。
 
 But wait, if an Emacs frame is small enough, isn't it the same as a popup window, but with
+但是等一下，如果Emacs帧足够小，它不是和弹出窗口一样吗
 every feature of a buffer (syntax highlighting, code jumping, etc) available? Not to mention,
-making a frame is much more lightweight than other popup solutions. 
+缓冲区的每个特性(语法突出显示、代码跳转等)都可用吗?更不用说,
+making a frame is much more lightweight than other popup solutions.
+制作一个框架比其他弹出式解决方案要轻得多。
 
-At this point, implementing a peek definition in Emacs is simply automating these steps: 
+At this point, implementing a peek definition in Emacs is simply automating these steps:
+此时，在Emacs中实现peek定义就是简单地自动化这些步骤:
 
-1 Find the absolute position of the current beginning of the symbol at point, in pixels. 
-2 Create a new invisible frame, with the current buffer in it. 
-3 Position the new frame right under the beginning of the symbol at point. 
-4 Jump to the symbol at point. 
-5 Make frame visible again. 
+1 Find the absolute position of the current beginning of the symbol at point, in pixels.
+求符号当前起始点的绝对位置，以像素为单位。
+2 Create a new invisible frame, with the current buffer in it.
+创建一个新的不可见的框架，其中包含当前缓冲区。
+3 Position the new frame right under the beginning of the symbol at point.
+将新帧定位在符号开始的正下方。
+4 Jump to the symbol at point.
+4跳转到符号点。
+5 Make frame visible again.
+5让帧再次可见。
 
-That's all for a peek definition popup: 
+That's all for a peek definition popup:
+这就是一个peek定义的弹出窗口:
 
 [[http://tuhdo.github.io/static/peek-definition-emacs.gif][peek-definition-emacs.gif]]
+[[http://tuhdo.github.io/static/peek-definition-emacs.gif] [peek-definition-emacs.gif]]
 
 In the example, I used rtags-find-symbol-at-point function for jumping. But you can use any
-function that finds a definition, as long as it jumps to a buffer. Finally, here is the code: 
+在本例中，我使用rtag -find-symbol-at-point函数进行跳转。但是你可以用任何一个
+function that finds a definition, as long as it jumps to a buffer. Finally, here is the code:
+函数查找定义，只要它跳转到缓冲区。最后，代码如下:
 
 #+BEGIN_SRC emacs-lisp
-  (defun rtags-peek-definition ()
-    "Peek at definition at point using rtags."
-    (interactive)
-    (let ((func (lambda ()
-                  (rtags-find-symbol-at-point)
-                  (rtags-location-stack-forward))))
-      (rtags-start-process-unless-running)
-      (make-peek-frame func)))
+# + BEGIN_SRC emacs lisp
+(defun rtags-peek-definition ()
+(defun rtags-peek-definition ()
+"Peek at definition at point using rtags."
+使用rtags查看定义点。
+(interactive)
+(互动)
+(let ((func (lambda ()
+(函数)
+(rtags-find-symbol-at-point)
+(rtags-find-symbol-at-point)
+(rtags-location-stack-forward))))
+(rtags-location-stack-forward))))
+(rtags-start-process-unless-running)
+(rtags-start-process-unless-running)
+(make-peek-frame func)))
+(make-peek-frame func)))
 
-  (defun make-peek-frame (find-definition-function &rest args)
-    "Make a new frame for peeking definition"
-    (when (or (not (rtags-called-interactively-p)) (rtags-sandbox-id-matches))
-      (let (summary
-            doc-frame
-            x y
-            ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-            ;; 1. Find the absolute position of the current beginning of the symbol at point, ;;
-            ;; in pixels.                                                                     ;;
-            ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-            (abs-pixel-pos (save-excursion
-                             (beginning-of-thing 'symbol)
-                             (window-absolute-pixel-position))))
-        (setq x (car abs-pixel-pos))
-        ;; (setq y (cdr abs-pixel-pos))
-        (setq y (+ (cdr abs-pixel-pos) (frame-char-height)))
+(defun make-peek-frame (find-definition-function &rest args)
+(defun make-peek-frame (find- define -function &rest args))
+"Make a new frame for peeking definition"
+“给偷看定义一个新框架”
+(when (or (not (rtags-called-interactively-p)) (rtags-sandbox-id-matches))
+(when (or (not (rtag -called- interactivly -p)) (rtag -sandbox-id-matches))
+(let (summary
+(让(总结
+doc-frame
+doc-frame
+x y
+x
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; 1. Find the absolute position of the current beginning of the symbol at point, ;;
+;;1. 求符号当前起始点的绝对位置，;;
+;; in pixels.                                                                     ;;
+;;以像素为单位。;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(abs-pixel-pos (save-excursion
+(abs-pixel-pos (save-excursion
+(beginning-of-thing 'symbol)
+(beginning-of-thing的象征)
+(window-absolute-pixel-position))))
+(window-absolute-pixel-position))))
+(setq x (car abs-pixel-pos))
+(setq x (car abs-pixel-pos))
+;; (setq y (cdr abs-pixel-pos))
+;;(setq y (cdr abs-pixel-pos))
+(setq y (+ (cdr abs-pixel-pos) (frame-char-height)))
+(setq y (+ (cdr abs-pixel-pos) (frame-char-height)))
 
-        ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-        ;; 2. Create a new invisible frame, with the current buffer in it. ;;
-        ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-        (setq doc-frame (make-frame '((minibuffer . nil)
-                                      (name . "*RTags Peek*")
-                                      (width . 80)
-                                      (visibility . nil)
-                                      (height . 15))))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; 2. Create a new invisible frame, with the current buffer in it. ;;
+;;2. 创建一个新的不可见的框架，其中包含当前缓冲区。;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(setq doc-frame (make-frame '((minibuffer . nil)
+设置文档帧(make-frame))。nil)
+(name . "*RTags Peek*")
+(名字。“* RTags Peek *”)
+(width . 80)
+(宽度。80)
+(visibility . nil)
+(可见性。nil)
+(height . 15))))
+(高度。15))))
 
-        ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-        ;; 3. Position the new frame right under the beginning of the symbol at point. ;;
-        ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-        (set-frame-position doc-frame x y)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; 3. Position the new frame right under the beginning of the symbol at point. ;;
+;;3.将新帧定位在符号起始点的正下方。;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(set-frame-position doc-frame x y)
+(set-frame-position doc-frame x y)
 
-        ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-        ;; 4. Jump to the symbol at point. ;;
-        ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-        (with-selected-frame doc-frame
-          (apply find-definition-function args)
-          (read-only-mode)
-          (when semantic-stickyfunc-mode (semantic-stickyfunc-mode -1))
-          (recenter-top-bottom 0))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; 4. Jump to the symbol at point. ;;
+;;4. 跳转到点上的符号。;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(with-selected-frame doc-frame
+(with-selected-frame doc-frame
+(apply find-definition-function args)
+(应用find-definition-function args)
+(read-only-mode)
+(只读模式下运行)
+(when semantic-stickyfunc-mode (semantic-stickyfunc-mode -1))
+(当语义- stickyfuncm -mode(语义- stickyfuncm -mode -1))
+(recenter-top-bottom 0))
+(recenter-top-bottom 0))
 
-        ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-        ;; 5. Make frame visible again ;;
-        ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-        (make-frame-visible doc-frame))))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; 5. Make frame visible again ;;
+;;5. 使帧再次可见;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(make-frame-visible doc-frame))))
+(make-frame-visible doc-frame))))
 #+END_SRC
+# + END_SRC
 
-Then, bind the new command to a key and try it out: 
+Then, bind the new command to a key and try it out:
+然后，将新命令绑定到一个键，并尝试:
 
 #+BEGIN_SRC emacs-lisp
-  (global-set-key (kbd "C-c p") 'rtags-peek-definition)
+# + BEGIN_SRC emacs lisp
+(global-set-key (kbd "C-c p") 'rtags-peek-definition)
+(全球集键(kbd“C-c - p”)“rtags-peek-definition)
 #+END_SRC
+# + END_SRC
 
 To close the peek frame, simply use C-x 5 0 (runs delete-frame command). You can bind it to
-another key to close frame easier, e.g. f12 key. 
+要关闭peek帧，只需使用C-x 5 0(运行删除帧命令)。你可以把它绑起来
+another key to close frame easier, e.g. f12 key.
+另一个键关闭帧更容易，例如f12键。
 
 The more I use Emacs, the more I start realizing how useful frames are. Especially with
+我使用Emacs越多，就越开始意识到帧是多么有用。尤其是在
 Emacs 26 onward, there is an option to remove a frame from OS taskbar, effectively you
+从Emacs 26开始，有一个选项可以从操作系统任务栏中移除一个框架
 cannot use Alt+Tab to switch to any child frame created in Emacs. With this feature, you can
+不能使用Alt+Tab切换到Emacs中创建的任何子帧。有了这个特性，您就可以
 create many Emacs frames without creating a mess that renders Alt+tab unusable. Perhaps
-it is the time to embrace the frames. 
-
+创建许多Emacs帧，而不造成混乱，使Alt+标签无法使用。也许
+it is the time to embrace the frames.
+现在是拥抱框架的时候了。

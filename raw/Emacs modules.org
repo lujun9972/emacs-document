@@ -4,2463 +4,3610 @@
 #+TAGS: raw
 #+DATE: [2019年 02月 28日 星期四 13:09:31 HKT]
 #+LANGUAGE:  zh-CN
-#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
 * Emacs modules
-  :PROPERTIES:
-  :CUSTOM_ID: emacs-modules
-  :CLASS: no_toc
-  :END:
+* Emacs模块
+:PROPERTIES:
+属性:
+:CUSTOM_ID: emacs-modules
+:CUSTOM_ID emacs-modules
+:CLASS: no_toc
+类:no_toc
+:END:
+结束:
 
 ** Introduction
-   :PROPERTIES:
-   :CUSTOM_ID: introduction
-   :END:
+* *的介绍
+:PROPERTIES:
+属性:
+:CUSTOM_ID: introduction
+:CUSTOM_ID:介绍
+:END:
+结束:
 
 The GNU Emacs dynamic module API is a C API that allows you to create extension
+GNU Emacs动态模块API是一个允许您创建扩展的C API
 modules for GNU Emacs written in C or any other language providing C bindings.
+用C或任何其他提供C绑定的语言编写的GNU Emacs模块。
 This document specifies the interface and behavior of the module subsystem and
+本文档指定了模块子系统的接口和行为
 the requirements that modules have to fulfill.
+模块必须满足的需求。
 
 Because the module API is a C API, you have to be familiar with C to write
+因为模块API是C API，所以必须熟悉C语言才能编写
 Emacs modules. Be aware that C is a difficult and unforgiving language; subtle
+Emacs模块。请注意，C语言是一种困难而苛刻的语言;微妙的
 mistakes tend to result in [[https://en.wikipedia.org/wiki/Undefined_behavior][undefined
+错误会导致[[https://en.wikipedia.org/wiki/Undefined_behavior][undefined]
 behavior]]. Undefined
+行为]]。未定义的
 behavior is always a bug that you have to find and fix.
+行为总是一个必须找到并修复的bug。
 
 All the snippets on this page are subject to the following license:
+本页所有片段均受下列授权限制:
 
 #+BEGIN_QUOTE
-  Copyright 2017 Google Inc.
+# + BEGIN_QUOTE
+Copyright 2017 Google Inc.
+谷歌公司版权所有
 
-  Licensed under the Apache License, Version 2.0 (the “License”); you may not
-  use this file except in compliance with the License. You may obtain a copy
-  of the License at
+Licensed under the Apache License, Version 2.0 (the “License”); you may not
+Apache许可下的2.0版本(“许可”);你可能不
+use this file except in compliance with the License. You may obtain a copy
+除非符合许可，否则请使用此文件。你可以复印一份
+of the License at
+的许可证
 
-  [[https://www.apache.org/licenses/LICENSE-2.0]]
+[[https://www.apache.org/licenses/LICENSE-2.0]]
+2.0 [[https://www.apache.org/licenses/license]]
 
-  Unless required by applicable law or agreed to in writing, software
-  distributed under the License is distributed on an “AS IS” BASIS, WITHOUT
-  WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
-  License for the specific language governing permissions and limitations under
-  the License.
+Unless required by applicable law or agreed to in writing, software
+除非适用法律要求或经书面同意，软件
+distributed under the License is distributed on an “AS IS” BASIS, WITHOUT
+在许可下发布的是“按现状”发布的，而不是
+WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+明示或默示的任何形式的保证或条件。看到
+License for the specific language governing permissions and limitations under
+针对特定语言的许可管理权限和限制
+the License.
+许可。
 #+END_QUOTE
+# + END_QUOTE
 
 ** Definitions
-   :PROPERTIES:
-   :CUSTOM_ID: definitions
-   :END:
+* *定义
+:PROPERTIES:
+属性:
+:CUSTOM_ID: definitions
+:CUSTOM_ID:定义
+:END:
+结束:
 
 In this document I'll use the terms [[https://en.wikipedia.org/wiki/Undefined_behavior][*undefined
+在本文中，我将使用术语[[https://en.wikipedia.org/wiki/Undefined_behavior][*undefined]
 behavior*]] and
+*]]和行为
 [[https://en.wikipedia.org/wiki/Unspecified_behavior][*unspecified behavior*]]
+[[https://en.wikipedia.org/wiki/Unspecified_behavior][*未指明的行为*]]
 with the same meanings as in the
+与中的意思相同
 [[http://www.open-std.org/jtc1/sc22/wg14/www/docs/n1256.pdf][C standard]].
+[[http://www.open-std.org/jtc1/sc22/wg14/www/docs/n1256.pdf] [C标准]]。
 Please be aware that the [[https://www.gnu.org/software/emacs/manual/html_node/elisp/index.html][Emacs Lisp
+请注意[[https://www.gnu.org/software/emacs/manual/html_node/elisp/index.html][Emacs Lisp
 manual]]
+手动]]
 generally uses the word “undefined” where I use “unspecified.”
+通常使用“未定义的”这个词，而我使用“未指定的”。
 
 A *module* is a [[https://en.wikipedia.org/wiki/Library_(computing)][library]]
+一个*模块*是一个[[https://en.wikipedia.org/wiki/Library_(computing)][library]]
 that GNU Emacs can [[https://en.wikipedia.org/wiki/Dynamic_loading][dynamically
+GNU Emacs可以[[https://en.wikipedia.org/wiki/Dynamic_loading][动态
 load]] to provide extension
+加载]]以提供扩展
 functions not implemented in Emacs Lisp. The exact format of module files
+没有在Emacs Lisp中实现的函数。模块文件的精确格式
 depends on the underlying operating system; on GNU/Linux, modules are shared
+取决于底层操作系统;在GNU/Linux上，模块是共享的
 ELF libraries.
+精灵库。
 
 The *GNU Emacs module API* is a set of functions, type definitions, macros,
+GNU Emacs模块API*是一组函数、类型定义、宏、
 and enumerators in the header file =emacs-module.h=. This document describes
+头文件中的枚举器=emacs-module.h=。本文档描述了
 its behavior.
+其行为。
 
 A *module function* is a function exported from a module library and
+*模块函数*是从模块库导出的函数
 registered with GNU Emacs that provides extension functions to GNU Emacs.
+注册了GNU Emacs，为GNU Emacs提供扩展函数。
 
 A *module initialization function* is a function exported from a module
+模块初始化函数*是从模块中导出的函数
 library that GNU Emacs calls to initialize the containing module.
+GNU Emacs调用来初始化包含模块的库。
 
 An *Emacs value* is the representation of a Lisp object in the module API.
+Emacs值*是模块API中Lisp对象的表示。
 Emacs values are represented using the opaque pointer type alias =emacs_value=.
+Emacs值使用不透明指针类型alias =emacs_value=表示。
 
 A *runtime* is an object that Emacs provides to module initialization
+运行时是Emacs提供给模块初始化的对象
 functions. Runtimes are represented using pointers to the structure type
+功能。运行时使用指向结构类型的指针表示
 =emacs_runtime=.
+= emacs_runtime =。
 
 A *runtime function* is a function obtained by dereferencing one of the
+运行时函数*是通过解引用其中一个来获得的函数
 fields of =emacs_runtime= that have pointer-to-function type.
+具有指针到函数类型的=emacs_runtime=的字段。
 
 An *environment* is a context object that modules use to interact with an
+环境是模块用来与对象交互的上下文对象
 Emacs process into which they are loaded. Environments are represented using
+加载它们的Emacs进程。环境用以下方式表示
 objects of the structure type alias =emacs_env=, or pointers to such objects.
+结构类型alias =emacs_env=的对象，或指向此类对象的指针。
 
 An *environment function* is a function obtained by dereferencing one of the
+环境函数*是通过取消对其中一个的引用而获得的函数
 fields of =emacs_env= that have a pointer-to-function type. Environment
+具有指针到函数类型的=emacs_env=的字段。环境
 functions are the primary means of interacting with GNU Emacs.
+函数是与GNU Emacs交互的主要方法。
 
 A *user pointer* is a special kind of Lisp object that wraps an arbitrary
+一个*user指针*是一种特殊类型的Lisp对象，它封装了一个任意对象
 value of type =void *= and a *finalizer function* to clean up (“finalize”)
+type =void *=和一个*finalizer函数*进行清理(“finalize”)
 such a value.
+这样的一个值。
 
 ** Common requirements
-   :PROPERTIES:
-   :CUSTOM_ID: common-requirements
-   :END:
+* *的共同需求
+:PROPERTIES:
+属性:
+:CUSTOM_ID: common-requirements
+:CUSTOM_ID:常见需求
+:END:
+结束:
 
 In this document I'll use wording similar to
+在这份文件中，我将使用类似的措辞
 [[https://www.ietf.org/rfc/rfc2119.txt][RFC 2119]] to describe the requirements
+[[https://www.ietf.org/rfc/rfc2119.txt][RFC 2119]]来描述需求
 of the module API. In particular, the words “must” and “mustn't” denote
+模块API的。尤其是“must”和“mustn’t”这两个词
 absolute requirements that you have to fulfill. Not fulfilling any of the
+你必须满足的绝对要求。没有完成任何一项
 requirements described here results in undefined behavior, unless otherwise
+这里描述的需求会导致未定义的行为，除非另有规定
 noted.
+指出。
 
 Unless otherwise noted, all pointers passed to module API functions must point
+除非另有说明，否则传递给模块API函数的所有指针都必须指向
 to valid, initialized objects and mustn't be =NULL=. Likewise, unless
+对于有效的、初始化的对象，不能是=NULL=。同样的,除非
 otherwise noted, pointer-returning environment functions will always return
+另外，返回指针的环境函数总是返回
 valid pointers to initialized objects. If possible, =emacs-module.h= uses
+指向初始化对象的有效指针。如果可能的话,= emacs-module。h =使用
 compiler extensions to trigger warnings if the compiler can prove that =NULL=
+编译器扩展来触发警告，如果编译器可以证明=NULL=
 is incorrectly passed to a module API function.
+错误地传递给模块API函数。
 
 Modules must use the functions provided by the module API to obtain environment
+模块必须使用模块API提供的函数来获取环境
 pointers and value objects; there is no other way to obtain these objects.
+指针和值对象;没有其他方法可以获得这些对象。
 
 Unless otherwise noted, the relation between pointers of the same type passed
+除非另有说明，否则传递的是同一类型指针之间的关系
 to module functions is unspecified. Modules mustn't make any assumptions abut
+到模块函数是未指定的。模块不能做任何假设
 equality or ordering of such pointers.
+这类指针的相等或顺序。
 
 A module mustn't access or use runtimes, environments, or values passed to or
+模块不能访问或使用运行时、环境或传递给或的值
 obtained in a different module.
+在不同的模块中获得。
 
 Module, initialization, and finalizer functions must either exit the process or
+模块、初始化和终结器函数必须退出进程或
 return locally; they mustn't exit nonlocally (e.g., by using =longjmp= or C++
+返回本地;它们不能非本地退出(例如，使用=longjmp=或c++)
 exceptions). Functions written in C++ must be declared using the C language
+例外情况)。用c++编写的函数必须用C语言声明
 linkage.
+联系。
 
 Structure types defined by the module API may contain private fields; modules
+模块API定义的结构类型可以包含私有字段;模块
 mustn't attempt to use or alter these fields.
+不要试图使用或更改这些字段。
 
 ** Lifetime
-   :PROPERTIES:
-   :CUSTOM_ID: lifetime
-   :END:
+* *一生
+:PROPERTIES:
+属性:
+:CUSTOM_ID: lifetime
+:CUSTOM_ID:一生
+:END:
+结束:
 
 *** Runtime lifetime
-    :PROPERTIES:
-    :CUSTOM_ID: runtime-lifetime
-    :END:
+* * *运行时
+:PROPERTIES:
+属性:
+:CUSTOM_ID: runtime-lifetime
+:CUSTOM_ID runtime-lifetime
+:END:
+结束:
 
 The lifetime of a runtime object is finite. It corresponds to the C lifetime
+运行时对象的生存期是有限的。它对应于C的生命周期
 of the =emacs_runtime= pointer passed to the module initialization function.
+传递给模块初始化函数的指针。
 You must not access a runtime object outside its lifetime.
+不能在运行时对象的生存期之外访问它。
 
 *** Environment lifetime
-    :PROPERTIES:
-    :CUSTOM_ID: environment-lifetime
-    :END:
+* * *环境生命周期
+:PROPERTIES:
+属性:
+:CUSTOM_ID: environment-lifetime
+:CUSTOM_ID environment-lifetime
+:END:
+结束:
 
 The lifetime of an environment is finite; its beginning and end is described
+环境的寿命是有限的;它的开始和结束被描述
 below, in the sections that describe how modules can obtain pointers to
+下面，在描述模块如何获得指向的指针的小节中
 environment objects. Modules mustn't dereference environment pointers or pass
+环境对象。模块不能取消对环境指针的引用或传递
 them to module API functions outside of the lifetime of the environments they
+它们将API函数模块化到环境的生存期之外
 represent.
+代表。
 
 *** Value lifetime
-    :PROPERTIES:
-    :CUSTOM_ID: value-lifetime
-    :END:
+* * *值
+:PROPERTIES:
+属性:
+:CUSTOM_ID: value-lifetime
+:CUSTOM_ID value-lifetime
+:END:
+结束:
 
 Regarding their lifetime, there are two kinds of values: local values and
+在人的一生中，有两种价值:局部价值和局部价值
 global values. Local values are owned by a specific environment, and their
+全球的价值观。局部值由特定的环境及其
 lifetime is bound by the lifetime of their owning environment. The lifetime of
+生存期受其拥有的环境的生存期的约束。的生命周期
 a value begins directly after the function with which it is obtained returns.
+一个值直接开始于它所获得的函数的后面。
 The lifetime of a local value ends not before the lifetime of their owning
+本地值的生存期不会在其所属值的生存期之前结束
 environment ends; modules mustn't make any assumptions about the lifetime of
+环境结束;模块不能对生命周期做任何假设
 values after their owner's lifetime has ended. The lifetime of global values
+在其所有者的生命周期结束后的值。全局值的生存期
 ends when they are freed (see below) or the Emacs process exits, whichever
+当它们被释放(参见下面的内容)或Emacs进程退出时，即结束
 comes first.
+是第一位的。
 
 Modules mustn't access or use values outside of their lifetime.
+模块不能在其生存期之外访问或使用值。
 
 ** Nested invocations
-   :PROPERTIES:
-   :CUSTOM_ID: nested-invocations
-   :END:
+* *的嵌套调用
+:PROPERTIES:
+属性:
+:CUSTOM_ID: nested-invocations
+:CUSTOM_ID nested-invocations
+:END:
+结束:
 
 Multiple invocations to module initialization functions or module functions can
+可以对模块初始化函数或模块函数进行多次调用
 be active at the same time. Each such invocation receives a unique =emacs_env=
+同时保持活跃。每个这样的调用都接收一个惟一的=emacs_env=
 pointer that is different from all other environment pointers that are live at
+不同于所有其他环境指针的指针
 the same time.
+同一时间。
 
 ** Threads
-   :PROPERTIES:
-   :CUSTOM_ID: threads
-   :END:
+* *线程
+:PROPERTIES:
+属性:
+:CUSTOM_ID: threads
+:CUSTOM_ID:线程
+:END:
+结束:
 
 The mapping of Emacs Lisp threads to operating system threads is unspecified.
+Emacs Lisp线程到操作系统线程的映射是未指定的。
 Emacs will never call module initialization functions, module functions, and
+Emacs将永远不会调用模块初始化函数、模块函数和
 user pointer finalizer functions concurrently; this means that at most one such
+用户指针终结器函数并发;这意味着最多有一个这样的
 function is running at a time (unless called from outside of Emacs), and access
+函数一次运行(除非从Emacs外部调用)，并且访问
 to global state doesn't need synchronization. However, it's unspecified in
+到全局状态不需要同步。但是，它是未指定的
 which operating system thread the functions are called; for example, two nested
+调用哪个操作系统线程的函数;例如，两个嵌套
 invocations of a module function may or may not be executed in the same
+模块函数的调用可以在同一模块中执行，也可以不执行
 thread.
+线程。
 
 You mustn't interact with Emacs outside of the current Lisp thread. Given the
+您不能在当前Lisp线程之外与Emacs交互。考虑到
 non-concurrency guarantee it's enough to ensure that you never access the
+非并发性保证保证您永远不会访问
 fields of the structures described in this document from threads that Emacs
+本文档中描述的结构的字段来自Emacs的线程
 hasn't created.
+还没有创建。
 
 ** Compatibility
-   :PROPERTIES:
-   :CUSTOM_ID: compatibility
-   :END:
+* *的兼容性
+:PROPERTIES:
+属性:
+:CUSTOM_ID: compatibility
+:CUSTOM_ID:兼容性
+:END:
+结束:
 
 *** Language compatibility
-    :PROPERTIES:
-    :CUSTOM_ID: language-compatibility
-    :END:
+* * *语言兼容性
+:PROPERTIES:
+属性:
+:CUSTOM_ID: language-compatibility
+:CUSTOM_ID:语言兼容
+:END:
+结束:
 
 The Emacs module API is guaranteed to work with all standard C versions
+Emacs模块API保证可以与所有标准C版本兼容
 starting with C99 and with all standard C++ versions starting with C++11. In
+从C99开始，所有标准的c++版本从c++ 11开始。在
 practice, it only requires language constructs from C89 or C++98 and some
+实践中，它只需要C89或c++ 98等语言结构
 standard library headers from newer versions, so there's a good chance that it
+新版本的标准库标头，所以很有可能
 works just fine with earlier language versions.
+在早期的语言版本中工作得很好。
 
 *** API compatibility
-    :PROPERTIES:
-    :CUSTOM_ID: api-compatibility
-    :END:
+* * * API兼容性
+:PROPERTIES:
+属性:
+:CUSTOM_ID: api-compatibility
+:CUSTOM_ID: api兼容
+:END:
+结束:
 
 All documented structure names, structure field names, enumeration names,
+所有文档化的结构名称、结构字段名称、枚举名称、
 enumerator names, enumerator values, and type alias names in the
+属性中的枚举器名称、枚举器值和类型别名
 =emacs-module.h= header fields are stable and will never be changed or removed.
+= emacs-module。头字段是稳定的，永远不会被改变或删除。
 Parameter names are not part of the API. There might be additional
+参数名不是API的一部分。可能会有额外的
 undocumented names in the header, which are not part of the API and subject to
+标题中没有文档化的名称，它们不是API的一部分，并且受API的约束
 change at any time. All toplevel names introduced in =emacs-module.h= begin
+随时改变。在=emacs模块中引入的所有顶层名称。h =开始
 with =emacs_= or =EMACS_=. Emacs may add new names to =emacs-module.h= at any
+with =emacs_=或=emacs_=。Emacs可以向= Emacs -模块添加新名称。h =在任何
 time; all new toplevel names will also start with =emacs_= or =EMACS_=.
+时间;所有新的toplevel名称也将以=emacs_=或=emacs_=开头。
 Non-toplevel names such as structure fields or parameters don't have specific
+诸如结构字段或参数之类的非顶层名称没有特定的含义
 prefixes. =emacs-module.h= depends only on headers from the standard C
+前缀。= emacs-module。h=仅依赖于标准C的标头
 library.
+图书馆。
 
 *** ABI compatibility
-    :PROPERTIES:
-    :CUSTOM_ID: abi-compatibility
-    :END:
+* * * ABI兼容性
+:PROPERTIES:
+属性:
+:CUSTOM_ID: abi-compatibility
+:CUSTOM_ID abi-compatibility
+:END:
+结束:
 
 To allow backwards and forwards compatibility, the following guarantees are
+为了允许向后和向前兼容，以下是保证
 made about all structure types described in this document:
+关于本文档中描述的所有结构类型:
 
 - Fields are never removed.
+-字段从未被删除。
 
 - Fields are never reordered.
+-字段永远不会被重新排序。
 
 - New fields get only added at the end of structures.
+-新字段只能在结构的末尾添加。
 
 - Adding new fields will always increase the size of a structure.
+-添加新字段总是会增加结构的大小。
 
 - The first field is always a field named =size= of type =ptrdiff_t=
-  containing the actual size of the object, in bytes. The value of the
-  =size= field will always be greater than zero and less than or equal to
-  =SIZE_MAX=.
+-第一个字段总是一个名为=size= of type =ptrdiff_t=的字段
+containing the actual size of the object, in bytes. The value of the
+包含对象的实际大小，以字节为单位。的价值
+=size= field will always be greater than zero and less than or equal to
+=size=字段总是大于零，小于等于
+=SIZE_MAX=.
+= SIZE_MAX =。
 
 Modules mustn't access structure fields outside of the object, even if they
+模块不能访问对象外部的结构字段，即使它们
 could do so using field access (i.e. if the size of a structure object as seen
+可以这样做使用字段访问(即，如果看到一个结构对象的大小
 by the module is larger than the actual size as passed in the =size= field).
+由模块传递的大小大于在=size=字段中传递的实际大小。
 To preserve compatibility with older versions of Emacs, modules should check
+为了保持与旧版本Emacs的兼容性，应该检查模块
 the =size= field to verify that it is at least as large as expected, and react
+验证它至少与预期的一样大，并做出反应
 accordingly if that is not the case. To preserve compatibility with future
+因此，如果不是这样的话。保持与未来的兼容性
 versions of Emacs, modules should not set a hard upper bound on the =size=
+在Emacs版本中，模块不应该设置=size=的硬上界
 field. Two different objects of the same structure type will always have the
+字段。相同结构类型的两个不同对象将始终具有
 same dynamic size, i.e., you have to check the =size= member only once per
+相同的动态大小，即，您必须每次只检查=size=成员一次
 structure type.
+结构类型。
 
 *** Version comparison
-    :PROPERTIES:
-    :CUSTOM_ID: version-comparison
-    :END:
+* * *版本比较
+:PROPERTIES:
+属性:
+:CUSTOM_ID: version-comparison
+:CUSTOM_ID:版本比较的
+:END:
+结束:
 
 Before calling runtime or environment functions, you must check whether the
+在调用运行时或环境函数之前，必须检查
 Emacs binary your module is loaded in is new enough. There are three ways to
+Emacs二进制你的模块加载是足够新的。有三种方法
 do this:
+这样做:
 
 1. You can compare the static and the dynamic sizes of the =emacs_runtime= and
-   =emacs_env= structures to verify that they are as large as you expect. You
-   need to do this in your =module_init= function before accessing any other
-   fields of the structures. The basic pattern looks as follows:
-
-   #+BEGIN_EXAMPLE
-       #include <assert.h>
-       #include <stddef.h>
-
-       #include <emacs-module.h>
-
-       int
-       module_init (struct emacs_runtime *ert)
-       {
-        assert (ert->size > 0);
-        if ((size_t) ert->size < sizeof *ert)
-        /* Dynamic size is smaller than static size. */
-        return 1;
-        emacs_env *env = ert->get_environment (ert);
-        assert (env->size > 0);
-        if ((size_t) env->size < sizeof *env)
-        /* Dynamic size is smaller than static size. */
-        return 2;
-        /* Continue initialization. */
-        return 0;
-       }
-   #+END_EXAMPLE
-
-   This makes sure that any field you can access is actually present.
-
-2. You can also compare the dynamic size of the environment structure against
-   the fixed sizes of the versioned structures:
-
-   #+BEGIN_EXAMPLE
-       #include <assert.h>
-       #include <stddef.h>
-
-       #include <emacs-module.h>
-
-       static int emacs_version;
-
-       int
-       module_init (struct emacs_runtime *ert)
-       {
-        assert (ert->size > 0);
-        if ((size_t) ert->size < sizeof *ert)
-        /* Dynamic size is smaller than static size. */
-        return 1;
-        emacs_env *env = ert->get_environment (ert);
-        assert (env->size > 0);
-        if ((size_t) env->size >= sizeof (struct emacs_env_26))
-        /* All fields from Emacs 26 are present. */
-        emacs_version = 26;
-        else if ((size_t) env->size >= sizeof (struct emacs_env_25))
-        /* All fields from Emacs 25 are present. */
-        emacs_version = 25;
-        else
-        /* Unknown version. */
-        return 2;
-        /* Continue initialization. */
-        return 0;
-       }
-   #+END_EXAMPLE
-
-   If you use this option, you must make sure to only access fields that are
-   known to be present in the actual Emacs version.
-
-3. You can also check the presence of individual fields:
-
-   #+BEGIN_EXAMPLE
-       #include <assert.h>
-       #include <stdbool.h>
-       #include <stddef.h>
-
-       #include <emacs-module.h>
-
-       static bool have_intern;
-       static bool have_funcall;
-
-       int
-       module_init (struct emacs_runtime *ert)
-       {
-        assert (ert->size > 0);
-        if ((size_t) ert->size < sizeof *ert)
-        /* Dynamic size is smaller than static size. */
-        return 1;
-        emacs_env *env = ert->get_environment (ert);
-        assert (env->size > 0);
-        /* Test whether ‘intern’ field is present. */
-        have_intern = ((size_t) env->size
-        >= offsetof (emacs_env, intern) + sizeof env->intern);
-        /* Test whether ‘funcall’ field is present. */
-        have_funcall = ((size_t) env->size
-        >= offsetof (emacs_env, funcall) + sizeof env->funcall);
-        /* More checks. */
-        /* Continue initialization. */
-        return 0;
-       }
-   #+END_EXAMPLE
-
-   If you use this option, you must make sure to only access fields that are
-   known to be present.
-
-Each of these options has advantages and disadvantages. From the first to the
-third option, both complexity and flexibility increase. The first option is by
-far the simplest one; it's only a single comparison, and if you use it you can
-be sure that you don't accidentally access a field that's not present.
-However, it's also the least flexible option: even if you don't use any field
-introduced in later versions of Emacs, your module will still refuse to load if
-Emacs is not new enough to contain all the expected fields. The second option
-provides a compromise between complexity and compatibility; it allows you to
-stay compatible with older versions of Emacs, but you have to remember to only
-access structure fields that you know are present. The third option is the
-most flexible one, but requires enormous amounts of boilerplate code: you need
-to check the presence of every single field you want to use.
-
-If you aren't concerned about staying compatible with old versions of Emacs, I
-recommend that you use the first option. If you want to make your module
-available to older versions of Emacs, I recommend the second option.
-
-** Module loading and initialization
-   :PROPERTIES:
-   :CUSTOM_ID: module-loading-and-initialization
-   :END:
-
-Emacs loads modules by calling the =module-load= function.
-
-A module must export a symbol named =plugin_is_GPL_compatible= to report its
-GPL compatibility to Emacs; otherwise =module-load= signals an error of type
-=module-not-gpl-compatible=.
-
-A module must export a symbol named =emacs_module_init=; otherwise
-=module-load= signals and error of type =missing-module-init-function=.
-
-The symbol named =emacs_module_init= must point to a function with the
-following signature:
+1. 您可以比较=emacs_runtime=和的静态和动态大小
+=emacs_env= structures to verify that they are as large as you expect. You
+=emacs_env=结构，以验证它们是否如您所期望的那样大。你
+need to do this in your =module_init= function before accessing any other
+在访问任何其他函数之前，需要在=module_init=函数中执行此操作
+fields of the structures. The basic pattern looks as follows:
+结构的场。基本模式如下:
 
 #+BEGIN_EXAMPLE
-    int emacs_module_init (struct emacs_runtime *runtime);
+#include <assert.h>
+#include <stddef.h>
+
+#include <emacs-module.h>
+
+int
+module_init (struct emacs_runtime *ert)
+{
+assert (ert->size > 0);
+if ((size_t) ert->size < sizeof *ert)
+/* Dynamic size is smaller than static size. */
+return 1;
+emacs_env *env = ert->get_environment (ert);
+assert (env->size > 0);
+if ((size_t) env->size < sizeof *env)
+/* Dynamic size is smaller than static size. */
+return 2;
+/* Continue initialization. */
+return 0;
+}
+#+END_EXAMPLE
+
+This makes sure that any field you can access is actually present.
+这确保您可以访问的任何字段都是实际存在的。
+
+2. You can also compare the dynamic size of the environment structure against
+2. 您还可以比较环境结构的动态大小
+the fixed sizes of the versioned structures:
+版本化结构的固定大小:
+
+#+BEGIN_EXAMPLE
+#include <assert.h>
+#include <stddef.h>
+
+#include <emacs-module.h>
+
+static int emacs_version;
+
+int
+module_init (struct emacs_runtime *ert)
+{
+assert (ert->size > 0);
+if ((size_t) ert->size < sizeof *ert)
+/* Dynamic size is smaller than static size. */
+return 1;
+emacs_env *env = ert->get_environment (ert);
+assert (env->size > 0);
+if ((size_t) env->size >= sizeof (struct emacs_env_26))
+/* All fields from Emacs 26 are present. */
+emacs_version = 26;
+else if ((size_t) env->size >= sizeof (struct emacs_env_25))
+/* All fields from Emacs 25 are present. */
+emacs_version = 25;
+else
+/* Unknown version. */
+return 2;
+/* Continue initialization. */
+return 0;
+}
+#+END_EXAMPLE
+
+If you use this option, you must make sure to only access fields that are
+如果您使用此选项，则必须确保只访问属于的字段
+known to be present in the actual Emacs version.
+已知存在于实际的Emacs版本中。
+
+3. You can also check the presence of individual fields:
+3.你也可以检查个别字段的存在:
+
+#+BEGIN_EXAMPLE
+#include <assert.h>
+#include <stdbool.h>
+#include <stddef.h>
+
+#include <emacs-module.h>
+
+static bool have_intern;
+static bool have_funcall;
+
+int
+module_init (struct emacs_runtime *ert)
+{
+assert (ert->size > 0);
+if ((size_t) ert->size < sizeof *ert)
+/* Dynamic size is smaller than static size. */
+return 1;
+emacs_env *env = ert->get_environment (ert);
+assert (env->size > 0);
+/* Test whether ‘intern’ field is present. */
+have_intern = ((size_t) env->size
+>= offsetof (emacs_env, intern) + sizeof env->intern);
+/* Test whether ‘funcall’ field is present. */
+have_funcall = ((size_t) env->size
+>= offsetof (emacs_env, funcall) + sizeof env->funcall);
+/* More checks. */
+/* Continue initialization. */
+return 0;
+}
+#+END_EXAMPLE
+
+If you use this option, you must make sure to only access fields that are
+如果您使用此选项，则必须确保只访问属于的字段
+known to be present.
+已知的存在。
+
+Each of these options has advantages and disadvantages. From the first to the
+这些选择各有利弊。从第一次到
+third option, both complexity and flexibility increase. The first option is by
+第三种选择，复杂性和灵活性都会增加。第一个选项是by
+far the simplest one; it's only a single comparison, and if you use it you can
+最简单的一个;这只是一个比较，如果你使用它，你可以
+be sure that you don't accidentally access a field that's not present.
+确保您不会意外地访问不存在的字段。
+However, it's also the least flexible option: even if you don't use any field
+然而，这也是最不灵活的选择:即使您不使用任何字段
+introduced in later versions of Emacs, your module will still refuse to load if
+在Emacs的后续版本中引入，如果
+Emacs is not new enough to contain all the expected fields. The second option
+Emacs还不够新，不足以包含所有预期的字段。第二个选项
+provides a compromise between complexity and compatibility; it allows you to
+在复杂性和兼容性之间提供折衷;它允许你
+stay compatible with older versions of Emacs, but you have to remember to only
+与旧版本的Emacs保持兼容，但您必须只记住这一点
+access structure fields that you know are present. The third option is the
+访问您知道存在的结构字段。第三个选择是
+most flexible one, but requires enormous amounts of boilerplate code: you need
+最灵活的一个，但需要大量的样板代码:您需要
+to check the presence of every single field you want to use.
+检查要使用的每个字段是否存在。
+
+If you aren't concerned about staying compatible with old versions of Emacs, I
+如果您不关心与旧版本Emacs的兼容性，I
+recommend that you use the first option. If you want to make your module
+建议您使用第一个选项。如果你想做你的模块
+available to older versions of Emacs, I recommend the second option.
+对于较老版本的Emacs，我建议使用第二个选项。
+
+** Module loading and initialization
+**模块加载和初始化
+:PROPERTIES:
+属性:
+:CUSTOM_ID: module-loading-and-initialization
+:CUSTOM_ID module-loading-and-initialization
+:END:
+结束:
+
+Emacs loads modules by calling the =module-load= function.
+Emacs通过调用=module-load=函数来加载模块。
+
+A module must export a symbol named =plugin_is_GPL_compatible= to report its
+模块必须导出一个名为=plugin_is_GPL_compatible=的符号来报告它
+GPL compatibility to Emacs; otherwise =module-load= signals an error of type
+GPL对Emacs的兼容性;否则=module-load=表示类型错误
+=module-not-gpl-compatible=.
+= module-not-gpl-compatible =。
+
+A module must export a symbol named =emacs_module_init=; otherwise
+模块必须导出一个名为=emacs_module_init=的符号;否则
+=module-load= signals and error of type =missing-module-init-function=.
+=模块加载=信号和类型错误=失踪模块-单元-功能=。
+
+The symbol named =emacs_module_init= must point to a function with the
+符号名=emacs_module_init=必须指向一个函数
+following signature:
+以下签名:
+
+#+BEGIN_EXAMPLE
+int emacs_module_init (struct emacs_runtime *runtime);
 #+END_EXAMPLE
 
 Emacs will call this function and pass a pointer to an object of type =struct emacs_runtime=, which is defined as follows:
+Emacs将调用这个函数，并将指针传递给类型为=struct emacs_runtime=的对象，定义如下:
 
 #+BEGIN_EXAMPLE
-    struct emacs_runtime
-    {
-     ptrdiff_t size;
-     struct /* unspecified */ *private_members;
-     emacs_env *(*get_environment) (struct emacs_runtime *runtime);
-    };
+struct emacs_runtime
+{
+ptrdiff_t size;
+struct /* unspecified */ *private_members;
+emacs_env *(*get_environment) (struct emacs_runtime *runtime);
+};
 #+END_EXAMPLE
 
 The lifetime of the runtime object begins not after the body of the module
+运行时对象的生存期不是在模块主体之后开始的
 initialization function is entered; it ends not before the module
+输入初始化函数;它在模块之前结束
 initialization function returns. Modules mustn't make any further assumptions
+初始化函数返回。模块不能做任何进一步的假设
 about the lifetime of the runtime object.
+关于运行时对象的生存期。
 
 The =size= field contains the size of the structure, in bytes. The
+字段=size=包含结构的大小，以字节为单位。的
 =get_environment= field is a pointer to a function that returns an environment
+=get_environment= field是一个指向返回环境的函数的指针
 pointer; module initialization functions may use that function to obtain an
+指针;模块初始化函数可以使用该函数获得一个
 initial environment. Modules must pass a pointer to the same runtime object to
+最初的环境。模块必须向同一运行时对象传递指针
 =get_environment= that has been passed to them. The lifetime of the
+=get_environment=已经传递给他们了。的寿命
 environment returned by the =get_environment= field starts not after the call
+由=get_environment=字段返回的环境在调用后不启动
 to =get_environment= returns and ends not before the module initialization
+to =get_environment=在模块初始化之前返回和结束
 function ends; modules mustn't make any further assumption about its lifetime.
+函数结束;模块不能对其生命周期做任何进一步的假设。
 
 Modules must be prepared for any number of invocations of their initialization
+模块必须为任何数量的初始化调用做好准备
 function; it is unspecified whether two successful calls to =module-load= with
+函数;未指定是否成功调用两次=module-load= with
 equivalent module file names will result in one or two invocations of the
+的一个或两个调用
 initialization function.
+初始化函数。
 
 After the module initialization function returns, Emacs will perform different
+模块初始化函数返回后，Emacs将执行不同的操作
 operations depending on the return value and the state of the environment
+取决于返回值和环境状态的操作
 returned by =get_environment=:
+返回的= get_environment =:
 
 - If the user has requested a quit using C-g while the
-  initialization function was running, Emacs will ignore the return value and
-  the state of the initial environment and quit immediately.
+-如果用户已要求退出使用C-g，而
+initialization function was running, Emacs will ignore the return value and
+初始化函数正在运行，Emacs将忽略返回值和
+the state of the initial environment and quit immediately.
+初始环境的状态，并立即退出。
 
 - Otherwise, if the initialization function has returned a nonzero value,
-  =module-load= will signal an error of type =module-init-failed=.
+-否则，如果初始化函数返回了一个非零值，
+=module-load= will signal an error of type =module-init-failed=.
+=module-load=将发送一个错误类型=module-init-failed=。
 
 - Otherwise, if the environment returned by =get_environment= has a nonlocal
-  exit pending, =module-load= will exit nonlocally as specified in the
-  environment.
+-否则，如果=get_environment=返回的环境是非本地的
+exit pending, =module-load= will exit nonlocally as specified in the
+方法中指定的非本地退出
+environment.
+环境。
 
 - Otherwise, =module-load= returns =t=.
+-否则，=module-load= return =t=。
 
 You might wonder why there are two different ways to report a failure. The
+您可能想知道为什么有两种不同的方法来报告失败。的
 reason is that there are cases where you can't use the initial environment to
+原因是，在某些情况下，您不能使用初始环境
 report errors: for example, if the module received a runtime or environment
+报告错误:例如，如果模块接收到运行时或环境
 structure of unknown size. In such as case it would be unsafe to attempt to
+结构尺寸未知。在这种情况下，试图这样做是不安全的
 use the environment structure to signal an error, but returning an integer is
+使用环境结构来表示错误，但返回整数是错误的
 always safe.
+总是安全的。
 
 ** Emacs values
-   :PROPERTIES:
-   :CUSTOM_ID: emacs-values
-   :END:
+* * Emacs值
+:PROPERTIES:
+属性:
+:CUSTOM_ID: emacs-values
+:CUSTOM_ID emacs-values
+:END:
+结束:
 
 The =emacs_value= type is defined as follows:
+=emacs_value= type的定义如下:
 
 #+BEGIN_EXAMPLE
-    typedef struct /* unspecified */ *emacs_value;
+typedef struct /* unspecified */ *emacs_value;
 #+END_EXAMPLE
 
 That is, an =emacs_value= is a pointer to an opaque structure. Modules mustn't
+也就是说，=emacs_value=是一个指向不透明结构的指针。模块不能
 make any assumptions about the pointer or its structure; in particular, it is
+对指针或其结构做任何假设;特别是，它是
 unspecified whether =emacs_value= pointers point to a valid memory location,
+是否=emacs_value=指针指向一个有效的内存位置，
 whether =NULL= represents a valid Emacs Lisp object, or whether identical
+是否=NULL=表示有效的Emacs Lisp对象，或者是否相同
 Emacs Lisp objects are represented by equal pointers or not.
+Emacs Lisp对象是否由相等指针表示。
 
 ** Environments
-   :PROPERTIES:
-   :CUSTOM_ID: environments
-   :END:
+* *环境
+:PROPERTIES:
+属性:
+:CUSTOM_ID: environments
+:CUSTOM_ID:环境
+:END:
+结束:
 
 The =emacs_env= type is a type alias for the following structure type:
+=emacs_env= type是以下结构类型的类型别名:
 
 #+BEGIN_EXAMPLE
-    struct emacs_env_26
-    {
-     ptrdiff_t size;
-     struct /* unspecified */ *private_members;
-     /* Pointers to environment functions. */
-    }
+struct emacs_env_26
+{
+ptrdiff_t size;
+struct /* unspecified */ *private_members;
+/* Pointers to environment functions. */
+}
 
-    typedef struct emacs_env_26 emacs_env;
+typedef struct emacs_env_26 emacs_env;
 #+END_EXAMPLE
 
 The number following =emacs_env_= is the Emacs major version in which the
+后面的数字=emacs_env_=是Emacs的主要版本，其中
 structure was first defined. For every Emacs major version, a corresponding
+结构首先被定义。对于每个Emacs主版本，都有一个对应的
 environment structure is available. The versioned structures “inherit” from
+环境结构是可用的。版本化的结构“继承”自
 each other in the following sense:
+彼此在以下意义上:
 
 - A later structure will contain exactly the same fields as an earlier
-  structure in exactly the same order.
+-以后的结构将包含与以前完全相同的字段
+structure in exactly the same order.
+结构完全相同的顺序。
 
 - A later structure may contain additional fields after the fields from the
-  earlier structure.
+-后面的结构可能包含来自。的字段之后的其他字段
+earlier structure.
+早期的结构。
 
 The =emacs_env= type alias is always an alias to the newest structure in
+中的=emacs_env= type别名始终是最新结构的别名
 =emacs-module.h=.
+= emacs-module.h =。
 
 =size= is the size of the object, in bytes. It is guaranteed to be the first
+=size=对象的大小，以字节为单位。它肯定是第一
 field. The other public fields are collectively called environment
+字段。其他公共字段统称为environment
 functions. They are described in the following subsections.
+功能。它们将在下面的小节中进行描述。
 
 The function pointers in an environment structure remain valid as long as the
+环境结构中的函数指针在
 corresponding =emacs_env= pointer is in scope. It's unspecified whether the
+对应的=emacs_env=指针在作用域内。它不确定是否
 some field has the same values in two different =emacs_env= structures. You
+有些字段在两个不同的=emacs_env=结构中具有相同的值。你
 must pass a pointer to the containing structure as the first argument to all
+必须将指向包含结构的指针作为第一个参数传递给所有
 environment functions, for example:
+环境功能，例如:
 
 #+BEGIN_EXAMPLE
-    env->intern (env, "nil")
+env->intern (env, "nil")
 #+END_EXAMPLE
 
 For the sake of simplicity, the prototypes below use the syntax for free
+为了简单起见，下面的原型免费使用语法
 functions, not function pointers. This is just to avoid additional parentheses
+函数，而不是函数指针。这只是为了避免额外的括号
 and asterisks that make the prototypes less readable. For instance, the
+以及使原型可读性降低的星号。例如,
 function
+函数
 
 #+BEGIN_EXAMPLE
-    emacs_value intern (emacs_env *env, const char *symbol_name);
+emacs_value intern (emacs_env *env, const char *symbol_name);
 #+END_EXAMPLE
 
 is actually a function pointer as structure field:
+实际上是一个函数指针作为结构字段:
 
 #+BEGIN_EXAMPLE
-    struct emacs_env_25
-    {
-     /* More fields. */
-     emacs_value (*intern) (emacs_env *env, const char *symbol_name);
-     /* More fields. */
-    }
+struct emacs_env_25
+{
+/* More fields. */
+emacs_value (*intern) (emacs_env *env, const char *symbol_name);
+/* More fields. */
+}
 #+END_EXAMPLE
 
 *** Nonlocal exits
-    :PROPERTIES:
-    :CUSTOM_ID: nonlocal-exits
-    :END:
+* * *外地退出
+:PROPERTIES:
+属性:
+:CUSTOM_ID: nonlocal-exits
+:CUSTOM_ID nonlocal-exits
+:END:
+结束:
 
 Some programming language have the concept of *nonlocal exits*: a function
+一些编程语言有*非本地出口*的概念:一个函数
 might not only return normally, but potentially “jump” to some other place in
+可能不仅返回正常，而且可能“跳转”到其他地方
 the code, typically a different function higher up in the call stack. The key
+代码，通常是调用堆栈中较高的另一个函数。的关键
 difference between normal (local) and nonlocal exits is that nonlocal exits can
+普通(本地)出口和非本地出口的区别在于，非本地出口可以
 jump to a position outside of the direct caller of the function; for example,
+跳转到函数的直接调用者之外的位置;例如,
 if a function f calls g and g calls h, then h might exit nonlocally
+如果函数f调用g, g调用h，那么h可能不存在
 by jumping directly back into f. The target of a nonlocal jump is generally
+直接跳转回f。非局部跳转的目标通常是
 a dynamic property of the code, i.e. it's known only at runtime. Because a
+代码的动态属性，即只在运行时才知道。因为一个
 nonlocal exit affects functions unrelated to the starting point and target of
+的起始点和目标无关的函数
 the jump, there has to be a global default assumption whether functions can
+跳转时，必须有一个全局默认的假设函数是否可以
 exit nonlocally: code either assumes that no function exits nonlocally, or that
+非本地退出:代码要么假设没有函数非本地退出，要么假设没有函数非本地退出
 potentially all functions exit nonlocally. Many well-known languages make the
+所有函数都可能非本地退出。许多著名的语言都有
 latter assumption; examples are C++, Java, C#, or Python. Emacs Lisp is also
+后一种假设;例如c++、Java、c#或Python。Emacs Lisp也是
 in the second category; functions can exit nonlocally using =signal= or
+在第二类;函数可以使用=signal= or非本地退出
 =throw=. Languages in the “nonlocal exit by default” category always provide
+= =。“非本地默认退出”类别中的语言总是提供
 language constructs to protect against the effects of nonlocal exits; for
+防止非局部出口影响的语言结构;为
 example, C++ has deterministic destructors, and other languages have
+例如，c++有确定性析构函数，而其他语言有
 =try=--=finally= or similar facilities. Such *unwind protection* is essential
+=try=——=finally=或类似的功能。这种“放松保护”是必要的
 if you have to assume that nonlocal exits can happen at any time; otherwise, it
+如果您必须假设任何时候都可能发生非本地出口;否则,它
 would be too difficult to keep data structures consistent, prevent
+是否很难保持数据结构的一致性
 synchronization primitives from leaking, or clean up resources.
+同步原语从泄漏，或清理资源。
 
 Nonlocal exits are a language feature that can be used for several purposes.
+非本地出口是一种可用于多种目的的语言特性。
 Probably the most well-known one is the use for error reporting, usually called
+最著名的可能是错误报告的使用，通常称为
 “exception handling.” Emacs Lisp uses nonlocal exits for error reporting, but
+“异常处理。Emacs Lisp使用非本地出口来报告错误，但是
 also for non-erroneous control flow.
+也适用于非错误控制流。
 
 The major difficulty when writing dynamic modules is that in the C language
+编写动态模块时的主要困难是用C语言
 functions are by default assumed to always return normally. Even though C has
+函数默认情况下总是正常返回。即使C
 the =setjmp= and =longjmp= functions for nonlocal jumps, it lacks an unwind
+对于非本地跳转，它缺少unwind
 protection mechanism, thus nonlocal exits are rare in practice, and most C
+因此，非局部出口在实际应用中比较少见，而C
 codebases assume they don't happen. The difficulty arises at the interface
+代码库假设它们不会发生。困难出现在界面上
 between a language with “nonlocal exit by default” semantics (Emacs Lisp) and a
+在具有“非本地默认退出”语义的语言(Emacs Lisp)和a之间
 language with “only normal return by default” semantics (C). For this reason,
+具有“正常默认返回”语义的语言(C)。
 the functions of the module API never exit nonlocally; instead, the API
+模块API的函数不会非本地退出;相反,该API
 represents nonlocal exits using the environment-local *pending nonlocal exit
+使用环境-本地*挂起的非本地出口表示非本地出口
 state*. If a module or environment function wishes to signal a nonlocal exit,
+*状态。如果模块或环境函数希望发出非本地退出信号，
 it sets the pending error state using =non_local_exit_signal= or
+它使用=non_local_exit_signal= or设置挂起的错误状态
 =non_local_exit_throw=; you can access the pending error state using
+= non_local_exit_throw =;可以使用以下命令访问挂起的错误状态
 =non_local_exit_check= and =non_local_exit_get=.
+= non_local_exit_check =和= non_local_exit_get =。
 
 If a nonlocal exit is pending, calling any environment function other than the
+如果非本地出口挂起，则调用除
 functions used to manage nonlocal exits (i.e. those starting with
+用于管理非本地出口(即从
 =non_local_exit_=) immediately returns an unspecified value without further
+=non_local_exit_=)立即返回一个未指定的值，不再进一步
 processing. You can make use of this fact to occasionally skip explicit
+处理。您可以利用这个事实来偶尔跳过显式
 nonlocal exit checks.
+外地退出检查。
 
 How a function exits is represented using the following enumeration:
+函数出口是如何使用以下枚举表示的:
 
 #+BEGIN_EXAMPLE
-    enum emacs_funcall_exit
-    {
-     emacs_funcall_exit_return = 0,
-     emacs_funcall_exit_signal = 1,
-     emacs_funcall_exit_throw = 2
-    };
+enum emacs_funcall_exit
+{
+emacs_funcall_exit_return = 0,
+emacs_funcall_exit_signal = 1,
+emacs_funcall_exit_throw = 2
+};
 #+END_EXAMPLE
 
 =emacs_funcall_exit_return= represents a local (normal) exit.
+=emacs_funcall_exit_return=表示一个本地(普通)出口。
 =emacs_funcall_exit_signal= represents an error signal raised by the =signal=
+=emacs_funcall_exit_signal=表示由=signal=引发的错误信号
 or =error= Lisp functions. =emacs_funcall_exit_throw= represents a nonlocal
+或者=error= Lisp函数。=emacs_funcall_exit_throw=表示非本地
 jump to a =catch= construct created by the =throw= Lisp function.
+跳转到由=throw= Lisp函数创建的=catch=结构。
 
 **** =non_local_exit_check=
-     :PROPERTIES:
-     :CUSTOM_ID: non_local_exit_check
-     :END:
+* * * * = non_local_exit_check =
+:PROPERTIES:
+属性:
+:CUSTOM_ID: non_local_exit_check
+:CUSTOM_ID non_local_exit_check
+:END:
+结束:
 
 Module functions can obtain the last function exit type for an environment
+模块函数可以获得环境的最后一个函数出口类型
 using =non_local_exit_check=:
+使用= non_local_exit_check =:
 
 #+BEGIN_EXAMPLE
-    enum emacs_funcall_exit non_local_exit_check (emacs_env *env);
+enum emacs_funcall_exit non_local_exit_check (emacs_env *env);
 #+END_EXAMPLE
 
 =non_local_exit_check= never fails and always returns normally. If there is no
+=non_local_exit_check=从不失败，总是正常返回。如果没有
 nonlocal exit pending, it returns the enumerator =emacs_funcall_exit_return=;
+非本地退出挂起，它返回枚举数=emacs_funcall_exit_return=;
 otherwise it returns one of the other enumerators.
+否则，它将返回另一个枚举数。
 
 =non_local_exit_check= is available since GNU Emacs 25.
+=non_local_exit_check=从GNU Emacs 25开始可用。
 
 **** =non_local_exit_get=
-     :PROPERTIES:
-     :CUSTOM_ID: non_local_exit_get
-     :END:
+* * * * = non_local_exit_get =
+:PROPERTIES:
+属性:
+:CUSTOM_ID: non_local_exit_get
+:CUSTOM_ID non_local_exit_get
+:END:
+结束:
 
 For nonlocal exits Emacs stores additional data. You can retrieve this data
+对于非本地出口，Emacs存储额外的数据。您可以检索这些数据
 using =non_local_exit_get=:
+使用= non_local_exit_get =:
 
 #+BEGIN_EXAMPLE
-    enum emacs_funcall_exit non_local_exit_get (emacs_env *env,
-     emacs_value *symbol_or_tag,
-     emacs_value *data_or_value);
+enum emacs_funcall_exit non_local_exit_get (emacs_env *env,
+emacs_value *symbol_or_tag,
+emacs_value *data_or_value);
 #+END_EXAMPLE
 
 Both symbol_or_tag and data_or_value must be non-=NULL=. The return value
+symbol_or_tag和data_or_value必须是非=NULL=。返回值
 is the same as for =non_local_exit_check=. In addition, Emacs fills
+与for =non_local_exit_check=相同。此外，Emacs还会填充
 =*symbol_or_tag= and =*data_or_value= with additional information depending on
+=*symbol_or_tag=和=*data_or_value=，附加信息视情况而定
 the return value:
+返回值:
 
 - If the return value is =emacs_funcall_exit_return=, the contents of
-  =*symbol_or_tag= and =*data_or_value= after the call are unspecified.
+-如果返回值是=emacs_funcall_exit_return=，则
+=*symbol_or_tag= and =*data_or_value= after the call are unspecified.
+=*symbol_or_tag=和=*data_or_value=调用后未指定。
 
 - If the return value is =emacs_funcall_exit_signal=, Emacs stores the error
-  symbol in =*symbol_or_tag= and the error data in =*data_or_value=; that is,
-  these values correspond to the two arguments of the =signal= Lisp function.
+-如果返回值是=emacs_funcall_exit_signal=，则Emacs存储错误
+symbol in =*symbol_or_tag= and the error data in =*data_or_value=; that is,
+=*symbol_or_tag=中的符号和=*data_or_value=中的错误数据;也就是说,
+these values correspond to the two arguments of the =signal= Lisp function.
+这些值对应于=signal= Lisp函数的两个参数。
 
 - If the return value is =emacs_funcall_exit_throw=, Emacs stores the catch
-  tag in =*symbol_or_tag= and the catch value in =*data_or_value=; that is,
-  these values correspond to the two arguments of the =throw= Lisp function.
+-如果返回值是=emacs_funcall_exit_throw=，则Emacs存储捕获
+tag in =*symbol_or_tag= and the catch value in =*data_or_value=; that is,
+在=*symbol_or_tag=和catch值在=*data_or_value=;也就是说,
+these values correspond to the two arguments of the =throw= Lisp function.
+这些值对应于=throw= Lisp函数的两个参数。
 
 =non_local_exit_get= is available since GNU Emacs 25.
+=non_local_exit_get=从GNU Emacs 25开始可用。
 
 **** =non_local_exit_signal=
-     :PROPERTIES:
-     :CUSTOM_ID: non_local_exit_signal
-     :END:
+* * * * = non_local_exit_signal =
+:PROPERTIES:
+属性:
+:CUSTOM_ID: non_local_exit_signal
+:CUSTOM_ID non_local_exit_signal
+:END:
+结束:
 
 #+BEGIN_EXAMPLE
-    void non_local_exit_signal (emacs_env *env, emacs_value symbol,
-     emacs_value data);
+void non_local_exit_signal (emacs_env *env, emacs_value symbol,
+emacs_value data);
 #+END_EXAMPLE
 
 =non_local_exit_signal= is the module equivalent of the Lisp =signal= function:
+=non_local_exit_signal=是与Lisp =signal= function等价的模块:
 it causes Emacs to signal an error of type symbol with error data data.
+它导致Emacs用错误数据数据来表示类型为symbol的错误。
 data should be a list.
+数据应该是一个列表。
 
 =non_local_exit_signal=, like all other environment functions, actually returns
+=non_local_exit_signal=与所有其他环境函数一样，实际返回
 normally when seen as a C function. Rather, it causes Emacs to signal an error
+通常是C函数。相反，它会导致Emacs发出错误信号
 once you return from the current module function or module initialization
+一旦您从当前模块函数或模块初始化返回
 function. Therefore you should typically return quickly after signaling an
+函数。因此，您通常应该在发出an信号后快速返回
 error with this function. If there was already a nonlocal exit pending when
+函数错误。如果已经有一个非本地退出挂起时
 calling =non_local_exit_signal=, the function does nothing; i.e. it doesn't
+调用=non_local_exit_signal=，函数什么都不做;即它不
 overwrite the error symbol and data. To do that, you must explicitly call
+覆盖错误符号和数据。为此，您必须显式地调用
 =non_local_exit_clear= first.
+= non_local_exit_clear =。
 
 =non_local_exit_signal= is available since GNU Emacs 25.
+=non_local_exit_signal=从GNU Emacs 25开始可用。
 
 **** =non_local_exit_throw=
-     :PROPERTIES:
-     :CUSTOM_ID: non_local_exit_throw
-     :END:
+* * * * = non_local_exit_throw =
+:PROPERTIES:
+属性:
+:CUSTOM_ID: non_local_exit_throw
+:CUSTOM_ID non_local_exit_throw
+:END:
+结束:
 
 #+BEGIN_EXAMPLE
-    void non_local_exit_throw (emacs_env *env, emacs_value tag, emacs_value value);
+void non_local_exit_throw (emacs_env *env, emacs_value tag, emacs_value value);
 #+END_EXAMPLE
 
 =non_local_exit_throw= is the module equivalent of the Lisp =throw= function:
+=non_local_exit_throw=是Lisp =throw= function的对应模块:
 it causes Emacs to perform a nonlocal jump to a =catch= block tagged with
+它导致Emacs执行到标记为的=catch=块的非本地跳转
 tag; the catch value will be value.
+标签;捕获值就是值。
 
 =non_local_exit_throw=, like all other environment functions, actually returns
+=non_local_exit_throw=与所有其他环境函数一样，实际返回
 normally when seen as a C function. Rather, it causes Emacs to throw to the
+通常是C函数。相反，它导致Emacs抛出
 catch lock once you return from the current module function or module
+捕获锁定一旦您从当前模块函数或模块返回
 initialization function. Therefore you should typically return quickly after
+初始化函数。因此，您通常应该很快返回
 requesting a jump with this function. If there was already a nonlocal exit
+使用此函数请求跳转。如果已经有一个非本地出口
 pending when calling =non_local_exit_throw=, the function does nothing; i.e. it
+当调用=non_local_exit_throw=时，函数不执行任何操作;即它
 doesn't overwrite catch tag and value. To do that, you must explicitly call
+不覆盖catch标记和值。为此，您必须显式地调用
 =non_local_exit_clear= first.
+= non_local_exit_clear =。
 
 =non_local_exit_throw= is available since GNU Emacs 25.
+=non_local_exit_throw=从GNU Emacs 25开始可用。
 
 **** =non_local_exit_clear=
-     :PROPERTIES:
-     :CUSTOM_ID: non_local_exit_clear
-     :END:
+* * * * = non_local_exit_clear =
+:PROPERTIES:
+属性:
+:CUSTOM_ID: non_local_exit_clear
+:CUSTOM_ID non_local_exit_clear
+:END:
+结束:
 
 #+BEGIN_EXAMPLE
-    void non_local_exit_clear (emacs_env *env);
+void non_local_exit_clear (emacs_env *env);
 #+END_EXAMPLE
 
 =non_local_exit_clear= resets the pending-error state of env. After calling
+=non_local_exit_clear=重置env的挂起错误状态。后调用
 =non_local_exit_clear=, =non_local_exit_check= will again return
+=non_local_exit_clear=， =non_local_exit_check=将再次返回
 =emacs_funcall_exit_return=, and Emacs won't signal an error after returning
+=emacs_funcall_exit_return=，返回后Emacs不会发出错误信号
 from the current module function or module initialization function. You can
+从当前模块函数或模块初始化函数。你可以
 use =non_local_exit_clear= to ignore certain kinds of errors. You can also
+使用=non_local_exit_clear=忽略某些类型的错误。你也可以
 transform errors into different errors by calling =non_local_exit_get=,
+通过调用=non_local_exit_get=将错误转换为不同的错误，
 =non_local_exit_clear=, and =non_local_exit_signal= in sequence.
+=non_local_exit_clear=，和=non_local_exit_signal=依次。
 
 =non_local_exit_clear= is available since GNU Emacs 25.
+=non_local_exit_clear=从GNU Emacs 25开始可用。
 
 **** How to deal with nonlocal exits properly
-     :PROPERTIES:
-     :CUSTOM_ID: how-to-deal-with-nonlocal-exits-properly
-     :END:
+如何正确处理非本地出口
+:PROPERTIES:
+属性:
+:CUSTOM_ID: how-to-deal-with-nonlocal-exits-properly
+:CUSTOM_ID how-to-deal-with-nonlocal-exits-properly
+:END:
+结束:
 
 The return value of the environment functions doesn't indicate whether a
+环境函数的返回值不指示是否
 nonlocal exit is pending. The only exception is =copy_string_contents=; for
+非本地退出正在等待。唯一的例外是=copy_string_contents=;为
 all other functions you have to call =non_local_exit_check= or
+必须调用的所有其他函数=non_local_exit_check= or
 =non_local_exit_get= to find out whether they have returned normally.
+=non_local_exit_get=查找它们是否正常返回。
 
 The saturating behavior of nonlocal exits gives rise to two error handling
+非本地出口的饱和行为导致了两个错误处理
 idioms:
+成语:
 
 1. You can call =non_local_exit_check= after each and every call to an environment
-   function. That way you can determine with certainty whether the function
-   call has exited normally. This is simple, but requires a lot of
-   boilerplate code. When choosing this option, you might want to wrap the
-   environment functions in wrapper functions that call =non_local_exit_check=
-   for you, for example:
-
-   #+BEGIN_EXAMPLE
-       #include <stdbool.h>
-       #include <stdint.h>
-
-       #include <emacs-module.h>
-
-       static bool
-       extract_integer (emacs_env *env, emacs_value value, intmax_t *num)
-       {
-        *num = env->extract_integer (env, value);
-        return env->non_local_exit_check (env) == emacs_funcall_exit_return;
-       }
-   #+END_EXAMPLE
-
-2. You can call =non_local_exit_check= only before “important” operations. An
-   operation in your code is “important” if it's a decision based on Emacs
-   values, has a side effect, or can take a long time. For example, in the
-   following function you have to insert checks before the =if= statement and
-   the =puts= function call:
-
-   #+BEGIN_EXAMPLE
-       #include <assert.h>
-       #include <stddef.h>
-       #include <stdint.h>
-       #include <stdio.h>
-
-       #include <emacs-module.h>
-
-       static emacs_value
-       test_number_sign (emacs_env *env, ptrdiff_t nargs, emacs_value *args,
-        void *data)
-       {
-        assert (nargs == 1);
-        intmax_t num = env->extract_integer (env, args[0]);
-        if (env->non_local_exit_check (env) != emacs_funcall_exit_return)
-        return NULL;
-        if (num > 0)
-        printf ("%jd is positive\n", num);
-        else if (num < 0)
-        printf ("%jd is negative\n", num);
-        else
-        printf ("%jd is zero\n", num);
-        emacs_value ret = env->make_integer (env, num);
-        if (env->non_local_exit_check (env) != emacs_funcall_exit_return)
-        return NULL;
-        puts ("Success!");
-        return ret;
-       }
-   #+END_EXAMPLE
-
-   If you remove the first check, the program output becomes unpredictable.
-   If you had remove the second check, the program prints “Success!” even if
-   =make_integer= fails. In such a simple case this might not seem like a big
-   deal, but imagine if instead of =printf= you had added code to delete
-   files, send data to the Internet, or started a long-running calculation.
-   Therefore you can't dispense with error checking in all but the most
-   trivial cases. On the other hand, it's safe to leave out the error
-   checking in the following example:
-
-   #+BEGIN_EXAMPLE
-       #include <assert.h>
-       #include <stddef.h>
-       #include <stdint.h>
-       #include <string.h>
-
-       #include <emacs-module.h>
-
-       static emacs_value
-       locate_config_file (emacs_env *env, ptrdiff_t nargs, emacs_value *args,
-        void *data)
-       {
-        assert (nargs == 2);
-        emacs_value home_dir = args[0];
-        emacs_value global_dir = args[1];
-        const char *name = "myconfig.conf";
-        const size_t name_len = strlen (name);
-        assert (name_len <= PTRDIFF_MAX);
-        emacs_value list_args[] = {home_dir, global_dir};
-        emacs_value locate_args[] = {
-        env->make_string (env, name, (ptrdiff_t) name_len),
-        env->funcall (env, env->intern (env, "list"), 2, list_args)
-        };
-        return env->funcall (env, env->intern (env, "locate-file"),
-        2, locate_args);
-       }
-   #+END_EXAMPLE
-
-   All of the environment functions used in this snippet can exit nonlocally,
-   but no nonlocal exit can cause any difference in behavior because there are
-   no “important” operations that depend on the outcome of any function. For
-   instance, consider what happens if the =make_string= call and the first
-   =intern= call succeed, but the =funcall= to =list= fails: the second
-   =intern= and =funcall= combination will just do nothing at all, as if the
-   code weren't there. This is exactly the behavior you'd get if you inserted
-   a =return= conditioned on a =non_local_exit_check= after the first
-   =funcall=.
-
-If you're unsure what to do, or you don't have yet enough practice with the
-module API, then I'd recommend following the first approach and check for
-nonlocal exits after each environment function call. Analyzing whether
-leaving out a nonlocal exit check would incur an observable behavior change
-can be tricky. However, there's one case where the first idiom just adds noise
-without making the code simpler: when returning from a module function. For
-example, theoretically you could write
+1. 您可以在每次调用一个环境之后调用=non_local_exit_check=
+function. That way you can determine with certainty whether the function
+函数。这样你就可以确定这个函数
+call has exited normally. This is simple, but requires a lot of
+电话已正常退出。这很简单，但是需要很多
+boilerplate code. When choosing this option, you might want to wrap the
+样板代码。在选择此选项时，您可能希望包装
+environment functions in wrapper functions that call =non_local_exit_check=
+调用=non_local_exit_check=的包装器函数中的环境函数
+for you, for example:
+对你来说，例如:
 
 #+BEGIN_EXAMPLE
-    emacs_value nil = env->intern (env, "nil");
-    if (env->non_local_exit_check (env) != emacs_funcall_exit_return)
-     return NULL;
-    return nil;
+#include <stdbool.h>
+#include <stdint.h>
+
+#include <emacs-module.h>
+
+static bool
+extract_integer (emacs_env *env, emacs_value value, intmax_t *num)
+{
+*num = env->extract_integer (env, value);
+return env->non_local_exit_check (env) == emacs_funcall_exit_return;
+}
+#+END_EXAMPLE
+
+2. You can call =non_local_exit_check= only before “important” operations. An
+2. 您可以只在“重要”操作之前调用=non_local_exit_check=。一个
+operation in your code is “important” if it's a decision based on Emacs
+如果是基于Emacs的决策，则代码中的操作是“重要的”
+values, has a side effect, or can take a long time. For example, in the
+价值观，有副作用，或可以花很长时间。例如，在
+following function you have to insert checks before the =if= statement and
+在下面的函数中，必须在=if=语句和之前插入检查
+the =puts= function call:
+=puts=函数调用:
+
+#+BEGIN_EXAMPLE
+#include <assert.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <stdio.h>
+
+#include <emacs-module.h>
+
+static emacs_value
+test_number_sign (emacs_env *env, ptrdiff_t nargs, emacs_value *args,
+void *data)
+{
+assert (nargs == 1);
+intmax_t num = env->extract_integer (env, args[0]);
+if (env->non_local_exit_check (env) != emacs_funcall_exit_return)
+return NULL;
+if (num > 0)
+printf ("%jd is positiven", num);
+else if (num < 0)
+printf ("%jd is negativen", num);
+else
+printf ("%jd is zeron", num);
+emacs_value ret = env->make_integer (env, num);
+if (env->non_local_exit_check (env) != emacs_funcall_exit_return)
+return NULL;
+puts ("Success!");
+return ret;
+}
+#+END_EXAMPLE
+
+If you remove the first check, the program output becomes unpredictable.
+如果删除第一个检查，程序输出将变得不可预测。
+If you had remove the second check, the program prints “Success!” even if
+如果你已经删除了第二个检查，程序会打印“成功!”“即使
+=make_integer= fails. In such a simple case this might not seem like a big
+= make_integer =失败。在如此简单的情况下，这似乎不是一个大问题
+deal, but imagine if instead of =printf= you had added code to delete
+但想象一下，如果您添加了要删除的代码，而不是=printf=
+files, send data to the Internet, or started a long-running calculation.
+文件、将数据发送到Internet或启动长时间运行的计算。
+Therefore you can't dispense with error checking in all but the most
+因此，除了大部分错误检查外，您不能免除所有错误检查
+trivial cases. On the other hand, it's safe to leave out the error
+琐碎的情况。另一方面，忽略错误是安全的
+checking in the following example:
+检查以下例子:
+
+#+BEGIN_EXAMPLE
+#include <assert.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <string.h>
+
+#include <emacs-module.h>
+
+static emacs_value
+locate_config_file (emacs_env *env, ptrdiff_t nargs, emacs_value *args,
+void *data)
+{
+assert (nargs == 2);
+emacs_value home_dir = args[0];
+emacs_value global_dir = args[1];
+const char *name = "myconfig.conf";
+const size_t name_len = strlen (name);
+assert (name_len <= PTRDIFF_MAX);
+emacs_value list_args[] = {home_dir, global_dir};
+emacs_value locate_args[] = {
+env->make_string (env, name, (ptrdiff_t) name_len),
+env->funcall (env, env->intern (env, "list"), 2, list_args)
+};
+return env->funcall (env, env->intern (env, "locate-file"),
+2, locate_args);
+}
+#+END_EXAMPLE
+
+All of the environment functions used in this snippet can exit nonlocally,
+此代码段中使用的所有环境函数都可以非本地退出，
+but no nonlocal exit can cause any difference in behavior because there are
+但是，任何非本地出口都不会导致任何行为上的差异，因为确实存在差异
+no “important” operations that depend on the outcome of any function. For
+没有依赖于任何函数结果的“重要”操作。为
+instance, consider what happens if the =make_string= call and the first
+实例，考虑如果=make_string=调用和第一个调用会发生什么
+=intern= call succeed, but the =funcall= to =list= fails: the second
+=intern=调用成功，但是=funcall= to =list=失败:第二个
+=intern= and =funcall= combination will just do nothing at all, as if the
+=intern=和=funcall=组合将什么都不做，就像
+code weren't there. This is exactly the behavior you'd get if you inserted
+没有代码。这正是插入后的行为
+a =return= conditioned on a =non_local_exit_check= after the first
+a =return=条件是a =non_local_exit_check=在第一个之后
+=funcall=.
+= funcall =。
+
+If you're unsure what to do, or you don't have yet enough practice with the
+如果你不确定要做什么，或者你还没有足够的练习
+module API, then I'd recommend following the first approach and check for
+模块API，然后我建议遵循第一种方法和检查
+nonlocal exits after each environment function call. Analyzing whether
+每个环境函数调用后的非本地出口。分析是否
+leaving out a nonlocal exit check would incur an observable behavior change
+忽略一个非本地的退出检查将导致一个可观察的行为变化
+can be tricky. However, there's one case where the first idiom just adds noise
+可能会非常棘手。然而，在一种情况下，第一个习语只是增加了噪音
+without making the code simpler: when returning from a module function. For
+而不使代码更简单:从模块函数返回时。为
+example, theoretically you could write
+例如，理论上你可以写
+
+#+BEGIN_EXAMPLE
+emacs_value nil = env->intern (env, "nil");
+if (env->non_local_exit_check (env) != emacs_funcall_exit_return)
+return NULL;
+return nil;
 #+END_EXAMPLE
 
 instead of
+而不是
 
 #+BEGIN_EXAMPLE
-    return env->intern (env, "nil");
+return env->intern (env, "nil");
 #+END_EXAMPLE
 
 but there wouldn't be any benefit to it: because you are returning from the
+但是没有任何好处:因为你正在从
 module function, there's no possibility that you could accidentally ignore a
+模块函数，你不可能不小心忽略a
 nonlocal exit, and Emacs will check for a nonlocal exit anyway directly after
+非本地退出后，Emacs将直接检查是否有非本地退出
 returning from the function, so you've just added a completely pointless check.
+从函数返回，所以您刚刚添加了一个完全没有意义的检查。
 
 If you don't like the API's nonlocal exit behavior, you can wrap the
+如果您不喜欢API的非本地退出行为，您可以封装
 environment functions. There are a couple of other snippets in this document
+环境的功能。这个文档中还有一些其他的片段
 that show how to wrap some of them in functions returning =bool= so you don't
+这展示了如何在返回=bool=的函数中包装它们中的一些
 have to call =non_local_exit_check= all the time. To give a different option,
+必须一直调用=non_local_exit_check=。给一个不同的选择，
 the following example shows how to wrap a single environment function to get
+下面的示例显示如何包装单个环境函数来获取
 rid of the nonlocal exit state and the saturating behavior:
+消除非局部退出状态和饱和行为:
 
 #+BEGIN_EXAMPLE
-    #include <stdbool.h>
-    #include <stdint.h>
+#include <stdbool.h>
+#include <stdint.h>
 
-    #include <emacs-module.h>
+#include <emacs-module.h>
 
-    struct nonlocal_exit
-    {
-     enum emacs_funcall_exit exit;
-     emacs_value symbol_or_tag;
-     emacs_value data_or_value;
-    };
+struct nonlocal_exit
+{
+enum emacs_funcall_exit exit;
+emacs_value symbol_or_tag;
+emacs_value data_or_value;
+};
 
-    static bool
-    put_exit (emacs_env *env, struct nonlocal_exit *exit)
-    {
-     exit->exit = env->non_local_exit_get (env, &exit->symbol_or_tag,
-     &exit->data_or_value);
-     env->non_local_exit_clear (env);
-     return exit->exit == emacs_funcall_exit_return;
-    }
+static bool
+put_exit (emacs_env *env, struct nonlocal_exit *exit)
+{
+exit->exit = env->non_local_exit_get (env, &exit->symbol_or_tag,
+&exit->data_or_value);
+env->non_local_exit_clear (env);
+return exit->exit == emacs_funcall_exit_return;
+}
 
-    static bool
-    make_integer (emacs_env *env, intmax_t value, emacs_value *result,
-     struct nonlocal_exit *nonlocal_exit)
-    {
-     *result = env->make_integer (env, value);
-     return put_exit (env, nonlocal_exit);
-    }
+static bool
+make_integer (emacs_env *env, intmax_t value, emacs_value *result,
+struct nonlocal_exit *nonlocal_exit)
+{
+*result = env->make_integer (env, value);
+return put_exit (env, nonlocal_exit);
+}
 #+END_EXAMPLE
 
 Most environment functions can request nonlocal exits. In particular, most
+大多数环境函数可以请求非本地出口。特别是,大多数
 will use signals to signal errors. This document calls out explicitly those
+将使用信号来表示错误。本文档显式地调用这些
 functions that never exit nonlocally; you have to assume that all other
+从不在非本地退出的函数;你必须假设所有其他的
 functions can exit nonlocally. Note that even the functions that don't exit
+函数可以非本地退出。注意，即使是不存在的函数
 nonlocally themselves still do nothing and return an unspecified value if a
+非本地本身仍然什么也不做，并返回一个未指定的值
 nonlocal exit was pending when calling them.
+调用它们时，非本地出口挂起。
 
 This document lists some of the error symbols signaled by environment
+本文档列出了环境发出的一些错误符号
 functions. However, it's not an exhaustive description: environment functions
+功能。然而，它并不是一个详尽的描述:环境函数
 are free to signal other errors not specified here. In particular, environment
+可以自由地标记此处未指定的其他错误。特别是,环境
 function will typically signal =memory-full= if they can't allocate memory, and
+函数通常会在无法分配内存时发出信号=memory-full=，并且
 =overflow-error= if some numeric cast would overflow the target type. These
+=overflow-error=如果某个数字类型转换将溢出目标类型。这些
 aren't listed specifically.
+没有明确列出。
 
 *** Global references
-    :PROPERTIES:
-    :CUSTOM_ID: global-references
-    :END:
+* * *全局引用
+:PROPERTIES:
+属性:
+:CUSTOM_ID: global-references
+:CUSTOM_ID:全局引用
+:END:
+结束:
 
 As explained above, most Emacs values have a short lifetime that ends once
+如上所述，大多数Emacs值的生命周期都很短，只有一次结束
 their owning =emacs_env= pointer goes out of scope. However, occasionally it's
+其所属的=emacs_env=指针超出范围。然而,偶尔的
 useful to have values with a longer lifetime:
+有用的价值与较长的生命周期:
 
 - You might want to store some global piece of data that should outlive the
-  current function call, similar to Emacs dynamic variables.
+-您可能想要存储一些应该比
+current function call, similar to Emacs dynamic variables.
+当前函数调用，类似于Emacs动态变量。
 
 - You have determined that creating some objects over and over again incurs a
-  too high CPU cost, so you want to create the object only once. A good
-  example is interning commonly-used symbols such as =car=.
+-你已经确定反复创建一些对象会招致a
+too high CPU cost, so you want to create the object only once. A good
+CPU成本太高，所以您只想创建一次对象。一个好的
+example is interning commonly-used symbols such as =car=.
+例如，插入常用的符号，如=car=。
 
 For such use cases the module API provides *global references*. They are
+对于这样的用例，模块API提供了*全局引用*。他们是
 normal =emacs_value= objects, with one key difference: they are not bound to
+normal =emacs_value=对象，有一个关键的区别:它们没有绑定到
 the lifetime of any environment. Rather, you can use them, once created,
+任何环境的生命周期。相反，你可以使用它们，一旦创建，
 whenever any environment is active.
+任何环境都是活动的。
 
 Be aware that using global references, like all global state, incurs a
+请注意，与所有全局状态一样，使用全局引用会招致a
 readability cost on your code: with global references, you have to keep track
+代码的可读性成本:使用全局引用时，必须跟踪
 which parts of your code modify which reference. You are also responsible for
+代码的哪些部分修改了哪些引用。你也要负责
 managing the lifetime of global references, whereas local values go out of
+管理全局引用的生命周期，而本地值则退出
 scope manually. Therefore I recommend to avoid global references as much as
+手动范围。因此，我建议尽量避免全局引用
 possible and use them only sparingly.
+尽可能少用。
 
 **** =make_global_ref=
-     :PROPERTIES:
-     :CUSTOM_ID: make_global_ref
-     :END:
+* * * * = make_global_ref =
+:PROPERTIES:
+属性:
+:CUSTOM_ID: make_global_ref
+:CUSTOM_ID make_global_ref
+:END:
+结束:
 
 #+BEGIN_EXAMPLE
-    emacs_value make_global_ref (emacs_env *env, emacs_value value);
+emacs_value make_global_ref (emacs_env *env, emacs_value value);
 #+END_EXAMPLE
 
 =make_global_ref= returns a new global reference for value. value can be
+=make_global_ref=返回一个新的全局值引用。值可以是
 any valid local or global reference. It's unspecified whether the return value
+任何有效的本地或全局引用。它没有指定返回值是否
 is equal to value. It's also unspecified whether two calls to
+等于值。它还不确定是否有两个调用
 =make_global_ref= with the same value have the same return value.
+=make_global_ref=具有相同的值，则具有相同的返回值。
 
 =make_global_ref= is available since GNU Emacs 25.
+=make_global_ref=自GNU Emacs 25起可用。
 
 **** =free_global_ref=
-     :PROPERTIES:
-     :CUSTOM_ID: free_global_ref
-     :END:
+* * * * = free_global_ref =
+:PROPERTIES:
+属性:
+:CUSTOM_ID: free_global_ref
+:CUSTOM_ID free_global_ref
+:END:
+结束:
 
 #+BEGIN_EXAMPLE
-    void free_global_ref (emacs_env *env, emacs_value global_ref);
+void free_global_ref (emacs_env *env, emacs_value global_ref);
 #+END_EXAMPLE
 
 =free_global_ref= frees a global reference previously returned by
+=free_global_ref=释放之前返回的全局引用
 =make_global_ref=. If global_ref is a local value or a global reference
+= make_global_ref =。如果global_ref是本地值或全局引用
 that's already been freed, nothing happens. Otherwise, the global reference
+它已经被释放了，什么都没有发生。否则，全局引用
 will no longer be valid after the call.
+在调用后将不再有效。
 
 If two calls to =make_global_ref= have returned the same value and it hasn't
+如果对=make_global_ref=的两次调用返回了相同的值，并且没有返回
 been freed in the meantime, you also have to call =free_global_ref= twice on
+在此期间，您还必须调用=free_global_ref=两次
 the value; that is, global references are reference-counted.
+的价值;也就是说，全局引用是被引用计数的。
 
 =free_global_ref= is available since GNU Emacs 25.
+=free_global_ref=从GNU Emacs 25开始可用。
 
 *** Basic object tests
-    :PROPERTIES:
-    :CUSTOM_ID: basic-object-tests
-    :END:
+基本对象测试
+:PROPERTIES:
+属性:
+:CUSTOM_ID: basic-object-tests
+:CUSTOM_ID basic-object-tests
+:END:
+结束:
 
 **** =is_not_nil=
-     :PROPERTIES:
-     :CUSTOM_ID: is_not_nil
-     :END:
+* * * * is_not_nil = = = =
+:PROPERTIES:
+属性:
+:CUSTOM_ID: is_not_nil
+:CUSTOM_ID is_not_nil
+:END:
+结束:
 
 #+BEGIN_EXAMPLE
-    bool is_not_nil (emacs_env *env, emacs_value value);
+bool is_not_nil (emacs_env *env, emacs_value value);
 #+END_EXAMPLE
 
 =is_not_nil= returns whether the Lisp object represented by value is not
+=is_not_nil=返回值所表示的Lisp对象是否为空
 =nil=. It never exits nonlocally. There can be multiple different values that
+= nil =。它从不在非本地退出。可以有多个不同的值
 represent =nil=. It's unspecified whether a =NULL= value represents =nil= (or
+代表= nil =。它不指定=NULL= value是否代表=nil=(或
 any other valid Lisp object, for that matter).
+任何其他有效的Lisp对象)。
 
 =is_not_nil= is available since GNU Emacs 25.
+=is_not_nil=从GNU Emacs 25开始可用。
 
 **** =eq=
-     :PROPERTIES:
-     :CUSTOM_ID: eq
-     :END:
+* * * *情商= = = =
+:PROPERTIES:
+属性:
+:CUSTOM_ID: eq
+:CUSTOM_ID:情商
+:END:
+结束:
 
 #+BEGIN_EXAMPLE
-    bool eq (emacs_env *env, emacs_value a, emacs_value b);
+bool eq (emacs_env *env, emacs_value a, emacs_value b);
 #+END_EXAMPLE
 
 =eq= returns whether a and b represent the same Lisp object. It never
+=eq=返回a和b是否代表相同的Lisp对象。它从来没有
 exits nonlocally. Note that =a == b= always implies =env->eq (env, a, b)=,
+外地退出。注意=a == b=总是意味着=env->eq (env, a, b)=，
 but the reverse is not true: Two =emacs_value= objects that are different in
+但是反过来就不正确了:Two =emacs_value=对象在
 the C sense might still represent the same Lisp object, so you must always call
+C感觉可能仍然表示相同的Lisp对象，因此必须始终调用
 =eq= to check for equality.
+=eq=检查是否相等。
 
 =eq= corresponds to the Lisp =eq= function. For other kinds of equality
+=eq=对应于Lisp =eq=函数。其他类型的平等
 comparisons, such as ===, =eql=, or =equal=, use =intern= and =funcall= to call
+比较，如===，=eql=，或=== =，使用=intern=和=funcall=来调用
 the corresponding Lisp function.
+对应的Lisp函数。
 
 =eq= is available since GNU Emacs 25.
+=eq=从GNU Emacs 25开始可用。
 
 **** =type_of=
-     :PROPERTIES:
-     :CUSTOM_ID: type_of
-     :END:
+* * * * = type_of =
+:PROPERTIES:
+属性:
+:CUSTOM_ID: type_of
+:CUSTOM_ID type_of
+:END:
+结束:
 
 #+BEGIN_EXAMPLE
-    emacs_value type_of (emacs_env *env, emacs_value value);
+emacs_value type_of (emacs_env *env, emacs_value value);
 #+END_EXAMPLE
 
 =type_of= returns the type of value as a Lisp symbol. It corresponds exactly
+=type_of=以Lisp符号的形式返回值的类型。它对应
 to the =type-of= Lisp function, which see.
+=type-of= Lisp函数，参见。
 
 =type_of= is available since GNU Emacs 25.
+=type_of=从GNU Emacs 25开始可用。
 
 *** Type conversion
-    :PROPERTIES:
-    :CUSTOM_ID: type-conversion
-    :END:
+* * *类型转换
+:PROPERTIES:
+属性:
+:CUSTOM_ID: type-conversion
+:CUSTOM_ID:类型转换
+:END:
+结束:
 
 The environment functions described in this section convert various values
+本节中描述的环境函数可以转换各种值
 between C and Emacs.
+在C和Emacs之间。
 
 **** =make_integer=
-     :PROPERTIES:
-     :CUSTOM_ID: make_integer
-     :END:
+* * * * = make_integer =
+:PROPERTIES:
+属性:
+:CUSTOM_ID: make_integer
+:CUSTOM_ID make_integer
+:END:
+结束:
 
 #+BEGIN_EXAMPLE
-    emacs_value make_integer (emacs_env *env, intmax_t value);
+emacs_value make_integer (emacs_env *env, intmax_t value);
 #+END_EXAMPLE
 
 =make_integer= creates an Emacs integer object from a C integer value. If the
+=make_integer=从一个C整数值创建一个Emacs整数对象。如果
 value can't be represented as an Emacs integer, Emacs signals an error of
+值不能表示为Emacs整数，Emacs表示错误
 type =overflow-error=.
+类型=溢出错误=。
 
 =make_integer= is available since GNU Emacs 25.
+=make_integer=从GNU Emacs 25开始可用。
 
 **** =extract_integer=
-     :PROPERTIES:
-     :CUSTOM_ID: extract_integer
-     :END:
+* * * * = extract_integer =
+:PROPERTIES:
+属性:
+:CUSTOM_ID: extract_integer
+:CUSTOM_ID extract_integer
+:END:
+结束:
 
 #+BEGIN_EXAMPLE
-    intmax_t extract_integer (emacs_env *env, emacs_value value);
+intmax_t extract_integer (emacs_env *env, emacs_value value);
 #+END_EXAMPLE
 
 =extract_integer= returns the integral value stored in an Emacs integer object.
+=extract_integer=返回存储在Emacs整数对象中的整数值。
 If value doesn't represent an integer object, Emacs signals an error of type
+如果值不表示整数对象，则Emacs将发出类型错误信号
 =wrong-type-argument=. If the integer represented by value can't be
+= wrong-type-argument =。如果用值表示的整数不能是
 represented as =intmax_t=, Emacs signals an error of type =overflow-error=.
+Emacs表示为=intmax_t=，表示类型为=overflow-error=的错误。
 
 =extract_integer= is available since GNU Emacs 25.
+=extract_integer=自GNU Emacs 25起可用。
 
 **** =make_float=
-     :PROPERTIES:
-     :CUSTOM_ID: make_float
-     :END:
+* * * * = make_float =
+:PROPERTIES:
+属性:
+:CUSTOM_ID: make_float
+:CUSTOM_ID make_float
+:END:
+结束:
 
 #+BEGIN_EXAMPLE
-    emacs_value make_float (emacs_env *env, double value);
+emacs_value make_float (emacs_env *env, double value);
 #+END_EXAMPLE
 
 =make_float= creates an Emacs floating-point number from a C floating-point
+=make_float=从C浮点数创建Emacs浮点数
 value.
+价值。
 
 =make_float= is available since GNU Emacs 25.
+=make_float=从GNU Emacs 25开始可用。
 
 **** =extract_float=
-     :PROPERTIES:
-     :CUSTOM_ID: extract_float
-     :END:
+* * * * = extract_float =
+:PROPERTIES:
+属性:
+:CUSTOM_ID: extract_float
+:CUSTOM_ID extract_float
+:END:
+结束:
 
 #+BEGIN_EXAMPLE
-    double extract_float (emacs_env *env, emacs_value value);
+double extract_float (emacs_env *env, emacs_value value);
 #+END_EXAMPLE
 
 =extract_float= returns the value stored in an Emacs floating-point number. If
+=extract_float=返回存储在Emacs浮点数中的值。如果
 value doesn't represent a floating-point object, Emacs signals an error of
+值不表示浮点对象，Emacs表示错误
 type =wrong-type-argument=.
+类型= wrong-type-argument =。
 
 =extract_float= is available since GNU Emacs 25.
+=extract_float=自GNU Emacs 25起可用。
 
 **** =make_string=
-     :PROPERTIES:
-     :CUSTOM_ID: make_string
-     :END:
+* * * * = make_string =
+:PROPERTIES:
+属性:
+:CUSTOM_ID: make_string
+:CUSTOM_ID make_string
+:END:
+结束:
 
 #+BEGIN_EXAMPLE
-    emacs_value make_string (emacs_env *env, const char *contents,
-     ptrdiff_t length);
+emacs_value make_string (emacs_env *env, const char *contents,
+ptrdiff_t length);
 #+END_EXAMPLE
 
 =make_string= creates a multibyte Lisp string object. length must be
+=make_string=创建一个多字节Lisp字符串对象。长度必须
 nonnegative. contents must point to an array of at least length + 1
+负的。内容必须指向长度至少为+ 1的数组
 characters, and =contents[length]= must be the null character.
+字符和=contents[length]=必须是空字符。
 
 If length is negative or larger than the maximum allowed Emacs string length,
+如果长度小于或大于Emacs允许的最大字符串长度，
 Emacs raises an =overflow-error= signal. Otherwise, Emacs treats the memory at
+Emacs发出=overflow-error=信号。否则，Emacs将处理内存at
 contents as the UTF-8 representation of a string.
+内容为字符串的UTF-8表示形式。
 
 If the memory block delimited by contents and length contains a valid UTF-8
+如果由内容和长度分隔的内存块包含有效的UTF-8
 string, the return value will be a multibyte Lisp string that contains the same
+返回值将是包含相同内容的多字节Lisp字符串
 sequence of Unicode scalar values as represented by contents. Otherwise, the
+用内容表示的Unicode标量值序列。否则,
 return value will be a multibyte Lisp string with unspecified contents; in
+返回值将是一个多字节Lisp字符串，其内容未指定;在
 practice, Emacs will attempt to detect as many valid UTF-8 subsequences in
+实践中，Emacs将尝试检测尽可能多的有效UTF-8子序列
 contents as possible and treat the rest as undecodable bytes, but you
+内容，并将其余的视为不可解码的字节，但您
 shouldn't rely on any specific behavior in this case.
+在这种情况下不应该依赖于任何特定的行为。
 
 The returned Lisp string will not contain any text properties. To create a
+返回的Lisp字符串将不包含任何文本属性。创建一个
 string containing text properties, use =funcall= to call functions such as
+包含文本属性的字符串，使用=funcall=来调用函数，如
 =propertize=.
+= propertize =。
 
 =make_string= can't create strings that contain characters that are not valid
+=make_string=无法创建包含无效字符的字符串
 Unicode scalar values. Such strings are rare, but occur from time to time;
+Unicode标量值。这样的字符串很少见，但时有发生;
 examples are strings with UTF-16 surrogate code points or
+例如带有UTF-16代理代码点的字符串或
 strings with extended Emacs characters that don't correspond to Unicode code
+带有扩展Emacs字符的字符串，这些字符不对应于Unicode代码
 points. To create such a Lisp string, call e.g. the function =string= and pass
+点。要创建这样一个Lisp字符串，可以调用函数=string=和pass
 the desired character values as integers.
+所需的字符值为整数。
 
 Because the behavior of =make_string= is unpredictable if contents is not a
+因为如果内容不是a，则=make_string=的行为是不可预测的
 valid UTF-8 string, you might want to provide a higher-level wrapper function
+有效的UTF-8字符串，您可能希望提供更高级别的包装器函数
 that checks whether it's a valid UTF-8 string first, for example:
+首先检查它是否是一个有效的UTF-8字符串，例如:
 
 #+BEGIN_EXAMPLE
-    #include <stdbool.h>
-    #include <stddef.h>
-    #include <stdint.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
 
-    #include <unistr.h> /* from libunistring or Gnulib */
+#include <unistr.h> /* from libunistring or Gnulib */
 
-    #include <emacs-module.h>
+#include <emacs-module.h>
 
-    static bool
-    make_string (emacs_env *env, const char *contents, size_t size,
-     emacs_value *result)
-    {
-     if (size > PTRDIFF_MAX)
-     {
-     env->non_local_exit_signal (env, env->intern (env, "overflow-error"),
-     env->intern (env, "nil"));
-     return false;
-     }
-     if (u8_check ((const uint8_t *) contents, size) != NULL)
-     {
-     env->non_local_exit_signal (env, env->intern (env, "wrong-type-argument"),
-     env->intern (env, "nil"));
-     return false;
-     }
-     *result = env->make_string(env, contents, (ptrdiff_t) size);
-     return env->non_local_exit_check (env) == emacs_funcall_exit_return;
-    }
+static bool
+make_string (emacs_env *env, const char *contents, size_t size,
+emacs_value *result)
+{
+if (size > PTRDIFF_MAX)
+{
+env->non_local_exit_signal (env, env->intern (env, "overflow-error"),
+env->intern (env, "nil"));
+return false;
+}
+if (u8_check ((const uint8_t *) contents, size) != NULL)
+{
+env->non_local_exit_signal (env, env->intern (env, "wrong-type-argument"),
+env->intern (env, "nil"));
+return false;
+}
+*result = env->make_string(env, contents, (ptrdiff_t) size);
+return env->non_local_exit_check (env) == emacs_funcall_exit_return;
+}
 #+END_EXAMPLE
 
 =make_string= is available since GNU Emacs 25.
+=make_string=从GNU Emacs 25开始可用。
 
 **** =copy_string_contents=
-     :PROPERTIES:
-     :CUSTOM_ID: copy_string_contents
-     :END:
+* * * * = copy_string_contents =
+:PROPERTIES:
+属性:
+:CUSTOM_ID: copy_string_contents
+:CUSTOM_ID copy_string_contents
+:END:
+结束:
 
 #+BEGIN_EXAMPLE
-    bool copy_string_contents(emacs_env *env, emacs_value value,
-     char *buffer, ptrdiff_t *size);
+bool copy_string_contents(emacs_env *env, emacs_value value,
+char *buffer, ptrdiff_t *size);
 #+END_EXAMPLE
 
 The function =copy_string_contents= copies the characters in the Lisp string
+函数=copy_string_contents=复制Lisp字符串中的字符
 value into buffer. buffer may be =NULL=, but size must not be =NULL=.
+值到缓冲区。缓冲区可以是=NULL=，但是大小不能是=NULL=。
 
 If value doesn't represent a Lisp string, Emacs signals an error of type
+如果值不代表Lisp字符串，则Emacs发出类型错误的信号
 =wrong-type-argument=.
+= wrong-type-argument =。
 
 If buffer is =NULL=, Emacs stores the required size for buffer in =*size=
+如果buffer是=NULL=，则Emacs将buffer所需的大小存储在=*size=中
 and returns =true=. The required size includes space for a terminating null
+并返回= true =。所需的大小包括用于终止null的空间
 character; it will be at most =SIZE_MAX=.
+字符;它将在最大为=SIZE_MAX=。
 
 If buffer is not =NULL=, =*size= must be positive, and buffer must point to
+如果buffer不是=NULL=，则=*size=必须为正，buffer必须指向
 an array of at least =*size= characters. If =*size= is nonpositive or less
+一个至少包含=*size=字符的数组。如果=*size=非正或小于正
 than the required buffer size (including a terminating null character), Emacs
+比所需的缓冲区大小(包括终止空字符)，Emacs
 stores the required size in =*size=, signals an error of type
+将所需的大小存储在=*size=中，表示类型错误
 =args-out-of-range=, and returns =false=. Otherwise, Emacs copies the UTF-8
+=args-out- range=，返回=false=。否则，Emacs将复制UTF-8
 representation of the characters contained in value to the array that
+数组中包含的字符的表示
 buffer points to and returns =true=. The contents of buffer will include a
+缓冲区指向并返回=true=。缓冲区的内容将包括a
 terminating null byte at =buffer[*size - 1]=. If value contains only Unicode
+在=buffer[*size - 1]=处终止空字节。如果值只包含Unicode
 scalar values (i.e. it's either a unibyte string containing only ASCII
+标量值(即它是一个只包含ASCII的单字节字符串)
 characters or a multibyte string containing only characters that are Unicode
+字符或只包含Unicode字符的多字节字符串
 scalar values), the string stored in buffer will be a valid UTF-8 string
+存储在缓冲区中的字符串将是有效的UTF-8字符串
 representing the same sequence of scalar values as value. Otherwise, the
+表示与值相同的标量值序列。否则,
 contents of buffer are unspecified; in practice, Emacs attempts to convert
+缓冲区内容未指定;在实践中，Emacs尝试转换
 scalar values to UTF-8 and leaves other bytes alone, but you shouldn't rely on
+将标量值设置为UTF-8，并保留其他字节，但是不应该依赖于此
 any specific behavior in this case.
+本例中的任何特定行为。
 
 After returning from =copy_string_contents=, a nonlocal exit is pending if and
+从=copy_string_contents=返回后，如果和则挂起一个非本地出口
 only if the return value is =false=.
+仅当返回值为=false=时。
 
 Emacs strings can contain null characters, and therefore buffer may also
+Emacs字符串可以包含空字符，因此缓冲区也可以包含空字符
 contain null characters. Using =strlen= on buffer can result in a length
+包含空字符。使用=strlen= on buffer可以得到一个长度
 that's too short; the actual length will be =*size= − 1.
+那太短;实际长度为=*size= - 1。
 
 There's no environment function to extract string properties. Use the usual
+没有用于提取字符串属性的环境函数。使用通常的
 Emacs functions such as =get-text-property= for that.
+Emacs函数，例如=get-text-property=。
 
 To deal with strings that don't represent sequences of Unicode scalar values,
+要处理不表示Unicode标量值序列的字符串，
 you can use Emacs functions such as =length= and =aref= to extract the
+可以使用诸如=length=和=aref=等Emacs函数来提取
 character values directly.
+直接字符值。
 
 You might want to wrap =copy_string_contents= in a function that allocates a
+您可能希望将=copy_string_contents=包装在分配a的函数中
 buffer of the appropriate size so that you don't have to call it twice:
+缓冲区的适当大小，使您不必调用两次:
 
 #+BEGIN_EXAMPLE
-    #include <assert.h>
-    #include <stdbool.h>
-    #include <stddef.h>
-    #include <stdint.h>
-    #include <stdlib.h>
+#include <assert.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <stdlib.h>
 
-    #include <emacs-module.h>
+#include <emacs-module.h>
 
-    static bool
-    copy_string_contents (emacs_env *env, emacs_value value,
-     char **buffer, size_t *size)
-    {
-     ptrdiff_t buffer_size;
-     if (!env->copy_string_contents (env, value, NULL, &buffer_size))
-     return false;
-     assert (env->non_local_exit_check (env) == emacs_funcall_exit_return);
-     assert (buffer_size > 0);
-     *buffer = malloc ((size_t) buffer_size);
-     if (*buffer == NULL)
-     {
-     env->non_local_exit_signal (env, env->intern (env, "memory-full"),
-     env->intern (env, "nil"));
-     return false;
-     }
-     ptrdiff_t old_buffer_size = buffer_size;
-     if (!env->copy_string_contents (env, value, *buffer, &buffer_size))
-     {
-     free (*buffer);
-     *buffer = NULL;
-     return false;
-     }
-     assert (env->non_local_exit_check (env) == emacs_funcall_exit_return);
-     assert (buffer_size == old_buffer_size);
-     *size = (size_t) (buffer_size - 1);
-     return true;
-    }
+static bool
+copy_string_contents (emacs_env *env, emacs_value value,
+char **buffer, size_t *size)
+{
+ptrdiff_t buffer_size;
+if (!env->copy_string_contents (env, value, NULL, &buffer_size))
+return false;
+assert (env->non_local_exit_check (env) == emacs_funcall_exit_return);
+assert (buffer_size > 0);
+*buffer = malloc ((size_t) buffer_size);
+if (*buffer == NULL)
+{
+env->non_local_exit_signal (env, env->intern (env, "memory-full"),
+env->intern (env, "nil"));
+return false;
+}
+ptrdiff_t old_buffer_size = buffer_size;
+if (!env->copy_string_contents (env, value, *buffer, &buffer_size))
+{
+free (*buffer);
+*buffer = NULL;
+return false;
+}
+assert (env->non_local_exit_check (env) == emacs_funcall_exit_return);
+assert (buffer_size == old_buffer_size);
+*size = (size_t) (buffer_size - 1);
+return true;
+}
 #+END_EXAMPLE
 
 When you use this function, be sure to call =free= on the returned buffer after
+使用此函数时，请确保在返回缓冲区后调用=free=
 use.
+使用。
 
 If you call =copy_string_contents= passing a Lisp string that only contains
+如果您调用=copy_string_contents=传递一个只包含的Lisp字符串
 Unicode scalar values and then call =make_string= on the filled buffer, Emacs
+Unicode标量值，然后调用=make_string=对填充缓冲区，Emacs
 will create a string that's equal (in the sense of =string-equal=) to the
+将创建一个与?相等的字符串(在=string-equal=的意义上)
 initial string, but text properties are lost. Likewise, if you call
+初始字符串，但是文本属性丢失。同样，如果你打电话
 =make_string= passing a valid UTF-8 string and then call =copy_string_contents=
+=make_string=传递一个有效的UTF-8字符串，然后调用=copy_string_contents=
 on the result, Emacs will produce an UTF-8 string that's byte-by-byte identical
+在结果中，Emacs将生成一个逐字节相同的UTF-8字符串
 to the initial UTF-8 string.
+到初始UTF-8字符串。
 
 =copy_string_contents= is available since GNU Emacs 25.
+=copy_string_contents=从GNU Emacs 25开始可用。
 
 *** Interning
-    :PROPERTIES:
-    :CUSTOM_ID: interning
-    :END:
+* * *实习
+:PROPERTIES:
+属性:
+:CUSTOM_ID: interning
+:CUSTOM_ID:实习
+:END:
+结束:
 
 **** =intern=
-     :PROPERTIES:
-     :CUSTOM_ID: intern
-     :END:
+* * * *实习生”= = = =
+:PROPERTIES:
+属性:
+:CUSTOM_ID: intern
+:CUSTOM_ID:实习生
+:END:
+结束:
 
 #+BEGIN_EXAMPLE
-    emacs_value intern (emacs_env *env, const char *symbol_name);
+emacs_value intern (emacs_env *env, const char *symbol_name);
 #+END_EXAMPLE
 
 The function =intern= behaves like the Lisp function =intern=: it looks up
+函数=intern=的行为类似于Lisp函数=intern=:它查找
 =symbol_name= in the default obarray; if a symbol with that name is already
+=symbol_name=在默认的obarray中;如果具有该名称的符号已经存在
 interned in the obarray, it's returned, otherwise a new symbol is created and
+在obarray中插入后返回，否则将创建一个新符号
 interned in the obarray. symbol_name must be non-=NULL= and point to a
+在obarray实习。symbol_name必须是非=NULL=并指向a
 null-terminated C string. The string that symbol_name points to must contain
+以null结尾C字符串。symbol_name指向的字符串必须包含
 only ASCII characters (i.e. characters in the range from 1 to 127); otherwise
+只使用ASCII字符(即范围为1至127的字符);否则
 it's unspecified which symbol is looked up and/or interned.
+它没有指明哪个符号被查找和/或拘留。
 
 Because the behavior is unpredictable if symbol_name is not an ASCII-only
+因为如果symbol_name不是仅限ascii，则行为是不可预测的
 string, you might want to create a higher-level wrapper function for =intern=.
+您可能希望为=intern=创建一个更高级的包装器函数。
 That wrapper function only calls =intern= directly if the symbol name is an
+如果符号名是，则包装器函数只直接调用=intern=
 ASCII string and falls back to calling the =intern= Lisp function otherwise:
+ASCII字符串，否则返回调用=intern= Lisp函数:
 
 #+BEGIN_EXAMPLE
-    #include <stdbool.h>
-    #include <stddef.h>
+#include <stdbool.h>
+#include <stddef.h>
 
-    #include <c-ctype.h> /* from Gnulib */
+#include <c-ctype.h> /* from Gnulib */
 
-    #include <emacs-module.h>
+#include <emacs-module.h>
 
-    static bool
-    intern (emacs_env *env, const char *name, size_t size, emacs_value *result)
-    {
-     bool simple = true;
-     for (size_t i = 0; i < size; ++i)
-     if (name[i] == '\0' || !c_isascii (name[i]))
-     {
-     simple = false;
-     break;
-     }
-     if (simple)
-     *result = env->intern (env, name);
-     else
-     {
-     emacs_value string_object;
-     /* ‘make_string’ from above. */
-     if (!make_string (env, name, size, &string_object))
-     return false;
-     *result = env->funcall (env, env->intern (env, "intern"),
-     1, &string_object);
-     }
-     return env->non_local_exit_check (env) == emacs_funcall_exit_return;
-    }
+static bool
+intern (emacs_env *env, const char *name, size_t size, emacs_value *result)
+{
+bool simple = true;
+for (size_t i = 0; i < size; ++i)
+if (name[i] == '0' || !c_isascii (name[i]))
+{
+simple = false;
+break;
+}
+if (simple)
+*result = env->intern (env, name);
+else
+{
+emacs_value string_object;
+/* ‘make_string’ from above. */
+if (!make_string (env, name, size, &string_object))
+return false;
+*result = env->funcall (env, env->intern (env, "intern"),
+1, &string_object);
+}
+return env->non_local_exit_check (env) == emacs_funcall_exit_return;
+}
 #+END_EXAMPLE
 
 *** Function definition
-    :PROPERTIES:
-    :CUSTOM_ID: function-definition
-    :END:
+* * *函数的定义
+:PROPERTIES:
+属性:
+:CUSTOM_ID: function-definition
+:CUSTOM_ID:函数定义
+:END:
+结束:
 
 The primary purpose of the module API is to allow you to make C functions
+模块API的主要目的是允许您创建C函数
 available to Emacs; such functions are called *module functions*. They have
+可以使用Emacs;这样的函数称为*模块函数*。他们有
 the following signature:
+以下签名:
 
 #+BEGIN_EXAMPLE
-    emacs_value
-    my_module_function (emacs_env *env, ptrdiff_t nargs,
-     emacs_value *args, void *data)
-    {
-     /* Your code. */
-    }
+emacs_value
+my_module_function (emacs_env *env, ptrdiff_t nargs,
+emacs_value *args, void *data)
+{
+/* Your code. */
+}
 #+END_EXAMPLE
 
 Within the body of this function, you can use the env argument to convert
+在这个函数体中，可以使用env参数进行转换
 between Lisp values and C values or interact with Emacs. The env pointer is
+在Lisp值和C值之间或者与Emacs交互。env指针是
 unique and different from all other environment pointers that are active at the
+惟一且不同于在。上活动的所有其他环境指针
 same time. After the module function returns, Emacs will perform different
+同样的时间。模块函数返回后，Emacs将执行不同的操作
 operations depending on the state of the environment represented by env:
+根据env所代表的环境状态进行的操作:
 
 - If the user has requested a quit using C-g while the module
-  function was running, Emacs will ignore both the return value and the state
-  of the environment represented by env and quit immediately. Note,
-  however, that such quits don't cause module functions to return; you have
-  to actively call =should_quit= if you want to react on user quit requests.
+-如果用户要求退出使用C-g模块
+function was running, Emacs will ignore both the return value and the state
+函数正在运行，Emacs将忽略返回值和状态
+of the environment represented by env and quit immediately. Note,
+以env为代表的环境，并立即退出。请注意,
+however, that such quits don't cause module functions to return; you have
+但是，这样的退出不会导致模块函数返回;你有
+to actively call =should_quit= if you want to react on user quit requests.
+如果您希望对用户退出请求做出响应，则应主动调用=should_quit=。
 
 - Otherwise, if env has a nonlocal exit pending, Emacs will ignore the
-  return value and exit nonlocally as specified in the environment. This
-  means that in the case of a nonlocal exit you can safely return a dummy
-  value such as =NULL= without checking whether it represents a valid Lisp
-  object.
+-否则，如果env有一个非本地退出挂起，则Emacs将忽略
+return value and exit nonlocally as specified in the environment. This
+返回值并在环境中指定的非本地退出。这
+means that in the case of a nonlocal exit you can safely return a dummy
+意味着在非本地退出的情况下，您可以安全地返回一个虚拟
+value such as =NULL= without checking whether it represents a valid Lisp
+值，如=NULL=，但不检查它是否表示有效的Lisp
+object.
+对象。
 
 - Otherwise, the return value of the call is the Lisp object represented by
-  the module function return value. In this case, the return value must
-  obviously represent a valid Lisp object. If you don't have a specific
-  value to return, simply return =nil=:
-
-  #+BEGIN_EXAMPLE
-      return env->intern (env, "nil");
-  #+END_EXAMPLE
-
-  Note that there's a theoretical chance that the call to =intern= itself
-  fails; then Emacs would signal an appropriate error instead of returning
-  =nil=.
-
-nargs is the number of arguments to the function; it is always nonnegative.
-You can further restrict the allowed number of arguments using the min_arity
-and max_arity parameters of =make_function=, which see. Emacs will never
-call a module function with a number of arguments that wouldn't be allowed by
-the arguments passed to =make_function=. If nargs is positive, args will
-point to an array of at least nargs elements: the argument values to the
-function. You must not modify the contents of the args array, even though
-it's not declared =const=. If nargs is zero, the value of args is
-unspecified; that means you mustn't dereference it.
-
-**** =make_function=
-     :PROPERTIES:
-     :CUSTOM_ID: make_function
-     :END:
+-否则，调用的返回值是Lisp对象所表示的
+the module function return value. In this case, the return value must
+模块函数返回值。在这种情况下，返回值必须
+obviously represent a valid Lisp object. If you don't have a specific
+显然表示一个有效的Lisp对象。如果你没有一个具体的
+value to return, simply return =nil=:
+返回值，简单地返回=nil=:
 
 #+BEGIN_EXAMPLE
-    typedef emacs_value (*emacs_subr) (emacs_env *env,
-     ptrdiff_t nargs, emacs_value *args,
-     void *data);
+return env->intern (env, "nil");
+#+END_EXAMPLE
 
-    emacs_value make_function (emacs_env *env,
-     ptrdiff_t min_arity, ptrdiff_t max_arity,
-     emacs_subr function, const char *documentation,
-     void *data);
+Note that there's a theoretical chance that the call to =intern= itself
+注意，理论上有可能调用=intern=本身
+fails; then Emacs would signal an appropriate error instead of returning
+失败;然后Emacs将发出适当的错误信号，而不是返回
+=nil=.
+= =尼罗河。
+
+nargs is the number of arguments to the function; it is always nonnegative.
+nargs是函数的参数个数;它总是非负的。
+You can further restrict the allowed number of arguments using the min_arity
+您可以使用min_arity进一步限制允许的参数数量
+and max_arity parameters of =make_function=, which see. Emacs will never
+max_arity参数=make_function=，参见。Emacs永远不会
+call a module function with a number of arguments that wouldn't be allowed by
+使用不允许的参数调用模块函数
+the arguments passed to =make_function=. If nargs is positive, args will
+传递给=make_function=的参数。如果nargs是正的，args会
+point to an array of at least nargs elements: the argument values to the
+的参数值
+function. You must not modify the contents of the args array, even though
+函数。但是，您不能修改args数组的内容
+it's not declared =const=. If nargs is zero, the value of args is
+它没有声明=const=。如果nargs为0，则args的值为
+unspecified; that means you mustn't dereference it.
+未指明的;那意味着你不能取消它。
+
+**** =make_function=
+* * * * = make_function =
+:PROPERTIES:
+属性:
+:CUSTOM_ID: make_function
+:CUSTOM_ID make_function
+:END:
+结束:
+
+#+BEGIN_EXAMPLE
+typedef emacs_value (*emacs_subr) (emacs_env *env,
+ptrdiff_t nargs, emacs_value *args,
+void *data);
+
+emacs_value make_function (emacs_env *env,
+ptrdiff_t min_arity, ptrdiff_t max_arity,
+emacs_subr function, const char *documentation,
+void *data);
 #+END_EXAMPLE
 
 =make_function= creates an Emacs function from a C function. This is how you
+=make_function=从C函数创建Emacs函数。这就是你
 expose functionality from your module to Emacs. To use it, you need to define
+将模块中的功能公开给Emacs。要使用它，您需要定义
 a module function and pass its address as the function argument to
+一个模块函数，并将其地址作为函数参数传递给
 =make_function=. min_arity and max_arity must be nonnegative numbers, and
+= make_function =。min_arity和max_arity必须是非负数，并且
 max_arity must be greater than or equal to min_arity. Alternatively,
+max_arity必须大于或等于min_arity。另外,
 max_arity can have the special value =emacs_variadic_function=; in this case
+max_arity可以有一个特殊值=emacs_variadic_function=;在这种情况下
 the function accepts an unbounded number of arguments, like functions defined
+该函数接受无界数量的参数，就像定义的函数一样
 with =&rest= in Lisp. The value of =emacs_variadic_function= is a negative
+在Lisp中使用=&rest=。=emacs_variadic_function=的值为负数
 number. When applied to a function object returned by =make_function=, the
+号码。当应用于由=make_function=返回的函数对象时，则
 Lisp function =subr-arity= will return
+Lisp函数=子函数=将返回
 =(min_arity . max_arity)= if max_arity is
+=(min_arity . max_arity)=如果max_arity是
 nonnegative, or =(min_arity . many)= if max_arity is
+非负的，或者=(min_arity . many)= max_arity
 =emacs_variadic_function=.
+= emacs_variadic_function =。
 
 Emacs passes the value of the data argument that you give to =make_function=
+Emacs传递给=make_function=的数据参数的值
 back to your module function, but doesn't touch it in any other way. You can
+返回您的模块函数，但不以任何其他方式接触它。你可以
 use data to pass additional context to the module function. If data points
+使用数据将额外的上下文传递给模块函数。如果数据点
 to an object, you are responsible to ensure that the object is still live when
+对于对象，您有责任确保该对象在
 Emacs calls the module function.
+Emacs调用模块函数。
 
 documentation can either be =NULL= or a pointer to a null-terminated string.
+文档可以是=NULL=，也可以是指向以NULL结尾的字符串的指针。
 If it's =NULL=, the new function won't have a documentation string. If it's
+如果是=NULL=，则新函数将没有文档字符串。如果它是
 not =NULL=, Emacs interprets it as an UTF-8 string and uses it as documentation
+not =NULL=， Emacs将其解释为UTF-8字符串并将其用作文档
 string for the new function. If it's not a valid UTF-8 string, the
+新函数的字符串。如果它不是有效的UTF-8字符串，则
 documentation string for the new function is unspecified.
+新函数的文档字符串未指定。
 
 The documentation string can end with a special string to specify the argument
+文档字符串可以以指定参数的特殊字符串结束
 names for the function. See [[https://www.gnu.org/software/emacs/manual/html_node/elisp/Function-Documentation.html][Documentation Strings of Functions in the Emacs
+函数的名称。参见[[https://www.gnu.org/software/emacs/manual/html_node/elisp/function-document.html][Emacs中函数的文档字符串]
 Lisp reference
+Lisp参考
 manual]]
+手动]]
 for the syntax.
+的语法。
 
 The function returned by =make_function= isn't bound to a symbol. For the
+=make_function=返回的函数没有绑定到符号。为
 common case that you want to create a function object and bind it to a symbol
+创建函数对象并将其绑定到符号的常见情况
 so that Lisp code can call it by name, you might want to add a wrapper function
+为了让Lisp代码能够按名称调用它，您可能需要添加一个包装器函数
 that combines =make_function= with =defalias=, similar to the =defun=
+它将=make_function=与=defalias=组合在一起，类似于=defun=
 Lisp function:
+Lisp函数:
 
 #+BEGIN_EXAMPLE
-    #include <stdbool.h>
-    #include <stddef.h>
-    #include <string.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <string.h>
 
-    #include <unistr.h> /* from libunistring or Gnulib */
+#include <unistr.h> /* from libunistring or Gnulib */
 
-    #include <emacs-module.h>
+#include <emacs-module.h>
 
-    typedef emacs_value (*emacs_subr) (emacs_env *env,
-     ptrdiff_t nargs, emacs_value *args,
-     void *data);
+typedef emacs_value (*emacs_subr) (emacs_env *env,
+ptrdiff_t nargs, emacs_value *args,
+void *data);
 
-    static bool
-    defun (emacs_env *env, const char *symbol_name,
-     ptrdiff_t min_arity, ptrdiff_t max_arity, emacs_subr function,
-     const char *documentation, void *data)
-    {
-     emacs_value symbol;
-     /* ‘intern’ from above. */
-     if (!intern (env, symbol_name, strlen (symbol_name), &symbol))
-     return false;
-     if (documentation != NULL
-     && u8_check ((const uint8_t *) documentation,
-     strlen (documentation)) != NULL)
-     {
-     env->non_local_exit_signal (env, env->intern (env, "wrong-type-argument"),
-     env->intern (env, "nil"));
-     return false;
-     }
-     emacs_value func = env->make_function (env, min_arity, max_arity,
-     function, documentation, data);
-     emacs_value args[] = {symbol, func};
-     env->funcall (env, env->intern (env, "defalias"), 2, args);
-     return env->non_local_exit_check (env) == emacs_funcall_exit_return;
-    }
+static bool
+defun (emacs_env *env, const char *symbol_name,
+ptrdiff_t min_arity, ptrdiff_t max_arity, emacs_subr function,
+const char *documentation, void *data)
+{
+emacs_value symbol;
+/* ‘intern’ from above. */
+if (!intern (env, symbol_name, strlen (symbol_name), &symbol))
+return false;
+if (documentation != NULL
+&& u8_check ((const uint8_t *) documentation,
+strlen (documentation)) != NULL)
+{
+env->non_local_exit_signal (env, env->intern (env, "wrong-type-argument"),
+env->intern (env, "nil"));
+return false;
+}
+emacs_value func = env->make_function (env, min_arity, max_arity,
+function, documentation, data);
+emacs_value args[] = {symbol, func};
+env->funcall (env, env->intern (env, "defalias"), 2, args);
+return env->non_local_exit_check (env) == emacs_funcall_exit_return;
+}
 #+END_EXAMPLE
 
 =make_function= is less general than =defun= or other Lisp facilities to create
+=make_function=不如=defun=或要创建的其他Lisp工具一般
 functions. In particular, it doesn't support the following types of functions:
+功能。特别是，它不支持以下类型的函数:
 
 - Interactive functions. To define such a function, wrap it in another
-  function:
-
-  #+BEGIN_EXAMPLE
-      #include <stdbool.h>
-      #include <stddef.h>
-      #include <string.h>
-
-      #include <emacs-module.h>
-
-      typedef emacs_value (*emacs_subr) (emacs_env *env,
-       ptrdiff_t nargs, emacs_value *args,
-       void *data);
-
-      static bool
-      defun_interactive (emacs_env *env, const char *symbol_name,
-       ptrdiff_t min_arity, ptrdiff_t max_arity,
-       emacs_value interactive, emacs_subr function,
-       const char *documentation, void *data)
-      {
-       emacs_value symbol;
-       /* ‘intern’ from above. */
-       if (!intern (env, symbol_name, strlen (symbol_name), &symbol))
-       return false;
-       /* ‘make_string’ from above. */
-       emacs_value doc;
-       if (!make_string (env, documentation, strlen (documentation), &doc))
-       return false;
-       emacs_value func = env->make_function (env, min_arity, max_arity,
-       function, NULL, data);
-       /* Now build up and evaluate the following form:
-
-       (eval '(defun SYMBOL (&rest args)
-       DOCUMENTATION
-       (interactive INTFORM)
-       (apply FUNC ARGS))
-       t) */
-       emacs_value list = env->intern (env, "list");
-       emacs_value args = env->intern (env, "args");
-       emacs_value arglist_elems[] = {env->intern (env, "&rest"), args};
-       emacs_value arglist = env->funcall (env, list, 2, arglist_elems);
-       emacs_value int_elems[] = {env->intern (env, "interactive"),
-       interactive};
-       emacs_value int_form = env->funcall (env, list, 2, int_elems);
-       emacs_value body_elems[] = {env->intern (env, "apply"), func, args};
-       emacs_value body = env->funcall (env, list, 3, body_elems);
-       emacs_value form_elems[] = {env->intern (env, "defun"), symbol,
-       arglist, doc, int_form, body};
-       emacs_value form = env->funcall (env, list, 6, form_elems);
-       emacs_value eval_args[] = {form, env->intern (env, "t")};
-       env->funcall (env, env->intern (env, "eval"), 2, eval_args);
-       return env->non_local_exit_check (env) == emacs_funcall_exit_return;
-      }
-  #+END_EXAMPLE
-
-- Macros or special forms that don't evaluate their arguments. To define a
-  macro, evaluate a =defmacro= form:
-
-  #+BEGIN_EXAMPLE
-      #include <stdbool.h>
-      #include <stddef.h>
-      #include <string.h>
-
-      #include <emacs-module.h>
-
-      typedef emacs_value (*emacs_subr) (emacs_env *env,
-       ptrdiff_t nargs, emacs_value *args,
-       void *data);
-
-      static bool
-      defmacro (emacs_env *env, const char *symbol_name,
-       ptrdiff_t min_arity, ptrdiff_t max_arity, emacs_subr function,
-       const char *documentation, void *data)
-      {
-       emacs_value symbol;
-       /* ‘intern’ from above. */
-       if (!intern (env, symbol_name, strlen (symbol_name), &symbol))
-       return false;
-       /* ‘make_string’ from above. */
-       emacs_value doc;
-       if (!make_string (env, documentation, strlen (documentation), &doc))
-       return false;
-       emacs_value func = env->make_function (env, min_arity, max_arity,
-       function, NULL, data);
-       /* Now build up and evaluate the following form:
-
-       (eval '(defmacro SYMBOL (&rest args)
-       DOCUMENTATION
-       nil
-       (apply FUNC args))
-       t) */
-       emacs_value list = env->intern (env, "list");
-       emacs_value args = env->intern (env, "args");
-       emacs_value arglist_elems[] = {env->intern (env, "&rest"), args};
-       emacs_value arglist = env->funcall (env, list, 2, arglist_elems);
-       emacs_value body_elems[] = {env->intern (env, "apply"), func, args};
-       emacs_value body = env->funcall (env, list, 2, body_elems);
-       emacs_value form_elems[] = {env->intern (env, "defmacro"), symbol,
-       arglist, doc, env->intern (env, "nil"),
-       body};
-       emacs_value form = env->funcall (env, list, 6, form_elems);
-       emacs_value eval_args[] = {form, env->intern (env, "t")};
-       env->funcall (env, env->intern (env, "eval"), 2, eval_args);
-       return env->non_local_exit_check (env) == emacs_funcall_exit_return;
-      }
-  #+END_EXAMPLE
-
-- Functions with declare forms. You can get the same effect by applying the
-  elements of =defun-declarations-alist= manually:
-
-  #+BEGIN_EXAMPLE
-      #include <stdbool.h>
-      #include <string.h>
-
-      #include <emacs-module.h>
-
-      static bool
-      apply_declaration (emacs_env *env,
-       const char *function_name, emacs_value arglist,
-       const char *property, emacs_value values)
-      {
-       emacs_value func_symbol;
-       /* ‘intern’ from above. */
-       if (!intern (env, function_name, strlen (function_name), &func_symbol))
-       return false;
-       emacs_value prop_symbol;
-       if (!intern (env, property, strlen (property), &prop_symbol))
-       return false;
-       /* Evaluate the following form:
-
-       (eval (apply (cadr (assq PROPERTY defun-declarations-alist))
-       FUNCTION ARGLIST VALUES)
-       t) */
-       emacs_value assq_args[] = {
-       prop_symbol,
-       env->intern (env, "defun-declarations-alist")
-       };
-       emacs_value element
-       = env->funcall (env, env->intern (env, "assq"), 2, assq_args);
-       emacs_value declarator
-       = env->funcall (env, env->intern (env, "cadr"), 1, &element);
-       emacs_value apply_args[] = {declarator, func_symbol, arglist, values};
-       emacs_value form
-       = env->funcall (env, env->intern (env, "apply"), 4, apply_args);
-       emacs_value eval_args[] = {form, env->intern (env, "t")};
-       env->funcall (env, env->intern (env, "eval"), 2, eval_args);
-       return env->non_local_exit_check (env) == emacs_funcall_exit_return;
-      }
-  #+END_EXAMPLE
-
-- Functions with documentation strings that can't be represented in Unicode
-  or contain embedded null characters. I assume that such functions are
-  extremely rare.
-
-The =emacs_subr= type alias is not part of =emacs-module.h=, so you have to
-define it yourself if you want it.
-
-=make_function= is available since GNU Emacs 25.
-
-**** =funcall=
-     :PROPERTIES:
-     :CUSTOM_ID: funcall
-     :END:
+——互动功能。要定义这样一个函数，请将其封装到另一个函数中
+function:
+功能:
 
 #+BEGIN_EXAMPLE
-    emacs_value funcall (emacs_env *env, emacs_value function,
-     ptrdiff_t nargs, emacs_value* args);
+#include <stdbool.h>
+#include <stddef.h>
+#include <string.h>
+
+#include <emacs-module.h>
+
+typedef emacs_value (*emacs_subr) (emacs_env *env,
+ptrdiff_t nargs, emacs_value *args,
+void *data);
+
+static bool
+defun_interactive (emacs_env *env, const char *symbol_name,
+ptrdiff_t min_arity, ptrdiff_t max_arity,
+emacs_value interactive, emacs_subr function,
+const char *documentation, void *data)
+{
+emacs_value symbol;
+/* ‘intern’ from above. */
+if (!intern (env, symbol_name, strlen (symbol_name), &symbol))
+return false;
+/* ‘make_string’ from above. */
+emacs_value doc;
+if (!make_string (env, documentation, strlen (documentation), &doc))
+return false;
+emacs_value func = env->make_function (env, min_arity, max_arity,
+function, NULL, data);
+/* Now build up and evaluate the following form:
+
+(eval '(defun SYMBOL (&rest args)
+DOCUMENTATION
+(interactive INTFORM)
+(apply FUNC ARGS))
+t) */
+emacs_value list = env->intern (env, "list");
+emacs_value args = env->intern (env, "args");
+emacs_value arglist_elems[] = {env->intern (env, "&rest"), args};
+emacs_value arglist = env->funcall (env, list, 2, arglist_elems);
+emacs_value int_elems[] = {env->intern (env, "interactive"),
+interactive};
+emacs_value int_form = env->funcall (env, list, 2, int_elems);
+emacs_value body_elems[] = {env->intern (env, "apply"), func, args};
+emacs_value body = env->funcall (env, list, 3, body_elems);
+emacs_value form_elems[] = {env->intern (env, "defun"), symbol,
+arglist, doc, int_form, body};
+emacs_value form = env->funcall (env, list, 6, form_elems);
+emacs_value eval_args[] = {form, env->intern (env, "t")};
+env->funcall (env, env->intern (env, "eval"), 2, eval_args);
+return env->non_local_exit_check (env) == emacs_funcall_exit_return;
+}
+#+END_EXAMPLE
+
+- Macros or special forms that don't evaluate their arguments. To define a
+-宏或特殊的形式，不评估他们的参数。定义一个
+macro, evaluate a =defmacro= form:
+宏，求值a =defmacro= form:
+
+#+BEGIN_EXAMPLE
+#include <stdbool.h>
+#include <stddef.h>
+#include <string.h>
+
+#include <emacs-module.h>
+
+typedef emacs_value (*emacs_subr) (emacs_env *env,
+ptrdiff_t nargs, emacs_value *args,
+void *data);
+
+static bool
+defmacro (emacs_env *env, const char *symbol_name,
+ptrdiff_t min_arity, ptrdiff_t max_arity, emacs_subr function,
+const char *documentation, void *data)
+{
+emacs_value symbol;
+/* ‘intern’ from above. */
+if (!intern (env, symbol_name, strlen (symbol_name), &symbol))
+return false;
+/* ‘make_string’ from above. */
+emacs_value doc;
+if (!make_string (env, documentation, strlen (documentation), &doc))
+return false;
+emacs_value func = env->make_function (env, min_arity, max_arity,
+function, NULL, data);
+/* Now build up and evaluate the following form:
+
+(eval '(defmacro SYMBOL (&rest args)
+DOCUMENTATION
+nil
+(apply FUNC args))
+t) */
+emacs_value list = env->intern (env, "list");
+emacs_value args = env->intern (env, "args");
+emacs_value arglist_elems[] = {env->intern (env, "&rest"), args};
+emacs_value arglist = env->funcall (env, list, 2, arglist_elems);
+emacs_value body_elems[] = {env->intern (env, "apply"), func, args};
+emacs_value body = env->funcall (env, list, 2, body_elems);
+emacs_value form_elems[] = {env->intern (env, "defmacro"), symbol,
+arglist, doc, env->intern (env, "nil"),
+body};
+emacs_value form = env->funcall (env, list, 6, form_elems);
+emacs_value eval_args[] = {form, env->intern (env, "t")};
+env->funcall (env, env->intern (env, "eval"), 2, eval_args);
+return env->non_local_exit_check (env) == emacs_funcall_exit_return;
+}
+#+END_EXAMPLE
+
+- Functions with declare forms. You can get the same effect by applying the
+-带有声明表单的函数。你可以通过应用同样的效果
+elements of =defun-declarations-alist= manually:
+元素= defun-ations-alist =手动:
+
+#+BEGIN_EXAMPLE
+#include <stdbool.h>
+#include <string.h>
+
+#include <emacs-module.h>
+
+static bool
+apply_declaration (emacs_env *env,
+const char *function_name, emacs_value arglist,
+const char *property, emacs_value values)
+{
+emacs_value func_symbol;
+/* ‘intern’ from above. */
+if (!intern (env, function_name, strlen (function_name), &func_symbol))
+return false;
+emacs_value prop_symbol;
+if (!intern (env, property, strlen (property), &prop_symbol))
+return false;
+/* Evaluate the following form:
+
+(eval (apply (cadr (assq PROPERTY defun-declarations-alist))
+FUNCTION ARGLIST VALUES)
+t) */
+emacs_value assq_args[] = {
+prop_symbol,
+env->intern (env, "defun-declarations-alist")
+};
+emacs_value element
+= env->funcall (env, env->intern (env, "assq"), 2, assq_args);
+emacs_value declarator
+= env->funcall (env, env->intern (env, "cadr"), 1, &element);
+emacs_value apply_args[] = {declarator, func_symbol, arglist, values};
+emacs_value form
+= env->funcall (env, env->intern (env, "apply"), 4, apply_args);
+emacs_value eval_args[] = {form, env->intern (env, "t")};
+env->funcall (env, env->intern (env, "eval"), 2, eval_args);
+return env->non_local_exit_check (env) == emacs_funcall_exit_return;
+}
+#+END_EXAMPLE
+
+- Functions with documentation strings that can't be represented in Unicode
+-带有无法用Unicode表示的文档字符串的函数
+or contain embedded null characters. I assume that such functions are
+或包含嵌入的空字符。我假设这样的函数是
+extremely rare.
+极为罕见。
+
+The =emacs_subr= type alias is not part of =emacs-module.h=, so you have to
+=emacs_subr= type别名不是=emacs-module的一部分。h=，所以你必须
+define it yourself if you want it.
+如果你想要，你自己定义它。
+
+=make_function= is available since GNU Emacs 25.
+=make_function=从GNU Emacs 25开始可用。
+
+**** =funcall=
+* * * * = funcall =
+:PROPERTIES:
+属性:
+:CUSTOM_ID: funcall
+:CUSTOM_ID funcall
+:END:
+结束:
+
+#+BEGIN_EXAMPLE
+emacs_value funcall (emacs_env *env, emacs_value function,
+ptrdiff_t nargs, emacs_value* args);
 #+END_EXAMPLE
 
 =funcall= corresponds to the Lisp =funcall= function: it calls any function,
+=funcall=对应于Lisp =funcall= function:它调用任何函数，
 passing it the arguments you provide. function may represent any valid
+将您提供的参数传递给它。函数可以表示任何有效的
 function, such as Lisp lambdas, C subroutines, or module functions returned by
+函数，如Lisp lambdas, C子程序，或模块函数返回
 =make_function=. It can also be a symbol; Emacs will find its function
+= make_function =。它也可以是一个象征;Emacs将找到它的功能
 definition (like =indirect-function=) and call that. nargs must be
+定义(比如=indirect-function=)并调用它。娜戈必须
 nonnegative. args must point to an array of at least nargs elements; Emacs
+负的。args必须指向至少包含nargs元素的数组;Emacs
 uses the first nargs elements as arguments to function. If nargs is
+使用第一个nargs元素作为函数的参数。如果娜戈
 zero, args may also be =NULL=. After =funcall= returns, the contents of the
+零，args也可以是=NULL=。函数的内容
 first nargs elements of the array that args points to are unspecified;
+首先声明args指向的数组元素是未指定的;
 i.e. if you need the array contents later you have to make a copy before
+也就是说，如果你以后需要数组的内容，你必须在之前做一个拷贝
 invoking =funcall=. =funcall= returns the return value of function. If
+调用= funcall =。=funcall=返回函数的返回值。如果
 function exits nonlocally, the return value is unspecified. Use
+函数非本地退出，返回值未指定。使用
 =non_local_exit_check= or =non_local_exit_get= to check whether a nonlocal exit
+=non_local_exit_check=或=non_local_exit_get=检查是否有非本地出口
 is pending. You can't use =funcall= to expand special forms or macros; use
+是等待。不能使用=funcall=展开特殊形式或宏;使用
 functions such as =eval= or =macroexpand= for that.
+诸如=eval=或=macroexpand=这样的函数。
 
 For the common case of calling a function though a symbol, you might consider
+对于通过符号调用函数的常见情况，您可以考虑
 adding a wrapper function, such as:
+添加包装函数，如:
 
 #+BEGIN_EXAMPLE
-    #include <stdbool.h>
-    #include <stddef.h>
-    #include <stdint.h>
-    #include <stdlib.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <stdlib.h>
 
-    #include <emacs-module.h>
+#include <emacs-module.h>
 
-    static bool
-    funcall_symbol (emacs_env *env, const char *symbol,
-     size_t nargs, const emacs_value* args,
-     emacs_value *result)
-    {
-     emacs_value symbol_value;
-     /* ‘intern’ from above. */
-     if (!intern (env, symbol, &symbol_value))
-     return false;
-     if (nargs > PTRDIFF_MAX)
-     {
-     env->non_local_exit_signal (env, env->intern (env, "overflow-error"),
-     env->intern (env, "nil"));
-     return false;
-     }
-     emacs_value *args_copy;
-     if (nargs > 0)
-     {
-     args_copy = calloc (nargs, sizeof args[0]);
-     if (args_copy == NULL)
-     {
-     env->non_local_exit_signal (env, env->intern (env, "memory-full"),
-     env->intern (env, "nil"));
-     return false;
-     }
-     for (size_t i = 0; i < nargs; ++i)
-     args_copy[i] = args[i];
-     }
-     else
-     args_copy = NULL;
-     *result = env->funcall (env, symbol_value, (ptrdiff_t) nargs, args_copy);
-     free (args_copy);
-     return env->non_local_exit_check (env) == emacs_funcall_exit_return;
-    }
+static bool
+funcall_symbol (emacs_env *env, const char *symbol,
+size_t nargs, const emacs_value* args,
+emacs_value *result)
+{
+emacs_value symbol_value;
+/* ‘intern’ from above. */
+if (!intern (env, symbol, &symbol_value))
+return false;
+if (nargs > PTRDIFF_MAX)
+{
+env->non_local_exit_signal (env, env->intern (env, "overflow-error"),
+env->intern (env, "nil"));
+return false;
+}
+emacs_value *args_copy;
+if (nargs > 0)
+{
+args_copy = calloc (nargs, sizeof args[0]);
+if (args_copy == NULL)
+{
+env->non_local_exit_signal (env, env->intern (env, "memory-full"),
+env->intern (env, "nil"));
+return false;
+}
+for (size_t i = 0; i < nargs; ++i)
+args_copy[i] = args[i];
+}
+else
+args_copy = NULL;
+*result = env->funcall (env, symbol_value, (ptrdiff_t) nargs, args_copy);
+free (args_copy);
+return env->non_local_exit_check (env) == emacs_funcall_exit_return;
+}
 #+END_EXAMPLE
 
 =funcall= is available since GNU Emacs 25.
+=funcall=从GNU Emacs 25起就可用了。
 
 *** Vector access
-    :PROPERTIES:
-    :CUSTOM_ID: vector-access
-    :END:
+* * *矢量访问
+:PROPERTIES:
+属性:
+:CUSTOM_ID: vector-access
+:CUSTOM_ID vector-access
+:END:
+结束:
 
 The module API provides direct access to vector elements without using
+模块API提供了对向量元素的直接访问，而无需使用
 =funcall=.
+= funcall =。
 
 **** =vec_get=
-     :PROPERTIES:
-     :CUSTOM_ID: vec_get
-     :END:
+* * * * vec_get =
+:PROPERTIES:
+属性:
+:CUSTOM_ID: vec_get
+:CUSTOM_ID vec_get
+:END:
+结束:
 
 #+BEGIN_EXAMPLE
-    emacs_value vec_get (emacs_env *env, emacs_value vec, ptrdiff_t index);
+emacs_value vec_get (emacs_env *env, emacs_value vec, ptrdiff_t index);
 #+END_EXAMPLE
 
 =vec_get= returns the index-th element of the vector vec. index is
+=vec_get=返回向量vec的第一个索引元素。指数
 zero-based. If vec is not a Lisp vector, Emacs signals an error of type
+从零开始的。如果vec不是Lisp向量，则Emacs发出类型错误的信号
 =wrong-type-argument=. If index is negative or not less than the number of
+= wrong-type-argument =。如果索引是负数或不小于的数目
 elements in vec, Emacs signals an error of type =args-out-of-range=.
+在vec中，Emacs发出类型为=args-out- range=的错误信号。
 
 =vec_get= is available since GNU Emacs 25.
+=vec_get=从GNU Emacs 25开始可用。
 
 **** =vec_set=
-     :PROPERTIES:
-     :CUSTOM_ID: vec_set
-     :END:
+* * * * vec_set = = = =
+:PROPERTIES:
+属性:
+:CUSTOM_ID: vec_set
+:CUSTOM_ID vec_set
+:END:
+结束:
 
 #+BEGIN_EXAMPLE
-    void vec_set (emacs_env *env, emacs_value vec, ptrdiff_t index,
-     emacs_value value);
+void vec_set (emacs_env *env, emacs_value vec, ptrdiff_t index,
+emacs_value value);
 #+END_EXAMPLE
 
 =vec_set= sets the index-th element of the vector vec to value. index
+=vec_set=将向量vec的index-th元素设置为值。指数
 is zero-based. If vec is not a Lisp vector, Emacs signals an error of type
+是从零开始的。如果vec不是Lisp向量，则Emacs发出类型错误的信号
 =wrong-type-argument=. If index is negative or not less than the number of
+= wrong-type-argument =。如果索引是负数或不小于的数目
 elements in vec, Emacs signals an error of type =args-out-of-range=.
+在vec中，Emacs发出类型为=args-out- range=的错误信号。
 
 =vec_set= is available since GNU Emacs 25.
+=vec_set=从GNU Emacs 25开始可用。
 
 **** =vec_size=
-     :PROPERTIES:
-     :CUSTOM_ID: vec_size
-     :END:
+* * * * = vec_size =
+:PROPERTIES:
+属性:
+:CUSTOM_ID: vec_size
+:CUSTOM_ID vec_size
+:END:
+结束:
 
 #+BEGIN_EXAMPLE
-    ptrdiff_t vec_size (emacs_env *env, emacs_value vec);
+ptrdiff_t vec_size (emacs_env *env, emacs_value vec);
 #+END_EXAMPLE
 
 =vec_size= returns the number of elements in the vector vec. If vec is not
+=vec_size=返回向量vec中的元素数量。如果vec不是
 a Lisp vector, Emacs signals an error of type =wrong-type-argument=.
+一个Lisp向量，Emacs信号错误类型=错误类型-参数=。
 
 =vec_size= is available since GNU Emacs 25.
+=vec_size=从GNU Emacs 25开始可用。
 
 *** User pointers
-    :PROPERTIES:
-    :CUSTOM_ID: user-pointers
-    :END:
+* * *用户指针
+:PROPERTIES:
+属性:
+:CUSTOM_ID: user-pointers
+:CUSTOM_ID user-pointers
+:END:
+结束:
 
 When dealing with C code, it's often useful to be able to store arbitrary C
+在处理C代码时，能够存储任意的C通常很有用
 objects inside Emacs Lisp objects. For this purpose the module API provides a
+对象中的对象。为此，模块API提供了一个
 unique Lisp datatype called *user pointer*. A user pointer object
+唯一的Lisp数据类型称为*用户指针*。用户指针对象
 encapsulates a C pointer value and optionally a finalizer function. Apart from
+封装C指针值和可选的终结器函数。除了
 storing it, Emacs leaves the pointer value alone. Even though it's a pointer,
+存储它时，Emacs不处理指针值。即使它是一个指针，
 there's no requirement that it point to valid memory. If you provide a
+没有要求它指向有效内存。如果你提供
 finalizer, Emacs will call it when the user pointer object is garbage
+当用户指针对象是垃圾时，Emacs会调用它
 collected. Note that Emacs's garbage collection is nondeterministic: it might
+收集。请注意，Emacs的垃圾收集是不确定的:可能是
 happen long after an object ceases to be used or not at all. Therefore you
+在一个物体停止使用或根本不使用后很久才发生。所以你
 can't use user pointer finalizers for finalization that has to be prompt or
+不能使用用户指针终结器来完成提示或
 deterministic; it's best to use finalizers only for clean-ups that can be
+确定的;最好只在清理的时候使用终结器
 delayed arbitrarily without bad side effects, such as freeing memory. If you
+任意延迟，没有副作用，比如释放内存。如果你
 store a resource handle in a user pointer that requires deterministic
+将资源句柄存储在需要确定性的用户指针中
 finalization, you should use a different mechanism such as =unwind-protect=.
+最后，应该使用另一种机制，如=unwind-protect=。
 Finalizers can't interact with Emacs in any way; they also can't fail.
+终结器不能以任何方式与Emacs交互;他们也不会失败。
 
 **** =make_user_ptr=
-     :PROPERTIES:
-     :CUSTOM_ID: make_user_ptr
-     :END:
+* * * * = make_user_ptr =
+:PROPERTIES:
+属性:
+:CUSTOM_ID: make_user_ptr
+:CUSTOM_ID make_user_ptr
+:END:
+结束:
 
 #+BEGIN_EXAMPLE
-    typedef void (*emacs_finalizer) (void *ptr);
-    emacs_value make_user_ptr (emacs_env *env, emacs_finalizer fin, void *ptr);
+typedef void (*emacs_finalizer) (void *ptr);
+emacs_value make_user_ptr (emacs_env *env, emacs_finalizer fin, void *ptr);
 #+END_EXAMPLE
 
 =make_user_ptr= creates and returns a new user pointer object. ptr is the
+=make_user_ptr=创建并返回一个新的用户指针对象。ptr是
 pointer value to be embedded in the user pointer; it's completely arbitrary and
+将指针值嵌入到用户指针中;它是完全任意的
 doesn't need to point to valid memory. If fin is not =NULL=, it must point
+不需要指向有效内存。如果fin不是=NULL=，它必须指向
 to a finalizer function with the following signature:
+一个具有以下签名的终结器函数:
 
 #+BEGIN_EXAMPLE
-    void fin (void *ptr);
+void fin (void *ptr);
 #+END_EXAMPLE
 
 When the new user pointer object is being garbage collected, Emacs calls fin
+当新用户指针对象被垃圾收集时，Emacs调用fin
 with ptr as argument. The finalizer function may contain arbitrary code, but
+以ptr为参数。终结器函数可以包含任意代码，但是
 it must not interact with Emacs in any way or exit nonlocally. It should
+它不能以任何方式与Emacs交互或以非本地方式退出。它应该
 finish as quickly as possible because delaying garbage collection blocks Emacs
+尽可能快地完成，因为延迟垃圾收集会阻塞Emacs
 completely.
+完全。
 
 The =emacs_finalizer= type alias is not defined in =emacs-module.h=; if you
+=emacs-module.h=中没有定义=emacs_finalizer= type alias;如果你
 want it you have to define it yourself.
+想要它，你必须自己定义它。
 
 =make_user_ptr= is available since GNU Emacs 25.
+=make_user_ptr=从GNU Emacs 25开始可用。
 
 **** =get_user_ptr=
-     :PROPERTIES:
-     :CUSTOM_ID: get_user_ptr
-     :END:
+* * * * = get_user_ptr =
+:PROPERTIES:
+属性:
+:CUSTOM_ID: get_user_ptr
+:CUSTOM_ID get_user_ptr
+:END:
+结束:
 
 #+BEGIN_EXAMPLE
-    void *get_user_ptr (emacs_env *env, emacs_value value);
+void *get_user_ptr (emacs_env *env, emacs_value value);
 #+END_EXAMPLE
 
 =get_user_ptr= returns the user pointer embedded in the user pointer object
+=get_user_ptr=返回嵌入在用户指针对象中的用户指针
 represented by value; this is the ptr value that you have passed to
+所代表的价值;这是您传递给的ptr值
 =make_user_ptr=. If value doesn't represent a user pointer object, Emacs
+= make_user_ptr =。如果值不代表用户指针对象，则使用Emacs
 signals an error of type =wrong-type-argument=.
+信号错误类型=错误类型-参数=。
 
 =get_user_ptr= is available since GNU Emacs 25.
+=get_user_ptr=从GNU Emacs 25开始可用。
 
 **** =set_user_ptr=
-     :PROPERTIES:
-     :CUSTOM_ID: set_user_ptr
-     :END:
+* * * * = set_user_ptr =
+:PROPERTIES:
+属性:
+:CUSTOM_ID: set_user_ptr
+:CUSTOM_ID set_user_ptr
+:END:
+结束:
 
 #+BEGIN_EXAMPLE
-    void set_user_ptr (emacs_env *env, emacs_value value, void *ptr);
+void set_user_ptr (emacs_env *env, emacs_value value, void *ptr);
 #+END_EXAMPLE
 
 =set_user_ptr= changes the user pointer wrapped by value to ptr. value
+=set_user_ptr=将值包装的用户指针更改为ptr。价值
 must be a user pointer object, otherwise Emacs signals an error of type
+必须是用户指针对象，否则Emacs将发出类型错误的信号
 =wrong-type-argument=.
+= wrong-type-argument =。
 
 =set_user_ptr= is available since GNU Emacs 25.
+=set_user_ptr=自GNU Emacs 25起可用。
 
 **** =get_user_finalizer=
-     :PROPERTIES:
-     :CUSTOM_ID: get_user_finalizer
-     :END:
+* * * * = get_user_finalizer =
+:PROPERTIES:
+属性:
+:CUSTOM_ID: get_user_finalizer
+:CUSTOM_ID get_user_finalizer
+:END:
+结束:
 
 #+BEGIN_EXAMPLE
-    emacs_finalizer get_user_finalizer (emacs_env *env, emacs_value value);
+emacs_finalizer get_user_finalizer (emacs_env *env, emacs_value value);
 #+END_EXAMPLE
 
 =get_user_finalizer= returns the user pointer finalizer embedded in the user
+=get_user_finalizer=返回嵌入到用户中的用户指针finalizer
 pointer object represented by value; this is the fin value that you have
+指针对象由值表示;这是鳍的值
 passed to =make_user_ptr=. If value doesn't have a custom finalizer, Emacs
+传递给= make_user_ptr =。如果值没有自定义终结器，则使用Emacs
 returns =NULL=. If value doesn't represent a user pointer object, Emacs
+返回= NULL =。如果值不代表用户指针对象，则使用Emacs
 signals an error of type =wrong-type-argument=.
+信号错误类型=错误类型-参数=。
 
 =get_user_finalizer= is available since GNU Emacs 25.
+=get_user_finalizer=从GNU Emacs 25开始可用。
 
 **** =set_user_ptr=
-     :PROPERTIES:
-     :CUSTOM_ID: set_user_ptr-1
-     :END:
+* * * * = set_user_ptr =
+:PROPERTIES:
+属性:
+:CUSTOM_ID: set_user_ptr-1
+:CUSTOM_ID set_user_ptr-1
+:END:
+结束:
 
 #+BEGIN_EXAMPLE
-    void set_user_finalizer (emacs_env *env, emacs_value value,
-     emacs_finalizer fin);
+void set_user_finalizer (emacs_env *env, emacs_value value,
+emacs_finalizer fin);
 #+END_EXAMPLE
 
 =set_user_finalizer= changes the user pointer finalizer wrapped by value to
+=set_user_finalizer=将按值包装的用户指针终结器更改为
 fin. value must be a user pointer object, otherwise Emacs signals an error
+值必须是用户指针对象，否则Emacs将发出错误信号
 of type =wrong-type-argument=. fin can be =NULL= if value doesn't need
+类型= wrong-type-argument =。如果值不需要，fin可以是=NULL=
 custom finalization.
+定制的终结。
 
 =set_user_ptr= is available since GNU Emacs 25.
+=set_user_ptr=自GNU Emacs 25起可用。
 
 *** Quitting
-    :PROPERTIES:
-    :CUSTOM_ID: quitting
-    :END:
+* * *戒烟
+:PROPERTIES:
+属性:
+:CUSTOM_ID: quitting
+:CUSTOM_ID:戒烟
+:END:
+结束:
 
 **** =should_quit=
-     :PROPERTIES:
-     :CUSTOM_ID: should_quit
-     :END:
+* * * * = should_quit =
+:PROPERTIES:
+属性:
+:CUSTOM_ID: should_quit
+:CUSTOM_ID should_quit
+:END:
+结束:
 
 #+BEGIN_EXAMPLE
-    bool should_quit (emacs_env *env);
+bool should_quit (emacs_env *env);
 #+END_EXAMPLE
 
 Long-running operations block Emacs and make it unresponsive. To mitigate
+长时间运行的操作阻塞Emacs并使其无响应。为了减轻
 this, you should from time to time check whether the user has requested a quit
+这样，您应该不时地检查用户是否请求退出
 by hitting C-g. To do this, call the =should_quit= function: it
+按c g。为此，调用=should_quit= function: it
 will return =true= if the user wants to quit. In that case you should return
+将返回=true=如果用户想退出。那样的话，你应该回来
 to Emacs as soon as possible, potentially aborting long-running operations.
+可能会终止长时间运行的操作。
 When a quit is pending after return from a module function, Emacs quits without
+当从模块函数返回后挂起quit时，Emacs将退出
 taking the return value or a possible pending nonlocal exit into account.
+考虑返回值或可能的挂起非本地出口。
 
 If you want to run a synchronous operation that could take a long time,
+如果你想运行一个可能需要很长时间的同步操作，
 consider running it in a worker thread and calling =should_quit= in a loop, for
+考虑在工作线程中运行它，并在循环中调用=should_quit= for
 example using this helper function:
+使用这个帮助函数的例子:
 
 #+BEGIN_EXAMPLE
-    #include <assert.h>
-    #include <errno.h>
-    #include <stdbool.h>
-    #include <time.h>
+#include <assert.h>
+#include <errno.h>
+#include <stdbool.h>
+#include <time.h>
 
-    #include <pthread.h>
+#include <pthread.h>
 
-    #include <timespec.h> /* from Gnulib */
+#include <timespec.h> /* from Gnulib */
 
-    #include <emacs-module.h>
+#include <emacs-module.h>
 
-    static void
-    assert_timespec (struct timespec time)
-    {
-     assert (time.tv_sec >= 0);
-     assert (time.tv_nsec >= 0);
-     assert (time.tv_nsec < TIMESPEC_RESOLUTION);
-    }
+static void
+assert_timespec (struct timespec time)
+{
+assert (time.tv_sec >= 0);
+assert (time.tv_nsec >= 0);
+assert (time.tv_nsec < TIMESPEC_RESOLUTION);
+}
 
-    /* Run the given operation and check at regular intervals whether the user
-     wants to quit. If the operation completed successfully, return true.
-     If the user wants to quit or an error occurred, return false; the caller
-     should then return to Emacs as quickly as possible. */
+/* Run the given operation and check at regular intervals whether the user
+wants to quit. If the operation completed successfully, return true.
+If the user wants to quit or an error occurred, return false; the caller
+should then return to Emacs as quickly as possible. */
 
-    static bool
-    run_with_quit (emacs_env *env, void *(*operation)(void *), void *arg,
-     struct timespec interval, void **result)
-    {
-     pthread_t thread;
-     int status = pthread_create (&thread, NULL, operation, arg);
-     if (status != 0)
-     {
-     emacs_value status_obj = env->make_integer (env, status);
-     emacs_value data
-     = env->funcall (env, env->intern (env, "list"), 1, &status_obj);
-     env->non_local_exit_signal (env, env->intern (env, "pthread-error"),
-     data);
-     return false;
-     }
-     while (true)
-     {
-     /* We have to recalculate the timeout in every iteration to account for
-     clock jumps. */
-     struct timespec now;
-     gettime (&now);
-     assert_timespec (now);
-     struct timespec timeout = timespec_add (now, interval);
-     assert_timespec (timeout);
-     /* pthread_timedjoin_np(3) is only available on GNU/Linux. See
-     https://stackoverflow.com/a/11552244/178761 for a portable
-     replacement. */
-     status = pthread_timedjoin_np (thread, result, &timeout);
-     if (status == ETIMEDOUT)
-     {
-     if (env->should_quit (env))
-     {
-     status = pthread_detach (thread);
-     assert (status == 0);
-     return false;
-     }
-     }
-     else
-     {
-     assert (status == 0);
-     return true;
-     }
-     }
-    }
+static bool
+run_with_quit (emacs_env *env, void *(*operation)(void *), void *arg,
+struct timespec interval, void **result)
+{
+pthread_t thread;
+int status = pthread_create (&thread, NULL, operation, arg);
+if (status != 0)
+{
+emacs_value status_obj = env->make_integer (env, status);
+emacs_value data
+= env->funcall (env, env->intern (env, "list"), 1, &status_obj);
+env->non_local_exit_signal (env, env->intern (env, "pthread-error"),
+data);
+return false;
+}
+while (true)
+{
+/* We have to recalculate the timeout in every iteration to account for
+clock jumps. */
+struct timespec now;
+gettime (&now);
+assert_timespec (now);
+struct timespec timeout = timespec_add (now, interval);
+assert_timespec (timeout);
+/* pthread_timedjoin_np(3) is only available on GNU/Linux. See
+https://stackoverflow.com/a/11552244/178761 for a portable
+replacement. */
+status = pthread_timedjoin_np (thread, result, &timeout);
+if (status == ETIMEDOUT)
+{
+if (env->should_quit (env))
+{
+status = pthread_detach (thread);
+assert (status == 0);
+return false;
+}
+}
+else
+{
+assert (status == 0);
+return true;
+}
+}
+}
 #+END_EXAMPLE
 
 =should_quit= is available since GNU Emacs 26.
+=should_quit=自GNU Emacs 26起可用。
 
 ** C++ compatibility
-   :PROPERTIES:
-   :CUSTOM_ID: c-compatibility
-   :END:
+* * c++兼容性
+:PROPERTIES:
+属性:
+:CUSTOM_ID: c-compatibility
+:CUSTOM_ID c-compatibility
+:END:
+结束:
 
 Emacs modules can be written in C++. When including =emacs-module.h=, all
+Emacs模块可以用c++编写。当包括= emacs-module。h =,
 definitions will get C language linkage. Module functions, initialization
+定义将得到C语言的链接。模块功能,初始化
 functions, and user pointer finalizers must also have C language linkage, and
+函数和用户指针终结器也必须有C语言的链接
 must not throw C++ exceptions. Likewise, module API functions won't throw C++
+不能抛出c++异常。同样，模块API函数也不会抛出c++
 exceptions. If possible, =emacs-module.h= attempts to enforce this requirement
+例外。如果可能的话,= emacs-module。h=尝试强制执行此要求
 by adding =noexcept= to all function prototypes. Please be aware that throwing
+将=noexcept=添加到所有函数原型中。请注意投掷
 an exception from within a function declared as =noexcept= calls
+声明为=noexcept=调用的函数中的异常
 =std::terminate= and aborts the process. Therefore you must catch all C++
+=std::terminate=终止进程。因此你必须掌握所有的c++
 exceptions before returning control to Emacs, for example using a [[https://cppsecrets.blogspot.com/2013/12/using-lippincott-function-for.html][Lippincott
+在将控制返回给Emacs之前出现异常，例如使用[[https://cppsecrets.blogspot.com/2013/12/using-lippincott-function-for.html][Lippincott]
 function]]:
+功能]]:
 
 #+BEGIN_EXAMPLE
-    #include <cstddef>
-    #include <exception>
-    #include <iostream>
-    #include <stdexcept>
+#include <cstddef>
+#include <exception>
+#include <iostream>
+#include <stdexcept>
 
-    #include <emacs-module.h>
+#include <emacs-module.h>
 
-    static void
-    signal_string (emacs_env& env, const char* symbol, const char* what) noexcept
-    {
-     std::size_t length = std::strlen (what);
-     emacs_value data;
-     if (length <= PTRDIFF_MAX)
-     {
-     emacs_value what_object
-     = env.make_string (&env, what, static_cast<std::ptrdiff_t>(length));
-     data = env.funcall (&env, env.intern (&env, "list"), 1, &what_object);
-     }
-     else
-     data = env.intern (&env, "nil");
-     env.non_local_exit_signal (&env, env.intern (&env, symbol), data);
-    }
+static void
+signal_string (emacs_env& env, const char* symbol, const char* what) noexcept
+{
+std::size_t length = std::strlen (what);
+emacs_value data;
+if (length <= PTRDIFF_MAX)
+{
+emacs_value what_object
+= env.make_string (&env, what, static_cast<std::ptrdiff_t>(length));
+data = env.funcall (&env, env.intern (&env, "list"), 1, &what_object);
+}
+else
+data = env.intern (&env, "nil");
+env.non_local_exit_signal (&env, env.intern (&env, symbol), data);
+}
 
-    /* Must be called only while handling an exception. */
-    static void
-    translate_exception (emacs_env& env) noexcept try
-    {
-     throw;
-    }
-    catch (const std::overflow_error& exc)
-    {
-     signal_string (env, "overflow-error", exc.what ());
-    }
-    catch (const std::underflow_error& exc)
-    {
-     signal_string (env, "underflow-error", exc.what ());
-    }
-    catch (const std::range_error& exc)
-    {
-     signal_string (env, "range-error", exc.what ());
-    }
-    catch (const std::out_of_range& exc)
-    {
-     signal_string (env, "args-out-of-range", exc.what ());
-    }
-    catch (const std::bad_alloc& exc)
-    {
-     signal_string (env, "memory-full", exc.what ());
-    }
-    /* If you have more exception types that you’d like to treat specially, add
-     handlers for them here. */
-    catch (const std::exception& exc)
-    {
-     signal_string (env, "error", exc.what ());
-    }
-    catch (...)
-    {
-     signal_string (env, "error", "unknown error");
-    }
+/* Must be called only while handling an exception. */
+static void
+translate_exception (emacs_env& env) noexcept try
+{
+throw;
+}
+catch (const std::overflow_error& exc)
+{
+signal_string (env, "overflow-error", exc.what ());
+}
+catch (const std::underflow_error& exc)
+{
+signal_string (env, "underflow-error", exc.what ());
+}
+catch (const std::range_error& exc)
+{
+signal_string (env, "range-error", exc.what ());
+}
+catch (const std::out_of_range& exc)
+{
+signal_string (env, "args-out-of-range", exc.what ());
+}
+catch (const std::bad_alloc& exc)
+{
+signal_string (env, "memory-full", exc.what ());
+}
+/* If you have more exception types that you’d like to treat specially, add
+handlers for them here. */
+catch (const std::exception& exc)
+{
+signal_string (env, "error", exc.what ());
+}
+catch (...)
+{
+signal_string (env, "error", "unknown error");
+}
 
-    extern "C"
-    {
-    static emacs_value
-    my_module_function (emacs_env* env, std::ptrdiff_t nargs, emacs_value* args,
-     void* data) noexcept try
-    {
-     /* Here you can throw C++ exceptions freely. */
-     std::cout << "Hello world!" << std::endl;
-     throw std::range_error ("something bad happened");
-    }
-    catch (...)
-    {
-     translate_exception (*env);
-     return NULL;
-    }
-    }
+extern "C"
+{
+static emacs_value
+my_module_function (emacs_env* env, std::ptrdiff_t nargs, emacs_value* args,
+void* data) noexcept try
+{
+/* Here you can throw C++ exceptions freely. */
+std::cout << "Hello world!" << std::endl;
+throw std::range_error ("something bad happened");
+}
+catch (...)
+{
+translate_exception (*env);
+return NULL;
+}
+}
 #+END_EXAMPLE
 
 You can also go the other way round, by throwing C++ exceptions whenever
+你也可以反过来，通过抛出c++异常
 there's a nonlocal exit:
+有一个非本地出口:
 
 #+BEGIN_EXAMPLE
-    #include <exception>
+#include <exception>
 
-    #include <emacs-module.h>
+#include <emacs-module.h>
 
-    class nonlocal_exit : public std::exception { };
+class nonlocal_exit : public std::exception { };
 
-    template <typename T> T
-    maybe_throw (emacs_env& env, T value)
-    {
-     if (env.non_local_exit_check (&env) == emacs_funcall_exit_return)
-     return value;
-     else
-     throw nonlocal_exit ();
-    }
+template <typename T> T
+maybe_throw (emacs_env& env, T value)
+{
+if (env.non_local_exit_check (&env) == emacs_funcall_exit_return)
+return value;
+else
+throw nonlocal_exit ();
+}
 #+END_EXAMPLE
 
 Now you can wrap arbitrary environment function calls in =maybe_throw= to have
+现在可以在=maybe_throw= to have中封装任意环境函数调用
 them throw an exception if a nonlocal exit is pending:
+如果一个非本地的退出正在等待，它们会抛出一个异常:
 
 #+BEGIN_EXAMPLE
-    std::intmax_t i = maybe_throw (env, env.extract_integer (&env, v));
+std::intmax_t i = maybe_throw (env, env.extract_integer (&env, v));
 #+END_EXAMPLE
 
 Note that the above Lippincott function continues working without modification:
+注意，以上Lippincott函数继续工作，没有修改:
 if a nonlocal exit is pending it won't be overwritten by the call to
+如果一个非本地出口挂起，它不会被调用覆盖
 =non_local_exit_sigal= in the =catch= clauses.
+=non_local_exit_sigal=在=catch=子句中。
 
 Another option is to get rid of the saturating behavior by completely
+另一种选择是完全消除饱和行为
 translating nonlocal exits into C++ exceptions, including the auxiliary data:
+将非本地出口转换为c++异常，包括辅助数据:
 
 #+BEGIN_EXAMPLE
-    #include <exception>
+#include <exception>
 
-    #include <emacs-module.h>
+#include <emacs-module.h>
 
-    class emacs_signal : public std::exception
-    {
-    public:
-     emacs_signal (emacs_value symbol, emacs_value data) noexcept
-     : symbol_(symbol), data_(data) { }
+class emacs_signal : public std::exception
+{
+public:
+emacs_signal (emacs_value symbol, emacs_value data) noexcept
+: symbol_(symbol), data_(data) { }
 
-     emacs_value symbol () const noexcept { return symbol_; }
-     emacs_value data () const noexcept { return data_; }
+emacs_value symbol () const noexcept { return symbol_; }
+emacs_value data () const noexcept { return data_; }
 
-    private:
-     emacs_value symbol_;
-     emacs_value data_;
-    };
+private:
+emacs_value symbol_;
+emacs_value data_;
+};
 
-    class emacs_throw : public std::exception
-    {
-    public:
-     emacs_throw (emacs_value tag, emacs_value value) noexcept
-     : tag_(tag), value_(value) { }
+class emacs_throw : public std::exception
+{
+public:
+emacs_throw (emacs_value tag, emacs_value value) noexcept
+: tag_(tag), value_(value) { }
 
-     emacs_value tag () const noexcept { return tag_; }
-     emacs_value value () const noexcept { return value_; }
+emacs_value tag () const noexcept { return tag_; }
+emacs_value value () const noexcept { return value_; }
 
-    private:
-     emacs_value tag_;
-     emacs_value value_;
-    };
+private:
+emacs_value tag_;
+emacs_value value_;
+};
 
-    template <typename T> T
-    maybe_throw (emacs_env& env, T value)
-    {
-     emacs_value symbol_or_tag;
-     emacs_value data_or_value;
-     switch (env.non_local_exit_get (&env, &symbol_or_tag, &data_or_value))
-     {
-     case emacs_funcall_exit_return:
-     return value;
-     case emacs_funcall_exit_signal:
-     env.non_local_exit_clear (&env);
-     throw emacs_signal (symbol_or_tag, data_or_value);
-     case emacs_funcall_exit_throw:
-     env.non_local_exit_clear (&env);
-     throw emacs_throw (symbol_or_tag, data_or_value);
-     }
-    }
+template <typename T> T
+maybe_throw (emacs_env& env, T value)
+{
+emacs_value symbol_or_tag;
+emacs_value data_or_value;
+switch (env.non_local_exit_get (&env, &symbol_or_tag, &data_or_value))
+{
+case emacs_funcall_exit_return:
+return value;
+case emacs_funcall_exit_signal:
+env.non_local_exit_clear (&env);
+throw emacs_signal (symbol_or_tag, data_or_value);
+case emacs_funcall_exit_throw:
+env.non_local_exit_clear (&env);
+throw emacs_throw (symbol_or_tag, data_or_value);
+}
+}
 #+END_EXAMPLE
 
 The calls to =non_local_exit_clear= mean that the saturating behavior is gone,
+对=non_local_exit_clear=的调用意味着饱和行为已经消失，
 and environment functions wrapped in =maybe_throw= behave like normal C++
+封装在=maybe_throw=中的环境函数的行为与普通c++类似
 functions. To translate the new exceptions back into nonlocal exits, you have
+功能。要将新的异常转换回非本地出口，您需要
 to handle them in the Lippincott function:
+在Lippincott的职能中处理它们:
 
 #+BEGIN_EXAMPLE
-    static void
-    translate_exception (emacs_env& env) noexcept try
-    {
-     throw;
-    }
-    catch (const emacs_signal& exc)
-    {
-     env.non_local_exit_signal (&env, exc.symbol (), exc.data ());
-    }
-    catch (const emacs_throw& exc)
-    {
-     env.non_local_exit_throw (&env, exc.tag (), exc.value ());
-    }
-    /* Other handlers as above. */
+static void
+translate_exception (emacs_env& env) noexcept try
+{
+throw;
+}
+catch (const emacs_signal& exc)
+{
+env.non_local_exit_signal (&env, exc.symbol (), exc.data ());
+}
+catch (const emacs_throw& exc)
+{
+env.non_local_exit_throw (&env, exc.tag (), exc.value ());
+}
+/* Other handlers as above. */
 #+END_EXAMPLE
 
 ** Caveats and bugs
-   :PROPERTIES:
-   :CUSTOM_ID: caveats-and-bugs
-   :END:
+**注意事项和错误
+:PROPERTIES:
+属性:
+:CUSTOM_ID: caveats-and-bugs
+:CUSTOM_ID caveats-and-bugs
+:END:
+结束:
 
 *** Emacs may jump out of arbitrary code on stack overflow
-    :PROPERTIES:
-    :CUSTOM_ID: emacs-may-jump-out-of-arbitrary-code-on-stack-overflow
-    :END:
+*** Emacs可以跳出堆栈溢出的任意代码
+:PROPERTIES:
+属性:
+:CUSTOM_ID: emacs-may-jump-out-of-arbitrary-code-on-stack-overflow
+:CUSTOM_ID emacs-may-jump-out-of-arbitrary-code-on-stack-overflow
+:END:
+结束:
 
 Emacs installs a signal handler for SIGSEGV that attempts to recover from stack
+Emacs为SIGSEGV安装一个试图从堆栈中恢复的信号处理程序
 overflows using =longjmp=. In modules written in C++, this typically causes
+使用= longjmp =溢出。在用c++编写的模块中，这通常会导致
 undefined behavior; in other modules it will often cause internal data
+未定义的行为;在其他模块中，它常常会导致内部数据
 structures to become silently corrupted. Therefore you should disable this
+结构将无声地损坏。因此，您应该禁用它
 behavior in most cases by resetting the signal handler for SIGSEGV to the
+方法来重新设置SIGSEGV的信号处理程序
 default, which will cause Emacs to terminate on stack overflows.
+默认值，这将导致Emacs在堆栈溢出时终止。
 
 *** When using 32-bit pointers, Emacs may jump out of =non_local_error_get=
-    :PROPERTIES:
-    :CUSTOM_ID: when-using-32-bit-pointers-emacs-may-jump-out-of-non_local_error_get
-    :END:
+***使用32位指针时，Emacs可能跳出=non_local_error_get=
+:PROPERTIES:
+属性:
+:CUSTOM_ID: when-using-32-bit-pointers-emacs-may-jump-out-of-non_local_error_get
+:CUSTOM_ID when-using-32-bit-pointers-emacs-may-jump-out-of-non_local_error_get
+:END:
+结束:
 
 There is a bug in the current Emacs codebase that can cause
+在当前的Emacs代码库中有一个可能导致的bug
 =non_local_error_get= to execute an uncontrollable =longjmp=. However, this
+=non_local_error_get=执行一个不可控的=longjmp=。然而,这
 code path should only get taken in 32-bit processes, so you can prevent it by
+代码路径应该只在32位进程中使用，因此可以通过
 failing compilation if pointers are not 64 bits wide.
+如果指针不是64位宽，则编译失败。
 
 *** Check the size of =emacs_runtime= and =emacs_env= structures
-    :PROPERTIES:
-    :CUSTOM_ID: check-the-size-of-emacs_runtime-and-emacs_env-structures
-    :END:
+***检查=emacs_runtime=和=emacs_env=结构的大小
+:PROPERTIES:
+属性:
+:CUSTOM_ID: check-the-size-of-emacs_runtime-and-emacs_env-structures
+:CUSTOM_ID check-the-size-of-emacs_runtime-and-emacs_env-structures
+:END:
+结束:
 
 Modules compiled with some version of =emacs-module.h= can be loaded into Emacs
+使用某些版本的=emacs-module编译的模块。h=可以加载到Emacs中
 processes using a different version. The Emacs module structure types
+使用不同版本的进程。Emacs模块结构类型
 (=emacs_runtime=, =emacs_env=) are generally binary-compatible (fields never
+(=emacs_runtime=， =emacs_env=)通常是二进制兼容的(字段从不兼容)
 get removed or reordered; adding new fields is guaranteed to increase the
+被移除或重新排序;添加新字段肯定会增加
 structure size), but you have to check in your initialization function that the
+，但您必须在初始化函数中检查
 fields you will access are actually present. The simplest way to achieve this
+您将访问的字段实际上是存在的。这是最简单的方法
 is to compare the dynamic size (the value of the =size= field) against the
+是将动态大小(=size=字段的值)与
 static size, as explained in the example below.
+静态大小，如下例所示。
 
 *** No sentinel values for nonlocal exits
-    :PROPERTIES:
-    :CUSTOM_ID: no-sentinel-values-for-nonlocal-exits
-    :END:
+非本地出口没有标记值
+:PROPERTIES:
+属性:
+:CUSTOM_ID: no-sentinel-values-for-nonlocal-exits
+:CUSTOM_ID no-sentinel-values-for-nonlocal-exits
+:END:
+结束:
 
 Except for =copy_string_contents=, you can't detect whether a module function
+除了=copy_string_contents=之外，您无法检测是否有模块函数
 has requested a nonlocal exit by only looking at its return value.
+仅通过查看其返回值请求非本地退出。
 Specifically, a module function with a return type of =emacs_value= may legally
+具体来说，返回类型为=emacs_value=的模块函数可能是合法的
 return =NULL= whether or not it has returned normally. You have to use the
+return =NULL=是否正常返回。你必须使用
 function =non_local_exit_check= or =non_local_exit_get= to determine whether
+函数=non_local_exit_check=或=non_local_exit_get=确定是否
 there's a pending nonlocal exit.
+有一个挂起的非本地出口。
 
 *** =emacs_value= objects are not real pointers
-    :PROPERTIES:
-    :CUSTOM_ID: emacs_value-objects-are-not-real-pointers
-    :END:
+对象不是真正的指针
+:PROPERTIES:
+属性:
+:CUSTOM_ID: emacs_value-objects-are-not-real-pointers
+:CUSTOM_ID emacs_value-objects-are-not-real-pointers
+:END:
+结束:
 
 The =emacs_value= type is defined as an alias of a structure without
+将=emacs_value= type定义为结构的别名
 definition. However, it's a completely transparent type, and objects of that
+定义。然而，它是一个完全透明的类型和对象
 type don't necessarily point to valid memory. Furthermore, =NULL= may or may
+类型不一定指向有效内存。而且，=NULL= may或may
 not represent a valid Lisp object. Therefore, you must never dereference
+不能表示有效的Lisp对象。因此，你永远不要放弃
 =emacs_value= objects or assign any meaning to its values. You should treat
+=emacs_value=对象或为其值赋任何意义。你应该把
 =emacs_value= as a completely opaque handle type that's only usable as return
+=emacs_value=作为一个完全不透明的句柄类型，只能作为返回使用
 or argument type or module environment functions.
+或参数类型或模块环境函数。
 
 *** When a nonlocal exit is pending, module functions silently do nothing
-    :PROPERTIES:
-    :CUSTOM_ID: when-a-nonlocal-exit-is-pending-module-functions-silently-do-nothing
-    :END:
+***当非本地出口挂起时，模块函数将不执行任何操作
+:PROPERTIES:
+属性:
+:CUSTOM_ID: when-a-nonlocal-exit-is-pending-module-functions-silently-do-nothing
+:CUSTOM_ID when-a-nonlocal-exit-is-pending-module-functions-silently-do-nothing
+:END:
+结束:
 
 There are lots of ways to represent failure modes in code: using C =errno=
+在代码中有很多方法可以表示故障模式:使用C =errno=
 values, C++ exceptions, sum types like Haskell's =Either=, etc. Some of them,
+值、c++异常、Haskell的=Either=等求和类型。他们中的一些人,
 like C's =errno= facility, are stateful: functions don't return errors
+与C的=errno= facility一样，也是有状态的:函数不会返回错误
 directly, but set a global variable that the caller has to check. However,
+但要设置调用者必须检查的全局变量。然而,
 Emacs's nonlocal exit handling approach is quite different from all other known
+Emacs的非本地出口处理方法与所有其他已知的方法非常不同
 approaches: nonlocal exits are represented as per-environment state, but
+方法:非本地出口表示为每个环境状态，但是
 environment functions exhibit saturating behavior: once a nonlocal exit is
+环境函数表现出饱和行为:一旦出现非本地出口
 pending for an environment, all environment functions called for that
+对于一个环境，所有的环境函数都需要挂起它
 environment silently ignore all their arguments (except the environment pointer
+环境悄悄地忽略它们的所有参数(环境指针除外)
 itself) and return an unspecified value. You have to understand the
+返回一个未指定的值。你必须理解
 consequences of this behavior and use the nonlocal exit handling functions
+此行为的后果，并使用非本地出口处理函数
 appropriately.
+适当。
 
 *** Strings passed to =make_string= must be null-terminated
-    :PROPERTIES:
-    :CUSTOM_ID: strings-passed-to-make_string-must-be-null-terminated
-    :END:
+***传递给=make_string=的字符串必须以null结尾
+:PROPERTIES:
+属性:
+:CUSTOM_ID: strings-passed-to-make_string-must-be-null-terminated
+:CUSTOM_ID strings-passed-to-make_string-must-be-null-terminated
+:END:
+结束:
 
 Even though you have to pass the length of the string explicitly to
+即使您必须显式地传递字符串的长度
 =make_string=, the string must still be null-terminated. This is unlike all
+=make_string=，字符串仍然必须以null结尾。这不像所有的
 other C APIs, which either take a null-terminated string or a pointer and a
+其他C api，它们要么接受一个以null结尾的字符串，要么接受一个指针和一个
 length.
+长度。
 
 *** Module functions may not modify the contents of the args array
-    :PROPERTIES:
-    :CUSTOM_ID: module-functions-may-not-modify-the-contents-of-the-args-array
-    :END:
+模块函数不能修改args数组的内容
+:PROPERTIES:
+属性:
+:CUSTOM_ID: module-functions-may-not-modify-the-contents-of-the-args-array
+:CUSTOM_ID module-functions-may-not-modify-the-contents-of-the-args-array
+:END:
+结束:
 
 Module functions receive their arguments in the args parameter. That
+模块函数在args参数中接收它们的参数。那
 parameter is defined as =emacs_value *args=. Even though it's not defined as a
+参数定义为=emacs_value *args=。即使它没有被定义为a
 pointer to =const=, module functions must not modify the array.
+指向=const=的指针，模块函数不能修改数组。
 
 ** Example
-   :PROPERTIES:
-   :CUSTOM_ID: example
-   :END:
+* *的例子
+:PROPERTIES:
+属性:
+:CUSTOM_ID: example
+:CUSTOM_ID:示例
+:END:
+结束:
 
 This is an example that shows how to work around some of the caveats described
+这是一个演示如何绕过所描述的一些警告的示例
 above. It refuses to compile if not in 64-bit mode, checks the sizes of the
+以上。如果不是64位模式，则拒绝编译，并检查
 runtime and environment structures, and resets the signal handler for
+运行时和环境结构，并为其重置信号处理程序
 =SIGSEGV=.
+= SIGSEGV =。
 
 #+BEGIN_EXAMPLE
-    #include <assert.h>
-    #include <limits.h>
-    #include <signal.h>
-    #include <stdalign.h>
-    #include <stddef.h>
-    #include <stdint.h>
+#include <assert.h>
+#include <limits.h>
+#include <signal.h>
+#include <stdalign.h>
+#include <stddef.h>
+#include <stdint.h>
 
-    #include <verify.h> /* from Gnulib */
+#include <verify.h> /* from Gnulib */
 
-    #include <emacs-module.h>
+#include <emacs-module.h>
 
-    /* The next three static assertions check that pointers are 64 bits and
-     properly aligned. This avoids a bug that can cause non_local_exit_get to
-     exit nonlocally by failing compilation if the bug is possible. */
-    verify (CHAR_BIT == 8);
-    verify (sizeof (emacs_value) == 8);
-    verify (alignof (emacs_value) == 8);
+/* The next three static assertions check that pointers are 64 bits and
+properly aligned. This avoids a bug that can cause non_local_exit_get to
+exit nonlocally by failing compilation if the bug is possible. */
+verify (CHAR_BIT == 8);
+verify (sizeof (emacs_value) == 8);
+verify (alignof (emacs_value) == 8);
 
-    /* The actual initialization function. It’s called in a safe regime where all
-     members of env are accessible and nonlocal exits are no longer possible. */
-    static void initialize_module (emacs_env *env);
+/* The actual initialization function. It’s called in a safe regime where all
+members of env are accessible and nonlocal exits are no longer possible. */
+static void initialize_module (emacs_env *env);
 
-    extern int
-    emacs_module_init (struct emacs_runtime *ert)
-    {
-     /* Fail if Emacs is too old. */
-     assert (ert->size > 0);
-     if ((size_t) ert->size < sizeof *ert)
-     return 1;
-     emacs_env *env = ert->get_environment(ert);
-     assert (env->size > 0);
-     if ((size_t) env->size < sizeof *env)
-     return 2;
-     /* Prevent Emacs’s dangerous stack overflow recovery. */
-     if (signal (SIGSEGV, SIG_DFL) == SIG_ERR)
-     return 3;
-     /* From this point on we are reasonably safe and can call the actual
-     initialization routine. */
-     initialize_module (env);
-     /* initialize_module can still use env->non_local_exit_signal to signal
-     errors during initialization. These will cause Emacs to signal even if we
-     return 0 here. */
-     return 0;
-    }
+extern int
+emacs_module_init (struct emacs_runtime *ert)
+{
+/* Fail if Emacs is too old. */
+assert (ert->size > 0);
+if ((size_t) ert->size < sizeof *ert)
+return 1;
+emacs_env *env = ert->get_environment(ert);
+assert (env->size > 0);
+if ((size_t) env->size < sizeof *env)
+return 2;
+/* Prevent Emacs’s dangerous stack overflow recovery. */
+if (signal (SIGSEGV, SIG_DFL) == SIG_ERR)
+return 3;
+/* From this point on we are reasonably safe and can call the actual
+initialization routine. */
+initialize_module (env);
+/* initialize_module can still use env->non_local_exit_signal to signal
+errors during initialization. These will cause Emacs to signal even if we
+return 0 here. */
+return 0;
+}
 #+END_EXAMPLE
 
 ** Module assertions
-   :PROPERTIES:
-   :CUSTOM_ID: module-assertions
-   :END:
+* *模块断言
+:PROPERTIES:
+属性:
+:CUSTOM_ID: module-assertions
+:CUSTOM_ID module-assertions
+:END:
+结束:
 
 You can pass a command-line option =-module-assertions= (or
+您可以传递一个命令行选项=-module-assertion =(或
 =--module-assertions=) to the Emacs binary. If you supply this option, Emacs
+=——module-断言=)到Emacs二进制文件。如果您提供此选项，Emacs
 will perform some additional checks to find violations of the requirements
+将执行一些额外的检查以发现违反需求的情况
 described in this document. A violation (that would otherwise lead to
+在本文档中描述。违规(否则会导致)
 undefined behavior) causes Emacs to print an error message and then abort the
+未定义行为)将导致Emacs打印错误消息，然后中止
 process. You should use this command-line option while you are developing or
+的过程。您应该在开发或时使用此命令行选项
 debugging a module; it can detect misuses of the module API that would
+调试模块;它可以检测模块API的误用
 otherwise be hard to detect manually. Module assertions can't detect all
+否则很难手动检测。模块断言不能检测所有
 specification violations related to modules, so not triggering module
+与模块相关的规范违反，所以没有触发模块
 assertions is not a proof that a module is bug-free. Module assertions slow
+断言并不能证明模块没有bug。模块断言缓慢
 down the interaction between Emacs and modules significantly; therefore you
+显著降低了Emacs与模块之间的交互;所以你
 shouldn't enable them in production.
+不应该在生产中启用它们。
 
 Module assertions are a new type of assertions only for modules; they are
+模块断言是针对模块的一种新型断言;他们是
 different from Lisp assertions (the Lisp =cl-assert= macro), C assertions (the
+与Lisp断言(Lisp =cl-assert=宏)不同，C断言(the
 C =assert= macro), and Emacs source-level assertions (the C =eassert= and
+和Emacs源级断言(C =eassert= and)
 =eassume= macros).
+= eassume =宏)。
 
 ** History
-   :PROPERTIES:
-   :CUSTOM_ID: history
-   :END:
+* *历史
+:PROPERTIES:
+属性:
+:CUSTOM_ID: history
+:CUSTOM_ID:历史
+:END:
+结束:
 
 The module API as presented here was designed by Daniel Colascione and
+这里介绍的模块API是由Daniel Colascione和
 primarily implemented by Aurélien Aptel. You can find the [[https://lists.gnu.org/archive/html/emacs-devel/2015-02/msg00960.html][original design
+主要由Aurelien Aptel实现。您可以找到[[https://lists.gnu.org/archive/html/emacs-devel/2015-02/msg00960.html][原设计]
 document]]
+文档]]
 with some rationales in the =emacs-devel= archives. The current implementation
+在=emacs-devel=归档中有一些基本原理。当前的实现
 differs from the original design in several ways:
+与最初的设计在几个方面不同:
 
 - In the original design, environments are thread-local so that calling an
-  environment function from a different thread than the one owning the
-  environment would be undefined behavior. In the current implementation,
-  you can call environment function from any thread as long as it's the
-  current Emacs Lisp thread; the thread in which the environment was created
-  doesn't matter.
+-在最初的设计中，环境是线程本地的，因此调用
+environment function from a different thread than the one owning the
+环境函数来自不同的线程
+environment would be undefined behavior. In the current implementation,
+环境将是未定义的行为。在当前的实现中，
+you can call environment function from any thread as long as it's the
+您可以从任何线程调用环境函数，只要它是
+current Emacs Lisp thread; the thread in which the environment was created
+当前的Emacs Lisp线程;创建环境的线程
+doesn't matter.
+没关系。
 
 - In the original design, calling most environment functions is undefined
-  behavior if a nonlocal exit is pending. In the current implementation,
-  nonlocal exits saturate: environment functions will ignore their arguments
-  and do nothing if a nonlocal exit is pending.
+-在最初的设计中，调用大多数环境函数是未定义的
+behavior if a nonlocal exit is pending. In the current implementation,
+非本地出口挂起时的行为。在当前的实现中，
+nonlocal exits saturate: environment functions will ignore their arguments
+非本地出口饱和:环境函数将忽略它们的参数
+and do nothing if a nonlocal exit is pending.
+如果非本地出口挂起，则不执行任何操作。
 
 - The original design treats =NULL= as sentinel value for a nonlocal exit.
-  The current implementation has no sentinel values.
+-原始设计将=NULL=作为非本地出口的标记值。
+The current implementation has no sentinel values.
+当前实现没有标记值。
 
 - Instead of a Boolean value to represent nonlocal exits, the current
-  implementation uses a ternary enumeration to deal with =throw= jumps. This
-  unfortunately makes checking for nonlocal exits more verbose, but has the
-  advantage that no special marker object for =throw= is required.
+-代替布尔值来表示非本地出口，当前
+implementation uses a ternary enumeration to deal with =throw= jumps. This
+实现使用三元枚举来处理=throw=跳转。这
+unfortunately makes checking for nonlocal exits more verbose, but has the
+不幸的是，这使检查非本地出口变得更加冗长，但是具有
+advantage that no special marker object for =throw= is required.
+优点是不需要特殊的标记对象=throw=。
 
 - =make_function= allows specifying a documentation string and an additional
-  data argument.
+允许指定一个文档字符串和一个附加的
+data argument.
+数据参数。
 
 - Instead of =int64_t=, the current implementation uses =intmax_t=. In
-  theory this reduces ABI compatibility because =intmax_t= is supposed to be
-  a variable-width integer type; in practice [[https://gcc.gnu.org/bugzilla/show_bug.cgi?id=49595#c2][ABI compatibility appears to be
-  important enough to keep it
-  fixed]].
+-当前实现使用=intmax_t=而不是=int64_t=。在
+theory this reduces ABI compatibility because =intmax_t= is supposed to be
+理论上，这降低了ABI的兼容性，因为=intmax_t=应该是这样的
+a variable-width integer type; in practice [[https://gcc.gnu.org/bugzilla/show_bug.cgi?id=49595#c2][ABI compatibility appears to be
+一种可变宽度整数类型;在实践中[[https://gcc.gnu.org/bugzilla/show_bug.cgi?id=49595#c2][ABI兼容性似乎是
+important enough to keep it
+足够重要来保存它
+fixed]].
+固定]]。
 
 - Instead of =size_t=, the current implementation uses =ptrdiff_t=. This has
-  advantages and disadvantages: on the one hand, =size_t= is more common in
-  existing C APIs so that additional type casts and range checks are
-  required; on the other hand, unsigned integer types have come to be seen
-  more negatively in recent years due to their behavior on overflow.
+-当前实现使用=ptrdiff_t=，而不是=size_t=。这已经
+advantages and disadvantages: on the one hand, =size_t= is more common in
+优点和缺点:一方面，=size_t=在
+existing C APIs so that additional type casts and range checks are
+现有的C api，以便进行额外的类型强制转换和范围检查
+required; on the other hand, unsigned integer types have come to be seen
+要求;另一方面，无符号整数类型开始出现
+more negatively in recent years due to their behavior on overflow.
+近年来，由于它们在溢流上的行为，对溢流的负面影响越来越大。
 
 - =copy_string_contents= signals an error if provided with a too short buffer
-  in the current implementation.
+- =copy_string_contents=如果提供的缓冲区太短，则发出错误信号
+in the current implementation.
+在当前实现中。
 
 - Some functions have slightly different names.
+-有些函数的名称稍有不同。
 
 - The original design doesn't contain the vector access functions or
-  =should_quit=.
-
-
+-原设计不包含矢量访问功能或
+=should_quit=.
+= should_quit =。

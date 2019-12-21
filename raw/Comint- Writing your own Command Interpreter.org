@@ -4,205 +4,335 @@
 #+TAGS: raw
 #+DATE: [2018年 10月 24日 星期三 11:25:58 HKT]
 #+LANGUAGE:  zh-CN
-#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
 
 One of the hallmarks of Emacs is its ability to interface with external processes and add to the user experience with the full coterie of Emacs functionality like syntax highlighting, macros, command history, and so on. This functionality has been in Emacs since time immemorial, yet few people make their own command interpreters -- also known as comint -- in Emacs, fearing that it is either really difficult or not possible.
+Emacs的特点之一是它能够与外部进程交互，并使用Emacs的全部功能(如语法突出显示、宏、命令历史记录等)增加用户体验。这种功能在Emacs中由来已久，但很少有人在Emacs中创建自己的命令解释器(也称为comint)，因为他们担心这可能非常困难或不可能。
 
 It's not surprising people feel this way when you consider how woefully underdocumented this functionality is; the few, scattered references to comint “mode” reveal little, and as a hacker you are forced to use the source, Luke.
+当您考虑到这种功能的文档记录是多么少时，人们有这种感觉并不奇怪;对comint“mode”的零星引用透露的信息很少，作为一个黑客，你不得不使用来源，卢克。
 
 * The Theory
-   :PROPERTIES:
-   :CUSTOM_ID: the-theory
-   :END:
+*理论
+:PROPERTIES:
+属性:
+:CUSTOM_ID: the-theory
+:CUSTOM_ID:理论
+:END:
+结束:
 
 Before I demonstrate how you use comint, a quick briefing -- but rough, as I'm leaving out a few boring steps -- on how it works.
+在我演示如何使用comint之前，先简要介绍一下它的工作原理——但由于我省略了一些无聊的步骤，所以比较粗略。
 
 At its core, you are spawning a process and either redirecting the stdin, stdout and stderr pipes to Emacs; or you use a pseudo-terminal. The choice between the two is governed by =process-connection-type=, but it's unlikely that you would ever want to change that manually.
+在其核心，您正在生成一个进程，并将stdin、stdout和stderr管道重定向到Emacs;或者使用伪终端。两者之间的选择由=process-connection-type=控制，但您不太可能希望手动更改它。
 
 The fundamental building blocks for interacting with processes are =start-process=, for kinda-sorta-asynchronous process calls; and=call-process=, for synchronous process calls.
+与流程交互的基本构件是=start-process=，用于kind -sort -异步流程调用;和=call-process=，用于同步进程调用。
 
 One layer above that and we get to comint with its very pared-down, basic interpreter framework. This is what things like =M-x shell= and the various REPL modes like Python build on. comint has handles all the nitty-gritty stuff like handling input/output; a command history; basic input/output filter hooks; and so on. In other words, it's the perfect thing to build on if you want something interactive but want more than just what comint has to offer. To use comint is very simple: =comint-run= takes one argument, =PROGRAM=, and nothing else; run it with a filepath to your favourite program and watch it fly. For greater configurability, you can use =make-comint-in-buffer=.
+再往上一层，我们就有了精简的基本解释器框架。这就是诸如=M-x shell=和各种REPL模式(如Python)的基础。comint可以处理所有的细节，比如输入/输出;命令历史记录;基本输入/输出过滤器挂钩;等等。换句话说，如果你想要一些交互性的东西，但又不满足于comint所能提供的东西，那么它就是你的基础。使用comint非常简单:=comint-run=只接受一个参数=PROGRAM=，其他什么都不接受;用文件路径运行它到您最喜欢的程序，并看着它飞行。为了更好的配置，您可以使用=make-com -in-buffer=。
 
 *Important caveat about pipe redirection:* Oftentimes programs will detect that you are redirecting its pipes to a dumb terminal or file and it disables its shell prompt; this is extremely frustrating as not all programs detect that it is running inside Emacs by looking for the signature environment variables Emacs will set: =EMACS= and =INSIDE_EMACS=. If that happens you may get lucky and find a flag you can set to force it to run in “interactive” mode -- for example, in Python it's =-i=.
+*关于管道重定向的重要警告:*通常情况下，程序会检测到您正在将其管道重定向到哑终端或文件，并禁用其shell提示;这是非常令人沮丧的，因为并不是所有的程序都通过查找Emacs将设置的签名环境变量来检测它是否在Emacs内部运行:= Emacs =和=INSIDE_EMACS=。如果发生这种情况，您可能会幸运地找到一个可以设置为强制它以“交互”模式运行的标志—例如，在Python中它是=-i=。
 
 One layer above that and we get to things like =M-x shell=, which I've talked about before in Running Shells in Emacs: An Overview.
+上面一层是=M-x shell=，我之前在Emacs:概览中运行shell时提到过。
 
 And finally, you can list all running/open processes by typing =M-x list-processes=.
+最后，您可以通过键入=M-x list-processes=来列出所有正在运行/打开的进程。
 
 * Writing a Comint Mode
-   :PROPERTIES:
-   :CUSTOM_ID: writing-a-comint-mode
-   :END:
+*写Comint模式
+:PROPERTIES:
+属性:
+:CUSTOM_ID: writing-a-comint-mode
+:CUSTOM_ID writing-a-comint-mode
+:END:
+结束:
 
 With that out of the way, let's write some code. I've been playing around with [[http://cassandra.apache.org/][Cassandra]], the database, and like all respectable databases it has a fine commandline interface -- but no Emacs mode! Oh no!
+解决了这个问题之后，让我们编写一些代码。我一直在玩[[http://cassandra.apache.org/][Cassandra]]，数据库，和所有值得尊敬的数据库一样，它有一个很好的命令行界面——但没有Emacs模式!噢,不!
 
 The most important thing about writing a comint mode is that it's very easy to get 80% of the way there, but getting those remaining 20 percentage points is the really difficult part! I'm only doing the 80% here!
+关于编写comint模式，最重要的一点是很容易获得80%的成功，但是剩下的20%才是真正困难的部分!我在这里只做80% !
 
 Let's write one. To start the Cassandra CLI you run the program =cassandra-cli= and you're presented with output similar to this:
+让我们编写一个。要启动Cassandra CLI，你运行程序= Cassandra - CLI =，你得到的输出如下:
 
 #+BEGIN_EXAMPLE
-    $ ./cassandra-cli
-    Connected to: "Test Cluster" on 127.0.0.1/9160
-    Welcome to Cassandra CLI version 1.2.8
+$ ./cassandra-cli
+Connected to: "Test Cluster" on 127.0.0.1/9160
+Welcome to Cassandra CLI version 1.2.8
 
-    Type 'help;' or '?' for help.
-    Type 'quit;' or 'exit;' to quit.
+Type 'help;' or '?' for help.
+Type 'quit;' or 'exit;' to quit.
 
-    [default@unknown] 
+[default@unknown]
 #+END_EXAMPLE
 
 If you run =cassandra-cli= with =comint-run= -- you already have a working, interactive process. It's barebones and simple, but its defaults are reasonable and it will work well enough. If you want to extend it, you have to write your own wrapper function around =make-comint-in-buffer= and write a major mode also. So let's do just that.
+如果您运行=cassandra-cli= with =comint-run=——您已经有一个工作的、交互的流程。这是一个简单的框架，但它的默认值是合理的，并且工作得足够好。如果您想要扩展它，您必须围绕=make-com -in-buffer=编写自己的包装器函数，并编写主模式。我们来做一下。
 
 ** The Comint Template
-    :PROPERTIES:
-    :CUSTOM_ID: the-comint-template
-    :END:
+** Comint模板
+:PROPERTIES:
+属性:
+:CUSTOM_ID: the-comint-template
+:CUSTOM_ID the-comint-template
+:END:
+结束:
 
 #+BEGIN_SRC lisp
-    (defvar cassandra-cli-file-path "/opt/cassandra/bin/cassandra-cli"
-     "Path to the program used by `run-cassandra'")
+# + BEGIN_SRC口齿不清
+(defvar cassandra-cli-file-path "/opt/cassandra/bin/cassandra-cli"
+(defvar cassandra-cli-file-path“/ opt /卡桑德拉/ bin / cassandra-cli”
+"Path to the program used by `run-cassandra'")
+" run-cassandra使用的程序的路径")
 
-    (defvar cassandra-cli-arguments '()
-     "Commandline arguments to pass to `cassandra-cli'")
+(defvar cassandra-cli-arguments '()
+(defvar cassandra-cli-arguments”()
+"Commandline arguments to pass to `cassandra-cli'")
+"传递给' cassandra-cli'的命令行参数")
 
-    (defvar cassandra-mode-map
-     (let ((map (nconc (make-sparse-keymap) comint-mode-map)))
-     ;; example definition
-     (define-key map "\t" 'completion-at-point)
-     map)
-     "Basic mode map for `run-cassandra'")
+(defvar cassandra-mode-map
+(defvar cassandra-mode-map
+(let ((map (nconc (make-sparse-keymap) comint-mode-map)))
+((map (nconc (make-sparse-keymap) com -mode-map))
+;; example definition
+;;示例定义
+(define-key map "t" 'completion-at-point)
+(定义键映射“t”完成于点)
+map)
+地图)
+"Basic mode map for `run-cassandra'")
+" ' run-cassandra'的基本模式图")
 
-    (defvar cassandra-prompt-regexp "^\\(?:\\[[^@]+@[^@]+\\]\\)"
-     "Prompt for `run-cassandra'.")
+(defvar cassandra-prompt-regexp "^\(?:\[[^@]+@[^@]+\]\)"
+(defvar cassandra-prompt-regexp”^ \ (?: \ [[^ @] + @ ^ @] + \] \)”
+"Prompt for `run-cassandra'.")
+“提示‘run-cassandra’。”)
 #+END_SRC
+# + END_SRC
 
 The first thing we need to do is declare some sensible variables so users can change the settings without having to edit the code. The first one is obvious: we need to store a path to =cassandra-cli=, the program we want to run.
+我们需要做的第一件事是声明一些合理的变量，这样用户就可以在不编辑代码的情况下更改设置。第一个很明显:我们需要存储=cassandra-cli=的路径，这是我们想要运行的程序。
 
 The next variable, =cassandra-cli-arguments=, holds an (empty) list of commandline arguments.
+下一个变量=cassandra- clil -arguments=保存命令行参数列表(空)。
 
 The third, is an empty and currently disused mode map for storing our custom keybindings. It is inherited from =comint-mode-map=, so we get the same keys exposed in =comint-mode=.
+第三个是一个空的模式映射，用于存储我们的自定义键绑定。它继承自=comint-mode-map=，因此我们在=comint-mode=中公开了相同的键值。
 
 Finally, we have =cassandra-prompt-regexp=, which holds a regular expression that matches the prompt style Cassandra uses. It so happens that by default it sort-of works already, but it pays to be prepared and it's a good idea to have a regular expression that matches no more than it needs to. Furthermore, as you're probably going to use this code to make your own comint derivatives, you'll probably have to change it anyway.
+最后，我们有= Cassandra -prompt-regexp=，它包含一个与Cassandra使用的提示样式匹配的正则表达式。在默认情况下，它已经工作了，但是准备是有好处的，最好有一个正则表达式，它只匹配它所需要的。此外，由于您可能要使用这些代码来创建自己的comint导数，所以无论如何您可能都要修改它。
 
 #+BEGIN_SRC lisp
-    (defun run-cassandra ()
-     "Run an inferior instance of `cassandra-cli' inside Emacs."
-     (interactive)
-     (let* ((cassandra-program cassandra-cli-file-path)
-     (buffer (comint-check-proc "Cassandra")))
-     ;; pop to the "*Cassandra*" buffer if the process is dead, the
-     ;; buffer is missing or it's got the wrong mode.
-     (pop-to-buffer-same-window
-     (if (or buffer (not (derived-mode-p 'cassandra-mode))
-     (comint-check-proc (current-buffer)))
-     (get-buffer-create (or buffer "*Cassandra*"))
-     (current-buffer)))
-     ;; create the comint process if there is no buffer.
-     (unless buffer
-     (apply 'make-comint-in-buffer "Cassandra" buffer
-     cassandra-program cassandra-cli-arguments)
-     (cassandra-mode))))
+# + BEGIN_SRC口齿不清
+(defun run-cassandra ()
+(defun run-cassandra ()
+"Run an inferior instance of `cassandra-cli' inside Emacs."
+“在Emacs中运行一个低级的‘cassandra-cli’实例。”
+(interactive)
+(互动)
+(let* ((cassandra-program cassandra-cli-file-path)
+(让* ((cassandra-program cassandra-cli-file-path)
+(buffer (comint-check-proc "Cassandra")))
+(缓冲区(comint-check-proc“卡桑德拉”)))
+;; pop to the "*Cassandra*" buffer if the process is dead, the
+;;如果进程已死，则弹出到“*Cassandra*”缓冲区
+;; buffer is missing or it's got the wrong mode.
+;;缓冲区丢失或模式错误。
+(pop-to-buffer-same-window
+(pop-to-buffer-same-window
+(if (or buffer (not (derived-mode-p 'cassandra-mode))
+(if (or buffer (not (-mode-p 'cassandra-mode))
+(comint-check-proc (current-buffer)))
+(comint-check-proc(当前缓冲区)))
+(get-buffer-create (or buffer "*Cassandra*"))
+(get-buffer-create(或buffer“*Cassandra*”))
+(current-buffer)))
+(当前缓冲区)))
+;; create the comint process if there is no buffer.
+;;如果没有缓冲区，则创建comint进程。
+(unless buffer
+(除非缓冲
+(apply 'make-comint-in-buffer "Cassandra" buffer
+(申请" make-com -in-buffer "Cassandra" buffer
+cassandra-program cassandra-cli-arguments)
+cassandra-program cassandra-cli-arguments)
+(cassandra-mode))))
+卡珊德拉(-mode))))
 #+END_SRC
+# + END_SRC
 
 This messy pile of code does some basic housekeeping like re-starting the Cassandra process if you're already in the buffer, or create the buffer if it does not exist. Annoyingly there is a dearth of macros to do stuff like this in the comint library; a shame, as it would cut down on the boilerplate code you need to write. The main gist of this function is the =apply= call taking =make-comint-in-buffer= as the function. Quite honestly, a direct call to =make-comint-in-buffer= would suffice, but you lose out on niceties like restartable processes and so on; but if you're writing a comint-derived mode for personal use you may not care about that sort of stuff.
+这堆杂乱的代码做了一些基本的整理工作，比如重新启动Cassandra进程(如果已经在缓冲区中)，或者创建缓冲区(如果缓冲区不存在)。令人恼火的是，在comint库中缺少这样的宏;遗憾的是，这将减少您需要编写的样板代码。这个函数的主要要点是=apply= call take =make-com -in-buffer=作为函数。坦白地说，直接调用=make-com -in-buffer=就足够了，但是您会丢失一些细节，比如可重新启动的进程等等;但是如果你写的是一种基于comint的模式供个人使用，你可能不会关心这些东西。
 
 #+BEGIN_SRC lisp
-    (defun cassandra--initialize ()
-     "Helper function to initialize Cassandra"
-     (setq comint-process-echoes t)
-     (setq comint-use-prompt-regexp t))
+# + BEGIN_SRC口齿不清
+(defun cassandra--initialize ()
+(defun卡桑德拉——初始化()
+"Helper function to initialize Cassandra"
+"帮助函数初始化Cassandra"
+(setq comint-process-echoes t)
+(setq comint-process-echoes t)
+(setq comint-use-prompt-regexp t))
+(setq comint-use-prompt-regexp t))
 
-    (define-derived-mode cassandra-mode comint-mode "Cassandra"
-     "Major mode for `run-cassandra'.
+(define-derived-mode cassandra-mode comint-mode "Cassandra"
+定义导出模式Cassandra模式cominta模式“Cassandra”
+"Major mode for `run-cassandra'.
+' run-cassandra'的主要模式。
 
-    \\<cassandra-mode-map>"
-     nil "Cassandra"
-     ;; this sets up the prompt so it matches things like: [foo@bar]
-     (setq comint-prompt-regexp cassandra-prompt-regexp)
-     ;; this makes it read only; a contentious subject as some prefer the
-     ;; buffer to be overwritable.
-     (setq comint-prompt-read-only t)
-     ;; this makes it so commands like M-{ and M-} work.
-     (set (make-local-variable 'paragraph-separate) "\\'")
-     (set (make-local-variable 'font-lock-defaults) '(cassandra-font-lock-keywords t))
-     (set (make-local-variable 'paragraph-start) cassandra-prompt-regexp))
+\<cassandra-mode-map>"
+\ < cassandra-mode-map >”
+nil "Cassandra"
+零"卡"
+;; this sets up the prompt so it matches things like: [foo@bar]
+;;这将设置提示符，使其匹配以下内容:[foo@bar]
+(setq comint-prompt-regexp cassandra-prompt-regexp)
+(setq comint-prompt-regexp cassandra-prompt-regexp)
+;; this makes it read only; a contentious subject as some prefer the
+;;这使得它只能读;这是一个有争议的话题
+;; buffer to be overwritable.
+;;缓冲区可重写。
+(setq comint-prompt-read-only t)
+(setq comint-prompt-read-only t)
+;; this makes it so commands like M-{ and M-} work.
+;;这使得它可以像M-{和M-}那样工作。
+(set (make-local-variable 'paragraph-separate) "\'")
+(设置(make-local-variable paragraph-separate)“\”)
+(set (make-local-variable 'font-lock-defaults) '(cassandra-font-lock-keywords t))
+(设置(make-local-variable font-lock-defaults)”(cassandra-font-lock-keywords t))
+(set (make-local-variable 'paragraph-start) cassandra-prompt-regexp))
+(set (make-local-variable’分段-开始)
 
-    ;; this has to be done in a hook. grumble grumble.
-    (add-hook 'cassandra-mode-hook 'cassandra--initialize)
+;; this has to be done in a hook. grumble grumble.
+;;这必须在一个钩子上完成。抱怨抱怨。
+(add-hook 'cassandra-mode-hook 'cassandra--initialize)
+(add-hook cassandra-mode-hook卡桑德拉——初始化)
 #+END_SRC
+# + END_SRC
 
 And finally, we have our major mode definition. Observe that we derive from =comint-mode=. I overwrite the default =comint-prompt-regexp= with our own, and I force the prompt to be read only also. I add a mode hook and set =comint-process-echoes= to =t= to avoid duplicating the input we write on the screen. And finally, I tweak the paragraph settings so you can navigate between each prompt with =M-{= and =M-}=.
+最后，我们有了主要的模式定义。注意，我们从=comint-mode=导出。我用我们自己的方法覆盖了默认的=comint-prompt-regexp=，并且我强制提示也只能读取。我添加了一个模式钩子和set =com -process-echo = to =t=，以避免重复我们在屏幕上写入的输入。最后，我调整了段落设置，这样您就可以在每个提示符之间使用=M-{=和=M-}=进行导航。
 
 And.. that's more or less it for the template. It's trivial to tweak it to your own needs and it's a good place to start.
+和. .这或多或少就是模板。根据自己的需要进行调整是很简单的，这是一个很好的开始。
 
 Let's add some cool functionality to our cassandra-mode: basic syntax highlighting.
+让我们在cassandra模式中添加一些很酷的功能:基本语法高亮显示。
 
 ** Extending Cassandra Mode
-    :PROPERTIES:
-    :CUSTOM_ID: extending-cassandra-mode
-    :END:
+扩展Cassandra模式
+:PROPERTIES:
+属性:
+:CUSTOM_ID: extending-cassandra-mode
+:CUSTOM_ID extending-cassandra-mode
+:END:
+结束:
 
 The first thing I want to do is add simple syntax highlighting for the commands you get when you run =help;=.
+我要做的第一件事是为运行=help;=时获得的命令添加简单的语法突出显示。
 
 We need to think about some simple rules we can come up with that will highlight stuff. This is the hard bit: coming up with a regular expression for non-regular languages is nigh-on impossible to get right; especially not when you're doing it for a commandline application that spits out all manner of output.
+我们需要想出一些简单的规则来突出重点。难点在于:为非正则语言设计正则表达式几乎是不可能的;特别是当您为一个命令行应用程序执行它时，它会吐出各种各样的输出。
 
 Before we do that though, let's augment our major mode to support syntax highlighting (which is actually known as font locking in Emacs parlance.)
+在此之前，让我们增强主模式以支持语法高亮显示(实际上在Emacs术语中称为字体锁定)。
 
 #+BEGIN_SRC lisp
-    (set (make-local-variable 'font-lock-defaults) '(cassandra-font-lock-keywords t))
+# + BEGIN_SRC口齿不清
+(set (make-local-variable 'font-lock-defaults) '(cassandra-font-lock-keywords t))
+(设置(make-local-variable font-lock-defaults)”(cassandra-font-lock-keywords t))
 #+END_SRC
+# + END_SRC
 
 Add this form to the body of the major mode (next to the existing setq calls) and then add the following form to the top of the file, to hold our font lock rules:
+将此表单添加到主模式的主体(与现有的setq调用相邻)，然后将以下表单添加到文件的顶部，以保持字体锁定规则:
 
 #+BEGIN_SRC lisp
-    (defconst cassandra-keywords
-     '("assume" "connect" "consistencylevel" "count" "create column family"
-     "create keyspace" "del" "decr" "describe cluster" "describe"
-     "drop column family" "drop keyspace" "drop index" "get" "incr" "list"
-     "set" "show api version" "show cluster name" "show keyspaces"
-     "show schema" "truncate" "update column family" "update keyspace" "use"))
+# + BEGIN_SRC口齿不清
+(defconst cassandra-keywords
+(defconst cassandra-keywords
+'("assume" "connect" "consistencylevel" "count" "create column family"
+(“假定”“连接”“一致性级别”“计数”“创建列族”
+"create keyspace" "del" "decr" "describe cluster" "describe"
+创建密钥空间" "del" "decr" "describe cluster" "describe"
+"drop column family" "drop keyspace" "drop index" "get" "incr" "list"
+"drop column family" "drop keyspace" "drop index" "get" "incr" "list"
+"set" "show api version" "show cluster name" "show keyspaces"
+“设置”“显示api版本”“显示集群名称”“显示密钥空间”
+"show schema" "truncate" "update column family" "update keyspace" "use"))
+"show schema" "truncate" "update column family" "update keyspace" "use"))
 
-    (defvar cassandra-font-lock-keywords
-     (list
-     ;; highlight all the reserved commands.
-     `(,(concat "\\_<" (regexp-opt cassandra-keywords) "\\_>") . font-lock-keyword-face))
-     "Additional expressions to highlight in `cassandra-mode'.")
+(defvar cassandra-font-lock-keywords
+(defvar cassandra-font-lock-keywords
+(list
+(列表
+;; highlight all the reserved commands.
+;;突出显示所有保留的命令。
+`(,(concat "\_<" (regexp-opt cassandra-keywords) "\_>") . font-lock-keyword-face))
+(，(concat "\_<" (regexp-opt cassandra-keywords))“\ _ >”)。font-lock-keyword-face))
+"Additional expressions to highlight in `cassandra-mode'.")
+“‘cassandra-mode’中需要强调的额外表达。”)
 #+END_SRC
+# + END_SRC
 
 There is one font lock rule: it highlights all matching keywords that I extracted from the =help;= command.
+有一个字体锁定规则:它突出显示我从=help;=命令中提取的所有匹配关键字。
 
 comint exposes a set of filter function variables that're triggered and run (in order, it's a list) when certain conditions are met:
+comint暴露了一组过滤器函数变量，这些变量在满足某些条件时被触发并运行(按顺序，它是一个列表):
 
 *Variable Name*
+*变量名称*
 
 *Purpose*
+* *目的
 
 =comint-dynamic-complete-functions=
+= comint-dynamic-complete-functions =
 
 List of functions called to perform completion.
+要执行完成的函数列表。
 
 =comint-input-filter-functions=
+= comint-input-filter-functions =
 
 Abnormal hook run before input is sent to the process.
+在将输入发送到进程之前，异常的钩子运行。
 
 =comint-output-filter-functions=
+= comint-output-filter-functions =
 
 Functions to call after output is inserted into the buffer.
+将输出插入缓冲区后要调用的函数。
 
 =comint-preoutput-filter-functions=
+= comint-preoutput-filter-functions =
 
 List of functions to call before inserting Comint output into the buffer.
+在将Comint输出插入缓冲区之前要调用的函数列表。
 
 =comint-redirect-filter-functions=
+= comint-redirect-filter-functions =
 
 List of functions to call before inserting redirected process output.
+插入重定向进程输出之前要调用的函数列表。
 
 =comint-redirect-original-filter-function=
+= comint-redirect-original-filter-function =
 
 The process filter that was in place when redirection is started
+启动重定向时所在的流程筛选器
 
 Another useful variable is =comint-input-sender=, which lets you alter the input string mid-stream. Annoyingly its name is inconsistent with the filter functions above.
+另一个有用的变量是=com -input-sender=，它允许您在流中间更改输入字符串。令人恼火的是，它的名称与上面的过滤器函数不一致。
 
 You can use them to control how input and output is processed and interpreted mid-stream.
+您可以使用它们来控制如何处理输入和输出以及如何解释中间流程。
 
 And there you go: a simple, comint-enabled Cassandra CLI in Emacs.
+这就是:Emacs中一个简单的、支持com的Cassandra CLI。

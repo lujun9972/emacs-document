@@ -4,184 +4,296 @@
 #+TAGS: raw
 #+DATE: [2018年 12月 28日 星期五 16:40:38 HKT]
 #+LANGUAGE:  zh-CN
-#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
 * Searching A Million Lines Of Lisp
-  :PROPERTIES:
-  :CUSTOM_ID: searching-a-million-lines-of-lisp
-  :END:
+搜索一百万个Lisp行
+:PROPERTIES:
+属性:
+:CUSTOM_ID: searching-a-million-lines-of-lisp
+:CUSTOM_ID:搜索-一百万-行- - lisp
+:END:
+结束:
 
-\\
+\
 
 9 minute read
+9分钟阅读
 
 Time for another Emacs adventure!
+是时候再来一次Emacs冒险了!
 
 In Emacs today, there's no way to find all the callers of a function
+在今天的Emacs中，无法找到函数的所有调用者
 or macro. Most Emacsers just grab their favourite text search tool.
+或宏。大多数Emacsers只抓取他们喜欢的文本搜索工具。
 Sadly, dumb text search knows nothing of syntax.
+遗憾的是，哑文本搜索对语法一窍不通。
 
 We can do better. It just wouldn't be Emacs without a little fanatical
+我们可以做得更好。如果没有一点狂热，它就不会是Emacs
 tool building. Let's make this happen.
+构建工具。让我们实现它。
 
 ** Parsing
-   :PROPERTIES:
-   :CUSTOM_ID: parsing
-   :END:
+* *解析
+:PROPERTIES:
+属性:
+:CUSTOM_ID: parsing
+:CUSTOM_ID:解析
+:END:
+结束:
 
 Everyone know how to parse lisp, right? It's just =read=.
+大家都知道如何解析lisp吧?它只是=阅读=。
 
 It turns out that a homoiconic language is hard to parse when you want
+事实证明，当您需要时，同形异义语言是很难解析的
 to know where you found the code in the first place. In a language
+知道你是在哪里找到代码的。的语言
 with a separate AST, the AST type includes file positions. In
+使用单独的AST, AST类型包括文件位置。在
 lisp, you just have... a list. No frills.
+lisp，你只是…一个列表。没有装饰。
 
 I briefly explored writing my own parser before coming to my
+在使用我的语法分析器之前，我简要地研究了编写自己的语法分析器
 senses. Did you know the following is legal elisp?
+感官。你知道以下是合法的elisp吗?
 
 #+BEGIN_EXAMPLE
-    ;; Variables can start with numbers:
-    (let ((0x0 1))
-     ;; And a backquote does not have to immediately precede the
-     ;; expression it's quoting:
-     `
-     ;; foo
-     (+ ,0x0))
+;; Variables can start with numbers:
+(let ((0x0 1))
+;; And a backquote does not have to immediately precede the
+;; expression it's quoting:
+`
+;; foo
+(+ ,0x0))
 #+END_EXAMPLE
 
 Cripes.
+天啊!。
 
 Anyway, I totally ripped off was inspired by similar functionality
+不管怎样，我完全被类似的功能所启发
 in [[https://elpa.gnu.org/packages/el-search.html][el-search]]. =read=
+在[[https://elpa.gnu.org/packages/el-search.html] [el-search]]。=阅读=
 moves point to the end of the expression read, and you can use
+移到表达式末尾的点读，可以使用
 =scan-sexps= to find the beginning. Using this technique
+=scan-sexps=查找开头。使用这种技术
 recursively, you can find the position of every form in a file.
+递归地，你可以找到一个文件中每个表单的位置。
 
 ** Analysing
-   :PROPERTIES:
-   :CUSTOM_ID: analysing
-   :END:
+* *分析
+:PROPERTIES:
+属性:
+:CUSTOM_ID: analysing
+:CUSTOM_ID:分析
+:END:
+结束:
 
 OK, we've parsed our code, preserving positions. Which forms actually
+好的，我们已经解析了代码，保留了位置。这实际上形式
 look like function calls?
+看起来像函数调用?
 
 This requires a little thought. Here are some tricky examples:
+这需要一点思考。这里有一些棘手的例子:
 
 #+BEGIN_EXAMPLE
-    ;; Not references to `foo' as a function.
-    (defun some-func (foo))
-    (lambda (foo))
-    (let (foo))
-    (let ((foo)))
+;; Not references to `foo' as a function.
+(defun some-func (foo))
+(lambda (foo))
+(let (foo))
+(let ((foo)))
 
-    ;; Calls to `foo'.
-    (foo)
-    (lambda (x) (foo))
-    (let (x) (foo))
-    (let ((x (foo))) (foo))
-    (funcall 'foo)
-    ;; Not necessarily a call, but definitely a reference to 
-    ;; the function `foo'.
-    (a-func #'foo)
+;; Calls to `foo'.
+(foo)
+(lambda (x) (foo))
+(let (x) (foo))
+(let ((x (foo))) (foo))
+(funcall 'foo)
+;; Not necessarily a call, but definitely a reference to
+;; the function `foo'.
+(a-func #'foo)
 #+END_EXAMPLE
 
 We can't simply walk the list: =(foo)= may or may not be a function
+我们不能简单地遍历列表:=(foo)=可能是一个函数，也可能不是
 call, depending on context. To model context, we build a ‘path' that
+根据上下文调用。为了建模上下文，我们构建一个“路径”
 describes the contextual position of the current form.
+描述当前窗体的上下文位置。
 
 A path is just a list that shows the first element of all the
+的第一个元素的列表
 enclosing forms, plus our position within it. For example, given the
+包括表格，加上我们的位置。例如，给定
 code =(let (x) (bar) (setq x (foo)))=, we build a path =((setq . 2) (let . 3))= when looking at the =(foo)=.
+代码=(let (x) (bar) (setq x (foo)))=，我们建立一个路径=((setq。2)(让。3))=当查看=(foo)=时。
 
 This gives us enough context to recognise function calls in normal
+这为我们提供了足够的上下文来识别正常情况下的函数调用
 code. “Aha!”, says the experienced lisper. “What about macros?”
+代码。“啊哈!经验丰富的lisper说。“宏呢?”
 
 Well, elisp-refs understands a few common macros. Most macros just
+elisp-refs可以理解一些常见的宏。大多数宏
 evaluate most of their arguments. This means we can just walk the
+评估他们的大多数论点。这意味着我们可以步行
 form and spot most function calls.
+形成并发现大多数函数调用。
 
 This isn't perfect, but it works very well in practice. We also
+这并不完美，但在实践中效果很好。我们也
 provide an =elisp-refs-symbol= command that finds all references to a
+提供一个=elisp-refs-symbol=命令来查找对a的所有引用
 symbol, regardless of its position in forms.
+符号，不论其在形式中的位置。
 
 ** Performance
-   :PROPERTIES:
-   :CUSTOM_ID: performance
-   :END:
+* *性能
+:PROPERTIES:
+属性:
+:CUSTOM_ID: performance
+:CUSTOM_ID:性能
+:END:
+结束:
 
 It turns out that Emacs has a *ton* of elisp. My current instance
+事实证明，Emacs有大量的elisp。我现在的实例
 has loaded three quarters of a million lines of code. Emacs actually
+已经加载了75万行代码。Emacs实际上
 lazily loads files, so that's only the functionality that I use!
+延迟加载文件，所以这只是我使用的功能!
 
 So, uh, a little optimisation was needed. I wrote a benchmark script
+所以，需要一点优化。我编写了一个基准脚本
 and learnt how to make elisp fast.
+并且学会了如何快速制作elisp。
 
 Firstly, *avoid doing work*. elisp-refs needs to calculate form
+首先，避免工作。elisp-refs需要计算表单
 positions, so users can jump to the file at the correct
+位置，以便用户可以在正确的位置跳转到文件
 location. However, if a form doesn't contain any matches, we don't
+的位置。但是，如果表单不包含任何匹配项，则不包含
 need to do this expensive calculation at all.
+需要做这个昂贵的计算。
 
 Secondly, *find shortcuts*. Emacs has a little-known variable
+其次,* *找到捷径。Emacs有一个鲜为人知的变量
 called =read-with-symbol-positions=. This variable reports all the
+称为= read-with-symbol-positions =。此变量报告所有
 symbols read when parsing a form. If we're looking for function calls
+解析表单时读取的符号。如果我们在寻找函数调用
 to =some-func=, and there's no reference to the symbol =some-func=, we
+to =some-func=，这里没有对符号=some-func= we的引用
 can skip that form entirely.
+可以完全跳过那个表单。
 
 Thirdly, *use C functions*. CS algorithms says that building a hash
+第三，*使用C函数*。CS算法说的是建立一个哈希
 map gives you fast lookup. In elisp-refs, we use =assoc= with small
+map提供快速查找。在elisp-refs中，我们使用=assoc= with small
 alists, because C functions are fast and most lists weren't big enough
+因为C函数比较快，而且大多数列表都不够大
 to benefit from the O(1) lookup.
+从O(1)查找中获益。
 
 Fourthly, *write impure functions*. Elisp provides various ways to
+第四，写不纯函数。Elisp提供了各种方法
 preserve the state of the current buffer, particularly
+特别是保持当前缓冲区的状态
 =save-excursion= and =with-current-buffer=. This bookkeeping is
+= save-excursion =和= with-current-buffer =。这簿记
 expensive, so elisp-refs just creates its own temporary buffers and
+代价昂贵，因此elisp-refs只创建它自己的临时缓冲区
 dirties them.
+弄脏。
 
 When all else fails, *cheat*. elisp-refs reports its progress, which
+当其他方法都失败时，*作弊*。elisp-refs报告其进展
 doesn't make it faster, but it certainly feels like it.
+并没有让它变快，但感觉上确实是这样的。
 
 ** Display
-   :PROPERTIES:
-   :CUSTOM_ID: display
-   :END:
+* *显示
+:PROPERTIES:
+属性:
+:CUSTOM_ID: display
+:CUSTOM_ID:显示
+:END:
+结束:
 
 We have something that works, and we can search in all the code in in
+我们有一些有用的东西，我们可以在in中搜索所有的代码
 the current Emacs instance in less than 10 seconds. How do we display
+当前Emacs实例需要不到10秒的时间。我们如何展示
 results?
+结果吗?
 
 [[/assets/refs_proto.png]]
+[[/资产/ refs_proto.png]]
 first prototype, showing the matching forms in isolation
+第一个原型，单独显示匹配的表单
 
 Initially, I just displayed each form in the results buffer. It turns
+最初，我只是在结果缓冲区中显示每个表单。结果
 out that the context is useful, so added the rest of the matching lines
+因为上下文是有用的，所以添加了其余的匹配行
 too. To avoid confusion, I underlined the section of the code that
+了。为了避免混淆，我在代码的…部分划了下划线
 matched the search.
+匹配搜索。
 
 [[/assets/refs_proto2.png]]
+[[/资产/ refs_proto2.png]]
 second prototype, adding context and custom faces
+第二个原型，添加上下文和自定义面
 
 The second prototype also had some custom faces for styling. This was
+第二个原型也有一些定制的样式。这是
 an improvement, but it forces all Emacs theme authors to add support
+这是一个改进，但它强制所有Emacs主题作者添加支持
 for the faces defined in our package.
+对于包中定义的面。
 
 It still didn't work as well as I'd hoped. When I get stuck with UI,
+它仍然没有我希望的那么好。当我遇到UI时，
 I ask ‘what would magit do?'. I decided that magit would take
+我问:“麦琪会怎么做?”我决定magit可以
 advantage of existing Emacs faces.
+现有Emacs的优势。
 
 [[/assets/refs_screenshot.png]]
+[[/资产/ refs_screenshot.png]]
 final UI, using normal syntax highlighting
+最后一个用户界面，使用普通的语法高亮显示
 
 The final version uses standard elisp highlighting, but highlights the
+最终版本使用标准的elisp高亮显示，但高亮显示
 surrounding context as comments. This means it will match your
+将上下文作为注释包围起来。这意味着它将匹配你的
 favourite colour scheme, and new users should find the UI familiar.
+最喜欢的配色方案，新用户应该会发现熟悉的用户界面。
 
 I added a few other flourishes too. You can see that results in the
+我还添加了一些其他的花饰。你可以看到结果
 second prototype were often very indented. The final version unindents
+第二个原型往往是非常缩进。最终的版本是反缩进的
 each result, to make the matches easier to read quickly.
+每个结果，使匹配更容易快速阅读。
 
 ** Wrap-Up
-   :PROPERTIES:
-   :CUSTOM_ID: wrap-up
-   :END:
+* *简讯
+:PROPERTIES:
+属性:
+:CUSTOM_ID: wrap-up
+:CUSTOM_ID:总结
+:END:
+结束:
 
 elisp-refs is [[https://github.com/Wilfred/elisp-refs.el][available on GitHub]], [[http://melpa.org/#/elisp-refs][available on MELPA]], and it's ready for your use! Go forth, and search your elisp!
+elisp-refs是[[https://github.com/Wilfred/elisp-refs.el][可在GitHub上获得]]，[[http://melpa.org/#/elisp-refs][可在MELPA上获得]]，它已经准备好供您使用!走出去，搜索你的elisp!

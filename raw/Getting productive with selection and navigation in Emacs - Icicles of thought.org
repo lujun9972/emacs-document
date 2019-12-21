@@ -4,45 +4,68 @@
 #+TAGS: raw
 #+DATE: [2018年 08月 19日 星期日 18:37:37 CST]
 #+LANGUAGE:  zh-CN
-#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
 This post is intended to primarily benefit people coming from other, so called “modern” editors to Emacs. Emacs veterans are likely to find most of the tips here very elementary.
+这篇文章的主要目的是让来自其他的人，也就是Emacs所谓的“现代”编辑受益。Emacs老手可能会发现这里的大多数技巧都非常基础。
 
 I have observed that many programmers habituated to newer editors have many implicit assumptions about editing workflows which simply don't hold true within Emacs environment and this prevents them from being productive to the fullest extent.
+我注意到，许多习惯了较新的编辑器的程序员对编辑工作流有许多隐含的假设，而这些假设在Emacs环境中并不适用，这妨碍了他们最大限度地提高生产力。
 
 This post primarily focusses on how getting familiar with the concept of =marks= and =regions= in Emacs can result in productive workflows. These concepts, coupled with a few extensions can enable much more pleasurable code-editing workflows not easily achievable in more prevalent “modern” editors.
+这篇文章主要关注如何熟悉Emacs中的=marks=和=regions=的概念，从而产生高效的工作流。这些概念，再加上一些扩展，可以使代码编辑工作流程更加愉快，这在更流行的“现代”编辑器中很难实现。
 
 * Marks and the Mark Ring
-   :PROPERTIES:
-   :CUSTOM_ID: marks-and-the-mark-ring
-   :END:
+*标记和标记环
+:PROPERTIES:
+属性:
+:CUSTOM_ID: marks-and-the-mark-ring
+:CUSTOM_ID marks-and-the-mark-ring
+:END:
+结束:
 
 Perhaps among the first things which we learn when dipping toes into Emacs is that =C-spc= is the keybinding used to select region.
+也许我们在接触Emacs时首先学到的是=C-spc=是用于选择区域的键绑定。
 
 We start a selection with =C-spc=, navigate to the the end of what we want to select, and then trigger a command to do something with the selection eg. Cut using =C-w=, Copy using =M-w= etc.
+我们开始一个选择=C-spc=，导航到我们想要选择的结尾，然后触发一个命令来做一些选择。剪切使用=C-w=，复制使用=M-w=等。
 
 While the above explanation usually suffices to get people started with elementary usage, the [[https://www.gnu.org/software/emacs/manual/html_node/emacs/Setting-Mark.html][concept of marks]] gets lost in the process.
+虽然上面的解释通常足以让人们从基本的用法开始，但是[[https://www.gnu.org/software/emacs/manual/html_node/emacs/settingmark.html][标记的概念]]在这个过程中丢失了。
 
 =C-spc= (or more accurately =set-mark-command= which this is key is bound to by default) actually does two things:
+=C-spc=(或者更准确地说=set-mark-command=默认情况下这个键被绑定到的键)实际上做了两件事:
 
 - Marks the current position of cursor (called [[https://www.gnu.org/software/emacs/manual/html_node/emacs/Point.html][point]])
+-标记光标的当前位置(调用[[https://www.gnu.org/software/emacs/manual/html_node/emacs/Point.html][point]])
 - Activates the region between mark and point
+-激活标记和点之间的区域
 
 Once point has been marked, moving the point by inserting text, navigating etc. changes the active region. This active region, between the point and the mark, is what we see as highlighted. .
+点被标记后，通过插入文本、导航等方式移动该点会改变活动区域。这个活跃的区域，在点和标记之间，是我们所看到的高亮显示。
 
 While this is /superficially/ similar to how selections behave in most other GUI applications, there are some important differences:
+虽然这与其他大多数GUI应用程序中的选择行为相似，但是有一些重要的区别:
 
 ** Commands can operate on invisible regions
-    :PROPERTIES:
-    :CUSTOM_ID: commands-can-operate-on-invisible-regions
-    :END:
+命令可以对不可见区域进行操作
+:PROPERTIES:
+属性:
+:CUSTOM_ID: commands-can-operate-on-invisible-regions
+:CUSTOM_ID commands-can-operate-on-invisible-regions
+:END:
+结束:
 
 A region is highlighted (visible) when it is active. But commands like kill (cut), kill-ring-save (copy) etc. operate on regions and don't care whether or not the region is active. This can be surprising and may appear to be a bug when a =C-w= copies away a large chunk of text even if there is no visible selection on screen.
+当某个区域处于活动状态时，它将突出显示(可见)。但是像kill (cut)、kill-ring-save (copy)等命令对区域进行操作，并不关心该区域是否处于活动状态。这可能令人惊讶，当a =C-w=复制了一大块文本时，即使在屏幕上没有可见的选择，这也可能是一个bug。
 
 While it is [[https://emacs.stackexchange.com/questions/2701/only-allow-kill-ring-save-if-there-is-highlighted-text][possible]] to make Emacs behave like other prevalent editors in this respect, I find the Emacs behavior slightly better.
+虽然在这方面[[https://emacs.stackexchange.com/questions/2701/onallow-kill-save -if- here-is- highlighting -text][可能]]可以使Emacs的行为与其他流行的编辑器类似，但是我发现Emacs的行为稍微好一些。
 
 This is because we can set the mark, continue typing, and then once done use =C-w= to copy the current region. This is useful when we know beforehand that we are going to need what we are typing later, eg. multiple class/interface names which have partially shared names by conventions. We thereby save on the extra navigation that would otherwise be required after typing.
+这是因为我们可以设置标记，继续输入，然后使用=C-w=复制当前区域。这是有用的，当我们事先知道，我们将需要什么，我们键入后，例如。多个类/接口名，根据约定它们具有部分共享的名称。因此，我们节省了额外的导航，否则需要键入后。
 
 Lets say we want to write the following (typescript) code:
+假设我们想要编写以下(typescript)代码:
 
 1
 
@@ -61,20 +84,26 @@ Lets say we want to write the following (typescript) code:
  
 
 class
+类
 
 Foo
+喷火
 
+extens
 extens
 
 React
+反应
 
 .
 
 Component
+组件
 
 <
 
 FooProps
+必选
 
 >
 
@@ -85,8 +114,10 @@ FooProps
  
 
 interface
+接口
 
 FooProps
+必选
 
 {
 
@@ -95,8 +126,10 @@ FooProps
  
 
 We see that there is quite a bit of redundancy in the names. We can utilize the above trick when typing to easily having to retype anything.
+我们可以看到名字中有很多冗余。我们可以利用上面的技巧来轻松地重新输入任何东西。
 
 [[https://lorefnon.tech/wp-content/uploads/2018/07/emacs-1.gif]]
+[[https://lorefnon.tech/wp - content/uploads/2018/07/emacs - 1. - gif]]
 
 1
 
@@ -145,61 +178,83 @@ We see that there is quite a bit of redundancy in the names. We can utilize the 
 23
 
 class
+类
 
-      \^ C-spc => Activate mark
+      ^ C-spc => Activate mark
+^ C-spc =>激活标记
 
  
 
 class Foo
+类Foo
 
-          \^ M-w => Foo has now been killed (copied)
-
- 
-
-class Foo extends React.Component<
-
-                                  \^ C-spc => Activate mark
+          ^ M-w => Foo has now been killed (copied)
+^ M-w = > Foo已经死亡(复制)
 
  
 
 class Foo extends React.Component<
+类Foo扩展了response . component <
 
-                                  \^ C-y => Yank (paste) Foo
+                                  ^ C-spc => Activate mark
+• C-spc = 激活标记
+
+ 
+
+class Foo extends React.Component<
+类Foo扩展了response . component <
+
+                                  ^ C-y => Yank (paste) Foo
+• C-y = 扬克（粘贴）Foo
 
  
 
 class Foo extends React.Component<FooProps
+类Foo扩展了response . component <FooProps
 
-                                          \^ M-w => FooProps has now been killed (copied)
+                                          ^ M-w => FooProps has now been killed (copied)
+• M-w = FooProps 现已被杀死（复制）
 
  
 
 class Foo extends React.Component<FooProps>
+类Foo扩展了response . component <FooProps>
 
  
 
 // Later
+/ /后
 
  
 
 interface
+接口
 
-           \^ C-y => Yank FooProps
+           ^ C-y => Yank FooProps
+^ C-y => Yank FooProps
 
  
 
 interface FooProps {}
+接口必选{}
 
 ** Marks are useful by themselves: for navigation
-    :PROPERTIES:
-    :CUSTOM_ID: marks-are-useful-by-themselves-for-navigation
-    :END:
+**标记本身是有用的:用于导航
+:PROPERTIES:
+属性:
+:CUSTOM_ID: marks-are-useful-by-themselves-for-navigation
+:CUSTOM_ID marks-are-useful-by-themselves-for-navigation
+:END:
+结束:
 
 This is perhaps the *least intuitive* part. Typing =C-u C-spc= jumps to a mark. So frequently it is useful to set a mark /without/ needing a selection. Emacs keeps a buffer local history of marks in a [[https://www.gnu.org/software/emacs/manual/html_node/emacs/Mark-Ring.html][mark ring]].
+这也许是最不直观的部分。输入=C-u C-spc=跳转到一个标记。所以经常设置标记/不需要/不需要选择是有用的。Emacs在[[https://www.gnu.org/software/emacs/manual/html_node/emacs/Mark-Ring.html][标记环]]中保存标记的缓冲区本地历史。
 
 We can use =C-spc C-spc= to mark a point without activating a region.
+我们可以使用=C-spc C-spc=标记一个点而不激活一个区域。
 
 I personally prefer a slightly more old-school approach where I have [[https://www.emacswiki.org/emacs/TransientMarkMode][transient-mark-mode]] disabled by default.
+我个人更喜欢一种稍微老式一点的方法，我在默认情况下禁用了[[https://www.emacswiki.org/emacs/TransientMarkMode][transient-mark-mode]]。
 
 1
 
@@ -210,55 +265,84 @@ I personally prefer a slightly more old-school approach where I have [[https://w
  
 
 (setq deactivate-mark nil)
+(setq deactivate-mark nil)
 
  
 
 In this configuration, the regions are not visible by default, and =C-spc= just sets the mark and does not activate a region.
+在这个配置中，区域在默认情况下是不可见的，=C-spc=只是设置标记，并不激活区域。
 
 It is occassionally convenient to highlight the region which will be selected, and for these cases we can can press =C-spc C-spc=. The double invocation temporarily activates the transient mark mode and active regions become visible.
+这是偶尔方便突出的地区，将被选择，对于这些情况下，我们可以按=C-spc C-spc=。双重调用暂时激活瞬态标记模式，活动区域变得可见。
 
 ** Helm integration
-    :PROPERTIES:
-    :CUSTOM_ID: helm-integration
-    :END:
+融合头盔
+:PROPERTIES:
+属性:
+:CUSTOM_ID: helm-integration
+:CUSTOM_ID helm-integration
+:END:
+结束:
 
 Helm is a sophisticated completion system that vastly overhauls the development workflow in Emacs. This tutorial does not focus on helm, an [[https://tuhdo.github.io/helm-intro.html][excellent one]] has already been written by Tuh Do. Helm requires some getting used to, but once habituated, its somewhat unconventional out-of-order matching system gets the job done a lot faster than other prevalent prefix-based or fuzzy-matching completion systems.
+Helm是一个复杂的完井系统，它极大地改变了Emacs中的开发工作流程。本教程不关注helm，一个[[https://tuhdo.github.io/helm-intro]。已经被Tuh Do写了。Helm需要一些习惯，但是一旦习惯，它的非常规无序匹配系统比其他流行的基于前缀或模糊匹配的完成系统更快地完成工作。
 
 Helm provides a command =helm-mark-ring= which shows all active marks in current buffer, and makes it easy to quickly jump to them. There is an analogous command =helm-all-mark-rings= which shows all marks across buffers.
+Helm提供了一个命令= Helm -mark-ring=，该命令显示当前缓冲区中的所有活动标记，可以方便地快速跳转到它们。还有一个类似的命令=helm-all-mark-rings=，它显示缓冲区之间的所有标记。
 
 [[https://lorefnon.tech/wp-content/uploads/2018/07/Screenshot-from-2018-07-09-01-56-23-1.png]]
+[[https://lorefnon.tech/wp - content/uploads/2018/07/screenshot——从2018 - 07 - 09 - 01 - 56 - 23 - 1. - png]]
 
 While marks are useful for a small number of recent locations, when we are exploring large projects, it is useful to tag points with a name, which are easy to remember and get back to. This is easily done by [[https://www.gnu.org/software/emacs/manual/html_node/emacs/Bookmarks.html][bookmarks]].
+虽然标记对于最近的少量位置是有用的，但是当我们在探索大型项目时，用名称标记点是有用的，这样很容易记住并返回。这很容易通过[[https://www.gnu.org/software/emacs/manual/html_node/emacs/Bookmarks.html][书签]]实现。
 
 Not surprisingly helm provides a way to browse bookmarks too.
+helm也提供了浏览书签的方法，这并不奇怪。
 
 [[https://lorefnon.tech/wp-content/uploads/2018/07/Screenshot-from-2018-07-09-02-00-10-e1531511960485.png]]
+[[https://lorefnon.tech/wp - content/uploads/2018/07/screenshot——从2018 - 07 - 09年10 - 02 - 00 - - e1531511960485.png]]
 
 The bookmark will by default take the name from current region (useful for bookmarking definition sites of symbols in code), or if a region is not active, the current file name.
+默认情况下，书签将使用当前区域的名称(用于在代码中标记符号的定义站点)，如果某个区域不活动，则使用当前文件名。
 
 It is also possible to save points to [[https://www.gnu.org/software/emacs/manual/html_node/emacs/Position-Registers.html][registers]] and access them later, but I don't find myself using them much. Unlike registers, bookmarks are persistend over sessions, and can have descriptive names -- both of which I find desirable when working with larger projects.
+也可以将点保存到[[https://www.gnu.org/software/emacs/manual/html_node/emacs/posiregisters.html][register]]，然后稍后访问它们，但是我发现自己不经常使用它们。与寄存器不同，书签是在会话中持久化的，并且可以有描述性的名称——在处理较大的项目时，这两种名称都是我所需要的。
 
 * More on regions
-   :PROPERTIES:
-   :CUSTOM_ID: more-on-regions
-   :END:
+*更多有关地区
+:PROPERTIES:
+属性:
+:CUSTOM_ID: more-on-regions
+:CUSTOM_ID more-on-regions
+:END:
+结束:
 
 Now that we know about marks, let us focus a bit on regions. As we mentioned above, a region is the area between point and a mark.
+现在我们知道了标记，让我们来关注一下区域。如前所述，区域是点和点之间的面积。
 
 Regions allow us to perform operations on a selection of text. Like the bookmark-set command described above, many commands have special support for active regions when it makes sense to simplify workflow in the context.
+区域允许我们对选择的文本执行操作。与上面描述的bookmark-set命令一样，当需要简化上下文中的工作流时，许多命令对活动区域有特殊的支持。
 
 Browsing Emacs documentation every once in a while is guaranteed to be a rewarding experience.
+每隔一段时间浏览Emacs文档保证是一次有益的体验。
 
 ** Expanding selections
-    :PROPERTIES:
-    :CUSTOM_ID: expanding-selections
-    :END:
+* *扩大选择
+:PROPERTIES:
+属性:
+:CUSTOM_ID: expanding-selections
+:CUSTOM_ID expanding-selections
+:END:
+结束:
 
 In modern editors, we usually select a region by mouse or by use shift+arrow keys and if we realize later that the starting of selection was wrong, maybe we left out a character or a word, woops ! We have to start again.
+在现代的编辑器中，我们通常通过鼠标或shift+方向键来选择一个区域，如果我们后来意识到选择的开始是错误的，可能我们会漏掉一个字符或一个单词，哎呀!我们必须重新开始。
 
 In Emacs this is not the case.
+在Emacs中，情况并非如此。
 
 Once we have a region, between a point and mark, we can use =C-x C-x= to exchange the point and the mark. The relevant command is appropriately called exchange-point-and-mark.
+一旦我们有了一个点和标记之间的区域，我们就可以使用=C-x C-x=来交换点和标记。相关的命令被适当地称为交换点和标记。
 
 1
 
@@ -341,40 +425,51 @@ Once we have a region, between a point and mark, we can use =C-x C-x= to exchang
  
 
 Lorem ipsum dolor sit amet
+罗琳·罗曼
 
-      \^ Cursor
+      ^ Cursor
+^光标
 
  
 
  
 
       Point
+点
 
       |
 
       Mark
+马克
 
       |
 
 Lorem ipsum dolor sit amet
+罗琳·罗曼
 
-      \^ C-spc
+      ^ C-spc
+• C-pc
 
  
 
  
 
       Mark          Point
+标记点
 
       | ----region--|
+——| | - - - - -区域
 
       |             |
 
 Lorem ipsum dolor sit amet
+罗琳·罗曼
 
-         move       \^
+         move       ^
+移动 |
 
          forward ->
+前进 -*
 
  
 
@@ -383,16 +478,20 @@ Lorem ipsum dolor sit amet
  
 
       Mark          Point
+标记点
 
       | ----region--|
+——| | - - - - -区域
 
       |             |
 
 Lorem ipsum dolor sit amet
+罗琳·罗曼
 
-                    \^
+                    ^
 
                     C-x C-x
+C-x C-x
 
  
 
@@ -401,80 +500,123 @@ Lorem ipsum dolor sit amet
  
 
       Point         Mark
+点标记
 
       | ----region--|
+——| | - - - - -区域
 
       |             |
 
 Lorem ipsum dolor sit amet
+罗琳·罗曼
 
  
 
      Point and mark interchanged
+点和标记互换
 
  
 
  
 
 Note that we still effectively have the same region. Exchanging point and mark allows us to grow (or shrink) the region from either ends.
+请注意，我们实际上仍然拥有相同的区域。交换点和标记允许我们从两端扩展(或缩小)区域。
 
 * Expanding and narrowing selections
-   :PROPERTIES:
-   :CUSTOM_ID: expanding-and-narrowing-selections
-   :END:
+*扩大和缩小选择范围
+:PROPERTIES:
+属性:
+:CUSTOM_ID: expanding-and-narrowing-selections
+:CUSTOM_ID expanding-and-narrowing-selections
+:END:
+结束:
 
 Why navigation and selection usually coupled, navigation is not always the best option to expand selection.
+为什么导航和选择通常是耦合的，导航并不总是扩展选择的最佳选择。
 
 Magnar Sveen has written a very useful package [[https://github.com/magnars/expand-region.el][expand-region]] which allows us to create a region from the point and expand it by semantic units.
+Magnar Sveen写了一个非常有用的包[[https://github.com/magnars/expand-region.el][expand-region]]，它允许我们从点创建一个区域，并通过语义单元扩展它。
 
 So first invocation selects a word, and then the next invocation expands the region to a symbol, further to a string, further to the string wrapped in quotes and so on to encompass the whole line and finally the whole buffer.
+因此，第一次调用选择一个单词，然后下一次调用将该区域扩展为符号，进一步扩展为字符串，进一步扩展为用引号括起来的字符串，以此来包围整行，最后是整个缓冲区。
 
 * Rectangular selections
-   :PROPERTIES:
-   :CUSTOM_ID: rectangular-selections
-   :END:
+*矩形选择
+:PROPERTIES:
+属性:
+:CUSTOM_ID: rectangular-selections
+:CUSTOM_ID rectangular-selections
+:END:
+结束:
 
 Emacs also provides a somewhat unique feature for selecting two dimensional [[https://www.gnu.org/software/emacs/manual/html_node/emacs/Rectangles.html][rectangles]] of code. This is useful when working with tabular data, log files etc. as well as when creating ascii art.
+Emacs还提供了一个比较独特的特性来选择代码的二维[[https://www.gnu.org/software/emacs/manual/html_node/emacs/Rectangles.html][rectangles]]。这在处理表格数据、日志文件等时很有用，在创建ascii艺术时也很有用。
 
 [[https://www.gnu.org/software/emacs/manual/html_node/emacs/CUA-Bindings.html][CUA bindings]] come with an enhanced rectangle mode which I prefer over the above.
+[[https://www.gnu.org/software/emacs/manual/html_node/emacs/CUA-Bindings.html][CUA bindings]]带有一个增强的矩形模式，我更喜欢上面的模式。
 
 [[https://lorefnon.tech/wp-content/uploads/2018/07/Screenshot-from-2018-07-09-02-55-30.png]]
+[[https://lorefnon.tech/wp - content/uploads/2018/07/screenshot——从2018 - 07 - 09 - 02 - 55 - 30. - png]]
 
 One great feature here, is the ability to cycle through the corners and expand the rectangles in all directions
+一个伟大的功能，是在这里的能力，循环通过角落和扩大矩形在所有方向
 
 [[https://lorefnon.tech/wp-content/uploads/2018/07/emacs-2.gif]]
+[[https://lorefnon.tech/wp - content/uploads/2018/07/emacs - 2. - gif]]
 
 * Other navigation tips
-   :PROPERTIES:
-   :CUSTOM_ID: other-navigation-tips
-   :END:
+*其他导航提示
+:PROPERTIES:
+属性:
+:CUSTOM_ID: other-navigation-tips
+:CUSTOM_ID other-navigation-tips
+:END:
+结束:
 
 ** Jumping to locations of recent changes
-    :PROPERTIES:
-    :CUSTOM_ID: jumping-to-locations-of-recent-changes
-    :END:
+跳转到最近更改的位置
+:PROPERTIES:
+属性:
+:CUSTOM_ID: jumping-to-locations-of-recent-changes
+:CUSTOM_ID jumping-to-locations-of-recent-changes
+:END:
+结束:
 
 It is often useful to jump to the location where a change was recently made. The appropriately named [[https://www.emacswiki.org/emacs/GotoLastChange][GotoLastChange extension]] is a very useful one that allows us to travel along the locations of edits.
+跳转到最近进行了更改的位置通常是有用的。适当命名的[[https://www.emacswiki.org/emacs/GotoLastChange][GotoLastChange扩展名]]是一个非常有用的扩展名，它允许我们沿着编辑的位置移动。
 
 * Incremental search for navigation
-   :PROPERTIES:
-   :CUSTOM_ID: incremental-search-for-navigation
-   :END:
+*增加导航搜索
+:PROPERTIES:
+属性:
+:CUSTOM_ID: incremental-search-for-navigation
+:CUSTOM_ID incremental-search-for-navigation
+:END:
+结束:
 
 Incremental search (=C-s=) of emacs is really helpful quick navigation. isearch-forward and its regex powered companion isearch-companion-forward quickly become the goto utilities for navigating through large code files.
+emacs的增量搜索(=C-s=)确实有助于快速导航。isearch-forward和它的regex伴侣isearch-companion-forward很快成为在大型代码文件中导航的goto实用程序。
 
 ** ISearch and Marks
-    :PROPERTIES:
-    :CUSTOM_ID: isearch-and-marks
-    :END:
+搜索和标记
+:PROPERTIES:
+属性:
+:CUSTOM_ID: isearch-and-marks
+:CUSTOM_ID isearch-and-marks
+:END:
+结束:
 
 When you start an incremental search, as you type, your cursor will move to the tail end of the next (best) prefix-match.
+当您开始增量搜索时，当您键入时，您的光标将移动到下一个(最佳)前缀匹配的末尾。
 
 When you complete the search with enter, the point where the search started is marked. This makes it possible to quickly jump back to the point from where we originally started entering the isearch query.
+当您使用enter完成搜索时，搜索开始的地方就会被标记出来。这使得我们可以快速地回到最初输入isearch查询的地方。
 
 A common error is to assume that the isearch match is an active region. *It is not.* As should be obvious from the statement above, the region at the point of completion of search, is from the point where started the isearch to the point where the search finished.
+一个常见的错误是假设isearch匹配是一个活动区域。*它不是。从上面的叙述中可以明显看出，搜索结束点的区域是从开始搜索的地方到结束搜索的地方。
 
 It is, however, frequently useful to have the matched content as the region, which can be accomplished by marking the head of the current match. This can be done by using =C-r= to jump to head of current match.
+然而，将匹配的内容作为区域通常是有用的，这可以通过标记当前匹配的头部来实现。这可以通过使用=C-r=跳转到当前匹配的开头来实现。
 
 1
 
@@ -613,203 +755,277 @@ It is, however, frequently useful to have the matched content as the region, whi
 68
 
 class SomeClass extends React.Component {
+类SomeClass扩展React。组件{
 
-\^
+^
 
 Original cursor position
+原光标位置
 
  
 
  
 
 class SomeClass extends React.Component {
+类SomeClass扩展React。组件{
 
-\^
+^
 
 C-s => Initiate isearch
+开始查找
 
  
 
                               Head end of match
+比赛头端
 
                               |  Tail end of match
+| 匹配的尾端
 
                               |  |
 
 class SomeClass extends React.Component {
+类SomeClass扩展React。组件{
 
-        -- type "comp" -->       \^
+        -- type "comp" -->       ^
+-- 键入"Comp"-* |
 
  
 
  
 
 class SomeClass extends React.Component {
+类SomeClass扩展React。组件{
 
-                                 \^ C-r (Without dismissing the search)
+                                 ^ C-r (Without dismissing the search)
+• C-r（不关闭搜索）
 
  
 
  
 
 Mark
+马克
 
 |
 
 class SomeClass extends React.Component {
+类SomeClass扩展React。组件{
 
-                              \^ (point moves to head of match)
+                              ^ (point moves to head of match)
+* （点移动到匹配头）
 
  
 
  
 
 class SomeClass extends React.Component {
+类SomeClass扩展React。组件{
 
-                              \^ C-spc
+                              ^ C-spc
+• C-pc
 
  
 
  
 
 Mark                          Mark
+马克马克
 
 |                             |
 
 class SomeClass extends React.Component {
+类SomeClass扩展React。组件{
 
-                              \^
+                              ^
 
  
 
  
 
 Mark                          Mark
+马克马克
 
 |                             |
 
 class SomeClass extends React.Component {
+类SomeClass扩展React。组件{
 
-                              \^ C-s C-s
+                              ^ C-s C-s
+• C-s C-s
 
  
 
  
 
 Mark                          Mark
+马克马克
 
 |                             |
 
 class SomeClass extends React.Component {
+类SomeClass扩展React。组件{
 
-                                 \^ Point moves to tail end of search
+                                 ^ Point moves to tail end of search
+• 点移动到搜索的尾端
 
  
 
  
 
 Mark                          Mark
+马克马克
 
 |                             |
 
 class SomeClass extends React.Component {
+类SomeClass扩展React。组件{
 
-                                 \^ C-u C-spc
+                                 ^ C-u C-spc
+• C-u C-pcpc
 
  
 
  
 
 Mark                          
+马克
 
 |                            
 
 class SomeClass extends React.Component {
+类SomeClass扩展React。组件{
 
-                              \^ (point -> mark)
+                              ^ (point -> mark)
+* （点 -* 标记）
 
  
 
  
 
 Mark                          
+马克
 
 |                            
 
 class SomeClass extends React.Component {
+类SomeClass扩展React。组件{
 
-                              \^ C-u C-spc
+                              ^ C-u C-spc
+• C-u C-pcpc
 
  
 
  
 
 class SomeClass extends React.Component {
+类SomeClass扩展React。组件{
 
-\^ (point -> mark)
+^ (point -> mark)
+^(点->标记)
 
 In addition to incremental-search, I have found a few other utilities very helpful for navigating through projects:
+除了增量搜索，我还发现了一些其他的实用工具，它们对浏览项目非常有帮助:
 
 ** Helm-swoop
-    :PROPERTIES:
-    :CUSTOM_ID: helm-swoop
-    :END:
+* * Helm-swoop
+:PROPERTIES:
+属性:
+:CUSTOM_ID: helm-swoop
+:CUSTOM_ID helm-swoop
+:END:
+结束:
 
 [[https://github.com/ShingoFukuyama/helm-swoop][Helm swoop]] provides an efficient way to find matches across files. It provides a helm friendly way to rapidly jump to a matching line anywhere in the entire project.
+[[https://github.com/ShingoFukuyama/helm-swoop]]提供了一种跨文件查找匹配项的有效方法。它提供了一种友好的方式，可以在整个项目的任何地方快速跳转到匹配的行。
 
 An example from their [[https://github.com/ShingoFukuyama/helm-swoop][home page]]:
+一个例子来自他们的[[https://github.com/ShingoFukuyama/helm-swoop][主页]]:
 
+[[https://raw.githubusercontent.com/ShingoFukuyama/images/master/helm-swoop.gif]]
 [[https://raw.githubusercontent.com/ShingoFukuyama/images/master/helm-swoop.gif]]
 
 ** Avy
-    :PROPERTIES:
-    :CUSTOM_ID: avy
-    :END:
+* *艾薇
+:PROPERTIES:
+属性:
+:CUSTOM_ID: avy
+:CUSTOM_ID:艾薇
+:END:
+结束:
 
 [[https://github.com/abo-abo/avy][Avy]] provides a novel approach that requires fewer keystrokes than an isearch for jumping to a specific location that is already visible. Usually within three keystrokes we can jump to any location in the visible area of the buffer.
+[[https://github.com/abo-abo/avy][Avy]]提供了一种新的方法，它比直接跳到一个已经可见的特定位置的isearch需要更少的击键。通常在三击键之内，我们可以跳转到缓冲区可见区域的任何位置。
 
 [[https://lorefnon.tech/wp-content/uploads/2018/07/emacs-3.gif]]
+[[https://lorefnon.tech/wp - content/uploads/2018/07/emacs - 3. - gif]]
 
 * Navigating to punctuation
-   :PROPERTIES:
-   :CUSTOM_ID: navigating-to-punctuation
-   :END:
+*使用标点符号
+:PROPERTIES:
+属性:
+:CUSTOM_ID: navigating-to-punctuation
+:CUSTOM_ID navigating-to-punctuation
+:END:
+结束:
 
 In programming contexts it is often useful to navigation to punctuation markers close by. Prolific blogger Xah Lee has shared [[http://ergoemacs.org/emacs/emacs_jump_to_punctuations.html][some snippets]] of elisp for achieving the same.
+在编程上下文中，导航到附近的标点符号通常是有用的。多产的博客作者Xah Lee分享了elisp [[http://ergoemacs.org/emacs/emacs_jump_to_ations.html][一些片段]]，以达到同样的效果。
 
 * Multiple cursors
-   :PROPERTIES:
-   :CUSTOM_ID: multiple-cursors
-   :END:
+*多个游标
+:PROPERTIES:
+属性:
+:CUSTOM_ID: multiple-cursors
+:CUSTOM_ID:多个游标的
+:END:
+结束:
 
 A feature common now a days in many editors is the support for multiple cursors. It is useful to do things like editing the same text occurring multiple times simultaneously.
+现在在许多编辑器中常见的一个特性是支持多个游标。做一些事情是很有用的，比如编辑同一文本同时出现多次。
 
+[[https://i.stack.imgur.com/TLZpd.gif]]
 [[https://i.stack.imgur.com/TLZpd.gif]]
 
 If you are really fond of multi-cursor style editing, Magnar once again has you covered with [[https://github.com/magnars/multiple-cursors.el][multiple-cursors]].
+如果您真的喜欢多光标样式的编辑，Magnar再次为您提供了[[https://github.com/magnars/cursors.el][多光标]]。
 
 I usually prefer a more conventional approach, where we can record an edit action as a macro, and then quickly apply in multiple positions.
+我通常更喜欢一种更传统的方法，我们可以将编辑操作记录为宏，然后快速应用于多个位置。
 
 Emacs Wiki has a [[https://www.emacswiki.org/emacs/KeyboardMacros][good overview]] on usage of macros.
+Emacs Wiki有一个关于宏用法的[[https://www.emacswiki.org/emacs/KeyboardMacros][很好的概述]]。
 
 The advantage over the multiple-cursor approach in that it is much more powerful and composable with any of the navigation patterns described above.
+与多游标方法相比，它的优点是更强大，并且可以与上面描述的任何导航模式组合。
 
 For instance, once a macro has been recorded, it is trivial to use =avy= to jump to the end of the third word starting with a, and then apply the macro there.
+例如，一旦记录了一个宏，使用=avy=跳到以a开头的第三个单词的末尾，然后在那里应用宏，这是很简单的。
 
 The disadvantage of course is that it requires slightly more keystrokes, but often the flexibility is worth it.
+当然，它的缺点是需要更多的击键，但是灵活性通常是值得的。
 
 Another utility I occasionally use is [[https://github.com/wence-/elisp/blob/master/multi-region.el][multi-region]] which makes it very easy to mark multiple regions of text and then run a command scoped to each region.
+我偶尔使用的另一个实用程序是[[https://github.com/w/elisp/blob/master/multi -region.el][multi-region]]，这使得标记多个文本区域非常容易，然后运行一个作用域为每个区域的命令。
 
 * Further resources
-   :PROPERTIES:
-   :CUSTOM_ID: further-resources
-   :END:
+*更多的资源
+:PROPERTIES:
+属性:
+:CUSTOM_ID: further-resources
+:CUSTOM_ID:资源
+:END:
+结束:
 
 Of course, Emacs is famously a “self-documenting” editor. So =M-x help-with-tutorial= and =M-x help= are the definitive resources for learning Emacs.
+当然，Emacs是出了名的“自文档化”编辑器。因此=M-x help-with-tutorial=和=M-x help=是学习Emacs的权威资源。
 
 In addition, following are some great resources I have frequently found useful:
+此外，以下是一些我经常发现有用的资源:
 
 + [[http://pragmaticemacs.com/][Pragmatic Emacs]]
++ [[http://pragmaticemacs.com/][务实Emacs]]
 + [[https://www.emacswiki.org/][Emacs Wiki]]
+Emacs + [[https://www.emacswiki.org/] [Wiki]]
 + [[https://www.masteringemacs.org/][Mastering Emacs]]
-
+掌握Emacs] + [[https://www.masteringemacs.org/] []

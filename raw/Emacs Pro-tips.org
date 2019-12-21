@@ -4,630 +4,915 @@
 #+TAGS: raw
 #+DATE: [2018年 10月 23日 星期二 10:12:34 HKT]
 #+LANGUAGE:  zh-CN
-#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
 
 
 Emacs is a wild beast that takes a while to tame. Read upon the official
+Emacs是一只需要一段时间才能驯服的野兽。阅读官方
 documentation, learn Elisp, check out for the best third-party packages and
+文档，学习Elisp，寻找最好的第三方包
 learn from other users.
+向其他用户学习。
 
 Here follows a selection of subtle best practices on how to set up Emacs as well
+下面是关于如何设置Emacs的一些微妙的最佳实践
 as a selection of my favorite Emacs features. See my [[https://gitlab.com/ambrevar/dotfiles][dotfiles]] for my complete
+作为我最喜欢的Emacs特性的选择。查看我的[[https://gitlab.com/ambrevar/dotfiles]
 configuration.
+配置。
 
 Also see the [[../emacs2/index.html][follow-up article]].
+还要查看[[.. ./emacs2/索引。html][后续文章中]]。
 
 ** Emacsclient and Emacs server (daemon)
-   :PROPERTIES:
-   :CUSTOM_ID: org629126e
-   :END:
+** Emacsclient和Emacs服务器(守护进程)
+:PROPERTIES:
+属性:
+:CUSTOM_ID: org629126e
+:CUSTOM_ID org629126e
+:END:
+结束:
 
 With time the configuration may grow and Emacs can take a while to load,
+随着时间的推移，配置可能会增长，Emacs可能需要一段时间来加载，
 especially when using heavy packages.
+尤其是使用重包装的时候。
 
 Running the daemon will make Emacs load the startup files only once. This allows
+运行这个守护进程将使Emacs只加载一次启动文件。这允许
 Emacs instances to be fired up instantly, with the added benefit of a shared
+可以立即启动Emacs实例，并带来共享的额外好处
 state between instances.
+国家之间的实例。
 
 The simplest way to start the daemon (if not already started) and the instances
+启动守护进程(如果尚未启动)和实例的最简单方法
 is to set your editor as this script:
+将你的编辑器设置为这个脚本:
 
 #+BEGIN_EXAMPLE
-    emacsclient -c -a "" "$@"
+emacsclient -c -a "" "$@"
 #+END_EXAMPLE
 
 The =-a ""= option lets Emacs start a daemon if none was already started. The
+如果还没有启动守护进程，则使用=-a ""=选项让Emacs启动守护进程。的
 command will spawn a new Emacs frame and return immediately, which is usually
+命令将生成一个新的Emacs帧并立即返回，通常是这样的
 what we want.
+我们想要的。
 
 This has some shortcomings however. While forking Emacs in the background is
+然而，这有一些缺点。而分叉Emacs在后台是
 generally a good idea, there are times when it should wait (writing git commit
+通常这是一个好主意，有时应该等待(编写git提交)
 message, web browser fields), others when it should fork. We can create links
+消息，web浏览器字段)，其他什么时候它应该分叉。我们可以创建链接
 to it and parameterize the waiting behaviour depending on the name of the
+属性的名称，并对等待行为进行参数化
 script. Which leads us to the following script: =em= forks and does not return
+脚本。这就导致了下面的脚本:=em= fork并且不返回
 while the =emw= and =emc= links (windowed and console version respectively)
+而=emw=和=emc=链接(分别为窗口版和控制台版)
 return to their caller.
+返回给他们的呼叫者。
 
 #+BEGIN_EXAMPLE
-    if [ "${0##*/}" = "emc" ]; then
-     ## Force terminal mode
-     param="-t"
-    else
-     ## If Emacs cannot start in graphical mode, -c will act just like -t.
-     param="-c"
-     if [ "${0##*/}" != "emw" ] && [ -n "$DISPLAY" ] && [ "$(emacs --batch -Q --eval='(message (if (fboundp '"'"'tool-bar-mode) "X" "TTY"))' 2>&1)" = X ]; then
-        ## Don't wait if not called with "emw" and if Emacs can start in graphical mode.
-        ## The Emacs batch test checks whether it was compiled with GUI suppport.
-        param="$param -n"
-     fi
-    fi
+if [ "${0##*/}" = "emc" ]; then
+## Force terminal mode
+param="-t"
+else
+## If Emacs cannot start in graphical mode, -c will act just like -t.
+param="-c"
+if [ "${0##*/}" != "emw" ] && [ -n "$DISPLAY" ] && [ "$(emacs --batch -Q --eval='(message (if (fboundp '"'"'tool-bar-mode) "X" "TTY"))' 2>&1)" = X ]; then
+## Don't wait if not called with "emw" and if Emacs can start in graphical mode.
+## The Emacs batch test checks whether it was compiled with GUI suppport.
+param="$param -n"
+fi
+fi
 
-    emacsclient "$param" -a "" "$@"
+emacsclient "$param" -a "" "$@"
 #+END_EXAMPLE
 
 The windowed version of Emacs is not restricted by any terminal limitation;
+视窗版本的Emacs不受任何终端限制;
 nonetheless the console version has the advantage of not spawning a new window
+尽管如此，控制台版本有不生成新窗口的优点
 when already running in console.
+当已经在控制台中运行时。
 
 You can then set your environment to your liking, e.g. export =EDITOR=em= and
+然后可以根据自己的喜好设置环境，例如export =EDITOR=em= and
 =VISUAL=emw=: some programs use VISUAL and wait for it to return, while others
+=VISUAL=emw=:一些程序使用VISUAL并等待它返回，而另一些程序使用VISUAL
 use =EDITOR= and need not waiting. This is barely a convention though and some
+使用=编辑器=，不需要等待。这只是一个惯例
 applications will require local adjustments.
+应用程序将需要本地调整。
 
 If you want to pass additional parameters to Emacs, create an =emacs= wrapper
+如果希望将其他参数传递给Emacs，请创建一个= Emacs =包装器
 and place it first in your =PATH=. For instance, say you want to use
+并将其放在=PATH=的前面。例如，假设您想使用
 =--no-site-file= to enforce a vanilla setting on invasive distributions, you can
+=——no-site-file=为了在入侵性发行版上强制使用vanilla设置，您可以这样做
 write the following wrapper:
+写下面的包装:
 
 #+BEGIN_EXAMPLE
-    #!/bin/sh
-    exec /usr/bin/emacs --no-site-file "$@"
+#!/bin/sh
+exec /usr/bin/emacs --no-site-file "$@"
 #+END_EXAMPLE
 
 This will apply to both the daemon and stand-alone instances.
+这将同时应用于守护进程和独立实例。
 
 ** Initialization file architecture
-   :PROPERTIES:
-   :CUSTOM_ID: orgac72560
-   :END:
+初始化文件架构
+:PROPERTIES:
+属性:
+:CUSTOM_ID: orgac72560
+:CUSTOM_ID orgac72560
+:END:
+结束:
 
 It is also wise to reduce the loading time to a minimum, should you start some
+如果你要开始做一些的话，把装载时间减到最少也是明智的
 daemon-independent Emacs instance (e.g. for development purposes).
+独立于守护进程的Emacs实例(例如，出于开发目的)。
 
 There is not one and only way to architecture Emacs initialization files, but
+Emacs初始化文件的架构并不是唯一的方法，但是
 surely so there are some good practices. My personal design tenets:
+当然，也有一些好的做法。我的个人设计原则:
 
 - Minimize Emacs startup time.
+-最小化Emacs启动时间。
 - Keep it simple.
+-保持简单。
 - Don't use configuration frameworks.
+-不要使用配置框架。
 
 Some like to rely on third-party packages to handle the configuration for them.
+有些人喜欢依赖第三方包来为他们处理配置。
 I think it adds a layer of complexity (together with its inevitable bugs) and
+我认为它增加了一层复杂性(以及不可避免的bug)
 reduces flexibility.
+降低了灵活性。
 
 To minimize the startup time, we need to lazy-load the configuration depending
+为了最小化启动时间，我们需要根据情况延迟加载配置
 on the running modes. Everything that is not part of the global configuration
+运行模式。不属于全局配置的所有内容
 can be conditionally loaded.
+可以有条件地加载。
 
 *** Major-modes configuration package
-    :PROPERTIES:
-    :CUSTOM_ID: orge771a4c
-    :END:
+***主模式配置包
+:PROPERTIES:
+属性:
+:CUSTOM_ID: orge771a4c
+:CUSTOM_ID orge771a4c
+:END:
+结束:
 
 Every major-mode related configuration can be moved to its own configuration
+每个主模式相关的配置都可以移动到它自己的配置中
 file which can be loaded:
+可载入的档案:
 
 - just in time when it is needed thanks to =with-eval-after-load=,
+-当需要它时，由于=与-eval-after-load=，
 - and only /once/ thanks to the =require= function.
+只有一次/多亏了=require=函数。
 
 In practice, it boils down to a simple line in =init.el=, e.g. for the C mode:
+实际上，它可以归结为简单的一行In =init。el=，例如:
 
 #+BEGIN_EXAMPLE
-    (with-eval-after-load 'cc-mode (require 'init-cc))
+(with-eval-after-load 'cc-mode (require 'init-cc))
 #+END_EXAMPLE
 
 The first time a C buffer is created, the =c-mode= autoloaded function
+第一次创建C缓冲区时，= C模式=自动加载函数
 =require='s the =cc-mode.el=. When this one is loaded, the =with-eval-after-load=
+=要求= = cc-mode.el =。加载这个时，=with-eval-after-load=
 kicks in and =requires= our additional =init-cc=. The form of
+插入并=require = our additional =init-cc=。的形式
 =with-eval-after-load= is evaluated everytime a C buffer is loaded, thus it is
+=with-eval-after-load=在每次加载C缓冲区时计算，因此
 important to rely on =require= instead of =load= so that we load our
+我们需要依赖=require=而不是=load=来加载
 configuration only once.
+配置只有一次。
 
 The =init-cc.el= file should contain a C-specific global configuration:
+= init-cc。文件应该包含一个c特定的全局配置:
 variables, function definitions, skeletons, etc.
+变量、函数定义、框架等等。
 
 #+BEGIN_EXAMPLE
-    (setq semanticdb-default-save-directory (concat emacs-cache-folder "semanticdb"))
-    (semantic-mode 1)
-    (local-set-key (kbd "<f6>") (recompile))
-    ;; …
+(setq semanticdb-default-save-directory (concat emacs-cache-folder "semanticdb"))
+(semantic-mode 1)
+(local-set-key (kbd "<f6>") (recompile))
+;; …
 
-    ;; Need to end with `provide' so that `require' does not load the file twice.
-    (provide 'init-cc)
+;; Need to end with `provide' so that `require' does not load the file twice.
+(provide 'init-cc)
 #+END_EXAMPLE
 
 Note that =local-set-key= generally sets the mode map globally and is /not/
+注意=local-set-key=通常全局设置模式映射，is /not/
 buffer-local. If it is, it means that the mode is not using the standard mode
+buffer-local。如果是，则意味着该模式没有使用标准模式
 API or it hasn't called =use-local-map=. You should probably report the issue
+或者它没有调用=use-local-map=。你应该报告这个问题
 upstream.
+上游。
 
 Some of your configuration might need to be buffer-local, in which case you must
+您的一些配置可能需要是缓冲本地的，在这种情况下您必须这样做
 add it to the mode hook. Cluttering hooks will slow down buffer creation and can
+将它添加到模式钩子。杂乱的钩子会减慢缓冲区的创建速度
 become a source of confusion, so it is advised to stick to only what requires a
+成为困惑的来源，所以建议只坚持需要a的东西
 hook.
+钩。
 
 #+BEGIN_EXAMPLE
-    (defun go-setup ()
-     (setq indent-tabs-mode t)
-     (set (make-local-variable 'compile-command) (concat "go run " (shell-quote-argument buffer-file-name)))
-     (add-hook 'before-save-hook #'gofmt-before-save nil t))
-    (add-hook 'go-mode-hook #'go-setup)
+(defun go-setup ()
+(setq indent-tabs-mode t)
+(set (make-local-variable 'compile-command) (concat "go run " (shell-quote-argument buffer-file-name)))
+(add-hook 'before-save-hook #'gofmt-before-save nil t))
+(add-hook 'go-mode-hook #'go-setup)
 #+END_EXAMPLE
 
 This last example shows three types of relevant hook use:
+最后一个例子展示了三种相关的钩子使用:
 
 - Set a buffer-local variable. (Those variables whose documentation shows
-  “Automatically becomes buffer-local when set.”, like =indent-tabs-mode=). If
-  not added to a hook, the change would apply to the current buffer only.
-  Global variables can be permanently made buffer-local with the
-  =make-variable-buffer-local= command.
+-设置一个缓冲区局部变量。(文档中显示的变量
+“Automatically becomes buffer-local when set.”, like =indent-tabs-mode=). If
+“设置时自动变成缓冲本地”，比如=indent-tab -mode=)。如果
+not added to a hook, the change would apply to the current buffer only.
+没有添加到挂钩，更改将只适用于当前缓冲区。
+Global variables can be permanently made buffer-local with the
+全局变量可以永久地成为缓冲区局部变量
+=make-variable-buffer-local= command.
+= make-variable-buffer-local =命令。
 - Set a variable to be buffer-local for this mode only and set its value.
-  =compile-command= is global by default: making it buffer-local in the mode
-  hook allows for setting different compile commands for the various buffers in
-  this mode while other modes will keep dealing with a global compile command.
+-设置一个变量为缓冲区本地的唯一模式，并设置其值。
+=compile-command= is global by default: making it buffer-local in the mode
+=compile-command=在默认情况下是全局的:在模式中使其成为缓冲区本地的
+hook allows for setting different compile commands for the various buffers in
+钩子允许为不同的缓冲区设置不同的编译命令
+this mode while other modes will keep dealing with a global compile command.
+此模式而其他模式将继续处理全局编译命令。
 - Make a buffer-local change to a hook thanks to the =LOCAL= parameter of the
-  =add-hook= function. Adding this hook change to the mode hook will effectively
-  apply the hook change to all buffers in this mode while leaving it untouched
-  for other modes.
+方法的=LOCAL=参数将缓冲区本地更改为钩子
+=add-hook= function. Adding this hook change to the mode hook will effectively
+= add-hook =函数。将此钩子更改添加到模式钩子将有效
+apply the hook change to all buffers in this mode while leaving it untouched
+将钩子更改应用于此模式下的所有缓冲区，而不改变它
+for other modes.
+对于其他模式。
 
 Last but not least, refrain from using lambdas in hooks: it makes the
+最后但并非最不重要的是，不要在挂钩中使用lambdas:它使
 documentation and the intention harder to understand, while making it much
+文档和意图更难于理解，但又使其更加复杂
 trickier to use the =remove-hook= function, should you need to alter the hook
+如果需要更改挂钩，则使用=remove-hook=函数会比较麻烦
 interactively.
+交互。
 
 *** Package management
-    :PROPERTIES:
-    :CUSTOM_ID: org045ab4c
-    :END:
+* * *包管理
+:PROPERTIES:
+属性:
+:CUSTOM_ID: org045ab4c
+:CUSTOM_ID org045ab4c
+:END:
+结束:
 
 Third party packages, major modes or not, can be loaded similarly depending on
+第三方包，主要模式或没有，可以加载类似的依赖
 their availability: if the package is not installed, there is no need to parse
+它们的可用性:如果包没有安装，就不需要解析
 its configuration. The procedure is the same:
+它的配置。程序是一样的:
 
 #+BEGIN_EXAMPLE
-    (with-eval-after-load 'lua-mode (require 'init-lua))
+(with-eval-after-load 'lua-mode (require 'init-lua))
 #+END_EXAMPLE
 
 If you want to make a mode immediately available on startup:
+如果你想让一个模式在启动时立即可用:
 
 #+BEGIN_EXAMPLE
-    (when (require 'helm-config nil t) (require 'init-helm))
+(when (require 'helm-config nil t) (require 'init-helm))
 #+END_EXAMPLE
 
 ** Helm
-   :PROPERTIES:
-   :CUSTOM_ID: org777b16a
-   :END:
+* *头盔
+:PROPERTIES:
+属性:
+:CUSTOM_ID: org777b16a
+:CUSTOM_ID org777b16a
+:END:
+结束:
 
 [[https://emacs-helm.github.io/helm/][Helm]] is a UI revolution: It will add incremental narrowing (fuzzy) search
+[[https://emacs-helm.github。io/helm/][helm]是一场用户界面革命:它将增加增量缩小(模糊)搜索
 to... everything!
+……一切!
 
 The concept: instead of listing and selecting, it will list and narrow down as
+它的概念是:不是列出和选择，而是列出并缩小范围
 you type, while sorting by the most relevant results first. Beside, the search
+你先输入，然后根据最相关的结果排序。旁边,搜索
 can be fuzzy, which makes it practical to find things when you do not know the
+可以是模糊的，这使得它在实际找东西的时候不知道吗
 exact name.
+确切的名字。
 
 You can lookup buffers, commands, documentation, files, and more: pretty much
+您可以查找缓冲区、命令、文档、文件以及更多:非常多
 anything that requires a /lookup/. See this [[https://tuhdo.github.io/helm-intro.html][article]] for a more exhaustive
+任何需要/查找/的内容。看到这个[[https://tuhdo.github.io/helm-intro。html][文章]]为更详尽
 presentation.
+演示。
 
 The one killer feature is the ability to search text in your whole project or
+一个杀手功能是搜索文本在您的整个项目或
 file tree. Helm comes with a few /greppers/: grep itself, but it also supports
+文件树。Helm有几个/greppers/: grep本身，但它也支持
 the current version control grepper (e.g. =git grep=) and other tools such as [[http://geoff.greer.fm/ag/][ag]]
+当前版本控制grepper(例如=git grep=)和其他工具，如[[geoff.greer.fm/ag/][ag]]
 and [[https://github.com/monochromegane/the_platinum_searcher][pt]].
+和[[https://github.com/monochromegane/the_platinum_searcher][葡文]]。
 
 The VCS grepper is usually faster than =grep=. I have set the bindings to use
+VCS grepper通常比=grep=更快。我已经设置了要使用的绑定
 the VCS grepper first and to fallback to =ag= when no file in the current folder
+当当前文件夹中没有文件时，返回到=ag=
 is versioned:
+版本:
 
 #+BEGIN_EXAMPLE
-    (defun call-process-to-string (program &rest args)
-     "Call PROGRAM with ARGS and return output."
-     (with-output-to-string
-     (with-current-buffer
-        standard-output
-     (apply 'call-process program nil t nil args))))
+(defun call-process-to-string (program &rest args)
+"Call PROGRAM with ARGS and return output."
+(with-output-to-string
+(with-current-buffer
+standard-output
+(apply 'call-process program nil t nil args))))
 
-    (defun helm-grep-git-or-ag (arg)
-     "Run `helm-grep-do-git-grep' if possible; fallback to `helm-do-grep-ag' otherwise."
-     (interactive "P")
-     (require 'vc)
-     (if (and (vc-find-root default-directory ".git")
-         (or arg (split-string (call-process-to-string "git" "ls-files" "-z") "\0" t)))
-     (helm-grep-do-git-grep arg)
-     (helm-do-grep-ag arg)))
+(defun helm-grep-git-or-ag (arg)
+"Run `helm-grep-do-git-grep' if possible; fallback to `helm-do-grep-ag' otherwise."
+(interactive "P")
+(require 'vc)
+(if (and (vc-find-root default-directory ".git")
+(or arg (split-string (call-process-to-string "git" "ls-files" "-z") "0" t)))
+(helm-grep-do-git-grep arg)
+(helm-do-grep-ag arg)))
 
-    (global-set-key (kbd "C-x G") #'helm-grep-git-or-ag)
+(global-set-key (kbd "C-x G") #'helm-grep-git-or-ag)
 #+END_EXAMPLE
 
 Other features of Helm:
+Helm的其他特点:
 
 - Lookup global variables and functions in current buffer with
-  =helm-semantic-or-imenu=, or for all buffers with =helm-imenu-in-all-buffers=.
+-查找当前缓冲区中的全局变量和函数
+=helm-semantic-or-imenu=, or for all buffers with =helm-imenu-in-all-buffers=.
+=helm-imenu-in-all-buffers=或所有的buffer =helm-imenu-in-all-buffers=。
 - To enable proper fuzzy finding when finding files recursively (=helm-find=),
-  set =helm-findutils-search-full-path= to non-nil.
+-要在递归查找文件时启用适当的模糊查找(=helm-find=)，
+set =helm-findutils-search-full-path= to non-nil.
+set =helm-findutil -search-full-path=非空。
 - Lookup files in the Git project with third-party =helm-ls-git=.
+-在第三方=helm-ls-git=的Git项目中查找文件。
 
-  - Call =yank= to lookup last region.
-  - Use the universal argument to include more to your lookup (e.g. subfolders).
+- Call =yank= to lookup last region.
+-调用=yank=查找最后一个区域。
+- Use the universal argument to include more to your lookup (e.g. subfolders).
+-使用通用参数包括更多到您的查找(例如，子文件夹)。
 
 - Use =C-c C-f= to activate follow mode and navigate through the results to
-  display a complete context.
+-使用=C-c C-f=激活follow模式，并通过结果导航到
+display a complete context.
+显示完整的上下文。
 - Save some helm sessions with =C-x C-s= for later re-use. Edit =grep= buffers
-  with =wgrep= and apply the changes all at once.
+-用=C-x C-s=保存一些helm会话，以便以后重用。编辑= grep =缓冲区
+with =wgrep= and apply the changes all at once.
+使用=wgrep=并同时应用所有更改。
 - Or resume last helm session with =C-x c b=.
+-或在= c -x c - b=时恢复上一届圣盔会议。
 - I like to replace =M-s o= with =helm-occur=, =C-x C-x= with
-  =helm-all-mark-rings=, =M-y= with =helm-show-kill-ring=, etc.
+-我想替换=M-s o= with =helm-occur=， =C-x C-x= with
+=helm-all-mark-rings=, =M-y= with =helm-show-kill-ring=, etc.
+=helm-all-mark-rings=， =M-y= with =helm-show-kill-ring=，等等。
 - Lookup completion suggestions with =helm-company=.
+-查找完成建议=helm-company=。
 - Browse Man page sections with =helm-imenu=.
+-浏览手册页部分=helm-imenu=。
 
 ** Update to latest Emacs version
-   :PROPERTIES:
-   :CUSTOM_ID: org4e15ba0
-   :END:
+**更新到最新的Emacs版本
+:PROPERTIES:
+属性:
+:CUSTOM_ID: org4e15ba0
+:CUSTOM_ID org4e15ba0
+:END:
+结束:
 
 You might like Emacs enough you want it everywhere. And yet sometimes you are
+您可能非常喜欢Emacs，希望它无处不在。但有时你确实是
 forced to use an outdated, crappy system on which you have no administrative
+被迫使用一个过时的，蹩脚的系统，你没有管理
 priviledge.
+特权。
 
 I would not advise sticking to an outdated versions: too many essential features
+我不建议坚持使用过时的版本:太多的基本功能
 and packages rely on recent Emacs.
+包依赖于最近的Emacs。
 
 Thankfully it's easy enough to compile the latest Emacs thanks to its extreme
+幸运的是，由于最新的Emacs的极端特性，它的编译非常简单
 portability and can be installed within the user home folder.
+可移植性，并可以安装在用户的主文件夹。
 
 ** Cache folder
-   :PROPERTIES:
-   :CUSTOM_ID: org661635e
-   :END:
+* *缓存文件夹
+:PROPERTIES:
+属性:
+:CUSTOM_ID: org661635e
+:CUSTOM_ID org661635e
+:END:
+结束:
 
 (Or how to keep your configuration folder clean.)
+(或者如何保持你的配置文件夹整洁。)
 
 Many modes store their cache files in =~/.emacs.d=. I prefer to keep those
+许多模式将缓存文件存储在=~/.emacs.d=中。我还是留着吧
 ephemeral files in =~/.cache/emacs=.
+在=~/.cache/emacs=中的临时文件。
 
 #+BEGIN_EXAMPLE
-    (setq user-emacs-directory "~/.cache/emacs/")
-    (if (not (file-directory-p user-cache-directory))
-     (make-directory user-cache-directory t))
+(setq user-emacs-directory "~/.cache/emacs/")
+(if (not (file-directory-p user-cache-directory))
+(make-directory user-cache-directory t))
 
-    ;; Some files need to be forced to the cache folder.
-    (setq geiser-repl-history-filename (expand-file-name "geiser_history" user-emacs-directory))
-    (setq elfeed-db-directory (expand-file-name "elfeed" user-emacs-directory))
+;; Some files need to be forced to the cache folder.
+(setq geiser-repl-history-filename (expand-file-name "geiser_history" user-emacs-directory))
+(setq elfeed-db-directory (expand-file-name "elfeed" user-emacs-directory))
 
-    ;; Place backup files in specific directory.
-    (setq backup-directory-alist
-     `(("." . ,(expand-file-name "backups" user-emacs-directory))))
+;; Place backup files in specific directory.
+(setq backup-directory-alist
+`(("." . ,(expand-file-name "backups" user-emacs-directory))))
 #+END_EXAMPLE
 
 If you use Semantic, make sure it is started /after/ changing the cache folder
+如果使用Semantic，请确保它是在/在/更改缓存文件夹之后启动的
 since its database is stored there.
+因为它的数据库存储在那里。
 
 ** Streamline indentation
-   :PROPERTIES:
-   :CUSTOM_ID: org0a3e227
-   :END:
+* *简化缩进
+:PROPERTIES:
+属性:
+:CUSTOM_ID: org0a3e227
+:CUSTOM_ID org0a3e227
+:END:
+结束:
 
 I think Emacs has too many options for indentation. Since I have a strong
+我认为Emacs有太多的缩进选项。因为我有坚强
 [[../indentation/index.html][opinion on always using tabs to indent]] (except for Lisp), I “redirect” with
+[[. . /压痕/索引。[意见总是使用制表符缩进]](除了Lisp)，我“重定向”与
 =defvaralias= the mode-specific indentation levels to only one variable, namely
+=defvaralias=特定于模式的缩进级别只有一个变量，即
 =tab-width=.
+=标签=。
 
 #+BEGIN_EXAMPLE
-    (defvaralias 'standard-indent 'tab-width)
-    (setq-default indent-tabs-mode t)
+(defvaralias 'standard-indent 'tab-width)
+(setq-default indent-tabs-mode t)
 
-    ;; Lisp should not use tabs.
-    (mapcar
-     (lambda (hook)
-     (add-hook
-     hook
-     (lambda () (setq indent-tabs-mode nil))))
-     '(lisp-mode-hook emacs-lisp-mode-hook))
+;; Lisp should not use tabs.
+(mapcar
+(lambda (hook)
+(add-hook
+hook
+(lambda () (setq indent-tabs-mode nil))))
+'(lisp-mode-hook emacs-lisp-mode-hook))
 
-    ;; This needs to be set globally since they are defined as local variables and
-    ;; Emacs does not know how to set an alias on a local variable.
-    (defvaralias 'c-basic-offset 'tab-width)
-    (defvaralias 'sh-basic-offset 'tab-width)
+;; This needs to be set globally since they are defined as local variables and
+;; Emacs does not know how to set an alias on a local variable.
+(defvaralias 'c-basic-offset 'tab-width)
+(defvaralias 'sh-basic-offset 'tab-width)
 #+END_EXAMPLE
 
 Add the following to =sh-mode-hook=:
+添加以下内容到=sh-mode-hook=:
 
 #+BEGIN_EXAMPLE
-    (defvaralias 'sh-indentation 'sh-basic-offset)
+(defvaralias 'sh-indentation 'sh-basic-offset)
 #+END_EXAMPLE
 
 The cases of /C/ and /sh/ are special for historical reasons. Other modes
+由于历史原因，/C/和/sh/的情况很特殊。其他模式
 indentation can be corrected as follows:
+压痕可以通过以下方式修正:
 
 #+BEGIN_EXAMPLE
-    (defvaralias 'js-indent-level 'tab-width)
-    (defvaralias 'lua-indent-level 'tab-width)
-    (defvaralias 'perl-indent-level 'tab-width)
+(defvaralias 'js-indent-level 'tab-width)
+(defvaralias 'lua-indent-level 'tab-width)
+(defvaralias 'perl-indent-level 'tab-width)
 #+END_EXAMPLE
 
 ** Elisp “go to definition”
-   :PROPERTIES:
-   :CUSTOM_ID: orgdd00133
-   :END:
+** Elisp“去定义”
+:PROPERTIES:
+属性:
+:CUSTOM_ID: orgdd00133
+:CUSTOM_ID orgdd00133
+:END:
+结束:
 
 Elisp has the =find-variable-at-point= and the =find-function-at-point=
+Elisp具有=find-variable-at-point=和=find-function-at-point=
 functions, yet it does not have a proper =go to definition= command. Not for
+函数，但它没有一个合适的=go to definition=命令。不是为了
 long:
+长:
 
 #+BEGIN_EXAMPLE
-    (defun find-symbol-at-point ()
-     "Find the symbol at point, i.e. go to definition."
-     (interactive)
-     (let ((sym (symbol-at-point)))
-     (if (boundp sym)
-        (find-variable sym)
-     (find-function sym))))
+(defun find-symbol-at-point ()
+"Find the symbol at point, i.e. go to definition."
+(interactive)
+(let ((sym (symbol-at-point)))
+(if (boundp sym)
+(find-variable sym)
+(find-function sym))))
 
-    (define-key lisp-mode-shared-map (kbd "M-.") 'find-symbol-at-point)
+(define-key lisp-mode-shared-map (kbd "M-.") 'find-symbol-at-point)
 #+END_EXAMPLE
 
 ** Smart compilation
-   :PROPERTIES:
-   :CUSTOM_ID: orgd3983ca
-   :END:
+* *智能编译
+:PROPERTIES:
+属性:
+:CUSTOM_ID: orgd3983ca
+:CUSTOM_ID orgd3983ca
+:END:
+结束:
 
 Emacs has a compilation mode that comes in very handy to run arbitrary commands
+Emacs有一个编译模式，可以非常方便地运行任意命令
 over your buffer and navigate the errors back to the source code.
+遍历缓冲区并将错误导航回源代码。
 
 It is not only useful for compilers but also for, say, browsing your own
+它不仅对编译器有用，而且对您自己的浏览器也有用
 programs' debug messages, a linter, etc.
+程序的调试消息、linter等。
 
 Emacs standard behaviour is to store the last used compile command in the global
+Emacs的标准行为是将最后使用的编译命令存储在全局变量中
 variable =compile-command=. Similarly, =compile-history= remembers all compile
+变量=编译命令=。类似地，=compile-history=记住所有的编译
 commands used globally. This is useful if you jump from buffer to buffer and
+命令在全球范围内使用。如果您从一个缓冲区跳到另一个缓冲区，这是非常有用的
 want to run the same compile command for your project without having to switch
+希望为您的项目运行相同的编译命令，而不必切换
 back to a specific buffer.
+返回到特定的缓冲区。
 
 Another approach is to make =compile-command= buffer-local. You'll have to be in
+另一种方法是使=compile-command= buffer-local。你得去
 a specific buffer to run the desired command. In practice, I find myself having
+运行所需命令的特定缓冲区。在实践中，我发现自己有
 to run several buffer-specific commands per project (documentation, linting,
+为每个项目运行几个特定于缓冲区的命令(文档、linting、
 library builds, executable builds, etc.).
+库构建、可执行构建等)。
 
 To use the buffer-local approach, add this to your init file before configuring
+要使用缓冲区本地方法，请在配置之前将其添加到init文件中
 the modes:
+模式:
 
 #+BEGIN_EXAMPLE
-    (eval-after-load 'compile (make-variable-buffer-local 'compile-command))
+(eval-after-load 'compile (make-variable-buffer-local 'compile-command))
 #+END_EXAMPLE
 
 The compile command can be modified per buffer upon request. If you use the
+根据请求，可以对每个缓冲区修改compile命令。如果你使用
 =desktop= mode to save your session, each buffer's command can be restored as
+=desktop= mode要保存会话，可以将每个缓冲区的命令恢复为
 well:
+因为:
 
 #+BEGIN_EXAMPLE
-    (add-to-list 'desktop-locals-to-save 'compile-command)
+(add-to-list 'desktop-locals-to-save 'compile-command)
 #+END_EXAMPLE
 
 Emacs provides two compilation commands:
+Emacs提供了两个编译命令:
 
 - =(compile COMMAND &optional COMINT)= prompts for the command to run when
-  called interactively. A user-defined command can do that with
-  =(call-interactively 'compile)=. Make =compile-command= local to the function
-  scope if you want to run a temporary command.
+- =(编译命令&可选的COMINT)=提示命令何时运行
+called interactively. A user-defined command can do that with
+称为交互。用户定义的命令可以做到这一点
+=(call-interactively 'compile)=. Make =compile-command= local to the function
+= (call-interactively编译)=。Make =compile-command=本地函数
+scope if you want to run a temporary command.
+作用域(如果您想运行临时命令)。
 - =(recompile &optional EDIT-COMMAND)= is handy to recall last command without
-  prompting the user. It has some shortcomings when using a buffer-local
-  =compile-command=:
+- =(recompile &optional EDIT-COMMAND)=可以方便地调用上一个命令
+prompting the user. It has some shortcomings when using a buffer-local
+提示用户。在使用缓冲区本地时，它有一些缺点
+=compile-command=:
+=编译命令=:
 
-  - =compile-history= remains untouched unless we do some manual bookkeeping.
-  - It uses a global =compilation-directory=, thus calling =recompile= in
-    another buffer will fail if the target file is in a different folder. We can
-    make that variable buffer-local, but that would only work if we never use
-    =compile=. In such a scenario, =compile-history= is unused.
+- =compile-history= remains untouched unless we do some manual bookkeeping.
+- =编译历史=保持不变，除非我们做一些手工簿记。
+- It uses a global =compilation-directory=, thus calling =recompile= in
+-它使用全局=编译目录=，因此调用=recompile= in
+another buffer will fail if the target file is in a different folder. We can
+如果目标文件在另一个文件夹中，则另一个缓冲区将失败。我们可以
+make that variable buffer-local, but that would only work if we never use
+将该变量设为缓冲区本地，但只有在我们从不使用时才会起作用
+=compile=. In such a scenario, =compile-history= is unused.
+= =编译。在这种情况下，=compile-history=未使用。
 
 In short: when using a buffer-local =compile-command=, we are better off
+简而言之:当使用buffer-local =compile-command=时，情况会更好
 sticking to =compile= and leaving =recompile= aside.
+坚持=compile=并保留=recompile= aside。
 
 Let's add some bindings for convenience:
+为了方便，我们添加一些绑定:
 
 #+BEGIN_EXAMPLE
-    (defun compile-last-command () (interactive) (compile compile-command))
-    (global-set-key (kbd "C-<f6>") #'compile)
-    (global-set-key (kbd "<f6>") #'compile-last-command)
+(defun compile-last-command () (interactive) (compile compile-command))
+(global-set-key (kbd "C-<f6>") #'compile)
+(global-set-key (kbd "<f6>") #'compile-last-command)
 #+END_EXAMPLE
 
 Here follows a complete example for C: it will look for the closest =Makefile=
+下面是关于C的完整示例:它将查找最接近的=Makefile=
 in the parent folders and set the command to =make -C /path/to/makefile= or else
+在父文件夹中，将命令设置为=make -C /path/to/makefile=或else
 fallback to some dynamically set values depending on the language (C or C++) and
+根据语言(C或c++)和，回退到一些动态设置的值
 the environment (GCC, Clang, etc.). The linker flags are configurable on a
+环境(GCC、Clang等)。链接器标志是可配置的
 per-buffer basis thanks to the buffer-local =cc-ldlibs= and =cc-ldflags=
+每个缓冲区的基础得益于buffer-local =cc-ldlibs=和=cc-ldflags=
 variables.
+变量。
 
 #+BEGIN_EXAMPLE
-    (defvar-local cc-ldlibs "-lm -pthread"
-     "Custom linker flags for C/C++ linkage.")
+(defvar-local cc-ldlibs "-lm -pthread"
+"Custom linker flags for C/C++ linkage.")
 
-    (defvar-local cc-ldflags ""
-     "Custom linker libs for C/C++ linkage.")
+(defvar-local cc-ldflags ""
+"Custom linker libs for C/C++ linkage.")
 
-    (defun cc-set-compiler (&optional nomakefile)
-     "Set compile command to be nearest Makefile or a generic command.
-    The Makefile is looked up in parent folders. If no Makefile is
-    found (or if NOMAKEFILE is non-nil or if function was called with
-    universal argument), then a configurable commandline is
-    provided."
-     (interactive "P")
-     (hack-local-variables)
-     ;; Alternatively, if a Makefile is found, we could change default directory
-     ;; and leave the compile command to "make". Changing `default-directory'
-     ;; could have side effects though.
-     (let ((makefile-dir (locate-dominating-file "." "Makefile")))
-     (if (and makefile-dir (not nomakefile))
-        (setq compile-command (concat "make -k -C " (shell-quote-argument (file-name-directory makefile-dir))))
-     (setq compile-command
-         (let
-            ((c++-p (eq major-mode 'c++-mode))
-             (file (file-name-nondirectory buffer-file-name)))
-         (format "%s %s -o '%s' %s %s %s"
-             (if c++-p
-                 (or (getenv "CXX") "g++")
-                (or (getenv "CC") "gcc"))
-             (shell-quote-argument file)
-             (shell-quote-argument (file-name-sans-extension file))
-             (if c++-p
-                 (or (getenv "CXXFLAGS") "-Wall -Wextra -Wshadow -DDEBUG=9 -g3 -O0")
-                (or (getenv "CFLAGS") "-ansi -pedantic -std=c11 -Wall -Wextra -Wshadow -DDEBUG=9 -g3 -O0"))
-             (or (getenv "LDFLAGS") cc-ldflags)
-             (or (getenv "LDLIBS") cc-ldlibs)))))))
+(defun cc-set-compiler (&optional nomakefile)
+"Set compile command to be nearest Makefile or a generic command.
+The Makefile is looked up in parent folders. If no Makefile is
+found (or if NOMAKEFILE is non-nil or if function was called with
+universal argument), then a configurable commandline is
+provided."
+(interactive "P")
+(hack-local-variables)
+;; Alternatively, if a Makefile is found, we could change default directory
+;; and leave the compile command to "make". Changing `default-directory'
+;; could have side effects though.
+(let ((makefile-dir (locate-dominating-file "." "Makefile")))
+(if (and makefile-dir (not nomakefile))
+(setq compile-command (concat "make -k -C " (shell-quote-argument (file-name-directory makefile-dir))))
+(setq compile-command
+(let
+((c++-p (eq major-mode 'c++-mode))
+(file (file-name-nondirectory buffer-file-name)))
+(format "%s %s -o '%s' %s %s %s"
+(if c++-p
+(or (getenv "CXX") "g++")
+(or (getenv "CC") "gcc"))
+(shell-quote-argument file)
+(shell-quote-argument (file-name-sans-extension file))
+(if c++-p
+(or (getenv "CXXFLAGS") "-Wall -Wextra -Wshadow -DDEBUG=9 -g3 -O0")
+(or (getenv "CFLAGS") "-ansi -pedantic -std=c11 -Wall -Wextra -Wshadow -DDEBUG=9 -g3 -O0"))
+(or (getenv "LDFLAGS") cc-ldflags)
+(or (getenv "LDLIBS") cc-ldlibs)))))))
 
-    (defun cc-clean ()
-     "Find Makefile and call the `clean' rule. If no Makefile is
-    found, no action is taken. The previous `compile' command is
-    restored."
-     (interactive)
-     (let (compile-command
-        (makefile-dir (locate-dominating-file "." "Makefile")))
-     (when makefile-dir
-     (compile (format "make -k -C %s clean" (shell-quote-argument makefile-dir))))))
+(defun cc-clean ()
+"Find Makefile and call the `clean' rule. If no Makefile is
+found, no action is taken. The previous `compile' command is
+restored."
+(interactive)
+(let (compile-command
+(makefile-dir (locate-dominating-file "." "Makefile")))
+(when makefile-dir
+(compile (format "make -k -C %s clean" (shell-quote-argument makefile-dir))))))
 
-    (dolist (map (list c-mode-map c++-mode-map))
-     (define-key map "<f5>" #'cc-clean))
+(dolist (map (list c-mode-map c++-mode-map))
+(define-key map "<f5>" #'cc-clean))
 
-    (dolist (hook '(c-mode-hook c++-mode-hook))
-     (add-hook hook #'cc-set-compiler))
+(dolist (hook '(c-mode-hook c++-mode-hook))
+(add-hook hook #'cc-set-compiler))
 #+END_EXAMPLE
 
 ** C pretty format
-   :PROPERTIES:
-   :CUSTOM_ID: org67905c0
-   :END:
+很漂亮的格式
+:PROPERTIES:
+属性:
+:CUSTOM_ID: org67905c0
+:CUSTOM_ID org67905c0
+:END:
+结束:
 
 I use [[http://uncrustify.sourceforge.net/][uncrustify]] to format my C code automatically. See my [[../indentation/index.html][indentation
+我使用[[http://uncrustify.sourceforge.net/][uncrustify]]自动格式化我的C代码。看到我的[[. . /压痕/ index . html][缩进
 rationale]].
+理性]]。
 
 I can call it from Emacs with the following function:
+我可以用下面的函数从Emacs中调用它:
 
 #+BEGIN_EXAMPLE
-    (defun cc-fmt ()
-     "Run uncrustify(1) on current buffer or region."
-     (interactive)
-     (let ((formatbuf (get-buffer-create "*C format buffer*"))
-        status start end)
-     (if (use-region-p)
-        (setq start (region-beginning) end (region-end))
-     (setq start (point-min) end (point-max)))
-     (setq status
-         (call-process-region start end "uncrustify" nil formatbuf nil "-lc" "-q" "-c"
-                 (concat (getenv "HOME") "/.uncrustify.cfg")))
-     (if (/= status 0)
-        (error "error running uncrustify")
-     (delete-region start end)
-     (insert-buffer formatbuf)
-     (kill-buffer formatbuf))))
+(defun cc-fmt ()
+"Run uncrustify(1) on current buffer or region."
+(interactive)
+(let ((formatbuf (get-buffer-create "*C format buffer*"))
+status start end)
+(if (use-region-p)
+(setq start (region-beginning) end (region-end))
+(setq start (point-min) end (point-max)))
+(setq status
+(call-process-region start end "uncrustify" nil formatbuf nil "-lc" "-q" "-c"
+(concat (getenv "HOME") "/.uncrustify.cfg")))
+(if (/= status 0)
+(error "error running uncrustify")
+(delete-region start end)
+(insert-buffer formatbuf)
+(kill-buffer formatbuf))))
 #+END_EXAMPLE
 
 We could add this to =before-save-hook= to auto-format my code at all times, but
+我们可以将其添加到=before-save-hook=中，以在任何时候自动格式化我的代码，但是
 that would be bad practice when working with source code using different
+当使用不同的源代码时，这将是一个糟糕的实践
 formatting rules.
+格式规则。
 
 ** Magit
-   :PROPERTIES:
-   :CUSTOM_ID: orgcaa21f2
-   :END:
+* * Magit
+:PROPERTIES:
+属性:
+:CUSTOM_ID: orgcaa21f2
+:CUSTOM_ID orgcaa21f2
+:END:
+结束:
 
 [[https://magit.vc/][Magit]] makes Git management a bliss. The most evident feature would be the easy
+[[https://magit。[Magit]]是Git管理的福音。最明显的特征是简单
 hunk selection when staging code. This simple feature together with a few others
+块选择时暂存代码。这个简单的特性以及其他一些特性
 will make a drastic change to your workflow.
+将对您的工作流程进行重大更改。
 
 ** Multiple cursors
-   :PROPERTIES:
-   :CUSTOM_ID: orgb468b2e
-   :END:
+* *多个游标
+:PROPERTIES:
+属性:
+:CUSTOM_ID: orgb468b2e
+:CUSTOM_ID orgb468b2e
+:END:
+结束:
 
 See this [[http://emacsrocks.com/e13.html][video]] for a short introduction of this very powerful editing framework.
+查看这个[[http://emacsrocks.com/e13.html][视频]]来简短介绍这个非常强大的编辑框架。
 
 As of Septermber 2016, multiple cursors does not support searching, so I use
+到2016年9月，多个游标不支持搜索，所以我使用
 =phi-search= that automatically adds support to it.
+=phi-search=自动添加支持。
 
 #+BEGIN_EXAMPLE
-    (when (require 'multiple-cursors nil t)
-     (setq mc/list-file (concat emacs-cache-folder "mc-lists.el"))
-     ;; Load the file at the new location.
-     (load mc/list-file t)
-     (global-unset-key (kbd "C-<down-mouse-1>"))
-     (global-set-key (kbd "C-<mouse-1>") #'mc/add-cursor-on-click)
-     (global-set-key (kbd "C-x M-r") #'mc/edit-lines)
-     (global-set-key (kbd "C-x M-m") #'mc/mark-more-like-this-extended)
-     (global-set-key (kbd "C-x M-l") #'mc/mark-all-like-this-dwim)
-     ;; mc-compatible with search.
-     (require 'phi-search nil t))
+(when (require 'multiple-cursors nil t)
+(setq mc/list-file (concat emacs-cache-folder "mc-lists.el"))
+;; Load the file at the new location.
+(load mc/list-file t)
+(global-unset-key (kbd "C-<down-mouse-1>"))
+(global-set-key (kbd "C-<mouse-1>") #'mc/add-cursor-on-click)
+(global-set-key (kbd "C-x M-r") #'mc/edit-lines)
+(global-set-key (kbd "C-x M-m") #'mc/mark-more-like-this-extended)
+(global-set-key (kbd "C-x M-l") #'mc/mark-all-like-this-dwim)
+;; mc-compatible with search.
+(require 'phi-search nil t))
 #+END_EXAMPLE
 
 If you are an Evil user, =multiple-cursors= will not work. Use the dedicated
+如果您是一个邪恶的用户，则=多游标=将不起作用。使用专用的
 =evil-mc= instead.
+= evil-mc =。
 
 ** Org Mode
-   :PROPERTIES:
-   :CUSTOM_ID: org7966e81
-   :END:
+* *组织模式
+:PROPERTIES:
+属性:
+:CUSTOM_ID: org7966e81
+:CUSTOM_ID org7966e81
+:END:
+结束:
 
 Last but not least, the famous [[http://orgmode.org/][Org Mode]]. It offers some impressive features,
+最后但并非最不重要的是，著名的[[http://orgmode.org/][Org模式]]。它提供了一些令人印象深刻的功能，
 such as seamless table manipulation (swap columns with a keystroke...) and formula
+例如无缝的表操作(用击键交换列…)和公式
 computation. From the manual:
+计算。从手册:
 
 #+BEGIN_EXAMPLE
-    Finally, just to whet your appetite for what can be done with the
-    fantastic `calc.el' package, here is a table that computes the Taylor
-    series of degree `n' at location `x' for a couple of functions.
+Finally, just to whet your appetite for what can be done with the
+fantastic `calc.el' package, here is a table that computes the Taylor
+series of degree `n' at location `x' for a couple of functions.
 
-     |---+-------------+---+-----+--------------------------------------|
-     | | Func | n | x | Result |
-     |---+-------------+---+-----+--------------------------------------|
-     | # | exp(x) | 1 | x | 1 + x |
-     | # | exp(x) | 2 | x | 1 + x + x^2 / 2 |
-     | # | exp(x) | 3 | x | 1 + x + x^2 / 2 + x^3 / 6 |
-     | # | x^2+sqrt(x) | 2 | x=0 | x*(0.5 / 0) + x^2 (2 - 0.25 / 0) / 2 |
-     | # | x^2+sqrt(x) | 2 | x=1 | 2 + 2.5 x - 2.5 + 0.875 (x - 1)^2 |
-     | 0_sync_master.sh 1_add_new_article_manual.sh 1_add_new_article_newspaper.sh 2_start_translating.sh 3_continue_the_work.sh 4_finish.sh 5_pause.sh base.sh parse_url_by_manual.sh parse_url_by_newspaper.py parse_url_by_newspaper.sh project.cfg reformat.sh texput.log urls_checker.sh | tan(x) | 3 | x | 0.0175 x + 1.77e-6 x^3 |
-     |---+-------------+---+-----+--------------------------------------|
-     #+TBLFM: $5=taylor($2,$4,$3);n3
+|---+-------------+---+-----+--------------------------------------|
+| | Func | n | x | Result |
+|---+-------------+---+-----+--------------------------------------|
+| # | exp(x) | 1 | x | 1 + x |
+| # | exp(x) | 2 | x | 1 + x + x^2 / 2 |
+| # | exp(x) | 3 | x | 1 + x + x^2 / 2 + x^3 / 6 |
+| # | x^2+sqrt(x) | 2 | x=0 | x*(0.5 / 0) + x^2 (2 - 0.25 / 0) / 2 |
+| # | x^2+sqrt(x) | 2 | x=1 | 2 + 2.5 x - 2.5 + 0.875 (x - 1)^2 |
+| 0_sync_master.sh 1_add_new_article_manual.sh 1_add_new_article_newspaper.sh 2_start_translating.sh 3_continue_the_work.sh 4_finish.sh 5_pause.sh base.sh parse_url_by_manual.sh parse_url_by_newspaper.py parse_url_by_newspaper.sh project.cfg reformat.sh texput.log urls_checker.sh | tan(x) | 3 | x | 0.0175 x + 1.77e-6 x^3 |
+|---+-------------+---+-----+--------------------------------------|
+#+TBLFM: $5=taylor($2,$4,$3);n3
 #+END_EXAMPLE
 
 Note that the last column is computed automatically! Formulae can be computed
+注意最后一列是自动计算的!公式可以计算
 using the Calc mode, Elisp, or even external programs such as R or PARI/GP.
+使用Calc模式，Elisp，甚至外部程序，如R或PARI/GP。
 Possibilities are endless.
+可能性是无限的。
 
 Finally, you can export the end result to LaTeX, HTML, etc.
+最后，您可以将最终结果导出到LaTeX、HTML等。
 
 ** References
-   :PROPERTIES:
-   :CUSTOM_ID: org48f03b1
-   :END:
+* *引用
+:PROPERTIES:
+属性:
+:CUSTOM_ID: org48f03b1
+:CUSTOM_ID org48f03b1
+:END:
+结束:
 
 Aggregator wikis:
+rss汇wikis:
 
 - [[https://github.com/emacs-tw/awesome-emacs]]
+- - - - - - [[https://github.com/emacs-tw/awesome-emacs]]
 - [[https://github.com/pierre-lecocq/emacs4developers]]
+- - - - - - [[https://github.com/pierre-lecocq/emacs4developers]]
 
 User configurations:
+运用构型:
 
 - [[https://github.com/wasamasa/dotemacs/]]
+- [[https://github.com/wasamasa/dotemacs/]]
 - [[https://writequit.org/org/]]
+- - - - - - [[https://writequit.org/org/]]
 - [[http://doc.rix.si/cce/cce.html]]
+- - - - - - [[http://doc.rix.si/cce/cce.html]]
 - [[https://github.com/larstvei/dot-emacs/blob/master/init.org]]
+- - - - - - [[https://github.com/larstvei/dot-emacs/blob/master/init.org]]
 - [[https://github.com/hlissner/.emacs.d]]
+- - - - - - [[https://github.com/hlissner/.emacs.d]]
 - [[https://github.com/howardabrams/dot-files]]
+- - - - - - [[https://github.com/howardabrams/dot-files]]
 - [[https://github.com/purcell/emacs.d/]]
+- - - - - - [[https://github.com/purcell/emacs.d/]]
 - [[http://pages.sachachua.com/.emacs.d/]]
+- - - - - - [[http://pages.sachachua.com/.emacs.d/]]
 
 Blogs and other resources:
+博客和其他资源:
 
 - [[http://planet.emacsen.org/]]
+- - - - - - [[http://planet.emacsen.org/]]
 - [[https://www.reddit.com/r/emacs/]]
+- - - - - - [[https://www.reddit.com/r/emacs/]]
 - [[https://emacs.stackexchange.com/]]
+- - - - - - [[https://emacs.stackexchange.com/]]
 - [[http://emacslife.com/]] and [[http://sachachua.com/blog/]]
+- - - - - - [[http://emacslife.com/]]和[[http://sachachua.com/blog/]]

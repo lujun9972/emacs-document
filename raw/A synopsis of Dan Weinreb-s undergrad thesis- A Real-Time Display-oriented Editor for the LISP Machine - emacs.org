@@ -4,171 +4,271 @@
 #+TAGS: raw
 #+DATE: [2018年 10月 25日 星期四 11:41:38 HKT]
 #+LANGUAGE:  zh-CN
-#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
 I have managed to procure a copy of Dan Weinreb's thesis: A Real-Time Display-Oriented Editor for the Lisp Machine. It has less information of the type I had hoped for, but I still found it worth reading. Given the expense, I can't recommend it to any others than to people especially interested in the history of Emacs and Lisp Machines. Below are some of my notes on parts I found interesting. I've provided some manually transcribed quotations, and have used ellipses and such to indicate omissions of bits I thought unnecessary for my purposes, and paraphrased a few omitted bits indicated with square brackets. I could easily have made typos though.
+我已经设法获得了Dan Weinreb的论文的副本:一个面向Lisp机器的实时显示编辑器。它包含的信息比我希望的要少，但我仍然觉得它值得一读。考虑到费用，我只能向那些对Emacs和Lisp机器历史特别感兴趣的人推荐它。以下是我觉得有趣的部分笔记。我提供了一些手动转录的引语，并使用省略号等来表示我认为对我的目的没有必要的部分的省略，并改写了方括号中表示的一些省略的部分。不过，我很容易打错字。
 
 First, a few general words about the paper. I procured it from MIT Document Services. It is unlisted in their catalogue, but you can still request it by writing to them and specifically requesting it. I believe the delay in their cataloguing of it is due to questions of the legality of listing it without the (now unobtainable) permission of the author (deceased), though that is just my speculation. It is 34 pages long, including all front and back matter. It is missing a diagram, which I believe was lost in the microfilming process. Each page bears the date 31-JAN-79.
+首先，简单介绍一下论文。我从麻省理工学院文献服务中心买的。它没有列入他们的目录，但你仍然可以写信给他们，明确地提出要求。我认为他们对它的编录工作的拖延是由于在没有得到作者(已去世)许可的情况下将其列入(现在无法获得)是否合法的问题，尽管这只是我的猜测。它有34页长，包括前面和后面的所有内容。它缺少一个图表，我相信是在微缩拍摄过程中丢失的。每一页都写着日期31- 1- 79。
 
 To forestall requests for me to provide copies to people: I am not going to do that, in part because MIT Document Services really exerted themselves to get this for me. Multiple people on their staff searched for it after I pestered them, and it was eventually found in an uncatalogued reel of microfilm. I certainly cannot justify denying them the paltry income that their existence must be in part justified by to distribute it in that way. However, if someone has a question they think might be answered by the thesis but which I have not talked about here, comment or send me a message and I will answer as best I can.
+为了防止有人要求我提供复印件:我不会这么做，部分原因是麻省理工学院的文件服务机构真的竭尽全力帮我弄到这些。在我纠缠了好几个人之后，他们的工作人员都在寻找它，最后在一个未编目的缩微胶卷卷里找到了它。我当然不能否认他们的微薄收入，他们的存在必须部分地通过这样分配来证明。然而，如果有人有问题，他们认为可能由论文回答，但我没有在这里谈论，评论或发送给我的信息，我会尽我所能回答。
 
 Here's the abstract:
+文摘:
 
 #+BEGIN_QUOTE
-  ZWEI is a real-time display-oriented editor, written for the Lisp Machine. It is display-oriented in that the text being edited is displayed on the screen at all times; it is real-time in that commands are executed as soon as they are given. The result is an extremely interactive and efficient kind of editing. This kind of editor has become very popular in widespread parts of the MIT computer community, and has been found to be easy to use yet extremely powerful. This thesis describes the user interface presented by ZWEI, and explains how ZWEI was implemented. An emphasis is placed on the way the nature of the Lisp Machine system affected ZWEI's design.
+# + BEGIN_QUOTE
+ZWEI is a real-time display-oriented editor, written for the Lisp Machine. It is display-oriented in that the text being edited is displayed on the screen at all times; it is real-time in that commands are executed as soon as they are given. The result is an extremely interactive and efficient kind of editing. This kind of editor has become very popular in widespread parts of the MIT computer community, and has been found to be easy to use yet extremely powerful. This thesis describes the user interface presented by ZWEI, and explains how ZWEI was implemented. An emphasis is placed on the way the nature of the Lisp Machine system affected ZWEI's design.
+ZWEI是一个面向实时显示的编辑器，为Lisp机器编写。它是面向显示的，因为被编辑的文本总是显示在屏幕上;它是实时的，因为命令一旦被给出就会立即执行。结果是一种极具交互性和效率的编辑方式。这种编辑器已经在麻省理工学院计算机社区的广泛地区变得非常流行，并且被发现易于使用但功能极其强大。本文描述了ZWEI提供的用户界面，并解释了ZWEI是如何实现的。重点介绍了Lisp机器系统的性质对ZWEI设计的影响。
 #+END_QUOTE
+# + END_QUOTE
 
 The thesis consists of four chapters:
+全文共分四章:
 
 1. Introduction, Explanation of what the Lisp Machine System is
+1. 介绍，解释什么是Lisp机器系统
 
 2. Description of ZWEI's user interface, rationale, how the nature of the Lisp Machine affects the interface
+2. 描述ZWEI的用户界面，基本原理，Lisp机器的性质如何影响界面
 
 3. Explanation of the implementation strategies used, emphasis on engineering trade-offs
+3.解释所使用的实现策略，强调工程上的权衡
 
 4. Discussion of the future of the system
+4. 讨论该系统的未来
 
 Here are my notes on the thesis. Some familiarity with the Emacs of today, and of Lisp, is presumed:
+这是我的论文笔记。假定您对今天的Emacs和Lisp有一定的了解:
 
 *1) Introduction*
+* * 1)介绍
 
 Note that when the Lisp Machine software was being built, they had written a similar editor called EINE (a recursive acronym: EINE Is Not Emacs), and that they were in the middle of writing a new version called ZWEI (ZWEI Was EINE Initially).
+请注意，在构建Lisp机器软件时，他们已经编写了一个类似的名为EINE的编辑器(EINE是一个递归缩写:EINE不是Emacs)，而且他们正在编写一个名为ZWEI的新版本(ZWEI最初是EINE)。
 
 #+BEGIN_QUOTE
-  This thesis is written in anticipation of the completion of the conversion effort, and describes ZWEI as it will be when the rest of EINE is converted over.
+# + BEGIN_QUOTE
+This thesis is written in anticipation of the completion of the conversion effort, and describes ZWEI as it will be when the rest of EINE is converted over.
+这篇论文是在预期转换工作完成的情况下撰写的，并描述了ZWEI在EINE的其余部分转换完成后的情况。
 #+END_QUOTE
+# + END_QUOTE
 
 Some paragraphs are devoted to what must have been a novel concept at the time for such a system: that the Lisp Machine was a personal system, not time-shared, and this gave rise to features not viable on time-sharing systems, due to the fact that the user was not contending with other users for resources.
+有些段落致力于什么时一定是一个新颖的概念对于这样一个系统:Lisp机是一个个人系统,不共享,这引发了特性不是可行的在分时系统中,由于用户没有与其他用户对资源的竞争。
 
 #+BEGIN_QUOTE
-  The Lisp Machine terminal consists of two input devices, called the keyboard and the mouse, and one output device called the TV.
+# + BEGIN_QUOTE
+The Lisp Machine terminal consists of two input devices, called the keyboard and the mouse, and one output device called the TV.
+Lisp机器终端由两个输入设备(键盘和鼠标)和一个输出设备(电视)组成。
 #+END_QUOTE
+# + END_QUOTE
 
 It was noted that the keyboard had control and meta keys, and that those two as well as shift could be used in conjunction with regular keys to form chords. The mouse got a whole paragraph, since mice were relatively new at the time. The mouse had three buttons. The TV was a raster-scan device of approximately one million black/white pixels. Emphasis was made of the (for the time) particularly good resolution, so many more characters could be displayed, compared to other contemporary terminals.
+值得注意的是，键盘上有控制键和元键，这两个键以及移位键可以与普通键结合形成和弦。老鼠得到了一个完整的段落，因为老鼠在当时是相对较新的。鼠标有三个按钮。这台电视是一个大约100万黑白像素的光栅扫描设备。重点是(当时)分辨率特别好，与其他现代终端相比，可以显示更多的字符。
 
 *2) The User Interface*
+*2)用户界面*
 
 The users of the system at the time were researchers at the MIT AI Lab. They had two principal uses for a text editor: 1) producing and debugging Lisp code, and 2) writing English text in the form of academic papers, email, and such. It was predicted that most users would spend half their time working with the editor.
+当时，该系统的用户是麻省理工学院人工智能实验室的研究人员。文本编辑器有两个主要用途:1)生成和调试Lisp代码，2)以学术论文、电子邮件等形式编写英语文本。据预测，大多数用户将花费一半的时间与编辑器一起工作。
 
 One of the most important considerations of ZWEI's user interface were compatibility with the PDP-10's interactive editors, so with ITS EMACS.
+ZWEI的用户界面最重要的考虑之一是与PDP-10的交互式编辑器的兼容性，以及与EMACS的兼容性。
 
 ZWEI is display-oriented: the text the user is editing is actually displayed (this is relevant because many editors of the time often showed out-of-date text due to efficiency and bandwidth restrictions, putting the burden on the user to imagine what their text looks like currently). ZWEI is real-time: each command takes effect immediately, and the displayed text is updated immediately. The update is called redisplay.
+ZWEI是面向显示的:用户编辑的文本实际上是显示的(这是相关的，因为当时的许多编辑器由于效率和带宽限制常常显示过期的文本，这给用户带来了想象文本当前样子的负担)。ZWEI是实时的:每个命令立即生效，显示的文本立即更新。更新称为重新显示。
 
 As with modern Emacs, ZWEI had a point and a cursor.
+与现代的Emacs一样，ZWEI也有一个指针。
 
 Some explanation is given of self-insertion for typing ASCII characters, control commands being given via control characters, and notes that numeric arguments can be provided to modify commands. He specifically calls out the feature of self-documentation, and that Control-? can be used to access describe-key, and alludes to the existence of other commands like C-h a. There are some other features and modes he describes, but they are commonplace things any current Emacs user will either know of or find easily.
+给出了输入ASCII字符的自插入的一些解释，通过控制字符给出了控制命令，并指出可以提供数字参数来修改命令。他特别强调了自我记录的特性，以及控制-?可以用来访问描述键，并暗指其他命令的存在，如C-h a。他还描述了其他一些特性和模式，但这些是任何当前Emacs用户都知道或很容易找到的常见东西。
 
 #+BEGIN_QUOTE
-  Since ZWEI is written in Lisp and lives in the Lisp environment of the Lisp machine, it is in a very good position to interface closely with other elements of that environment.
+# + BEGIN_QUOTE
+Since ZWEI is written in Lisp and lives in the Lisp environment of the Lisp machine, it is in a very good position to interface closely with other elements of that environment.
+由于ZWEI是用Lisp编写的，并且生活在Lisp机器的Lisp环境中，所以它可以很好地与环境中的其他元素紧密地交互。
 #+END_QUOTE
+# + END_QUOTE
 
 He does not specifically mention this, but this would not be elisp, it would be the native Lisp which would be MacLisp, and later generations would be Zetalisp and even Common Lisp.
+他并没有特别提到这一点，但这不是elisp，这是本机Lisp，这是MacLisp，后来的版本是Zetalisp，甚至是普通的Lisp。
 
 He also mentions that the graphical capabilities of the display allowed the use of different typefaces or fonts, specifically italic and bold, as well as varying sizes and styles, and that these can all be mixed in a buffer.
+他还提到，显示器的图形功能允许使用不同的字体或字体，特别是斜体和粗体，以及不同的大小和样式，这些都可以混合在一个缓冲区中。
 
 Regions could be marked with the mouse, as well as through the keyboard-based methods, by holding the left mouse button down whilst moving from one end of the region to the other. The middle mouse button could mark words or lists at a time, and the right button was reserved for the system.
+区域可以用鼠标标记，也可以通过基于键盘的方法标记，方法是按住鼠标左键，同时从区域的一端移动到另一端。鼠标中间的按钮可以一次标记单词或列表，右边的按钮为系统保留。
 
 #+BEGIN_QUOTE
-  The use of the mouse is still considered experimental. We know of several editors which depend highly on the use of a mouse for input, but we are not convinced that it is better than a keyboard; after more people start using ZWEI, it will be interesting to see how many of them make heavy use of the mouse and how many hardly use it at all.
+# + BEGIN_QUOTE
+The use of the mouse is still considered experimental. We know of several editors which depend highly on the use of a mouse for input, but we are not convinced that it is better than a keyboard; after more people start using ZWEI, it will be interesting to see how many of them make heavy use of the mouse and how many hardly use it at all.
+鼠标的使用仍处于试验阶段。我们知道有几个编辑器在很大程度上依赖于使用鼠标进行输入，但我们并不认为它比键盘更好;在越来越多的人开始使用ZWEI之后，看看他们中有多少人大量使用鼠标，有多少人几乎不使用鼠标，将会很有趣。
 #+END_QUOTE
+# + END_QUOTE
 
 *3) The Implementation*
+* * 3)实现
 
 #+BEGIN_QUOTE
-  The Lisp Machine's unusual nature played a pervasive role in the design of ZWEI. The first question, in what language should ZWEI be written, was instantly answered: Lisp. Since everything in the Lisp Machine is written in the Lisp language, the choice was clear. The only question was whether some intermediate language should be written in Lisp, and ZWEI written in the intermediate language.
+# + BEGIN_QUOTE
+The Lisp Machine's unusual nature played a pervasive role in the design of ZWEI. The first question, in what language should ZWEI be written, was instantly answered: Lisp. Since everything in the Lisp Machine is written in the Lisp language, the choice was clear. The only question was whether some intermediate language should be written in Lisp, and ZWEI written in the intermediate language.
+Lisp机器不同寻常的特性在ZWEI的设计中起到了非常重要的作用。第一个问题，应该用什么语言来写，立刻得到了回答:Lisp。由于Lisp机器中的所有内容都是用Lisp语言编写的，所以选择是显而易见的。唯一的问题是一些中间语言是否应该用Lisp来写，ZWEI是否应该用中间语言来写。
 
-  However, it seemed that Lisp Machine Lisp was a sufficiently powerful and comfortable environment for writing a text editor that no intermediate language would be needed.
+However, it seemed that Lisp Machine Lisp was a sufficiently powerful and comfortable environment for writing a text editor that no intermediate language would be needed.
+然而，似乎Lisp机器Lisp对于编写文本编辑器是一个足够强大和舒适的环境，不需要任何中间语言。
 #+END_QUOTE
+# + END_QUOTE
 
 A pervasive theme throughout this section was that because the Lisp Machine was a dedicated single-user machine, many constraints that influenced the design of previous editors running on terminals connected to time-sharing machines were not an issue.
+本节的一个普遍主题是，由于Lisp机器是专用的单用户机器，因此许多影响在连接到分时机器的终端上运行的以前编辑器的设计的约束不是问题。
 
 A lot of this section is devoted to the nuts-and-bolts of the representation and handling of text, but not much about the relations between the various conceptual objects like buffers and modes.
+本节主要讨论文本的具体表示和处理，而不是各种概念对象(如缓冲区和模式)之间的关系。
 
 #+BEGIN_QUOTE
-  Text in ZWEI is represented as a doubly-linked list of lines. The structure that represents a line has the text itself, its length, a list of buffer pointers, a tick representing the last time the line was modified, and of course previous and next line. An associated structure is a buffer-pointer (bp), which is associated with a line, an index of a character within the line, and a status which is one of {normal, moves, temp} (more on this later). The point and mark, for example, are represented as bps, though they are by no means the only bps.
+# + BEGIN_QUOTE
+Text in ZWEI is represented as a doubly-linked list of lines. The structure that represents a line has the text itself, its length, a list of buffer pointers, a tick representing the last time the line was modified, and of course previous and next line. An associated structure is a buffer-pointer (bp), which is associated with a line, an index of a character within the line, and a status which is one of {normal, moves, temp} (more on this later). The point and mark, for example, are represented as bps, though they are by no means the only bps.
+在ZWEI中，文本表示为双链的行列表。表示一行的结构包含文本本身、长度、缓冲区指针列表、表示最后一次修改行的刻度，当然还有上一行和下一行。关联的结构是一个缓冲指针(bp)，它与一行、一行中字符的索引以及{normal、moves、temp}之一的状态(后面会详细介绍)相关联。例如，点和标记被表示为bps，尽管它们绝不是唯一的bps。
 #+END_QUOTE
+# + END_QUOTE
 
 #+BEGIN_QUOTE
-  ZWEI provides a large number of functions for the manipulation of text, and the arguments used to designate positions in text are buffer pointers.
+# + BEGIN_QUOTE
+ZWEI provides a large number of functions for the manipulation of text, and the arguments used to designate positions in text are buffer pointers.
+ZWEI为文本操作提供了大量的函数，用于指定文本位置的参数是缓冲区指针。
 
-  There are also a wide variety of positioning commands, which take a bp pointing to some text and return a new bp that points some number of characters ahead of the given pointer, or words or lines or Lisp lists or sentences ahead of the given pointer. The ZWEI user commands are all built out of these functions.
+There are also a wide variety of positioning commands, which take a bp pointing to some text and return a new bp that points some number of characters ahead of the given pointer, or words or lines or Lisp lists or sentences ahead of the given pointer. The ZWEI user commands are all built out of these functions.
+还有各种各样的定位命令，它们将一个bp指向一些文本，然后返回一个新的bp，该bp指向给定指针前面的一些字符，或者指向给定指针前面的单词、行、Lisp列表或句子。ZWEI用户命令都是由这些函数构建的。
 
-  Every time an insertion or deletion takes place, all buffer pointers are adjusted, or relocated, so that they continue to point at the same point relative to the text.
+Every time an insertion or deletion takes place, all buffer pointers are adjusted, or relocated, so that they continue to point at the same point relative to the text.
+每次发生插入或删除操作时，都会调整或重新定位所有缓冲区指针，以便它们继续指向相对于文本的同一点。
 #+END_QUOTE
+# + END_QUOTE
 
 The status attribute of bps mentioned above is used to indicate how a bp should be updated if the insertion or deletion happens right where the bp was pointing. The normal status means the index is unchanged by insertions before it, the moves status means that the bp is moved to the end of the inserted text. The temporary bp is used for intermediate bps that don't live long enough to be affected by insertions or deletions. These bps do not get put in the data structure that is searched for updatable bps upon insertions or deletions.
+上面提到的bps的status属性用于指示如果在bp指向的地方插入或删除bp，应该如何更新bp。正常状态意味着索引在其之前的插入没有改变，而移动状态意味着bp移动到插入文本的末尾。临时bp用于生存时间不足以受到插入或删除影响的中间bp。在执行插入或删除操作时，这些bps不会被放入搜索可更新bps的数据结构中。
 
 A third data structure is the interval, which has two components: first-bp and last-bp. Its content is the text between the two. The first-bp is normal, so it does not move, and the last-bp is a moves bp, so insertions and deletions in the interval cause the last-bp to move to accommodate.
+第三种数据结构是interval，它有两个组成部分:first-bp和last-bp。它的内容是两者之间的文本。第一个bp是正常的，所以它不会移动，而最后一个bp是a移动bp，所以间隔中的插入和删除会导致最后一个bp移动以适应。
 
 Some discussion was made of the redisplay algorithm, and how it is different from those generally in use at the time, due to the Lisp Machine being a single-user machine:
+讨论了redisplay算法，以及它与当时普遍使用的算法有什么不同，因为Lisp机器是单用户机器:
 
 #+BEGIN_QUOTE
-  In the Lisp Machine, there tends to be lots of spare computation power lying around for interactive problems. ... Sacrifices were made ... in exchange for simplicity and elegance in the redisplay routines.
+# + BEGIN_QUOTE
+In the Lisp Machine, there tends to be lots of spare computation power lying around for interactive problems. ... Sacrifices were made ... in exchange for simplicity and elegance in the redisplay routines.
+在Lisp机器中，往往会有很多空闲的计算能力来处理交互问题。做出了牺牲……以换取简单和优雅的重新显示例程。
 #+END_QUOTE
+# + END_QUOTE
 
 *3.5) Organization of the Code*
+*3.5)守则的组织*
 
 This section contains some of the most worthwhile bits of the whole paper, to me. It talks more of generalities, lessons learned, design principles, and such.
+对我来说，这一部分包含了整篇论文中最有价值的部分。它讨论了更多的一般性、经验教训、设计原则等等。
 
 #+BEGIN_QUOTE
-  A great deal of programming experience in the past few years has pointed out a peril in the writing of large programs: complexity. When a program gets very large, and the job done by the program is elaborate and takes some time to explain, the program can get so complex that nobody could possibly keep all of it in his head at once. When a program is very large and complex, it becomes hard to maintain, modify, improve, or debug.
+# + BEGIN_QUOTE
+A great deal of programming experience in the past few years has pointed out a peril in the writing of large programs: complexity. When a program gets very large, and the job done by the program is elaborate and takes some time to explain, the program can get so complex that nobody could possibly keep all of it in his head at once. When a program is very large and complex, it becomes hard to maintain, modify, improve, or debug.
+过去几年的大量编程经验指出了编写大型程序的一个危险:复杂性。当一个程序变得非常庞大，而这个程序所完成的工作是复杂的，并且需要一些时间来解释时，这个程序就会变得非常复杂，以至于没有人可能一次记住所有的内容。当一个程序非常大且复杂时，它就很难维护、修改、改进或调试。
 #+END_QUOTE
+# + END_QUOTE
 
 #+BEGIN_QUOTE
-  ... we used several interesting techniques in the coding to keep ZWEI clear and simple. Some of these techniques were only possible because of the powerful features of the Lisp macro facility.
+# + BEGIN_QUOTE
+... we used several interesting techniques in the coding to keep ZWEI clear and simple. Some of these techniques were only possible because of the powerful features of the Lisp macro facility.
+…我们在编码中使用了一些有趣的技术来保持ZWEI的清晰和简单。其中一些技术之所以成为可能，是因为Lisp宏工具具有强大的功能。
 #+END_QUOTE
+# + END_QUOTE
 
 ZWEI predates things like Flavors and LOOPS, not to mention CLOS, so structures were used, and macros and macro-defining-macros were used to decouple the instantiation and access to those structures from their representation.
+ZWEI比滋味和循环更早，更不用说CLOS了，所以使用了结构，并使用宏和宏定义宏将实例化和对这些结构的访问与它们的表示分离。
 
 #+BEGIN_QUOTE
-  Lisp macros were also useful for the definition of new control structures, as well as new data structures. In ZWEI, we created a new iterative control structure called *charmap*, which iterates over characters in an interval. Intervals are stored as doubly-linked lists of arrays, and the starting point might be in the middle of one array and the ending point might be in the middle of another array. The code to perform this iteration was not trivial, and someone reading it might easily not understand the function it was performing, even though that function was the conceptually simple one of iterating over characters. So we created a macro called *charmap* that expands into the double-loop code to iterate over the characters. It is simple and obvious, and is used in many places, greatly reducing the size of the code and making the functionality obvious at a glance.
+# + BEGIN_QUOTE
+Lisp macros were also useful for the definition of new control structures, as well as new data structures. In ZWEI, we created a new iterative control structure called *charmap*, which iterates over characters in an interval. Intervals are stored as doubly-linked lists of arrays, and the starting point might be in the middle of one array and the ending point might be in the middle of another array. The code to perform this iteration was not trivial, and someone reading it might easily not understand the function it was performing, even though that function was the conceptually simple one of iterating over characters. So we created a macro called *charmap* that expands into the double-loop code to iterate over the characters. It is simple and obvious, and is used in many places, greatly reducing the size of the code and making the functionality obvious at a glance.
+Lisp宏对于定义新的控制结构和新的数据结构也很有用。在ZWEI中，我们创建了一个新的迭代控制结构*charmap*，它在一个区间内迭代字符。区间存储为数组的双链表，起始点可能在一个数组的中间，结束点可能在另一个数组的中间。执行这个迭代的代码并不是微不足道的，读它的人可能很容易不理解它所执行的函数，即使这个函数在概念上很简单，就是遍历字符。因此，我们创建了一个名为*charmap*的宏，该宏扩展为双循环代码来遍历字符。它简单而明显，在许多地方都可以使用，极大地减少了代码的大小，使功能一目了然。
 #+END_QUOTE
+# + END_QUOTE
 
 #+BEGIN_QUOTE
-  A good deal of time was devoted to considering the right way to modularize various functions, providing smooth functional interfaces that worked out well for many different tasks. This was often difficult, and several times large pieces of code were re-written as better ways of organizing and modularizing became clear.
+# + BEGIN_QUOTE
+A good deal of time was devoted to considering the right way to modularize various functions, providing smooth functional interfaces that worked out well for many different tasks. This was often difficult, and several times large pieces of code were re-written as better ways of organizing and modularizing became clear.
+花了大量的时间来考虑模块化各种函数的正确方法，从而为许多不同的任务提供平滑的功能接口。这通常很困难，随着组织和模块化的更好方法变得清晰，大段代码被重写了好几次。
 #+END_QUOTE
+# + END_QUOTE
 
 They thought a lot about the naming of things, when fighting the problems brought about by the proliferation of incompatible abbreviations:
+他们对事物的命名思考了很多，在与不兼容的缩写词的泛滥所带来的问题作斗争时:
 
 #+BEGIN_QUOTE
-  It became policy to avoid abbreviations in most cases. In ZWEI, we made a list of several words that were used extremely often, and established 'official' abbreviations for them, and always used only those abbreviations. ... Words not on this list were always spelled out in full.
+# + BEGIN_QUOTE
+It became policy to avoid abbreviations in most cases. In ZWEI, we made a list of several words that were used extremely often, and established 'official' abbreviations for them, and always used only those abbreviations. ... Words not on this list were always spelled out in full.
+在大多数情况下，避免使用缩写成了一项政策。在ZWEI，我们列出了几个使用频率极高的单词，并为它们建立了“官方”缩写，并且总是只使用那些缩写。不在这个列表上的单词总是完整地拼写出来。
 #+END_QUOTE
+# + END_QUOTE
 
 #+BEGIN_QUOTE
-  [They were] very careful with function names in general, and to establish naming conventions and calling conventions. For example, all functions that take some action on an interval of text end in '-interval' ... All such functions take the interval as their last required argument, and then accept an optional argument after that. If the optional argument is not given, then the first argument is an interval. If the optional argument is given, then the first of the two is the starting bp of the interval, and the second is the ending bp of the interval.
+# + BEGIN_QUOTE
+[They were] very careful with function names in general, and to establish naming conventions and calling conventions. For example, all functions that take some action on an interval of text end in '-interval' ... All such functions take the interval as their last required argument, and then accept an optional argument after that. If the optional argument is not given, then the first argument is an interval. If the optional argument is given, then the first of the two is the starting bp of the interval, and the second is the ending bp of the interval.
+一般来说，他们对函数名非常谨慎，并建立命名约定和调用约定。例如，所有在文本间隔上执行某些操作的函数都以'-interval'结束…所有这些函数都将interval作为最后一个必需参数，然后接受一个可选参数。如果没有给出可选参数，那么第一个参数是一个区间。如果给出了可选参数，那么第一个参数是区间的起始bp，第二个参数是区间的结束bp。
 #+END_QUOTE
+# + END_QUOTE
 
 This allowed them to avoid the construction of intermediate aggregate values just to satisfy calling conventions.
+这允许它们避免构造中间的聚合值来满足调用约定。
 
 #+BEGIN_QUOTE
-  There are several conventions of this type used throughout ZWEI.
+# + BEGIN_QUOTE
+There are several conventions of this type used throughout ZWEI.
+在ZWEI中有几种这种类型的约定。
 #+END_QUOTE
+# + END_QUOTE
 
 *4) The Future*
+* * 4)未来
 
 This section is a couple of pages, and talks about the graphics capabilities and how they allow the use of different typefaces, and also about structured text.
+本节有几个页面，讨论了图形功能以及它们如何允许使用不同的字体，还讨论了结构化文本。
 
 *4.2) Structured Text*
+* * 4.2)结构化文本
 
 They describe the text editor NLS, which was a structure editor, and talked about how it was an appealing idea, but that ZWEI does not currently do this kind of thing.
+他们描述了文本编辑器NLS，这是一个结构编辑器，并谈到它是一个多么吸引人的想法，但是ZWEI目前还没有做这种事情。
 
 *References*
+*引用*
 
 [Anderson] Anderson, Owen T. "The Design of an Editor-Writing System", S. B. thesis, Dept of Physics, MIT, Feb. 1979
+[安德森]安德森，欧文T。“编辑写作系统的设计”，S. B.论文，麻省理工学院物理系，1979年2月
 
 [Ciccarelli] Ciccarelli, Eugene E., "An Introduction to the EMACS Editor", MIT Artificial Intelligence Lab Memo 447, January 1978
+[Ciccarelli]， Eugene E.，“EMACS编辑器的介绍”，麻省理工学院人工智能实验室备忘录447,1978年1月
 
 [English et al] English, W. K., Engelbart, D. C., and Berman, M. L., "Display Selection Techniques for Text Manipulation," IEEE Transactions on Human Factors in Electronics, Vol. HFE-8, No.. 1, March 1967
+[英]英，英，恩格巴特，"文本操作的显示选择技术"，《IEEE电子人因汇刊》，第8卷第1期。1967年3月1日
 
 [Greenberg 1] Greenberg, Bernard S., "Real-Time Editing on Multics" Multics Technical Bulletin 373, April 1978, Honeywell, Inc., Cambridge Mass.
+[格林伯格1]格林伯格，伯纳德·S·格林伯格，“Multics的实时编辑”，Multics技术公报373,1978年4月，霍尼韦尔公司，剑桥麻州。
 
 [Greenberg 2] Greenberg, Bernard S., "The Multics MACLISP Compiler--The Basic Hackery.," Unpublished paper, December 1977. Available from author, Honeywell Inc., Cambridge, Mass.
+[格林伯格，伯纳德·S·格林伯格，《Multics MACLISP编译器——基本的黑客行为》。，发表于1977年12月。可从作者，霍尼韦尔公司，剑桥，马萨诸塞州。
 
 [Reed and Kanodia] Reed, David P. and Kanodia, R., "Synchronization with Eventcounts and Sequencers," CSR Request for Comments #138, Laboratory for Computer Science, MIT.
+[Reed和Kanodia] Reed, David P.和Kanodia, R.，“与事件计数和序列器的同步”，CSR请求评论#138，麻省理工学院计算机科学实验室。
 
 [Stallman] Stallman, Richard M., online EMACS documentation, MIT Artificial Intelligence Laboratory.
+理查德·斯托尔曼，麻省理工学院人工智能实验室EMACS在线文档。
 
 [Weinreb and Moon] Weinreb, Daniel L. and Moon, David A. "The Lisp Machine Manual", MIT Artificial Intelligence Laboratory, 1978.
+[魏雷布和月亮]魏雷布，丹尼尔L.和月亮，大卫A。“Lisp机器手册”，麻省理工学院人工智能实验室，1978年。
 
 *Edit*: fixed a few formatting problems and typos, made very minor phrasing and grammar changes.
+*编辑*:修正了一些格式问题和拼写错误，做了非常小的措辞和语法变化。
 
 *Edit 2*: have added the complete References section
+*编辑2*:已添加完整的参考资料部分

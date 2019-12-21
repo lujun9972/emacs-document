@@ -4,351 +4,526 @@
 #+TAGS: raw
 #+DATE: [2018年 03月 28日 星期三 12:31:54 CST]
 #+LANGUAGE:  zh-CN
-#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
 
 This week I made a mistake that ultimately enlightened me about the
+这周我犯了一个错误，它最终启发了我
 nature of function objects in Emacs Lisp. There are three kinds of
+Emacs Lisp中函数对象的性质。有三种
 function objects, but they each behave very differently when evaluated
+函数对象，但它们在计算时的行为非常不同
 as objects.
+作为对象。
 
 But before we get to that, let's talk about one of Emacs'
+但在此之前，我们先来谈谈Emacs的
 embarrassing, old missteps: =eval-after-load=.
+令人尴尬的老错误:=事后评估=。
 
 * Taming an old dragon
-    :PROPERTIES:
-    :CUSTOM_ID: taming-an-old-dragon
-    :END:
+驯服一条老龙
+:PROPERTIES:
+属性:
+:CUSTOM_ID: taming-an-old-dragon
+:CUSTOM_ID taming-an-old-dragon
+:END:
+结束:
 
 One of the long-standing issues with Emacs is that loading Emacs Lisp
+Emacs的一个长期存在的问题是加载Emacs Lisp
 files (.el and .elc) is a slow process, even when those files have
+文件(。el和。elc)是一个缓慢的过程，即使这些文件
 been byte compiled. There are a number of dirty hacks in place to deal
+字节编译。有许多肮脏的黑客行为需要处理
 with this issue, and the biggest and nastiest of them all is the
+在这个问题上，最大和最糟糕的是
 [[https://lwn.net/Articles/707615/][dumper]], also known as unexec.
+[[https://lwn.net/Articles/707615/][dumper]]，也称为unexec。
 
 The Emacs you routinely use throughout the day is actually a previous
+您一天中经常使用的Emacs实际上是以前的
 instance of Emacs that's been resurrected from the dead. Your undead
+从死亡中复活的Emacs实例。你不死
 Emacs was probably created months, if not years, earlier, back when it
+Emacs可能是在几个月前(如果不是几年的话)创建的
 was originally compiled. The first stage of compiling Emacs is to
+最初的编译。编译Emacs的第一阶段是to
 compile a minimal C core called =temacs=. The second stage is loading
+编译一个最小的C内核=temacs=。第二阶段是加载
 a bunch of Emacs Lisp files, then dumping a memory image in an
+一堆Emacs Lisp文件，然后将内存映像转储到
 unportable, platform-dependent way. On Linux, this actually [[https://lwn.net/Articles/707615/][requires
+unportable,平台相关的方式。在Linux上，这实际上是[[https://lwn.net/Articles/707615/]需要的
 special hooks in glibc]]. The Emacs you know and love is this
+glibc中的特殊钩子]]。你所熟悉和喜爱的Emacs是这样的
 dumped image loaded back into memory, continuing from where it left
+将已加载的图像转储回内存，从原来的位置继续
 off just after it was compiled. Regardless of your own feelings on the
+刚编译完就关闭了。不管你自己的感受如何
 matter, you have to admit [[/blog/2011/01/30/][this is a very lispy thing to do]].
+重要的是，你必须承认[[/blog/2011/01/30/][这是一件非常口齿不清的事情]]。
 
 There are two notable costs to Emacs' dumper:
+Emacs的自卸车有两个值得注意的成本:
 
 1. The dumped image contains hard-coded memory addresses. This means
-   Emacs can't be a Position Independent Executable (PIE). It can't
-   take advantage of a security feature called Address Space Layout
-   Randomization (ASLR), which would increase the difficulty of
-   [[/blog/2017/07/19/][exploiting]] some [[/blog/2012/09/28/][classes of bugs]]. This might be
-   important to you if Emacs processes untrusted data, such as when it's
-   used as [[/blog/2013/09/03/][a mail client]], [[https://github.com/skeeto/emacs-web-server][a web server]] or generally
-   [[https://github.com/skeeto/elfeed][parses data downloaded across the network]].
+1. 转储映像包含硬编码的内存地址。这意味着
+Emacs can't be a Position Independent Executable (PIE). It can't
+Emacs不能是位置独立的可执行文件(PIE)。它不能
+take advantage of a security feature called Address Space Layout
+利用一个叫做地址空间布局的安全特性
+Randomization (ASLR), which would increase the difficulty of
+随机化(ASLR)，这将增加的难度
+[[/blog/2017/07/19/][exploiting]] some [[/blog/2012/09/28/][classes of bugs]]. This might be
+[[/blog/2017/07/19/][利用]]一些[[/blog/2012/09/28/][bug类]]。这可能是
+important to you if Emacs processes untrusted data, such as when it's
+如果Emacs处理不受信任的数据(比如在什么时候)，这对您很重要
+used as [[/blog/2013/09/03/][a mail client]], [[https://github.com/skeeto/emacs-web-server][a web server]] or generally
+用作[[blog/2013/09/03/][邮件客户端]]，[[https://github.com/skeeto/emacs-webserver][web服务器]]或一般用途
+[[https://github.com/skeeto/elfeed][parses data downloaded across the network]].
+[[https://github.com/skeeto/elfeed][通过网络下载解析数据]]。
 
 2. It's not possible to cross-compile Emacs since it can only be dumped
-   by running =temacs= on its target platform. As an experiment I've
-   attempted to dump the Windows version of Emacs on Linux using
-   [[https://www.winehq.org/][Wine]], but was unsuccessful.
+2. 不能交叉编译Emacs，因为它只能被转储
+by running =temacs= on its target platform. As an experiment I've
+通过在其目标平台上运行=temacs=。作为一个实验
+attempted to dump the Windows version of Emacs on Linux using
+试图将Windows版本的Emacs转储到Linux上
+[[https://www.winehq.org/][Wine]], but was unsuccessful.
+[[https://www.winehq.org/][Wine]]，但是没有成功。
 
 The good news is that there's [[https://lists.gnu.org/archive/html/emacs-devel/2018-02/msg00347.html][a portable dumper]] in the works
+好消息是[[https://lists.gnu.org/archive/html/emacs-devel/2018-02/msg00347.html][便携式翻车机]]正在研制中
 that makes this a lot less nasty. If you're adventurous, you can
+这让事情没那么糟糕了。如果你有冒险精神，你可以
 already disable dumping and run =temacs= directly by setting
+已经禁用转储和运行=temacs=直接设置
 [[https://lists.gnu.org/archive/html/bug-gnu-emacs/2016-11/msg00729.html][=CANNOT_DUMP=yes= at compile time]]. Be warned, though, that a
+[[https://lists.gnu.org/archive/html/bug.gnu -emacs/2016-11/msg00729.html][=CANNOT_DUMP=yes=在编译时]]。但是要注意，a
 non-dumped Emacs takes several seconds, or worse, to initialize
+非转储Emacs需要几秒钟或者更糟的时间来初始化
 before it even begins loading your own configuration. It's also
+甚至在它开始加载您自己的配置之前。这也是
 somewhat buggy since it seems nobody ever runs it this way
+有点bug，因为似乎从来没有人这样运行它
 productively.
+有效。
 
 The other major way Emacs users have worked around slow loading is
+Emacs用户处理慢加载的另一个主要方法是
 aggressive use of lazy loading, generally via autoloads. The major
+积极使用延迟加载，通常通过自动加载。主要的
 package interactive entry points are defined ahead of time as stub
+包交互入口点被预先定义为存根
 functions. These stubs, when invoked, load the full package, which
+功能。当调用这些存根时，将加载完整的包
 overrides the stub definition, then finally the stub re-invokes the
+重写存根定义，然后存根最终重新调用
 new definition with the same arguments.
+具有相同参数的新定义。
 
 To further assist with lazy loading, an evaluated =defvar= form will
+为了进一步帮助延迟加载，计算后的=defvar= form会
 not override an existing global variable binding. This means you can,
+未覆盖现有的全局变量绑定。这意味着你可以，
 to a certain extent, configure a package before it's loaded. The
+在某种程度上，在加载包之前配置它。的
 package will not clobber any existing configuration when it loads.
+包加载时不会破坏任何现有配置。
 This also explains the bizarre interfaces for the various hook
+这也解释了各种钩子的奇怪接口
 functions, like =add-hook= and =run-hooks=. These accept symbols --- the
+函数，如=add-hook=和=run-hook =。这些接受符号
 names of the variables --- rather than values of those variables as
+变量的名称，而不是变量的值
 would normally be the case. The =add-to-list= function does the same
+通常是这样的。函数=add-to-list=执行相同的操作
 thing. It's all intended to cooperate with lazy loading, where the
+的事情。所有这些都是为了与惰性加载配合使用
 variable may not have been defined yet.
+变量可能还没有定义。
 
 ** eval-after-load
-     :PROPERTIES:
-     :CUSTOM_ID: eval-after-load
-     :END:
+* * eval-after-load
+:PROPERTIES:
+属性:
+:CUSTOM_ID: eval-after-load
+:CUSTOM_ID eval-after-load
+:END:
+结束:
 
 Sometimes this isn't enough and you need some some configuration to
+有时这还不够，你需要一些配置
 take place after the package has been loaded, but without forcing it
+在装入包后发生，但不强制执行
 to load early. That is, you need to tell Emacs “evaluate this code
+提前加载。也就是说，您需要告诉Emacs“评估这段代码”
 after this particular package loads.” That's where =eval-after-load=
+在这个特定的包加载之后。这就是= after-load=
 comes into play, except for its fatal flaw: it takes the word “eval”
+起作用的，除了它的致命缺陷:它采取“eval”这个词
 completely literally.
+完全从字面上。
 
 The first argument to =eval-after-load= is the name of a package. Fair
+=eval-after-load=的第一个参数是包的名称。公平
 enough. The second argument is a form that will be passed to =eval=
+足够了。第二个参数是一个表单，它将被传递给=eval=
 after that package is loaded. Now hold on a minute. The general rule
+加载包之后。等一下。一般规则
 of thumb is that if you're calling =eval=, you're probably doing
+如果你调用=eval=，你可能在做
 something seriously wrong, and this function is no exception. This is
+严重错误，这个函数也不例外。这是
 completely the wrong mechanism for the task.
+完全错误的机制。
 
 The second argument should have been a function --- either a (sharp
+第二个参数应该是一个函数——要么是一个(sharp)
 quoted) symbol or a function object. And then instead of =eval= it
+引用)符号或函数对象。而不是=eval= it
 would be something more sensible, like =funcall=. Perhaps this
+应该更合理一些，比如=funcall=。也许这
 improved version would be named =call-after-load= or =run-after-load=.
+改进版本将命名为=调用后加载=或=运行后加载=。
 
 The big problem with passing an s-expression is that it will be left
+传递s表达式的一个大问题是它会被留下
 uncompiled due to being quoted. [[/blog/2017/12/14/][I've talked before about the
+由于引用而未编译。[/blog/2017/12/14][/blog][/blog
 importance of evaluating your lambdas]]. =eval-after-load= not
+评价你的lambdas的重要性]]。= eval-after-load =不
 only encourages badly written Emacs Lisp, it demands it.
+只会鼓励写得不好的Emacs Lisp，它需要它。
 
 #+BEGIN_EXAMPLE
-    ;;; BAD!
-    (eval-after-load 'simple-httpd
-     '(push '("c" . "text/plain") httpd-mime-types))
+;;; BAD!
+(eval-after-load 'simple-httpd
+'(push '("c" . "text/plain") httpd-mime-types))
 #+END_EXAMPLE
 
 This was all corrected in Emacs 25. If the second argument to
+这在Emacs 25中得到了纠正。如果第二个参数
 =eval-after-load= is a function --- the result of applying =functionp= is
+=eval-after-load=是一个函数——应用=functionp= is的结果
 non-nil --- then it uses =funcall=. There's also a new macro,
+非nil——然后使用=funcall=。还有一个新的宏，
 =with-eval-after-load=, to package it all up nicely.
+=with-eval-after-load=，将其打包好。
 
 #+BEGIN_EXAMPLE
-    ;;; Better (Emacs >= 25 only)
-    (eval-after-load 'simple-httpd
-     (lambda ()
-     (push '("c" . "text/plain") httpd-mime-types)))
+;;; Better (Emacs >= 25 only)
+(eval-after-load 'simple-httpd
+(lambda ()
+(push '("c" . "text/plain") httpd-mime-types)))
 
-    ;;; Best (Emacs >= 25 only)
-    (with-eval-after-load 'simple-httpd
-     (push '("c" . "text/plain") httpd-mime-types))
+;;; Best (Emacs >= 25 only)
+(with-eval-after-load 'simple-httpd
+(push '("c" . "text/plain") httpd-mime-types))
 #+END_EXAMPLE
 
 Though in both of these examples the compiler will likely warn about
+尽管在这两个例子中，编译器可能会发出警告
 =httpd-mime-types= not being defined. That's a problem for another
+=httpd-mime-type =未定义。那是另一个问题
 day.
+的一天。
 
 ** A workaround
-     :PROPERTIES:
-     :CUSTOM_ID: a-workaround
-     :END:
+* *一个工作区
+:PROPERTIES:
+属性:
+:CUSTOM_ID: a-workaround
+:CUSTOM_ID:一个工作区
+:END:
+结束:
 
 But what if you need to use Emacs 24, as was the [[https://github.com/skeeto/elfeed/pull/268][situation that
+但是，如果您需要使用Emacs 24，就像使用[[https://github.com/skeeto/elfeed/pull/268][这种情况
 sparked this article]]? What can we do with the bad version of
+引发了本文]]吗?我们能拿坏的版本做什么
 =eval-after-load=? We could situate a lambda such that it's evaluated,
+= eval-after-load = ?我们可以放置一个这样它被求值，
 but then smuggle the resulting function object into the form passed to
+然后将得到的函数对象偷偷地放入传递给的表单中
 =eval-after-load=, all using a backquote.
+=eval-after-load=，全部使用后引号。
 
 #+BEGIN_EXAMPLE
-    ;;; Note: this is subtly broken
-    (eval-after-load 'simple-httpd
-     `(funcall
-     ,(lambda ()
-     (push '("c" . "text/plain") httpd-mime-types)))
+;;; Note: this is subtly broken
+(eval-after-load 'simple-httpd
+`(funcall
+,(lambda ()
+(push '("c" . "text/plain") httpd-mime-types)))
 #+END_EXAMPLE
 
 When everything is compiled, the backquoted form evalutes to this:
+当一切都被编译，反引号形式的值是:
 
 #+BEGIN_EXAMPLE
-    (funcall #[0 <bytecode> [httpd-mime-types ("c" . "text/plain")] 2])
+(funcall #[0 <bytecode> [httpd-mime-types ("c" . "text/plain")] 2])
 #+END_EXAMPLE
 
 Where the second value (=#[...]=) is a [[/blog/2014/01/04/][byte-code object]].
+其中第二个值(=#[…]=)是一个[[/blog/2014/01/04/][字节码对象]]。
 However, as the comment notes, this is subtly broken. A cleaner and
+然而，正如评论所指出的那样，这一点被巧妙地打破了。一个更干净、
 correct way to solve all this is with a named function. The damage
+解决这一切的正确方法是使用一个命名函数。造成的损害
 caused by =eval-after-load= will have been (mostly) minimized.
+由=后载值=引起的将(大部分)最小化。
 
 #+BEGIN_EXAMPLE
-    (defun my-simple-httpd-hook ()
-     (push '("c" . "text/plain") httpd-mime-types))
+(defun my-simple-httpd-hook ()
+(push '("c" . "text/plain") httpd-mime-types))
 
-    (eval-after-load 'simple-httpd
-     '(funcall #'my-simple-httpd-hook))
+(eval-after-load 'simple-httpd
+'(funcall #'my-simple-httpd-hook))
 #+END_EXAMPLE
 
 But, let's go back to the anonymous function solution. What was broken
+但是，让我们回到匿名函数解决方案。什么坏了
 about it? It all has to do with evaluating function objects.
+呢?它都与函数对象的求值有关。
 
 * Evaluating function objects
-    :PROPERTIES:
-    :CUSTOM_ID: evaluating-function-objects
-    :END:
+*函数对象的取值
+:PROPERTIES:
+属性:
+:CUSTOM_ID: evaluating-function-objects
+:CUSTOM_ID evaluating-function-objects
+:END:
+结束:
 
 So what happens when we evaluate an expression like the one above with
+当我们求像上面这样的表达式的值时会发生什么
 =eval=? Here's what it looks like again.
+= eval = ?这是它的样子。
 
 #+BEGIN_EXAMPLE
-    (funcall #[...])
+(funcall #[...])
 #+END_EXAMPLE
 
 First, =eval= notices it's been given a non-empty list, so it's probably
+首先，=eval=注意到它被赋予了一个非空列表，所以它可能是
 a function call. The first argument is the name of the function to be
+一个函数调用。第一个参数是函数名
 called (=funcall=) and the remaining elements are its arguments. But
+调用(=funcall=)，其余元素是它的参数。但
 each of these elements must be evaluated first, and the result of that
+每个元素都必须先求值，然后求值的结果
 evaluation becomes the arguments.
+评价变成了争论。
 
 Any value that isn't a list or a symbol is self-evaluating. That is,
+任何不是列表或符号的值都是自评估的。也就是说,
 it evaluates to its own value:
+它计算出自己的值:
 
 #+BEGIN_EXAMPLE
-    (eval 10)
-    ;; => 10
+(eval 10)
+;; => 10
 #+END_EXAMPLE
 
 If the value is a symbol, it's treated as a variable. If the value is a
+如果值是符号，则将其视为变量。如果值是a
 list, it goes through the function call process I'm describing (or one
+它将遍历我所描述的函数调用过程(或一个)
 of a number of other special cases, such as macro expansion, lambda
+一些其他的特殊情况，例如宏展开，lambda
 expressions, and special forms).
+表达式和特殊形式)。
 
 So, conceptually =eval= recurses on the function object =#[...]=. A
+因此，在概念上=eval=在函数object =#[…]=上进行递归。一个
 function object is not a list or a symbol, so it's self-evaluating. No
+函数对象不是一个列表或符号，所以它是自求值的。没有
 problem.
+问题。
 
 #+BEGIN_EXAMPLE
-    ;; Byte-code objects are self-evaluating
+;; Byte-code objects are self-evaluating
 
-    (let ((x (byte-compile (lambda ()))))
-     (eq x (eval x)))
-    ;; => t
+(let ((x (byte-compile (lambda ()))))
+(eq x (eval x)))
+;; => t
 #+END_EXAMPLE
 
 What if this code wasn't compiled? Rather than a byte-code object,
+如果这段代码没有被编译呢?而不是字节码对象，
 we'd have some other kind of function object for the interpreter.
+我们会为解释器提供一些其他类型的函数对象。
 Let's examine the dynamic scope (shudder) case. Here, a lambda
+让我们检查动态范围(抖动)情况。在这里,一个λ
 appears to evaluate to itself, but appearances can be deceiving:
+表面上看是自我评价，但表面可能是骗人的:
 
 #+BEGIN_EXAMPLE
-    (eval (lambda ())
-    ;; => (lambda ())
+(eval (lambda ())
+;; => (lambda ())
 #+END_EXAMPLE
 
 However, this is not self-evaluation. *Lambda expressions are not
+然而，这不是自我评价。*Lambda表达式不是
 self-evaluating*. It's merely coincidence that the result of
+自我评估。这仅仅是巧合
 evaluating a lambda expression looks like the original expression.
+对lambda表达式求值看起来与原始表达式类似。
 This is just how the Emacs Lisp interpreter is currently implemented
+这就是Emacs Lisp解释器目前的实现方式
 and, strictly speaking, it's an implementation detail that just so
+严格来说，这是一个实现细节
 happens to be mostly compatible with byte-code objects being
+恰好与字节码对象基本兼容
 self-evaluating. It would be a mistake to rely on this.
+自我评估。相信这一点是错误的。
 
 Instead, *dynamic scope lambda expression evaluation is
+相反，*dynamic scope lambda表达式求值是
 [[https://labs.spotify.com/2013/06/18/creative-usernames/][idempotent]].* Applying =eval= to the result will return
+[[https://labs.spotify.com/2013/06/18/creusernames/][idempotent] .*应用=eval=将返回结果
 an =equal=, but not identical (=eq=), expression. In contrast, a
+一个= =但不完全相同的表达式。相比之下,一个
 self-evaluating value is also idempotent under evaluation, but with
+自我评价的价值在评价下也是幂等的，但有
 =eq= results.
+=情商=结果。
 
 #+BEGIN_EXAMPLE
-    ;; Not self-evaluating:
+;; Not self-evaluating:
 
-    (let ((x '(lambda ())))
-     (eq x (eval x)))
-    ;; => nil
+(let ((x '(lambda ())))
+(eq x (eval x)))
+;; => nil
 
-    ;; Evaluation is idempotent:
+;; Evaluation is idempotent:
 
-    (let ((x '(lambda ())))
-     (equal x (eval x)))
-    ;; => t
+(let ((x '(lambda ())))
+(equal x (eval x)))
+;; => t
 
-    (let ((x '(lambda ())))
-     (equal x (eval (eval x))))
-    ;; => t
+(let ((x '(lambda ())))
+(equal x (eval (eval x))))
+;; => t
 #+END_EXAMPLE
 
 So, with dynamic scope, the subtly broken backquote example will still
+因此，对于动态范围，这个被巧妙地取消后引号的例子仍然有效
 work, but only by sheer luck. Under lexical scope, the situation isn't
+工作，但纯粹靠运气。在词法范围下，情况就不一样了
 so lucky:
+这么幸运了:
 
 #+BEGIN_EXAMPLE
-    ;;; -*- lexical-scope: t; -*-
+;;; -*- lexical-scope: t; -*-
 
-    (lambda ())
-    ;; => (closure (t) nil)
+(lambda ())
+;; => (closure (t) nil)
 #+END_EXAMPLE
 
 These interpreted lambda functions are neither self-evaluating nor
+这些解释的lambda函数既不是自求值函数，也不是自求值函数
 idempotent. Passing =t= as the second argument to =eval= tells it to
+幂等。将=t=作为第二个参数传递给=eval=告诉它
 use lexical scope, as shown below:
+使用词法范围，如下所示:
 
 #+BEGIN_EXAMPLE
-    ;; Not self-evaluating:
+;; Not self-evaluating:
 
-    (let ((x '(lambda ())))
-     (eq x (eval x t)))
-    ;; => nil
+(let ((x '(lambda ())))
+(eq x (eval x t)))
+;; => nil
 
-    ;; Not idempotent:
+;; Not idempotent:
 
-    (let ((x '(lambda ())))
-     (equal x (eval x t)))
-    ;; => nil
+(let ((x '(lambda ())))
+(equal x (eval x t)))
+;; => nil
 
-    (let ((x '(lambda ())))
-     (equal x (eval (eval x t) t)))
-    ;; error: (void-function closure)
+(let ((x '(lambda ())))
+(equal x (eval (eval x t) t)))
+;; error: (void-function closure)
 #+END_EXAMPLE
 
 I can [[/blog/2017/05/03/][imagine an implementation]] of Emacs Lisp where dynamic
+我可以[[博客/2017/05/03/][想象一个实现]]Emacs Lisp在哪里是动态的
 scope lambda expressions are in the same boat, where they're not even
+作用域lambda表达式在同一条船上，它们甚至不是
 idempotent. For example:
+幂等。例如:
 
 #+BEGIN_EXAMPLE
-    ;;; -*- lexical-binding: nil; -*-
+;;; -*- lexical-binding: nil; -*-
 
-    (lambda ())
-    ;; => (totally-not-a-closure ())
+(lambda ())
+;; => (totally-not-a-closure ())
 #+END_EXAMPLE
 
 Most Emacs Lisp would work just fine under this change, and only code
+大多数Emacs Lisp在这种变化下工作得很好，而且只适用于代码
 that makes some kind of logical mistake --- where there's nested
+这就犯了某种逻辑错误——在嵌套的地方
 evaluation of lambda expressions --- would break. This essentially
+计算lambda表达式——会中断。这实质上
 already happened when lots of code was quietly switched over to
+当大量代码被悄悄转换为
 lexical scope after Emacs 24. Lambda idempotency was lost and
+Emacs 24之后的词汇范围。丢失和
 well-written code didn't notice.
+编写良好的代码没有注意到这一点。
 
 There's a temptation here for Emacs to define a =closure= function or
+这里，Emacs很容易定义一个=closure=函数或
 special form that would allow interpreter closure objects to be either
+允许解释器闭包对象的特殊形式
 self-evaluating or idempotent. This would be a mistake. It would only
+自我评估或幂等。这将是一个错误。这只会
 serve as a hack that covers up logical mistakes that lead to nested
+作为一个hack，掩盖导致嵌套的逻辑错误
 evaluation. Much better to catch those problems early.
+评估。尽早发现这些问题会更好。
 
 * Solving the problem with one character
-    :PROPERTIES:
-    :CUSTOM_ID: solving-the-problem-with-one-character
-    :END:
+用一个字符解决问题
+:PROPERTIES:
+属性:
+:CUSTOM_ID: solving-the-problem-with-one-character
+:CUSTOM_ID solving-the-problem-with-one-character
+:END:
+结束:
 
 So how do we fix the subtly broken example? With a strategically
+那么，我们如何修复这个微妙的问题呢?与战略
 placed quote right before the comma.
+在逗号前加上引号。
 
 #+BEGIN_EXAMPLE
-    (eval-after-load 'simple-httpd
-     `(funcall
-     ',(lambda ()
-     (push '("c" . "text/plain") httpd-mime-types)))
+(eval-after-load 'simple-httpd
+`(funcall
+',(lambda ()
+(push '("c" . "text/plain") httpd-mime-types)))
 #+END_EXAMPLE
 
 So the form passed to =eval-after-load= becomes:
+因此，传递给=eval-after-load=的表单变成:
 
 #+BEGIN_EXAMPLE
-    ;; Compiled:
-    (funcall (quote #[...]))
+;; Compiled:
+(funcall (quote #[...]))
 
-    ;; Dynamic scope:
-    (funcall (quote (lambda () ...)))
+;; Dynamic scope:
+(funcall (quote (lambda () ...)))
 
-    ;; Lexical scope:
-    (funcall (quote (closure (t) () ...)))
+;; Lexical scope:
+(funcall (quote (closure (t) () ...)))
 #+END_EXAMPLE
 
 The quote prevents =eval= from evaluating the function object, which
+引号阻止=eval=对函数对象求值
 would be either needless or harmful. There's also an argument to be
+不是没有必要就是有害的。还有一个论点
 made that this is a perfect situation for a sharp-quote (=#'=), which
+这对于一个尖锐的引号(=#'=)来说是一个完美的情况
 exists to quote functions.
-
-
+存在是为了引用函数。

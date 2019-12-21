@@ -4,394 +4,540 @@
 #+TAGS: raw
 #+DATE: [2018年 03月 22日 星期四 17:16:52 CST]
 #+LANGUAGE:  zh-CN
-#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+[[http://martinsosic.com/images/emacs-loves-cpp.png]]
 [[http://martinsosic.com/images/emacs-loves-cpp.png]]
 
 *TL;DR* -> take a look at the [[#summary][summary]].
+*TL;DR* ->查看一下[[#摘要][摘要]]。
 
 I have been using Emacs for a few years for development in different languages, including C++.
+几年来，我一直在使用Emacs进行不同语言的开发，包括c++。
 Since I was working mostly on smaller C++ projects and I heard how notoriously hard it is to setup Emacs as a C++ IDE, I never took time to fully set it up. That was working fine for me until I got my hands on a bigger C++ project and figured out I am really missing some of the more advanced features.
+由于我主要从事的是较小的c++项目，而且我听说将Emacs设置为c++ IDE是出了名的困难，所以我从来没有花时间来完全设置它。在我着手一个更大的c++项目并发现我确实遗漏了一些更高级的特性之前，这对我来说还算不错。
 I decided to give it a go and realized it is not as hard as I expected!
+我决定试一试，并意识到这并不像我想象的那么难!
 
 Since it did take some time to try different setups and I feel like information about them is not accessible enough, I decided to share what I learned so others can have an easier start.
+因为尝试不同的设置确实需要一些时间，而且我觉得关于它们的信息还不够容易获得，所以我决定分享我学到的东西，这样其他人可以更容易地开始。
 
 Some of the main features that we can expect from C++ IDE:
+我们可以期待c++ IDE的一些主要特性:
 
 - Navigation (jump from reference to definition and vice versa).
+-导航(从引用跳转到定义，反之亦然)。
 - File outline (list of symbols in file for quick navigation).
+-文件大纲(文件中的符号列表，用于快速导航)。
 - Code completion.
+——代码完成。
 - Real-time syntax checking.
+-实时语法检查。
 
 While there are solutions for C that work quite well (e.g. CEDET), and some of them also work pretty well for C++, none of them fully support C++, since it is more complicated than C.
+虽然有一些C语言的解决方案可以很好地工作(例如CEDET)，其中一些也可以很好地工作于c++，但是没有一个完全支持c++，因为它比C语言更复杂。
 Thanks to release of [[https://clang.llvm.org/doxygen/group__CINDEX.html][libclang]], which brought capabilities needed to create full support for C++, multiple tools/IDEs specialized for C++ were created. I am going to focus on two of them, Irony and RTags, which are among the most popular Emacs packages offering C++ IDE functionality.
+由于发布了[[https://clang.llvm.org/doxygen/groupcindex.html][libclang]]，它带来了创建完全支持c++所需的功能，因此创建了多个专门针对c++的工具/ ide。我将重点介绍其中的两个，Irony和RTags，它们是提供c++ IDE功能的最流行的Emacs包之一。
 
 Also, since I work on Linux and usually use CMake with make or ninja as generators, that is what I am going to focus on in examples.
+另外，由于我在Linux上工作，并且通常使用带有make或ninja的CMake作为生成器，所以我将在示例中重点关注这一点。
 I found a lot of great advice and inspiration in [[https://tuhdo.github.io/c-ide.html][blog post by tuhdo]], so make sure to check it out for wider overview of available solutions!
+我在[[https://tuhdo.github.io/c-ide]中找到了很多很好的建议和灵感。[tuhdo的博客]]，所以一定要查看它来获得可用解决方案的更广泛的概述!
 
 * Company
-   :PROPERTIES:
-   :CUSTOM_ID: company
-   :END:
+*公司
+:PROPERTIES:
+属性:
+:CUSTOM_ID: company
+:CUSTOM_ID:公司
+:END:
+结束:
 
 [[http://company-mode.github.io][Company]] is a code completion frontend, meaning it handles all the logic regarding code completion while typing except for actually coming up with completions.
+[[http://company-mode.github。io][公司]]是一个代码完成前端，意味着它处理所有的逻辑有关的代码完成而打字，除了实际提出完成。
 So basically, Company does all the work with showing and handling completions, but it needs a brain (backend) to provide it with completions.
+所以基本上，公司做所有显示和处理完井的工作，但是它需要一个大脑(后端)来提供完井。
 It can use different sources (backends) of completions, including Irony and Rtags, which work really well for C++.
+它可以使用不同的完成源(后端)，包括Irony和rtag，这在c++中非常好用。
 
 My basic configuration looks like this (without Irony or RTags added as a backend yet):
+我的基本配置是这样的(没有讽刺或rtag作为后端添加):
 
 #+BEGIN_EXAMPLE
-    (req-package company
-     :config
-     (progn
-     (add-hook 'after-init-hook 'global-company-mode)
-     (global-set-key (kbd "M-/") 'company-complete-common-or-cycle)
-     (setq company-idle-delay 0)))
+(req-package company
+:config
+(progn
+(add-hook 'after-init-hook 'global-company-mode)
+(global-set-key (kbd "M-/") 'company-complete-common-or-cycle)
+(setq company-idle-delay 0)))
 #+END_EXAMPLE
 
 * Flycheck
-   :PROPERTIES:
-   :CUSTOM_ID: flycheck
-   :END:
+* Flycheck
+:PROPERTIES:
+属性:
+:CUSTOM_ID: flycheck
+:CUSTOM_ID flycheck
+:END:
+结束:
 
 [[http://www.flycheck.org][Flycheck]] is package for Emacs that brings on-the-fly syntax checking.
+[[http://www.flycheck.org][Flycheck]]是Emacs的包，它提供实时语法检查。
 It already comes with support for a lot of languages and can also use other packages as backend.
+它已经提供了对许多语言的支持，还可以使用其他包作为后端。
 In our case, we are going to use it together with Irony or Rtags as backend.
+在我们的例子中，我们将使用它和Irony或rtag作为后端。
 
 For me, this might just be the most important package of the ones listed here, as it helps you write code that will most likely compile in first try. I find it super useful, it saves me a lot of time.
+对我来说，这可能是这里列出的包中最重要的一个，因为它可以帮助您编写最有可能在第一次尝试时就编译的代码。我发现它非常有用，它节省了我很多时间。
 
 My basic configuration looks like this (without Irony or RTags added as a backend yet):
+我的基本配置是这样的(没有讽刺或rtag作为后端添加):
 
 #+BEGIN_EXAMPLE
-    (req-package flycheck
-     :config
-     (progn
-     (global-flycheck-mode)))
+(req-package flycheck
+:config
+(progn
+(global-flycheck-mode)))
 #+END_EXAMPLE
 
 * Compilation database
-   :PROPERTIES:
-   :CUSTOM_ID: compilation-database
-   :END:
+*编译数据库
+:PROPERTIES:
+属性:
+:CUSTOM_ID: compilation-database
+:CUSTOM_ID compilation-database
+:END:
+结束:
 
 In order for both Irony and Rtags to work, we need to supply them with detailed information about our C++ project.
+为了讽刺和rtag都能工作，我们需要向它们提供关于c++项目的详细信息。
 
 This is done by providing [[http://clang.llvm.org/docs/JSONCompilationDatabase.html][compilation database]], which is a standard way to describe how your project is compiled.
+这是通过提供[[http://clang.llvm.org/docs/JSONCompilationDatabase.html][编译数据库]]来实现的，这是描述如何编译项目的标准方法。
 Compilation database is (usually) just a JSON file that contains compilation information for each translation unit and there are multiple ways to generate it.
+编译数据库(通常)只是一个JSON文件，包含每个翻译单元的编译信息，有多种方法可以生成它。
 
 If you are using Cmake to build your project, it is really easy to generate compilation database, since CMake has support for it.
+如果您使用Cmake来构建项目，那么生成编译数据库是非常容易的，因为Cmake支持编译数据库。
 You just provide CMake with correct flag (=cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON ...=) and that is it! Later you can just call =cmake .= and it will update compilation database if needed.
+您只需提供CMake正确的标志(= CMake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON…=)，就可以了!稍后可以调用=cmake .=，如果需要，它将更新编译数据库。
 This is what I used for my project, since it uses CMake.
+这是我在我的项目中使用的，因为它使用CMake。
 
 In case tool that you are using to build your project does not have support for generation of compilation database, you can use [[https://github.com/rizsotto/Bear][bear]] tool, which records all calls to compiler by your build system and builds compilation database from it. It is easy to use and gives very good results.
+如果您用于构建项目的工具不支持生成编译数据库，您可以使用[[https://github.com/rizsotto/Bear][bear]]工具，它记录您的构建系统对编译器的所有调用，并从中构建编译数据库。它很容易使用，并给出了很好的结果。
 
 * Irony
-   :PROPERTIES:
-   :CUSTOM_ID: irony
-   :END:
+*具有讽刺意味
+:PROPERTIES:
+属性:
+:CUSTOM_ID: irony
+:CUSTOM_ID:讽刺
+:END:
+结束:
 
 [[https://github.com/Sarcasm/irony-mode][Irony mode]] brings IDE functionality to C, C++ and Objective-C.
+[[https://github.com/Sarcasm/irony-mode][mode]]为C、c++和Objective-C带来了IDE功能。
 It consists of Emacs package (client) and Irony server (which runs on your machine and uses libclang).
+它由Emacs包(客户机)和sarcasserver(在您的机器上运行并使用libclang)组成。
 Features are: code completion, real-time syntax checking, live documentation.
+特点是:代码完成，实时语法检查，实时文档。
 
 Irony is not hard to set up, just follow instructions from their documentation: you put configuration in your
+讽刺的是，设置起来并不难，只需按照文档中的说明:将配置放入您的
 =init.el= file and that is it, it will automatically run =irony-server=.
+= init。它会自动运行=irony-server=。
 Irony is going to find [[#compilation-database][compilation database]] on its own, as long as it is positioned in some logical place, so you only have to generate it and make sure it is up to date.
+讽刺的是，只要[[#编译数据库][编译数据库]]位于某个逻辑位置，您就可以自己找到它，因此只需生成它并确保它是最新的。
 In my case, since I have an out of source build, compilation database was in directory =build/= which is sibling of directory =source/=, and Irony had no problem picking it up.
+在我的例子中，由于我有一个out of source build，编译数据库在目录=build/=中，而目录=source/=是目录=source/=的兄弟目录，所以讽刺的是，我没有遇到任何问题。
 
 What I really like about Irony is that even on big projects (10k files) it is still fast and does not consume noticable amount of resources.
+我真正喜欢讽刺的是，即使在大型项目(10k文件)中，它仍然是快速的，并且不会消耗大量的资源。
 
 ** Lacking support for header files
-    :PROPERTIES:
-    :CUSTOM_ID: lacking-support-for-header-files
-    :END:
+**缺少对头文件的支持
+:PROPERTIES:
+属性:
+:CUSTOM_ID: lacking-support-for-header-files
+:CUSTOM_ID lacking-support-for-header-files
+:END:
+结束:
 
 Bad side when using Irony is that it does not know how to work with header files (.h, .hpp), because compilation database provides compilation information for source files but not for headers, meaning you get all the nifty features only for source files!
+当使用讽刺的时候，不好的一面是它不知道如何处理头文件。因为编译数据库只提供源文件的编译信息，而不提供头文件的编译信息，这意味着您只能获得源文件的所有漂亮特性!
 This was a pretty big deal for me, and at the time of writing of this post author of Irony said he is actively working on solution for this, which is great.
+这对我来说是一件大事，在写这篇文章的时候，讽刺的作者说他正在积极地解决这个问题，这很好。
 
 Luckily, Irony has fallback options when compilation database is not enough or not available, so we can use those while waiting for solution.
+幸运的是，当编译数据库不够或不可用时，Irony有回退选项，因此我们可以在等待解决方案时使用它们。
 In my case, I used =.clang_complete= file as a fallback option, which results with Irony using compilation database for source files and =.clang_complete= file for header files.
+在我的例子中，我使用=。clang_complete= file作为回退选项，这导致使用编译数据库处理源文件和=。clang_complete=头文件的文件。
 
 =.clang_complete= is a file with special format, originally used by a Vim plugin to provide code completion. It is simpler than compilation database since it can not provide specific compilation commands for each source file, instead it provides compilation flags for all files in the project. In most cases that is enough for Irony to work with your header files.
+=.clang_complete=是一个特殊格式的文件，Vim插件最初使用它来提供代码补全。它比编译数据库更简单，因为它不能为每个源文件提供特定的编译命令，而是为项目中的所有文件提供编译标志。在大多数情况下，使用头文件就足够讽刺了。
 
 ** Code completion
-    :PROPERTIES:
-    :CUSTOM_ID: code-completion
-    :END:
+* *代码完成
+:PROPERTIES:
+属性:
+:CUSTOM_ID: code-completion
+:CUSTOM_ID:补全
+:END:
+结束:
 
 Irony code completion works really well and fast, and can be provided as backend for different code completion frontends (Company, AC). I use it with Company.
+反讽代码完成工作真的很好，很快，并可以作为后端提供不同的代码完成前端(公司，AC)。我和同伴一起使用它。
 
 ** Real-time syntax checking
-    :PROPERTIES:
-    :CUSTOM_ID: real-time-syntax-checking
-    :END:
+**实时语法检查
+:PROPERTIES:
+属性:
+:CUSTOM_ID: real-time-syntax-checking
+:CUSTOM_ID real-time-syntax-checking
+:END:
+结束:
 
 Irony integrates with Flycheck and works really well. Syntax checking is fast and on spot.
+讽刺与Flycheck集成在一起，效果非常好。语法检查快速、及时。
 
 ** Configuration
-    :PROPERTIES:
-    :CUSTOM_ID: configuration
-    :END:
+* *配置
+:PROPERTIES:
+属性:
+:CUSTOM_ID: configuration
+:CUSTOM_ID:配置
+:END:
+结束:
 
 Here is my configuration in =init.el=:
+这是我在=init.el=中的配置:
 
 #+BEGIN_EXAMPLE
-    (req-package irony
-     :config
-     (progn
-     ;; If irony server was never installed, install it.
-     (unless (irony--find-server-executable) (call-interactively #'irony-install-server))
+(req-package irony
+:config
+(progn
+;; If irony server was never installed, install it.
+(unless (irony--find-server-executable) (call-interactively #'irony-install-server))
 
-     (add-hook 'c++-mode-hook 'irony-mode)
-     (add-hook 'c-mode-hook 'irony-mode)
+(add-hook 'c++-mode-hook 'irony-mode)
+(add-hook 'c-mode-hook 'irony-mode)
 
-     ;; Use compilation database first, clang_complete as fallback.
-     (setq-default irony-cdb-compilation-databases '(irony-cdb-libclang
-     irony-cdb-clang-complete))
+;; Use compilation database first, clang_complete as fallback.
+(setq-default irony-cdb-compilation-databases '(irony-cdb-libclang
+irony-cdb-clang-complete))
 
-     (add-hook 'irony-mode-hook 'irony-cdb-autosetup-compile-options)
-     ))
+(add-hook 'irony-mode-hook 'irony-cdb-autosetup-compile-options)
+))
 
-     ;; I use irony with company to get code completion.
-     (req-package company-irony
-     :require company irony
-     :config
-     (progn
-     (eval-after-load 'company '(add-to-list 'company-backends 'company-irony))))
+;; I use irony with company to get code completion.
+(req-package company-irony
+:require company irony
+:config
+(progn
+(eval-after-load 'company '(add-to-list 'company-backends 'company-irony))))
 
-     ;; I use irony with flycheck to get real-time syntax checking.
-     (req-package flycheck-irony
-     :require flycheck irony
-     :config
-     (progn
-     (eval-after-load 'flycheck '(add-hook 'flycheck-mode-hook #'flycheck-irony-setup))))
+;; I use irony with flycheck to get real-time syntax checking.
+(req-package flycheck-irony
+:require flycheck irony
+:config
+(progn
+(eval-after-load 'flycheck '(add-hook 'flycheck-mode-hook #'flycheck-irony-setup))))
 
-     ;; Eldoc shows argument list of the function you are currently writing in the echo area.
-     (req-package irony-eldoc
-     :require eldoc irony
-     :config
-     (progn
-     (add-hook 'irony-mode-hook #'irony-eldoc)))
+;; Eldoc shows argument list of the function you are currently writing in the echo area.
+(req-package irony-eldoc
+:require eldoc irony
+:config
+(progn
+(add-hook 'irony-mode-hook #'irony-eldoc)))
 #+END_EXAMPLE
 
 [[https://github.com/Andersbakken/rtags][RTags]] is indexer for C/C++ (and ObjC/ObjC++) that comes with integration for Emacs. Basically, what it does is it actually understands your C++ project and therefore offers all the functionality that C++ IDE needs.
+[[https://github.com/Andersbakken/rtags][RTags]]是与Emacs集成的C/ c++(和ObjC/ObjC++)的索引器。基本上，它所做的就是真正理解你的c++项目，并因此提供所有c++ IDE需要的功能。
 
 As mentioned above, RTags indexes the whole projects and builds an index on the disk which it can query for information.
+如前所述，RTags为整个项目建立索引，并在磁盘上构建一个可以查询信息的索引。
 RTags consists of =rc= (client), =rdm= (daemon that does indexing) and Emacs =rtags= package that interacts with =rc=.
+RTags由=rc= (client)、=rdm=(执行索引的守护进程)和Emacs = RTags =与=rc=交互的包组成。
 =rdm= runs in the background, re-indexes files as needed (on change) and answers to queries from =rc=.
+=rdm=在后台运行，根据需要(更改时)重新索引文件，并回答来自=rc=的查询。
 
 ** Features
-    :PROPERTIES:
-    :CUSTOM_ID: features
-    :END:
+* *功能
+:PROPERTIES:
+属性:
+:CUSTOM_ID: features
+:CUSTOM_ID:功能
+:END:
+结束:
 
 - Code completion (both source and header files).
+-代码完成(源代码和头文件)。
 - Real-time syntax checking.
+-实时语法检查。
 - Jump to definition.
+-跳转到定义。
 - Find references.
+——找到引用。
 - ...
 
 ** Setup
-    :PROPERTIES:
-    :CUSTOM_ID: setup
-    :END:
+* *设置
+:PROPERTIES:
+属性:
+:CUSTOM_ID: setup
+:CUSTOM_ID:设置
+:END:
+结束:
 
 =rdm= and =rc= can be installed through Emacs =rtags= package by running =rtags-install=, or manually.
+=rdm=和=rc=可以通过Emacs =rtags= package来安装，方法是运行=rtag -install=，或者手动安装。
 Manual installation gives more control, and in that case it is best to configure it as systemd socket service.
+手动安装提供了更多的控制，在这种情况下，最好将其配置为systemd套接字服务。
 
 I like better manual installation, since in that case I can control number of processes that RTags uses.
+我喜欢手动安装，因为在这种情况下，我可以控制rtag使用的进程的数量。
 This is important because on larger projects reindexing takes a lot of CPU, so it makes sense to either go with smaller number of processes or turning automatic reindexing off.
+这一点很重要，因为在较大的项目中，重新索引会占用大量的CPU，所以应该减少进程数量，或者关闭自动重新索引。
 
 We have to manually register each new project with RTags, which is done by running =rc -J <path_to_compile_commands.json>=.
+我们必须用RTags手动注册每个新项目，这是通过运行=rc -J <path_to_compile_commands.json>=来完成的。
 If you installed RTags through emacs, =rc= is somewhere in its internal directory structure, so you have to find it to run this command. Also, make sure that =rdm= is running when doing that, and make sure it finishes indexing.
+如果通过emacs安装RTags，则=rc=位于其内部目录结构中的某个位置，因此必须找到它才能运行此命令。同时，确保=rdm=正在运行，并确保它完成了索引。
 
 RTags will make sure to automatically detect which project currently active buffer belongs to and tell rdm to switch to that project.
+RTags将确保自动检测当前活动缓冲区属于哪个项目，并告诉rdm切换到该项目。
 
 ** Configuration
-    :PROPERTIES:
-    :CUSTOM_ID: configuration-1
-    :END:
+* *配置
+:PROPERTIES:
+属性:
+:CUSTOM_ID: configuration-1
+:CUSTOM_ID:配置1
+:END:
+结束:
 
 Below is my configuration for RTags:
+下面是我对RTags的配置:
 
 #+BEGIN_EXAMPLE
-    (req-package rtags
-     :config
-     (progn
-     (unless (rtags-executable-find "rc") (error "Binary rc is not installed!"))
-     (unless (rtags-executable-find "rdm") (error "Binary rdm is not installed!"))
+(req-package rtags
+:config
+(progn
+(unless (rtags-executable-find "rc") (error "Binary rc is not installed!"))
+(unless (rtags-executable-find "rdm") (error "Binary rdm is not installed!"))
 
-     (define-key c-mode-base-map (kbd "M-.") 'rtags-find-symbol-at-point)
-     (define-key c-mode-base-map (kbd "M-,") 'rtags-find-references-at-point)
-     (define-key c-mode-base-map (kbd "M-?") 'rtags-display-summary)
-     (rtags-enable-standard-keybindings)
+(define-key c-mode-base-map (kbd "M-.") 'rtags-find-symbol-at-point)
+(define-key c-mode-base-map (kbd "M-,") 'rtags-find-references-at-point)
+(define-key c-mode-base-map (kbd "M-?") 'rtags-display-summary)
+(rtags-enable-standard-keybindings)
 
-     (setq rtags-use-helm t)
+(setq rtags-use-helm t)
 
-     ;; Shutdown rdm when leaving emacs.
-     (add-hook 'kill-emacs-hook 'rtags-quit-rdm)
-     ))
+;; Shutdown rdm when leaving emacs.
+(add-hook 'kill-emacs-hook 'rtags-quit-rdm)
+))
 
-    ;; TODO: Has no coloring! How can I get coloring?
-    (req-package helm-rtags
-     :require helm rtags
-     :config
-     (progn
-     (setq rtags-display-result-backend 'helm)
-     ))
+;; TODO: Has no coloring! How can I get coloring?
+(req-package helm-rtags
+:require helm rtags
+:config
+(progn
+(setq rtags-display-result-backend 'helm)
+))
 
-    ;; Use rtags for auto-completion.
-    (req-package company-rtags
-     :require company rtags
-     :config
-     (progn
-     (setq rtags-autostart-diagnostics t)
-     (rtags-diagnostics)
-     (setq rtags-completions-enabled t)
-     (push 'company-rtags company-backends)
-     ))
+;; Use rtags for auto-completion.
+(req-package company-rtags
+:require company rtags
+:config
+(progn
+(setq rtags-autostart-diagnostics t)
+(rtags-diagnostics)
+(setq rtags-completions-enabled t)
+(push 'company-rtags company-backends)
+))
 
-    ;; Live code checking.
-    (req-package flycheck-rtags
-     :require flycheck rtags
-     :config
-     (progn
-     ;; ensure that we use only rtags checking
-     ;; https://github.com/Andersbakken/rtags#optional-1
-     (defun setup-flycheck-rtags ()
-     (flycheck-select-checker 'rtags)
-     (setq-local flycheck-highlighting-mode nil) ;; RTags creates more accurate overlays.
-     (setq-local flycheck-check-syntax-automatically nil)
-     (rtags-set-periodic-reparse-timeout 2.0) ;; Run flycheck 2 seconds after being idle.
-     )
-     (add-hook 'c-mode-hook #'setup-flycheck-rtags)
-     (add-hook 'c++-mode-hook #'setup-flycheck-rtags)
-     ))
+;; Live code checking.
+(req-package flycheck-rtags
+:require flycheck rtags
+:config
+(progn
+;; ensure that we use only rtags checking
+;; https://github.com/Andersbakken/rtags#optional-1
+(defun setup-flycheck-rtags ()
+(flycheck-select-checker 'rtags)
+(setq-local flycheck-highlighting-mode nil) ;; RTags creates more accurate overlays.
+(setq-local flycheck-check-syntax-automatically nil)
+(rtags-set-periodic-reparse-timeout 2.0) ;; Run flycheck 2 seconds after being idle.
+)
+(add-hook 'c-mode-hook #'setup-flycheck-rtags)
+(add-hook 'c++-mode-hook #'setup-flycheck-rtags)
+))
 #+END_EXAMPLE
 
 Compared to Irony, RTags is more powerful but it is also more heavyweight.
+与讽刺相比，rtag更强大，但也更重量级。
 For example, RTags can jump to definitions, find references and do similar advanced stuff that Irony can't do, however Irony does not have to reindex big part of the project with each change which makes it much faster for big C++ projects.
+例如，RTags可以跳转到定义，查找引用，并执行类似的高级功能，而sarcasc无法做到这一点，但是sarcasc不必每次修改都重新索引项目的大部分内容，这大大加快了大型c++项目的速度。
 Also, it is worth noting that RTags works correctly with header files out of the box, while Irony does not support that yet.
+另外，值得注意的是，rtag可以正确地使用开箱即用的头文件，而Irony还不支持这一点。
 
 On smaller projects, I might go just with RTags, however on bigger projects (> 10k files) automatic reindexing becomes very resource demanding.
+对于较小的项目，我可能只使用rtag，但是对于较大的项目(> 10k文件)，自动重索引变得非常需要资源。
 What works well for me on bigger projects is using Irony for auto-complete and flycheck, since Irony works correct enough and is fast, while on the other hand I use RTags for more advanced features (jump to definition, find references, ...) and reindex manually from time to time.
+对我来说，在更大的项目中，最适合我的是使用Irony来实现自动补全和flycheck，因为Irony足够正确，而且速度很快，而另一方面，我使用rtag来实现更高级的功能(跳转到定义、查找引用……)，并时不时手动重新建立索引。
 
 In this post I have shown my init.el configurations for both RTags and Irony, but I don't have all of it active at the same time.
+在这篇文章中，我展示了我的init。rtag和Irony的el配置，但我并没有同时激活它们。
 I do have all of it in my init.el, but usually I (un)comment parts that I am (not)using currently, so for a very big project I might comment out company-rtags and flycheck-rtags configuration in favour of Irony.
+所有这些都在init中。但通常我(un)注释部分，我目前(不)使用，所以对于一个非常大的项目，我可能注释掉company-rtags和flycheck-rtags配置，以支持讽刺。
 
 In the future, as both packages advance, I expect Irony will get more features while RTags will become faster and I will able to choose just one of them.
+在未来，随着这两个包的发展，我预计sarcasl将获得更多的功能，而rtag将变得更快，我将能够从中选择一个。
 
 * Projectile
-   :PROPERTIES:
-   :CUSTOM_ID: projectile
-   :END:
+*弹
+:PROPERTIES:
+属性:
+:CUSTOM_ID: projectile
+:CUSTOM_ID:弹
+:END:
+结束:
 
 [[https://github.com/bbatsov/projectile][Projectile]] is a really nifty package, that “teaches” Emacs the concept of project.
+[[https://github.com/bbatsov/]]是一个非常漂亮的包，它“教导”Emacs项目的概念。
 
 This means that when working on a certain source file, it will understand which project this file belongs to and offer some nice features based on that.
+这意味着在处理某个源文件时，它将了解该文件属于哪个项目，并基于此提供一些不错的特性。
 
 Projectile usually works out of the box, since it will detect your VCS (I use git) files automatically and figure out the project root from that.
+投射通常是开箱即用的，因为它将自动检测您的VCS(我使用git)文件并从中找出项目根。
 If your case is more complicated, you can just create empty =.projectile= file in the root directory of your project and Projectile will detect it.
+如果您的情况比较复杂，您可以创建empty =。射弹=文件在您的项目的根目录，射弹将检测它。
 
 Setting it up is as easy as:
+设置它很简单:
 
 #+BEGIN_EXAMPLE
-    (req-package projectile
-     :config
-     (progn
-     (projectile-global-mode)
-     ))
+(req-package projectile
+:config
+(progn
+(projectile-global-mode)
+))
 #+END_EXAMPLE
 
 Features I found most useful are jumping to a file/buffer in project and switching from source file to corresponding header file.
+我发现最有用的特性是跳转到项目中的文件/缓冲区，并从源文件切换到相应的头文件。
 
 * Helm
-   :PROPERTIES:
-   :CUSTOM_ID: helm
-   :END:
+*头盔
+:PROPERTIES:
+属性:
+:CUSTOM_ID: helm
+:CUSTOM_ID:舵
+:END:
+结束:
 
 [[https://emacs-helm.github.io/helm/][Helm]] is Emacs incremental completion and selection narrowing framework.
+[[https://emacs-helm.github。io/helm/][helm]是Emacs增量完成和选择收缩框架。
 What that actually means is that if you use Helm, most of the searches/selections (finding file/buffer, browsing kill ring, executing command, ...) you do will have the same interface: Helm interface.
+这实际上意味着，如果你使用Helm，你所做的大多数搜索/选择(查找文件/缓冲区，浏览杀死环，执行命令，…)都会有相同的接口:Helm接口。
 It also comes with some other useful features, and there are many integrations with other packages.
+它还附带了一些其他有用的特性，并且与其他包有许多集成。
 
 Helm does not bring any C++ specific features, but since it is useful and adds to making Emacs a C++ IDE, I thought it is worth mentioning it.
+Helm没有带来任何c++特定的特性，但是由于它很有用，并且有助于使Emacs成为一个c++ IDE，所以我认为值得一提。
 
 My setup for it goes like this:
+我的设置是这样的:
 
 #+BEGIN_EXAMPLE
-    ;; Helm makes searching for anything nicer.
-    ;; It works on top of many other commands / packages and gives them nice, flexible UI.
-    (req-package helm
-     :config
-     (progn
-     (require 'helm-config)
+;; Helm makes searching for anything nicer.
+;; It works on top of many other commands / packages and gives them nice, flexible UI.
+(req-package helm
+:config
+(progn
+(require 'helm-config)
 
-     ;; Use C-c h instead of default C-x c, it makes more sense.
-     (global-set-key (kbd "C-c h") 'helm-command-prefix)
-     (global-unset-key (kbd "C-x c"))
+;; Use C-c h instead of default C-x c, it makes more sense.
+(global-set-key (kbd "C-c h") 'helm-command-prefix)
+(global-unset-key (kbd "C-x c"))
 
-     (setq
-     ;; move to end or beginning of source when reaching top or bottom of source.
-     helm-move-to-line-cycle-in-source t
-     ;; search for library in `require' and `declare-function' sexp.
-     helm-ff-search-library-in-sexp t
-     ;; scroll 8 lines other window using M-<next>/M-<prior>
-     helm-scroll-amount 8
-     helm-ff-file-name-history-use-recentf t
-     helm-echo-input-in-header-line t)
+(setq
+;; move to end or beginning of source when reaching top or bottom of source.
+helm-move-to-line-cycle-in-source t
+;; search for library in `require' and `declare-function' sexp.
+helm-ff-search-library-in-sexp t
+;; scroll 8 lines other window using M-<next>/M-<prior>
+helm-scroll-amount 8
+helm-ff-file-name-history-use-recentf t
+helm-echo-input-in-header-line t)
 
-     (global-set-key (kbd "M-x") 'helm-M-x)
-     (setq helm-M-x-fuzzy-match t) ;; optional fuzzy matching for helm-M-x
+(global-set-key (kbd "M-x") 'helm-M-x)
+(setq helm-M-x-fuzzy-match t) ;; optional fuzzy matching for helm-M-x
 
-     (global-set-key (kbd "C-x C-f") 'helm-find-files)
+(global-set-key (kbd "C-x C-f") 'helm-find-files)
 
-     (global-set-key (kbd "M-y") 'helm-show-kill-ring)
+(global-set-key (kbd "M-y") 'helm-show-kill-ring)
 
-     (global-set-key (kbd "C-x b") 'helm-mini)
-     (setq helm-buffers-fuzzy-matching t
-     helm-recentf-fuzzy-match t)
+(global-set-key (kbd "C-x b") 'helm-mini)
+(setq helm-buffers-fuzzy-matching t
+helm-recentf-fuzzy-match t)
 
-     ;; TOOD: helm-semantic has not syntax coloring! How can I fix that?
-     (setq helm-semantic-fuzzy-match t
-     helm-imenu-fuzzy-match t)
+;; TOOD: helm-semantic has not syntax coloring! How can I fix that?
+(setq helm-semantic-fuzzy-match t
+helm-imenu-fuzzy-match t)
 
-     ;; Lists all occurences of a pattern in buffer.
-     (global-set-key (kbd "C-c h o") 'helm-occur)
+;; Lists all occurences of a pattern in buffer.
+(global-set-key (kbd "C-c h o") 'helm-occur)
 
-     (global-set-key (kbd "C-h SPC") 'helm-all-mark-rings)
+(global-set-key (kbd "C-h SPC") 'helm-all-mark-rings)
 
-     ;; open helm buffer inside current window, not occupy whole other window
-     (setq helm-split-window-in-side-p t)
-     (setq helm-autoresize-max-height 50)
-     (setq helm-autoresize-min-height 30)
-     (helm-autoresize-mode 1)
+;; open helm buffer inside current window, not occupy whole other window
+(setq helm-split-window-in-side-p t)
+(setq helm-autoresize-max-height 50)
+(setq helm-autoresize-min-height 30)
+(helm-autoresize-mode 1)
 
-     (helm-mode 1)
-     ))
+(helm-mode 1)
+))
 
-    ;; Use Helm in Projectile.
-    (req-package helm-projectile
-     :require helm projectile
-     :config
-     (progn
-     (setq projectile-completion-system 'helm)
-     (helm-projectile-on)
-     ))
+;; Use Helm in Projectile.
+(req-package helm-projectile
+:require helm projectile
+:config
+(progn
+(setq projectile-completion-system 'helm)
+(helm-projectile-on)
+))
 #+END_EXAMPLE
 
 As you can see from the comments, I have an issue with helm-semantic not doing syntax coloring, I haven't figured out yet how to fix that.
+正如您从评论中看到的，我有一个helm-semantic不做语法着色的问题，我还没有找到解决的办法。
 
 * Summary
-   :PROPERTIES:
-   :CUSTOM_ID: summary
-   :END:
+*总结
+:PROPERTIES:
+属性:
+:CUSTOM_ID: summary
+:CUSTOM_ID:总结
+:END:
+结束:
 
 With few packages, Emacs can become a full-fledged C++ IDE!
+用很少的包，Emacs可以成为一个成熟的c++ IDE!
 
 I use Company, Flycheck, Helm, Projectile and Irony and/or RTags. Most of these packages require pretty simple setup, Irony and RTags being the most demanding but still manageable with medium effort.
+我使用连队，防飞，头盔，射弹和反讽和/或rtag。大多数这些包需要非常简单的设置，讽刺和rtag是要求最高的，但仍然可以用中等的工作量来管理。
 
 Irony and RTags are the “brain”, as they understand your C++ project (thanks to libclang) and provide code completion and other features.
+讽刺和rtag是“大脑”，因为它们理解您的c++项目(感谢libclang)并提供代码完成和其他特性。
 Although they are alternatives to each other and are not meant to be used together, I found that combination of the two is sometimes the best option since they have different strengths and weaknesses. In the future I hope to be able to use just one of them for projects of all types/sizes.
+虽然它们是彼此的替代品，并不意味着可以同时使用，但我发现两者的结合有时是最好的选择，因为它们有不同的优点和缺点。在未来，我希望能够使用其中之一，为所有类型/大小的项目。
 
 I hope this post will give you a good idea of how to get more out of Emacs for C++ development!
+我希望这篇文章能让您对如何从Emacs中获得更多的c++开发知识有一个很好的理解!
 I am also sure there is a lot that can be improved over my setup, so please write your suggestions and I will do my best to try them out and update this post.
+我也肯定有很多可以改进我的设置，所以请写下你的建议，我将尽我最大的努力去尝试和更新这篇文章。
 And again, big thanks to *tuhdo* for writing his [[https://tuhdo.github.io/c-ide.html][blog post]] that helped me a lot while setting up Emacs for C++ development, check it out.
+再次感谢*tuhdo*编写了他的[[https://tuhdo.github.io/c-ide]。这帮了我很大的忙，当我为c++开发设置Emacs时，看看吧。

@@ -4,228 +4,269 @@
 #+TAGS: raw
 #+DATE: [2018年 10月 24日 星期三 11:28:05 HKT]
 #+LANGUAGE:  zh-CN
-#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
 *Web scraping* is the extraction of data from web pages. But most web pages aren't designed to accomodate automated data extraction; instead, they're designed to be easily read by humans, with colors and fonts and pictures and all sorts of junk. This makes web scraping tricky. There are two predominant techniques for web scraping: *HTML parsing* and *browser automation*.
+*Web抓取*是从Web页面中提取数据。但大多数网页的设计都不支持自动数据提取;相反，它们被设计成便于人类阅读，有颜色、字体、图片和各种各样的垃圾。这使得网络抓取变得棘手。有两种主要的web抓取技术:*HTML解析*和*浏览器自动化*。
 
 Before going on, I must confess a shameful secret: *I don't understand HTML very well*. It's just too ugly to get me interested. Every so often I'll try to sit down and read about HTML, and I usually get bored and quit right around the time they get to unordered lists (*=<ul>=*). Why couldn't they just use *S-expressions*? Do the brackets and explicit close tags actually add anything? Whatever, it doesn't matter. The bottom line is that I hate dealing with HTML and I'd prefer to avoid it if I possibly can.
+在继续之前，我必须承认一个可耻的秘密:*我不太懂HTML *。太丑了，我没兴趣。每隔一段时间，我都会尝试坐下来阅读HTML，我通常会感到无聊，当他们进入无序列表时，我就会放弃(*=<ul>=*)。为什么他们不能使用* s -expression *?方括号和显式结束标记实际上添加了什么吗?不管怎样，都没关系。底线是，我讨厌处理HTML，如果可能的话，我宁愿避免它。
 
 So I'm left with browser automation if I want to scrape. But for simple scraping tasks, especially *one-off* tasks, most browser automation tools seem like *overkill*. You have to download the thing, then figure out how to use it, wade through documentation, learn the relevant APIs, blah blah blah. Maybe it's another personal failing, but I hate doing all that stuff, and again I would prefer to avoid it if I possibly can.
+因此，如果我想刮，我就只能使用浏览器自动化了。但是对于简单的抓取任务，尤其是一次性的任务，大多数浏览器自动化工具看起来都是“杀得过了头”。你必须下载这个东西，然后弄清楚如何使用它，浏览文档，学习相关的api等等。也许这是另一个个人的失败，但我讨厌做所有这些事情，如果可能的话，我宁愿避免这些事情。
 
 So what am I to do when I want to scrape? As usual, the answer is easy: *Emacs*. And why not? In most cases the data I want to scrape is text, and Emacs is an all-purpose text-handling tool, so really, what else would I use?
+那么当我想刮的时候我该怎么做呢?和往常一样，答案很简单:*Emacs*。为什么不呢?在大多数情况下，我想要获取的数据是文本，而Emacs是一个通用的文本处理工具，所以实际上，我还会使用什么?
 
 As an example, consider *Hurriyet Daily News*, an English-language Turkish news site. Comparing it to American news outlets in terms of jounalistic quality, I would it's like CNN -- not a real journalism organization like the New York Times, but also not a propoganda dissemination machine like Fox News. If you want to keep up with Turkish news and you don't speak Turkish, it's not a bad option.
+以土耳其英语新闻网站《每日新闻》(Hurriyet Daily News)为例。就新闻报道的质量而言，与美国新闻机构相比，我认为它就像CNN——不是像《纽约时报》那样的真正的新闻机构，也不是像福克斯新闻那样的宣传机器。如果你想了解土耳其新闻，但又不会说土耳其语，这是个不错的选择。
 
 Here's what *[[http://www.hurriyetdailynews.com/][hurriyetdailynews.com]]* looks like:
+下面是[[http://www.hurriyetdailynews.com/][hurriyetdailynews.com]]*的样子:
 
+[[https://nickdrozd.github.io/assets/2018-10-17-web-scraping/hurriyet-web.png]]
 [[https://nickdrozd.github.io/assets/2018-10-17-web-scraping/hurriyet-web.png]]
 
 The centerpiece of the landing page is a box containing a half dozen or so headlines with accompanying images. These headlines scroll through one at a time. Suppose, for whatever reason, that I'm interested in tracking the headlines that show up in that box. Here's how I would do it in Emacs.
+登陆页面的中心是一个盒子，里面有半打左右的标题和图片。这些标题一次滚动一个。假设，不管出于什么原因，我对跟踪出现在方框中的标题感兴趣。我在Emacs中是这样做的。
 
 First, pop the site open in the Emacs brower *eww*. It should looke like this (and if it doesn't, then the website has changed and this post is out of date):
+首先，在Emacs brower *eww*中打开站点。它应该看起来像这样(如果它不是，那么网站已经改变，这篇文章是过时的):
 
+[[https://nickdrozd.github.io/assets/2018-10-17-web-scraping/hurriyet-eww.png]]
 [[https://nickdrozd.github.io/assets/2018-10-17-web-scraping/hurriyet-eww.png]]
 
 There are the headlines, together with topic keywords and some kind of text object corresponding to the story (I think it doesn't show up because *Javascript* isn't run). Now, open an empty buffer. I usually call my empty buffers =asdf=, but you can call yours something else if you want. Our ultimate goal is to copy each of those headlines into the empty buffer, at which point we can do whatever with them.
+有标题、主题关键字和与故事对应的某种文本对象(我认为它不会显示，因为*Javascript*没有运行)。现在，打开一个空缓冲区。我通常调用我的空缓冲区=asdf=，但你可以调用你的其他东西，如果你想。我们的最终目标是将每个标题复制到空缓冲区中，这样我们就可以对它们进行任何操作。
 
 To do this, we'll use a *keyboard macro*. [[https://sites.google.com/site/steveyegge2/effective-emacs][Steve Yegge]] once said “I believe I can state without the slightest hint of exaggeration that Emacs keyboard macros are the coolest thing in the entire universe”, and he's not wrong. Keyboard macros make boring, repetitive tasks quick and even fun (I'll sometimes spend more time trying to craft the perfect macro than it would have taken me to do it manually). The way keyboard macros work is you start recording, then hit some keys, then stop recording. When you play back the macro, the keys you recorded will be entered again. The meaning of the keys is not recorded, just the keys themselves, so *be careful!*
+为此，我们将使用一个*keyboard宏*。[[https://sites.google.com/site/steveyegge2/effecemacs][Steve Yegge]]曾经说过“我相信我可以毫不夸张地说Emacs的键盘宏是整个宇宙中最酷的东西”，他没有错。键盘宏使枯燥、重复的任务变得很快，甚至很有趣(我有时会花更多的时间来制作完美的宏，而不是手工操作)。键盘宏的工作方式是你开始录制，然后按一些键，然后停止录制。当您回放宏时，您录制的键将再次被输入。钥匙的意思是没有记录，只是钥匙本身，所以*小心!*
 
 Now, pay attention here, because the details are important (except for the details of the headlines, which don't matter at all). For reference, the first few lines of the headline section looks something like this:
+现在，注意这里，因为细节是重要的(除了标题的细节，这一点都不重要)。作为参考，标题部分的前几行是这样的:
 
 #+BEGIN_EXAMPLE
-    Home Page
+Home Page
 
-    WORLD
-
-
-    Saudi consul in Istanbul 'relieved of post, to be investigated' as police knock door
-
-    TURKEY
+WORLD
 
 
-    Saudi journalist Khashoggi decapitated after fingers cut off: Reports
+Saudi consul in Istanbul 'relieved of post, to be investigated' as police knock door
+
+TURKEY
+
+
+Saudi journalist Khashoggi decapitated after fingers cut off: Reports
 #+END_EXAMPLE
 
 1.  Move point (cursor) to the beginning of the line in the =eww= buffer that says Home Page.
+1.  将光标移到表示主页的=eww= buffer中的行首。
 2.  Start recording a keyboard macro. The default binding for this is =C-x (=.
+2.  开始录制键盘宏。默认绑定是=C-x(=。
 3.  Hit =TAB=. This will jump down to the first topic keyword, which in this case is =WORLD=. (This is a link of some kind).
+3.= =选项卡。这将跳到第一个topic关键字，在本例中是=WORLD=。(这是某种链接)。
 4.  For whatever reason, the headlines can't be reached by =TAB=-jumping, so move the cursor down three lines (=C-n=, or =<down>=).
+4.  由于某种原因，无法通过=TAB=-jumping到达标题，因此将光标向下移动三行(=C-n=，或=<down>=)。
 5.  The cursor should now be at the beginning of the line that says “Saudi consul...”. If it isn't, move it there with =C-a=. Now highlight the whole line. This can be done by setting the mark and moving to the end of the line (=C-SPC C-e=), but it can be done other ways too.
+5.  光标现在应该在“沙特领事……”这一行的开头。如果不是，则使用=C-a=将其移动到那里。现在高亮整行。这可以通过设置标记并移动到行尾(=C-SPC C-e=)来实现，但是也可以通过其他方法来实现。
 6.  Copy the highlighted text, or kill it or whatever the weird Emacs terminology is. I use =C-k= for this, but that isn't the default binding, which I can never remember.
+6.  复制突出显示的文本，或者删除它，或者使用任何奇怪的Emacs术语。我使用=C-k=，但这不是默认绑定，我永远也记不住。
 7.  Jump over to the empty buffer. The default binding for this is =C-x b=, which is an unbelievably shitty way do something as common as changing buffers. Anyway, hit that and then enter the name of the empty buffer (=asdf= for me).
+7.  跳转到空缓冲区。它的默认绑定是=C-x b=，这是一种非常糟糕的方法，就像更改缓冲区一样常见。无论如何，点击它，然后输入空缓冲区的名称(=asdf= for me)。
 8.  The cursor should be at the beginning of the buffer, which should have nothing in it. Paste in (or yank or whatever) the copied text. I use =C-v= for this, which again is not the standard binding.
+8.  游标应该在缓冲区的开头，缓冲区中应该没有任何内容。粘贴(或猛拉或其他)复制的文本。这里我使用=C-v=，这也不是标准绑定。
 9.  Enter a newline (=RET=). The cursor should be at the beginning of an empty line at the end of the buffer.
+9.  输入换行(=RET=)。游标应该位于缓冲区末尾的空行开头。
 10. Jump back back to the =eww= buffer. The cursor should be at the end of the “Saudi consul...” line.
+10. 跳转回=eww=缓冲区。光标应该在“沙特领事…”“行。
 11. Stop recording the macro. The default binding for this is =C-x )=.
+11. 停止录制宏。默认绑定是=C-x)=。
 
 At this point the previously empty buffer should have the first headline, with an inactive cursor at the beginning of an empty line below it, and the active cursor should be at the end of the first headline in the =eww= buffer. Good? Okay, now execute the macro with =C-x e=. If it worked, the situation should be the same, but with the second headline copied into the other buffer, and the cursor at the end of the second headline in the =eww= buffer. Neat, right? If it didn't work, something got screwed up, and there's no telling what happened. Undo whatever it did and try again.
+在这一点上，先前的空缓冲区应该有第一个标题，在它下面的空行开头有一个不活动的游标，而活动的游标应该在=eww= buffer中第一个标题的末尾。好吗?好的，现在执行宏=C-x e=。如果它工作，情况应该是相同的，但第二个标题复制到另一个缓冲区，光标在=eww=缓冲区的第二个标题的结尾。整洁的,对吧?如果它不工作，事情就搞砸了，谁也不知道发生了什么。撤销它所做的一切，然后再试一次。
 
 There are a few more headlines, so execute the macro as many times as needed to get all of them. For convenience, after hitting =C-x e= the first time, the macro can be replayed again by just hitting =e=.
+还有一些标题，所以需要执行多少次宏就执行多少次，以获得所有的标题。为方便起见，在第一次点击=C-x e=之后，只需点击=e=即可重新播放宏。
 
 The copy buffer should look like this:
+复制缓冲区应该是这样的:
 
 #+BEGIN_EXAMPLE
-    Saudi consul in Istanbul 'relieved of post, to be investigated' as police knock door
-    Saudi journalist Khashoggi decapitated after fingers cut off: Reports
-    Suspects in Khashoggi case had ties to Saudi crown prince: Report
-    Turkey to clear Manbij if US fails to do so: Erdoğan tells Pompeo
-    Thousands of Turkish police, watchmen receive commando training
-    Istanbul metro receives first reverse vending machine
-    Dust storm from Syria immerses Turkey in orange cloud
+Saudi consul in Istanbul 'relieved of post, to be investigated' as police knock door
+Saudi journalist Khashoggi decapitated after fingers cut off: Reports
+Suspects in Khashoggi case had ties to Saudi crown prince: Report
+Turkey to clear Manbij if US fails to do so: Erdoğan tells Pompeo
+Thousands of Turkish police, watchmen receive commando training
+Istanbul metro receives first reverse vending machine
+Dust storm from Syria immerses Turkey in orange cloud
 #+END_EXAMPLE
 
 *And the headlines are scraped!* Obviously this was a somewhat labored explanation, but once you get the hang of keyboard macros, this kind of thing can be done very quickly.
+头条新闻都是刮出来的!显然，这是一个有点费力的解释，但一旦你掌握了键盘宏，这种事情可以很快完成。
 
 Okay, but there are new headlines every day; what if we want to scrape them regularly? It would be annoying to have to fiddle with keyboard macros every time.
+好吧，但是每天都有新的头条新闻;如果我们想要经常刮呢?每次都要摆弄键盘宏是很烦人的。
 
 Fortunately, macros can be named and saved. Go to your favorite config file or whatever and execute the following:
+幸运的是，可以命名和保存宏。打开你最喜欢的配置文件或其他文件，执行以下命令:
 
 #+BEGIN_EXAMPLE
-    (let ((macro-name 'hurriyet-scrape))
-     (name-last-kbd-macro macro-name)
-     (insert-kbd-macro macro-name))
+(let ((macro-name 'hurriyet-scrape))
+(name-last-kbd-macro macro-name)
+(insert-kbd-macro macro-name))
 #+END_EXAMPLE
 
 It should spit out something like this:
+它应该是这样的:
 
 #+BEGIN_EXAMPLE
-    (fset 'hurriyet-scrape
-     [tab ?\C-n ?\C-n ?\C-n ?\C- ?\C-e ?\C-k ?\C-t ?a ?s ?d ?f return ?\C-v return ?\C-t ?e ?w ?w return])
+(fset 'hurriyet-scrape
+[tab ?C-n ?C-n ?C-n ?C- ?C-e ?C-k ?C-t ?a ?s ?d ?f return ?C-v return ?C-t ?e ?w ?w return])
 #+END_EXAMPLE
 
 Now, if you wanted to leave it at that, you could, and you would, as far as anyone could tell, have a function that did exactly what the macro did. You could call it, bind it to a key, whatever. However, with a macro as complex as this one, it's usually better just to *write a real function*. This can be done without too much trouble, as the bulk of the work is just figuring out what commands the key presses are bound to, and then putting those in the function. It doesn't have to be fancy.
+现在，如果你想让它停留在这里，你可以，你可以，就像任何人所知道的那样，得到一个和宏观函数完全一样的函数。你可以调用它，把它绑定到一个键上，等等。但是，对于像这样复杂的宏，通常最好只写一个实函数。这样做不需要太多的麻烦，因为大量的工作只是确定键按被绑定到什么命令，然后将这些命令放到函数中。不需要很花哨。
 
 Here's a function for scraping Hurriyet based on that macro. It grabs the headlines and then dumps them into a file called =hurriyet-headlines= along with a timestamp. Some example output:
+这是一个基于这个宏的关于抓取的函数。它获取标题，然后将它们与时间戳一起转储到一个名为=hurriyet-headline =的文件中。一些示例输出:
 
 #+BEGIN_EXAMPLE
-    2018-09-21 14:26:04 UTC
+2018-09-21 14:26:04 UTC
 
-    Turkey, Russia agree on borders of Idlib disarmament zone
-    German FM praises Turkey’s efforts for Idlib
-    Turkey expects US to implement Manbij roadmap without delays
-    Main opposition lawmaker Berberoğlu speaks after release from prison
-    Letter with forged signature of Erdoğan stirs Swiss controversy
-    Turkish mother found alive after going missing in wild for three days
-
-
-    2018-09-20 13:08:09 UTC
-
-    Turkey’s medium-term economic program revises inflation, growth targets
-    Turkey will protect its energy rights in Mediterranean: Minister
-    President Erdoğan meets representatives of US companies in Turkey
-    Ankara sharply cuts investment levels for Turkish citizenship
-    Turkish mayor of town bordering Syria attacked
-    Main opposition leader criticizes party’s performance in June elections
-    Turkey to work to strengthen ties with Russia: Minister
+Turkey, Russia agree on borders of Idlib disarmament zone
+German FM praises Turkey’s efforts for Idlib
+Turkey expects US to implement Manbij roadmap without delays
+Main opposition lawmaker Berberoğlu speaks after release from prison
+Letter with forged signature of Erdoğan stirs Swiss controversy
+Turkish mother found alive after going missing in wild for three days
 
 
-    2018-09-19 17:42:32 UTC
+2018-09-20 13:08:09 UTC
 
-    No crisis in Turkey, all manipulations: President Erdoğan
-    Ankara sharply cuts investment levels for Turkish citizenship
-    Turkish mayor of town bordering Syria attacked
-    Main opposition leader criticizes party’s performance in June elections
-    Turkey to work to strengthen ties with Russia: Minister
-    24 workers arrested after new Istanbul airport protests
-    85-year-old man kills wife in Istanbul over ‘social media jealousy’
+Turkey’s medium-term economic program revises inflation, growth targets
+Turkey will protect its energy rights in Mediterranean: Minister
+President Erdoğan meets representatives of US companies in Turkey
+Ankara sharply cuts investment levels for Turkish citizenship
+Turkish mayor of town bordering Syria attacked
+Main opposition leader criticizes party’s performance in June elections
+Turkey to work to strengthen ties with Russia: Minister
+
+
+2018-09-19 17:42:32 UTC
+
+No crisis in Turkey, all manipulations: President Erdoğan
+Ankara sharply cuts investment levels for Turkish citizenship
+Turkish mayor of town bordering Syria attacked
+Main opposition leader criticizes party’s performance in June elections
+Turkey to work to strengthen ties with Russia: Minister
+24 workers arrested after new Istanbul airport protests
+85-year-old man kills wife in Istanbul over ‘social media jealousy’
 #+END_EXAMPLE
 
 And the code itself:
+以及守则本身:
 
 #+BEGIN_EXAMPLE
-    (require 'shr)
+(require 'shr)
 
-    (defun scrape-hurriyet-headlines ()
-     "Scrape the top Hurriyet Daily News headlines.
+(defun scrape-hurriyet-headlines ()
+"Scrape the top Hurriyet Daily News headlines.
 
-    The Hurriyet home page is expected to be laid out as follows:
+The Hurriyet home page is expected to be laid out as follows:
 
-    <front matter>
+<front matter>
 
-    Home Page
+Home Page
 
-    <topic -- LINK>
-    <story>
+<topic -- LINK>
+<story>
 
-    <headline>
+<headline>
 
-    <topic -- LINK>
-    <story>
+<topic -- LINK>
+<story>
 
-    <headline>
+<headline>
 
-    <topic -- LINK>
-    <story>
+<topic -- LINK>
+<story>
 
-    <headline>
+<headline>
 
-    ...
+...
 
-    The scraping strategy will be to jump to that home page section, then
-    walk down the first seven links and copy the headlines associated with
-    them, pasting them in to a result file.
-    "
-     (interactive)
-     (let ((site "http://www.hurriyetdailynews.com/")
-     (file (find-file "~/hurriyet-headlines"))
-     (headline-count 7))
-     ;; Add date and time
-     (switch-to-buffer file)
-     (goto-char (point-min))
-     (insert (format-time-string "%F %T %Z" nil t))
-     (newline 2)
+The scraping strategy will be to jump to that home page section, then
+walk down the first seven links and copy the headlines associated with
+them, pasting them in to a result file.
+"
+(interactive)
+(let ((site "http://www.hurriyetdailynews.com/")
+(file (find-file "~/hurriyet-headlines"))
+(headline-count 7))
+;; Add date and time
+(switch-to-buffer file)
+(goto-char (point-min))
+(insert (format-time-string "%F %T %Z" nil t))
+(newline 2)
 
-     ;; Give eww some time to load
-     (eww site)
-     (sit-for 2)
+;; Give eww some time to load
+(eww site)
+(sit-for 2)
 
-     ;; Jump to "Home Page" header
-     (re-search-forward "^home page$")
+;; Jump to "Home Page" header
+(re-search-forward "^home page$")
 
-     ;; Stories look like this in eww:
-     ;; <topic -- LINK>
-     ;; <story>
-     ;;
-     ;; <headline>
+;; Stories look like this in eww:
+;; <topic -- LINK>
+;; <story>
+;;
+;; <headline>
 
-     (dotimes (_ headline-count)
-     ;; Navigate to headline
-     (shr-next-link)
-     (dotimes (_ 3)
-     (forward-line))
+(dotimes (_ headline-count)
+;; Navigate to headline
+(shr-next-link)
+(dotimes (_ 3)
+(forward-line))
 
-     ;; Copy headline
-     (set-mark-command nil)
-     (move-end-of-line nil)
-     (kill-ring-save t t t)
-     (deactivate-mark)
+;; Copy headline
+(set-mark-command nil)
+(move-end-of-line nil)
+(kill-ring-save t t t)
+(deactivate-mark)
 
-     ;; Paste headline
-     (switch-to-buffer file)
-     (yank)
-     (newline)
-     (switch-to-buffer "*eww*"))
+;; Paste headline
+(switch-to-buffer file)
+(yank)
+(newline)
+(switch-to-buffer "*eww*"))
 
-     ;; Save and prepare file for next invocation
-     (switch-to-buffer file)
-     (newline 2)
-     (save-buffer file)))
+;; Save and prepare file for next invocation
+(switch-to-buffer file)
+(newline 2)
+(save-buffer file)))
 #+END_EXAMPLE
 
 To be clear, this is *NOT elegant Elisp*, and it definitely does stuff that would be inappropriate in a distributed package. It's also *brittle*, as scrapers tend to be -- if the Hurriyet website changed its format, I would have to dump it in the trash and start over. Nonetheless, it works fine for personal use.
+需要说明的是，这不是优雅的Elisp*，它确实做了一些在分布式包中不合适的事情。它也很“脆弱”，因为信息搜集公司往往是这样的——如果《每日新闻》网站改变了它的格式，我将不得不把它扔进垃圾箱，重新开始。尽管如此，它对个人使用还是很有效的。
 
 * Footnotes
+*脚注
 
 1. *hürriyet* is a Turkish word derived from the Arabic حرية meaning freedom.
+1. * hurriyet *土耳其词来源于阿拉伯语حرية意义的自由。
 
 2. *eww* is short for *Emacs Web Wowser*. Really.
+2. *eww*是*Emacs Web Wowser*的缩写。真的。
 
 3. Note that keyboard macros are completely unrelated to Lisp macros.
+3.注意，键盘宏与Lisp宏完全无关。
 
 4. =kmacro-name-last-macro= can be used in place of =name-last-kbd-macro=. Its output is a little different:
+4. =kmacro-name-last-macro=可以代替=name-last-kbd-macro=。它的输出有点不同:
 
 #+BEGIN_EXAMPLE
-    (fset 'hurriyet-scrape
-     (lambda (&optional arg) "Keyboard macro." (interactive "p") (kmacro-exec-ring-item (quote ([tab 14 14 14 67108896 5 11 20 97 115 100 102 return 22 20 101 119 119 return] 0 "%d")) arg)))
+(fset 'hurriyet-scrape
+(lambda (&optional arg) "Keyboard macro." (interactive "p") (kmacro-exec-ring-item (quote ([tab 14 14 14 67108896 5 11 20 97 115 100 102 return 22 20 101 119 119 return] 0 "%d")) arg)))
 #+END_EXAMPLE
 
 This one uses numerical key codes, which I find hard to decipher (you can see =97 115 100 102= for =asdf=, for instance).
+这一个使用数字键码，我发现很难破译(例如，您可以看到=97 115 100 102= for =asdf=)。

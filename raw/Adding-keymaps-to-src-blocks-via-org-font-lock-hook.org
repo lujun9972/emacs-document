@@ -4,190 +4,351 @@
 #+TAGS: raw
 #+DATE: [2017-06-14 三 16:19]
 #+LANGUAGE:  zh-CN
-#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
 
 
 I had an idea to use custom keymaps in src-blocks. For example, you could then
+我有一个在src块中使用自定义键映射的想法。例如，你可以
 use lispy directly in your org-files without entering org-special-edit, or the
+直接在组织文件中使用lispy，而不需要输入org-special-edit或
 elpy key-bindings in python blocks. There are other solutions I have seen,
+python块中的elpy键绑定。我还看到了其他的解决方案，
 e.g. polymode, that claim to do this. You might guess that if they worked, I
+例如polymode，声称要这样做。你可能会猜，如果他们工作，我
 would not be writing this! There was some nice discussion about this idea on
+就不会写这些了!关于这个想法有一些很好的讨论
 the org-mode mailing list, and Nicolas Goaziou pointed out this might be
+组织模式邮件列表，Nicolas Goaziou指出这可能是
 accomplished with the org-font-lock-hook.
+使用org-font-lock-hook完成。
 
 You can check out the video here:
+你可以在这里观看视频:
 
+[[https://www.youtube.com/embed/a2jHqB1qWiY]]
 [[https://www.youtube.com/embed/a2jHqB1qWiY]]
 
 It was relatively easy to figure out how to do this. Keymaps can be added to
+解决这个问题相对容易。可以将键映射添加到
 regions during font-lock, so I just had to hook into the org-mode font lock
+区域在字体锁定，所以我只是钩到组织模式字体锁定
 system with a function to find the src blocks and add the keymap as a
+系统具有查找src块并添加keymap的功能
 text-property. That took three steps:
+文本属性。这需要三个步骤:
 
- 1. Define the keymaps to use. I use an a-list of (language . map) for this.
- 2. Define the font-lock function. This will add the keymap properties to
-    src-blocks.
- 3. Define a minor mode to toggle this feature on and off.
+1. Define the keymaps to use. I use an a-list of (language . map) for this.
+1. 定义要使用的键映射。我用的是第一流的语言。地图)。
+2. Define the font-lock function. This will add the keymap properties to
+2. 定义字体锁定函数。这将向其中添加keymap属性
+src-blocks.
+src-blocks。
+3. Define a minor mode to toggle this feature on and off.
+3.定义一个次要模式来打开和关闭此功能。
 
 Here is the definition of the keymaps. Generally I just copy the mode-map I
+下面是键映射的定义。通常我只是复制模式映射I
 want and then add some things to them. For example sometimes it is still a
+想要，然后添加一些东西到他们。例如，有时它仍然是
 good idea to jump into the org-special-edit mode. For example, if you try to
+跳进组织-特别编辑模式是个好主意。例如，如果你尝试
 use a command in a Python block to send the buffer to the repl while in
+使用Python块中的命令将缓冲区发送到repl
 org-mode you are sure to get an error! You might also want to add the C-c C-e
+组织模式你一定会得到一个错误!你也可以加上C-c - C-e
 export command if you use that a lot. An alternative approach, of course, is
+导出命令，如果您经常使用它。当然，另一种方法是
 to copy the org-map and add additional bindings to it. The choice is up to
+复制组织映射并向其添加附加绑定。选择权在你
 you.
+你。
 
 #+BEGIN_SRC emacs-lisp
-  (require 'lispy)
-  (require 'elpy)
+# + BEGIN_SRC emacs lisp
+(require 'lispy)
+(需要的lispy)
+(require 'elpy)
+(需要的elpy)
 
-  (setq scimax-src-block-keymaps
-        `(("ipython" . ,(let ((map (make-composed-keymap
-                                    `(,elpy-mode-map ,python-mode-map ,pyvenv-mode-map)
-                                    org-mode-map)))
-                          ;; In org-mode I define RET so we f
-                          (define-key map (kbd "<return>") 'newline)
-                          (define-key map (kbd "C-c C-c") 'org-ctrl-c-ctrl-c)
-                          map))
-          ("python" . ,(let ((map (make-composed-keymap
-                                   `(,elpy-mode-map ,python-mode-map ,pyvenv-mode-map)
-                                   org-mode-map)))
-                         ;; In org-mode I define RET so we f
-                         (define-key map (kbd "<return>") 'newline)
-                         (define-key map (kbd "C-c C-c") 'org-ctrl-c-ctrl-c)
-                         map))
-          ("emacs-lisp" . ,(let ((map (make-composed-keymap `(,lispy-mode-map
-                                                              ,emacs-lisp-mode-map
-                                                              ,outline-minor-mode-map)
-                                                            org-mode-map)))
-                             (define-key map (kbd "C-c C-c") 'org-ctrl-c-ctrl-c)
-                             map))))
+(setq scimax-src-block-keymaps
+(setq scimax-src-block-keymaps
+`(("ipython" . ,(let ((map (make-composed-keymap
+”(“ipython”。,((((make-composed-keymap地图
+`(,elpy-mode-map ,python-mode-map ,pyvenv-mode-map)
+“点阵准备”
+org-mode-map)))
+org-mode-map)))
+;; In org-mode I define RET so we f
+;;在组织模式中，我定义RET，所以我们f
+(define-key map (kbd "<return>") 'newline)
+(定义键映射(kbd“<return>”)“换行符)
+(define-key map (kbd "C-c C-c") 'org-ctrl-c-ctrl-c)
+(定义键映射(kbd“C-c -c”)“org-ctrl-c-ctrl-c)
+map))
+地图))
+("python" . ,(let ((map (make-composed-keymap
+(“python”。,((((make-composed-keymap地图
+`(,elpy-mode-map ,python-mode-map ,pyvenv-mode-map)
+“点阵准备”
+org-mode-map)))
+org-mode-map)))
+;; In org-mode I define RET so we f
+;;在组织模式中，我定义RET，所以我们f
+(define-key map (kbd "<return>") 'newline)
+(定义键映射(kbd“<return>”)“换行符)
+(define-key map (kbd "C-c C-c") 'org-ctrl-c-ctrl-c)
+(定义键映射(kbd“C-c -c”)“org-ctrl-c-ctrl-c)
+map))
+地图))
+("emacs-lisp" . ,(let ((map (make-composed-keymap `(,lispy-mode-map
+(“emacs lisp”。，(let ((map (make- composite -keymap '))，lispy-mode-map
+,emacs-lisp-mode-map
+,emacs-lisp-mode-map
+,outline-minor-mode-map)
+outline-minor-mode-map)
+org-mode-map)))
+org-mode-map)))
+(define-key map (kbd "C-c C-c") 'org-ctrl-c-ctrl-c)
+(定义键映射(kbd“C-c -c”)“org-ctrl-c-ctrl-c)
+map))))
+地图))))
 #+END_SRC
+# + END_SRC
 
 Next we define the function that will apply the keymap to each src block. The
+接下来，我们定义将密钥映射应用到每个src块的函数。的
 keymaps are only applied when they are defined in the variable above. This
+只有在上面的变量中定义了键映射时，才会应用它们。这
 function is derived from org-fontify-meta-lines-and-blocks-1.
+函数源自org-fontify-meta-line -and-blocks-1。
 
 #+BEGIN_SRC emacs-lisp
-  (defun scimax-add-keymap-to-src-blocks (limit)
-    "Add keymaps to src-blocks defined in `scimax-src-block-keymaps'."
-    (let ((case-fold-search t)
-          lang)
-      (while (re-search-forward org-babel-src-block-regexp limit t)
-        (let ((lang (match-string 2))
-              (beg (match-beginning 0))
-              (end (match-end 0)))
-          (if (assoc (org-no-properties lang) scimax-src-block-keymaps)
-              (progn
-                (add-text-properties
-                 beg end `(local-map ,(cdr (assoc
-                                            (org-no-properties lang)
-                                            scimax-src-block-keymaps))))
-                (add-text-properties
-                 beg end `(cursor-sensor-functions
-                           ((lambda (win prev-pos sym)
-                              ;; This simulates a mouse click and makes a menu change
-                              (org-mouse-down-mouse nil)))))))))))
+# + BEGIN_SRC emacs lisp
+(defun scimax-add-keymap-to-src-blocks (limit)
+(defun scimax-add-keymap-to-src-blocks(限制)
+"Add keymaps to src-blocks defined in `scimax-src-block-keymaps'."
+“将密钥映射添加到‘scimax-src-block-keymaps’中定义的src块。”
+(let ((case-fold-search t)
+(让((case-fold-search t)
+lang)
+长)
+(while (re-search-forward org-babel-src-block-regexp limit t)
+(同时(重新搜索-babel-src-block-regexp limit t)
+(let ((lang (match-string 2))
+((lang (match-string 2))
+(beg (match-beginning 0))
+(求(match-beginning 0))
+(end (match-end 0)))
+(结束(match-end 0)))
+(if (assoc (org-no-properties lang) scimax-src-block-keymaps)
+(assoc (org-no-properties lang) scimax-src-block-keymaps)
+(progn
+(progn
+(add-text-properties
+(add-text-properties
+beg end `(local-map ,(cdr (assoc
+请求结束'(地方地图，)
+(org-no-properties lang)
+(org-no-properties朗)
+scimax-src-block-keymaps))))
+scimax-src-block-keymaps))))
+(add-text-properties
+(add-text-properties
+beg end `(cursor-sensor-functions
+请求结束”(cursor-sensor-functions
+((lambda (win prev-pos sym)
+(lambda (win prep -pos sym))
+;; This simulates a mouse click and makes a menu change
+;;这将模拟鼠标单击并更改菜单
+(org-mouse-down-mouse nil)))))))))))
+(org-mouse-down-mouse nil)))))))))))
 #+END_SRC
+# + END_SRC
 
 Here we create an advice to trick any functions that need to know the major
+这里我们创建了一个建议来欺骗任何需要知道专业的函数
 mode. We only apply the spoof if we are in org-mode and in a src block though.
+模式。我们只在组织模式和src块中应用欺骗。
 Otherwise we call the original function. So far lispy–eval is the only
+否则我们调用原始函数。到目前为止，lispy-eval是唯一的
 function I have needed it for. This might be a general strategy though to do
+功能我需要它。这可能是一个通用的策略
 other things like narrow to the src-block, or even go into special edit mode
+其他的比如缩小到src块，甚至进入特殊的编辑模式
 temporarily if there are commands that require it.
+暂时的，如果有命令需要它。
 
 #+BEGIN_SRC emacs-lisp
-  (defun scimax-spoof-mode (orig-func &rest args)
-    "Advice function to spoof commands in org-mode src blocks.
-  It is for commands that depend on the major mode. One example is
-  `lispy--eval'."
-    (if (org-in-src-block-p)
-        (let ((major-mode (intern (format "%s-mode" (first (org-babel-get-src-block-info))))))
-          (apply orig-func args))
-      (apply orig-func args)))
+# + BEGIN_SRC emacs lisp
+(defun scimax-spoof-mode (orig-func &rest args)
+(defun scimax-spoof模式)
+"Advice function to spoof commands in org-mode src blocks.
+通知功能，以欺骗命令在组织模式src块。
+It is for commands that depend on the major mode. One example is
+它适用于依赖于主模式的命令。一个例子是
+`lispy--eval'."
+“lispy——eval’。”
+(if (org-in-src-block-p)
+(如果(org-in-src-block-p)
+(let ((major-mode (intern (format "%s-mode" (first (org-babel-get-src-block-info))))))
+(let((主模式)(实习生(格式化"%s模式" (first (org-babel-get-src-block-info)))
+(apply orig-func args))
+(应用orig-func args))
+(apply orig-func args)))
+(应用orig-func args)))
 #+END_SRC
+# + END_SRC
 
 We define a minor mode so we can toggle this on and off. Here we add the
+我们定义了一个次要模式，这样我们就可以切换它的开启和关闭
 function to the org-font-lock-hook and advise the lispy–eval function. I had
+函数，并通知lispy-eval函数。我有
 to add the font-lock-function to the end of the org-font-lock hook for some
+在某些情况下，可以在org-font-lock钩子的末尾添加font-lock函数
 reason, and also add local-map as an extra-managed property so it would be
+原因，并将local-map添加为一个额外管理的属性
 removed when we toggle it off.
+当我们把它关掉时，它就消失了。
 
 #+BEGIN_SRC emacs-lisp
-  (define-minor-mode scimax-src-keymap-mode
-    "Minor mode to add mode keymaps to src-blocks."
-    :init-value nil
-    (if scimax-src-keymap-mode
-        (progn
-          (add-hook 'org-font-lock-hook #'scimax-add-keymap-to-src-blocks t)
-          (add-to-list 'font-lock-extra-managed-props 'local-map)
-          (add-to-list 'font-lock-extra-managed-props 'cursor-sensor-functions)
-          (advice-add 'lispy--eval :around 'scimax-spoof-mode)
-          (cursor-sensor-mode +1))
-      (remove-hook 'org-font-lock-hook #'scimax-add-keymap-to-src-blocks)
-      (advice-remove 'lispy--eval 'scimax-spoof-mode)
-      (cursor-sensor-mode -1))
-    (font-lock-fontify-buffer))
+# + BEGIN_SRC emacs lisp
+(define-minor-mode scimax-src-keymap-mode
+(define-minor-mode scimax-src-keymap-mode
+"Minor mode to add mode keymaps to src-blocks."
+次要模式添加模式键映射到src块。
+:init-value nil
+:init-value尼罗河
+(if scimax-src-keymap-mode
+(如果scimax-src-keymap-mode
+(progn
+(progn
+(add-hook 'org-font-lock-hook #'scimax-add-keymap-to-src-blocks t)
+(add-hook 'org-font-lock-hook #'scimax-add-keymap-to-src blocks t)
+(add-to-list 'font-lock-extra-managed-props 'local-map)
+(增加到列表font-lock-extra-managed-props local map)
+(add-to-list 'font-lock-extra-managed-props 'cursor-sensor-functions)
+(增加到列表font-lock-extra-managed-props cursor-sensor-functions)
+(advice-add 'lispy--eval :around 'scimax-spoof-mode)
+(建议添加'lispy—eval:around 'scimax-spoof-mode)
+(cursor-sensor-mode +1))
+(cursor-sensor-mode + 1))
+(remove-hook 'org-font-lock-hook #'scimax-add-keymap-to-src-blocks)
+(remove-hook org-font-lock-hook # scimax-add-keymap-to-src-blocks)
+(advice-remove 'lispy--eval 'scimax-spoof-mode)
+(advice-remove lispy - eval scimax-spoof-mode)
+(cursor-sensor-mode -1))
+(cursor-sensor-mode 1))
+(font-lock-fontify-buffer))
+(font-lock-fontify-buffer))
 
-  (add-hook 'org-mode-hook (lambda ()
-                             (scimax-src-keymap-mode +1)))
+(add-hook 'org-mode-hook (lambda ()
+(add-hook 'org-mode-hook (lambda ()
+(scimax-src-keymap-mode +1)))
+(scimax-src-keymap-mode + 1)))
 #+END_SRC
+# + END_SRC
 
 That is it! I am pretty sure this is a good idea. It helps a lot when you are
+这就是它!我很确定这是个好主意。这对你很有帮助
 writing a lot of short code blocks and near equal amounts of text (like in
+编写大量的短代码块和几乎相同数量的文本(比如in)
 this blog post). It also helps write the code since many things like
+这篇文章)。它也有助于写代码，因为许多事情像
 indentation, parentheses, etc. are automatically handled. That is what I used
+缩进、括号等自动处理。我用的就是这个
 to go into special-edit mode all the time for!
+要进入特殊编辑模式的所有时间!
 
 I have not used this long enough to know if it causes any other surprises. If
+我使用这个时间还不够长，不知道它是否会引起其他意外。如果
 you try it and find any, leave a comment!
+你可以试一试，找到任何一个，请留言!
 
 * Update
+*更新
 
 It turns out you can have the best of all the worlds by combining keymaps. The
+事实证明，通过组合键映射，您可以获得最好的结果。的
 make-composed-keymap creates a new keymap that combines a keymaps and falls
+make-composed-keymap创建一个新的keymap，它组合了一个键映射和falls
 through to a parent keymap. So here we use that to combine several keymaps,
+转到父键映射。这里我们用它来组合几个键映射，
 falling through to org-mode. The only subtlety I have come across is that I
+进入组织模式。我所遇到的唯一微妙之处就是我
 remapped <return> in orgmode to scimax/org-return, and not all modes define
+重新映射<在组织模式中返回>到scimax/org-return，并不是所有模式都定义
 it, so I redefine it in some places to just be newline. Also to keep C-c C-c
+所以我在某些地方重新定义了它为换行。还要保持C-c C-c
 for executing the block, I add that back too.
+对于执行块，我也将其添加回去。
 
 I use a few maps here, and some of them seem to just add menus that are only
+我在这里使用了一些地图，其中一些似乎只是添加了一些菜单
 active when your cursor is in the block. Pretty handy!
+当光标位于块中时激活。非常方便!
 
 #+BEGIN_SRC emacs-lisp
-  (setq scimax-src-block-keymaps
-        `(("ipython" . ,(let ((map (make-composed-keymap
-                                    `(,elpy-mode-map ,python-mode-map ,pyvenv-mode-map)
-                                    org-mode-map)))
-                          ;; In org-mode I define RET so we f
-                          (define-key map (kbd "<return>") 'newline)
-                          (define-key map (kbd "C-c C-c") 'org-ctrl-c-ctrl-c)
-                          map))
-          ("python" . ,(let ((map (make-composed-keymap
-                                   `(,elpy-mode-map ,python-mode-map ,pyvenv-mode-map)
-                                   org-mode-map)))
-                         ;; In org-mode I define RET so we f
-                         (define-key map (kbd "<return>") 'newline)
-                         (define-key map (kbd "C-c C-c") 'org-ctrl-c-ctrl-c)
-                         map))
-          ("emacs-lisp" . ,(let ((map (make-composed-keymap `(,lispy-mode-map
-                                                              ,emacs-lisp-mode-map
-                                                              ,outline-minor-mode-map)
-                                                            org-mode-map)))
-                             (define-key map (kbd "C-c C-c") 'org-ctrl-c-ctrl-c)
-                             map))))
+# + BEGIN_SRC emacs lisp
+(setq scimax-src-block-keymaps
+(setq scimax-src-block-keymaps
+`(("ipython" . ,(let ((map (make-composed-keymap
+”(“ipython”。,((((make-composed-keymap地图
+`(,elpy-mode-map ,python-mode-map ,pyvenv-mode-map)
+“点阵准备”
+org-mode-map)))
+org-mode-map)))
+;; In org-mode I define RET so we f
+;;在组织模式中，我定义RET，所以我们f
+(define-key map (kbd "<return>") 'newline)
+(定义键映射(kbd“<return>”)“换行符)
+(define-key map (kbd "C-c C-c") 'org-ctrl-c-ctrl-c)
+(定义键映射(kbd“C-c -c”)“org-ctrl-c-ctrl-c)
+map))
+地图))
+("python" . ,(let ((map (make-composed-keymap
+(“python”。,((((make-composed-keymap地图
+`(,elpy-mode-map ,python-mode-map ,pyvenv-mode-map)
+“点阵准备”
+org-mode-map)))
+org-mode-map)))
+;; In org-mode I define RET so we f
+;;在组织模式中，我定义RET，所以我们f
+(define-key map (kbd "<return>") 'newline)
+(定义键映射(kbd“<return>”)“换行符)
+(define-key map (kbd "C-c C-c") 'org-ctrl-c-ctrl-c)
+(定义键映射(kbd“C-c -c”)“org-ctrl-c-ctrl-c)
+map))
+地图))
+("emacs-lisp" . ,(let ((map (make-composed-keymap `(,lispy-mode-map
+(“emacs lisp”。，(let ((map (make- composite -keymap '))，lispy-mode-map
+,emacs-lisp-mode-map
+,emacs-lisp-mode-map
+,outline-minor-mode-map)
+outline-minor-mode-map)
+org-mode-map)))
+org-mode-map)))
+(define-key map (kbd "C-c C-c") 'org-ctrl-c-ctrl-c)
+(定义键映射(kbd“C-c -c”)“org-ctrl-c-ctrl-c)
+map))))
+地图))))
 #+END_SRC
+# + END_SRC
 
 * Update #2
+*更新# 2
 
 The previous version had some issues where it would only add a keymap to the
+以前的版本有一些问题，它只会添加一个键映射到
 first block. The code in this post now addresses that and uses
+第一块。本文中的代码现在处理并使用它
 cursor-sensor-functions to make sure we change key map on entering and leaving
+指针-传感器-功能，以确保我们改变关键地图的进出
 blocks. That might mean you need an emacs of at least version 25 to use this.
+块。这可能意味着您需要至少版本25的emacs才能使用它。
 I guess it will work with an earlier version, but the cursor-sensor-functions
+我想它将与一个较早的版本，但光标-传感器-功能
 might get ignored. You might have to comment out the cursor-sensor-mode line
+可能会忽略。您可能必须注释掉指针-传感器-模式行
 
 Thanks to those brave people alpha-testing this and helping refine the idea!
+感谢那些勇敢的人-测试这一点，并帮助完善的想法!

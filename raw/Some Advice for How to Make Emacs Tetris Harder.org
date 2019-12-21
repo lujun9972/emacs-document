@@ -4,126 +4,155 @@
 #+TAGS: raw
 #+DATE: [2019年 02月 26日 星期二 16:59:01 HKT]
 #+LANGUAGE:  zh-CN
-#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
 Did you know that *Emacs* comes bundled with an implementation of *Tetris*? Just hit =M-x tetris= and there it is:
+你知道吗，*Emacs*与*俄罗斯方块*的实现捆绑在一起?点击=M-x俄罗斯方块=
 
 https://nickdrozd.github.io[[/assets/2019-01-14-tetris/tetris-normal.png]]
+https://nickdrozd.github.io[[/资产/ 2019 - 01 - 14 -俄罗斯方块/ tetris-normal.png]]
 
 This is often mentioned by Emacs advocates in text editor discussions. “Yeah, but can that other editor run Tetris?” I wonder, is that supposed to convince anyone that Emacs is superior? Like, why would anyone care that they could play games in their text editor? “Yeah, but can that other vacuum play mp3s?”
+在文本编辑器讨论中，Emacs倡导者经常提到这一点。“是的，但是那个编辑能运行俄罗斯方块吗?”“我想知道，这是为了让大家相信Emacs更优秀吗?”比如，为什么有人会关心他们可以在文本编辑器中玩游戏?“是的，但是那台吸尘器能播放mp3吗?”
 
 That said, *Tetris is always fun*. Like everything in Emacs, the source code is open for easy inspection and modifcation, so *it's possible to make it even more fun*. And by more fun, I mean harder.
+也就是说，俄罗斯方块总是很有趣的。像Emacs中的所有东西一样，源代码是开放的，易于检查和修改，因此*可以使它更加有趣*。更多的乐趣，我指的是更努力。
 
 One of the simplest ways to make the game harder is to *get rid of the next-block preview*. No more sitting that S/Z block in a precarious position knowing that you can fill in the space with the next piece -- you have to chance it and hope for the best. Here's what it looks like with no preview (as you can see, without the preview I made some choices that turned out to have *dire consequences*):
+让游戏变得更困难的一个最简单的方法就是“摆脱下一个块预览”。不要再把S/Z区放在一个危险的位置，知道你可以用下一块填满空间——你必须碰碰运气，抱最好的希望。下面是没有预览的情况(你可以看到，没有预览，我做出了一些选择，结果是“可怕的后果”):
 
+[[https://nickdrozd.github.io/assets/2019-01-14-tetris/tetris-no-preview.png]]
 [[https://nickdrozd.github.io/assets/2019-01-14-tetris/tetris-no-preview.png]]
 
 The preview box is set with a function called =tetris-draw-next-shape=:
+预览框使用一个名为=tetris-draw-next-shape=:
 
 #+BEGIN_EXAMPLE
-    (defun tetris-draw-next-shape ()
-     (dotimes (x 4)
-     (dotimes (y 4)
-     (gamegrid-set-cell (+ tetris-next-x x)
-     (+ tetris-next-y y)
-     tetris-blank)))
-     (dotimes (i 4)
-     (let ((tetris-shape tetris-next-shape)
-     (tetris-rot 0))
-     (gamegrid-set-cell (+ tetris-next-x
-     (aref (tetris-get-shape-cell i) 0))
-     (+ tetris-next-y
-     (aref (tetris-get-shape-cell i) 1))
-     tetris-shape))))
+(defun tetris-draw-next-shape ()
+(dotimes (x 4)
+(dotimes (y 4)
+(gamegrid-set-cell (+ tetris-next-x x)
+(+ tetris-next-y y)
+tetris-blank)))
+(dotimes (i 4)
+(let ((tetris-shape tetris-next-shape)
+(tetris-rot 0))
+(gamegrid-set-cell (+ tetris-next-x
+(aref (tetris-get-shape-cell i) 0))
+(+ tetris-next-y
+(aref (tetris-get-shape-cell i) 1))
+tetris-shape))))
 #+END_EXAMPLE
 
 First, we'll introduce a flag to allow configuring next-preview:
+首先，我们将引入一个标志，允许配置下一个预览:
 
 #+BEGIN_EXAMPLE
-    (defvar tetris-preview-next-shape nil
-     "When non-nil, show the next block the preview box.")
+(defvar tetris-preview-next-shape nil
+"When non-nil, show the next block the preview box.")
 #+END_EXAMPLE
 
 Now the question is, how can we make =tetris-draw-next-shape= obey this flag? The obvious way would be to redefine it:
+现在的问题是，我们如何才能让=tetris-draw-next-shape=遵从这面旗帜?最明显的方法是重新定义它:
 
 #+BEGIN_EXAMPLE
-    (defun tetris-draw-next-shape ()
-     (when tetris-preview-next-shape
-     ;; existing tetris-draw-next-shape logic
-     ))
+(defun tetris-draw-next-shape ()
+(when tetris-preview-next-shape
+;; existing tetris-draw-next-shape logic
+))
 #+END_EXAMPLE
 
 This is not an ideal solution. There will be two definitions of the same function floating around, which is confusing, and we'll have to maintain our modified definition in case the upstream version changes.
+这不是理想溶液。同一个函数会有两个定义，这很容易混淆，如果上游版本发生变化，我们必须维护修改后的定义。
 
 A better approach is to use *advice*. Emacs advice is like a *Python decorator*, but even more flexible, since advice can be added to a function from anywhere. This means that we can modify the function without disturbing the original source file at all.
+一个更好的方法是使用“建议”。Emacs通知类似于*Python装饰器*，但是更加灵活，因为通知可以从任何地方添加到函数中。这意味着我们可以修改函数而不影响原始的源文件。
 
 There are a lot of different ways to use Emacs advice ([[https://www.gnu.org/software/emacs/manual/html_node/elisp/Advising-Functions.html][check the manual]]), but for now we'll just stick with the =advice-add= function with the =:around= flag. The advising function takes the original function as an argument, and it might or might not execute it. In this case, we'll say that the original should be executed only if the preview flag is non-nil:
+使用Emacs建议有很多不同的方法([[https://www.gnu.org/software/emacs/manual/html_node/elisp/Advising-Functions.html][检查手册]])，但是现在我们只使用=advice-add=函数和=:around=标志。通知函数将原始函数作为参数，它可能执行也可能不执行。在这种情况下，我们会说，只有在预览标志是非空的情况下，才能执行原始的:
 
 #+BEGIN_EXAMPLE
-    (defun tetris-maybe-draw-next-shape (tetris-draw-next-shape)
-     (when tetris-preview-next-shape
-     (funcall tetris-draw-next-shape)))
+(defun tetris-maybe-draw-next-shape (tetris-draw-next-shape)
+(when tetris-preview-next-shape
+(funcall tetris-draw-next-shape)))
 
-    (advice-add 'tetris-draw-next-shape :around #'tetris-maybe-draw-next-shape)
+(advice-add 'tetris-draw-next-shape :around #'tetris-maybe-draw-next-shape)
 #+END_EXAMPLE
 
 This code will modify the behavior of =tetris-draw-next-shape=, but it can be stored in your config files, safely away from the actual Tetris code.
+这段代码将修改= Tetris -draw-next-shape=的行为，但它可以存储在配置文件中，远离实际的俄罗斯方块代码。
 
 Getting rid of the preview box is a simple change. A more drastic change is to make it so that *blocks randomly stop in the air*:
+去掉预览框是一个简单的改变。一个更激烈的变化是，*块随机停止在空中*:
 
 https://nickdrozd.github.io[[/assets/2019-01-14-tetris/tetris-air.png]]
+https://nickdrozd.github.io[[/资产/ 2019 - 01 - 14 -俄罗斯方块/ tetris-air.png]]
 
 In that picture, the red I and green T pieces are not falling, they're set in place. This can make the game almost *unplayably hard*, but it's easy to implement.
+在这幅图中，红色的I和绿色的T部分没有掉下来，它们是固定的。这可能会让游戏变得难以玩，但却很容易实现。
 
 As before, we'll first define a flag:
+和前面一样，我们首先定义一个标志:
 
 #+BEGIN_EXAMPLE
-    (defvar tetris-stop-midair t
-     "If non-nil, pieces will sometimes stop in the air.")
+(defvar tetris-stop-midair t
+"If non-nil, pieces will sometimes stop in the air.")
 #+END_EXAMPLE
 
 Now, *the way Emacs Tetris works* is something like this. The active piece has x- and y-coordinates. On each clock tick, the y-coordinate is incremented (the piece moves down one row), and then a check is made for collisions. If a collision is detected, the piece is backed out (its y-coordinate is decremented) and set in place. In order to make a piece stop in the air, all we have to do is hack the detection function, =tetris-test-shape=.
+Emacs俄罗斯方块是这样工作的。活动部件有x和y坐标。在每个时钟滴答声中，y坐标递增(块向下移动一行)，然后检查是否有冲突。如果检测到碰撞，则将该块回退(其y坐标递减)并设置到位。为了让一个棋子在半空中停下来，我们所要做的就是破解检测函数=tetris-test-shape=。
 
 *It doesn't matter what this function does internally* -- what matters is that it's a function of no arguments that returns a boolean value. We need it to return true whenever it normally would (otherwise we risk weird collisions) but also at other times. I'm sure there are a variety of ways this could be done, but here is what I came up with:
+*这个函数内部做什么并不重要*——重要的是它是一个返回布尔值的无参数函数。我们需要它在正常情况下返回true(否则我们将冒奇怪的冲突风险)，但在其他时候也需要它返回true。我相信有很多方法可以做到这一点，但以下是我想到的:
 
 #+BEGIN_EXAMPLE
-    (defun tetris-test-shape-random (tetris-test-shape)
-     (or (and
-     tetris-stop-midair
-     ;; Don't stop on the first shape.
-     (< 1 tetris-n-shapes )
-     ;; Stop every INTERVAL pieces.
-     (let ((interval 7))
-     (zerop (mod tetris-n-shapes interval)))
-     ;; Don't stop too early (it makes the game unplayable).
-     (let ((upper-limit 8))
-     (< upper-limit tetris-pos-y))
-     ;; Don't stop at the same place every time.
-     (zerop (mod (random 7) 10)))
-     (funcall tetris-test-shape)))
+(defun tetris-test-shape-random (tetris-test-shape)
+(or (and
+tetris-stop-midair
+;; Don't stop on the first shape.
+(< 1 tetris-n-shapes )
+;; Stop every INTERVAL pieces.
+(let ((interval 7))
+(zerop (mod tetris-n-shapes interval)))
+;; Don't stop too early (it makes the game unplayable).
+(let ((upper-limit 8))
+(< upper-limit tetris-pos-y))
+;; Don't stop at the same place every time.
+(zerop (mod (random 7) 10)))
+(funcall tetris-test-shape)))
 
-    (advice-add 'tetris-test-shape :around #'tetris-test-shape-random)
+(advice-add 'tetris-test-shape :around #'tetris-test-shape-random)
 #+END_EXAMPLE
 
 The hardcoded parameters here were chosen to make the game harder but still playable. I was *drunk on an airplane* when I decided on them though, so they might need some further tweaking.
+这里选择的硬编码参数是为了使游戏更困难，但仍然可以玩。我在飞机上喝醉了，所以他们可能需要进一步调整。
 
 By the way, according to my =tetris-scores= file, my *top score* is
+顺便说一下，根据我的=tetris-scores=文件，我的*top score*是
 
 #+BEGIN_EXAMPLE
-    01389   Wed Dec 5 15:32:19 2018
+01389   Wed Dec 5 15:32:19 2018
 #+END_EXAMPLE
 
 The scores in that file are listed up to five digits by default, so that doesn't seem very good.
+该文件中列出的分数默认最多为五位数，因此看起来不是很好。
 
 *Exercises for the reader*
+*给读者的练习*
 
 1. Using advice, modify Emacs Tetris so that it flashes the messsage “OH SHIT” under the scoreboard every time the block moves down. Make the size of the message proportional to the height of the block stack (when there are no blocks, the message should be small or nonexistent, and when the highest block is close to the ceiling, the message should be large).
+1. 使用建议，修改Emacs俄罗斯方块，使它闪烁的讯息“哦，狗屎”，每当方块下移动。使消息的大小与块堆栈的高度成比例(当没有块时，消息应该是小的或不存在的，当最高块接近天花板时，消息应该是大的)。
 
 2. The version of =tetris-test-shape-random= given here has every seventh piece stop midair. A player could potentially figure out the interval and use it to their advantage. Modify it to make the interval random in some reasonable range (say, every five to ten pieces).
+2. 这里给出的=tetris-test-shape-random=的版本中，每隔七格就有一个半空中停止。一个球员有可能计算出时间间隔，并利用它来获得优势。修改它，使间隔随机在一些合理的范围内(例如，每5到10块)。
 
 3. For a different take on advising Tetris, try out [[https://nullprogram.com/blog/2014/10/19/][=autotetris-mode=]].
+3.对于俄罗斯方块的建议，你可以尝试[[https://nullprogram.com/blog/2014/10/19/][=autotetris-mode=]]。
 
 4. Come up with an interesting way to mess with the piece-rotation mechanics and then implement it with advice.
+4. 想出一个有趣的方法来打乱片段旋转机制，然后使用建议来实现它。
 
 1. Emacs has just one big global namespace, so function and variable names are typically prefixed with their package name in order to avoid collisions.
+1. Emacs只有一个大的全局命名空间，因此函数和变量名通常以它们的包名作为前缀，以避免冲突。
 
 2. A lot of people will tell you that you shouldn't use an existing namespace prefix and that you should reserve a namespace prefix for anything you define yourself, e.g. =my/tetris-preview-next-shape=. This is ugly and usually pointless, so I don't do it.
+2. 很多人会告诉你，你不应该使用现有的名称空间前缀，你应该为你自己定义的任何东西保留一个名称空间前缀，例如=my/tetris-preview-next-shape=。这是丑陋的，通常是没有意义的，所以我不这样做。

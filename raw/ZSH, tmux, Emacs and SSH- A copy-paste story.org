@@ -4,317 +4,416 @@
 #+TAGS: raw
 #+DATE: [2018年 05月 31日 星期四 14:39:43 CST]
 #+LANGUAGE:  zh-CN
-#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
 
 Explanations and code for how to enable copy-paste support working in as many
+说明和代码如何使复制-粘贴支持在尽可能多的工作
 terminal applications as possible. Works on a full GUI =$DISPLAY=, over SSH, on
+尽可能使用终端应用程序。工作在一个完整的GUI =$DISPLAY=，通过SSH, on
 both macOS and Linux, and between ZSH, tmux and Emacs.
+macOS和Linux，以及ZSH、tmux和Emacs之间。
 
 tl;dr: See the code from my [[https://github.com/jschaf/dotfiles/blob/master/bin/clipboard-copy][dotfiles]] for [[https://github.com/jschaf/dotfiles/blob/master/bin/clipboard-copy][clipboard-copy]], [[https://github.com/jschaf/dotfiles/blob/master/bin/clipboard-paste][clipboard-paste]], [[https://github.com/jschaf/dotfiles/blob/d5b0b75423a681bb39d42a88336fd9ab44744849/layers/joe/config.el#L828][Emacs
+tl;博士:查看代码从我的[[https://github.com/jschaf/dotfiles/blob/master/bin/clipboard-copy][.]]的[[https://github.com/jschaf/dotfiles/blob/master/bin/clipboard-copy] [clipboard-copy]], [[https://github.com/jschaf/dotfiles/blob/master/bin/clipboard-paste] [clipboard-paste]], [[https://github.com/jschaf/dotfiles/blob/d5b0b75423a681bb39d42a88336fd9ab44744849/layers/joe/config.el L828] [Emacs
 integration]] and [[https://github.com/jschaf/dotfiles/blob/d5b0b75423a681bb39d42a88336fd9ab44744849/tmux.conf#L66][tmux integration]].
+集成]]和[[https://github.com/jschaf/dotfiles/blob/d5b0b75423a681bb39d42a88336fd9ab44744849/tmux.conf#L66][tmux集成]]。
 
 Implementing working copy-paste in multiple environments is /absurdly/
+在多个环境中实现工作复制粘贴是/荒谬的/
 difficult. Any of the following reasons complicate matters, but taken together
+困难。以下任何一个原因都会使问题复杂化，但是综合起来看
 the difficulty rises to a level of complexity not seen since macOS stopped shipping
+难度上升到macOS停止发货以来从未见过的复杂程度
 reasonably updated versions of bash.
+合理更新的bash版本。
 
 - Pasting into a terminal is interpreted literally, meaning an attacker can hide
-  =;sudo do $really_evil_thing;= in innocent looking, pasteable HTML with CSS
-  trickery. Therefore, we can't blindly paste text into a terminal.
+-粘贴到终端的字面解释，意味着攻击者可以隐藏
+=;sudo do $really_evil_thing;= in innocent looking, pasteable HTML with CSS
+=;sudo做$really_evil_thing;=在无辜的外观，粘贴HTML与CSS
+trickery. Therefore, we can't blindly paste text into a terminal.
+欺骗。因此，我们不能盲目地将文本粘贴到终端中。
 - In a terminal, Emacs doesn't have access to the clipboard.
+-在终端中，Emacs不能访问剪贴板。
 - Emacs has its own independent idea of a clipboard, called a [[https://www.gnu.org/software/emacs/manual/html_node/emacs/Kill-Ring.html][kill ring]].
+- Emacs有自己独立的剪贴板概念，叫做[[https://www.gnu.org/software/emacs/manual/html_node/emacs/Kill-Ring.html][kill ring]]。
 - tmux has its own independent idea of a clipboard, called =paste buffers=.
+- tmux有自己独立的剪贴板思想，称为=粘贴缓冲区=。
 - zsh has it's own independent idea of a clipboard, also called a [[http://zsh.sourceforge.net/Doc/Release/Zsh-Line-Editor.html][kill ring]].
+- zsh有自己独立的剪贴板，也叫[[http://zsh.sourceforge.net/doc/release/zsh-lineeditor.html][kill ring]]。
 - There is no clipboard in a remote SSH session because a clipboard is a
-  windowing system concept.
+-在远程SSH会话中没有剪贴板，因为剪贴板是
+windowing system concept.
+窗口系统的概念。
 - There are 3 separate “clipboards” in X11, the primary selection, the clipboard
-  selection, and the obsolete cut buffers.
+在X11中有3个独立的“剪贴板”，主选区，剪贴板
+selection, and the obsolete cut buffers.
+选择，并淘汰切割缓冲区。
 - tmux in macOS doesn't have access to the clipboard by default.
+- macOS中的tmux在默认情况下不能访问剪贴板。
 
 We will address each issue separately to develop a unified solution.
+我们将分别处理各个问题，制定统一的解决方案。
 
 * Shared functions
-   :PROPERTIES:
-   :CUSTOM_ID: org7acbd90
-   :END:
+*共享功能
+:PROPERTIES:
+属性:
+:CUSTOM_ID: org7acbd90
+:CUSTOM_ID org7acbd90
+:END:
+结束:
 
 We need several functions to unify copy-paste handling across macOS and Linux.
+我们需要几个函数来统一跨macOS和Linux的复制-粘贴处理。
 I've only included the most relevant functions. The rest of the helper
+我只包含了最相关的函数。剩下的帮手
 functions can be found in my [[https://github.com/jschaf/dotfiles/blob/master/bin/clipboard-copy][dotfiles]], under [[https://github.com/jschaf/dotfiles/tree/master/zsh/functions][zsh/functions]].
+函数可以在我的[[https://github.com/jschaf/dotfiles/blob/master/bin/clipboard-copy][dotfiles]]中找到，在[[https://github.com/jschaf/dotfiles/tree/master/zsh/functions][zsh/functions]]下。
 
 #+BEGIN_EXAMPLE
-    zsh
+zsh
 
-     
-    function clipboard-copy() {
-     emulate -L zsh
 
-     local clipper_port=8377
-     local fake_clipboard=/tmp/clipboard-data.txt
-     if is-ssh && is-port-in-use $clipper_port; then
-     
-     tee >(nc localhost $clipper_port) "$fake_clipboard"
-     return
-     fi
+function clipboard-copy() {
+emulate -L zsh
 
-     if ! has-display; then
-     
-     > fake_clipboard
-     return
-     fi
+local clipper_port=8377
+local fake_clipboard=/tmp/clipboard-data.txt
+if is-ssh && is-port-in-use $clipper_port; then
 
-     if is-darwin; then
-     pbcopy
-     elif is-cygwin; then
-     cat > /dev/clipboard
-     else
-     if command-exists xclip; then
-     xclip -in -selection clipboard
-     elif command-exists xsel; then
-     xsel --clipboard --input
-     else
-     local message="clipboard-copy: Platform $(uname -s) not supported or "
-     message+="xclip/xsel not installed"
-     print message >&2
-     return 1
-     fi
-     fi
-    }
+tee >(nc localhost $clipper_port) "$fake_clipboard"
+return
+fi
 
-    clipboard-copy $@
+if ! has-display; then
+
+> fake_clipboard
+return
+fi
+
+if is-darwin; then
+pbcopy
+elif is-cygwin; then
+cat > /dev/clipboard
+else
+if command-exists xclip; then
+xclip -in -selection clipboard
+elif command-exists xsel; then
+xsel --clipboard --input
+else
+local message="clipboard-copy: Platform $(uname -s) not supported or "
+message+="xclip/xsel not installed"
+print message >&2
+return 1
+fi
+fi
+}
+
+clipboard-copy $@
 #+END_EXAMPLE
 
 #+BEGIN_EXAMPLE
-    zsh
+zsh
 
-     
-    function clipboard-paste() {
-     emulate -L zsh
-     
-     
-     if ! has-display; then
-     local fake_clipboard=/tmp/clipboard-data.txt
-     [[ -e $fake_clipboard ]] && cat $fake_clipboard
-     return
-     fi
 
-     if is-darwin; then
-     pbpaste
-     elif is-cygwin; then
-     cat /dev/clipboard
-     else
-     if command-exists xclip; then
-     xclip -out -selection clipboard
-     elif command-exists xsel; then
-     xsel --clipboard --output
-     else
-     message="clipboard-paste: Platform $GRML_OSTYPE not supported "
-     message+="or xclip/xsel not installed"
-     print $message >&2
-     return 1
-     fi
-     fi
-    }
+function clipboard-paste() {
+emulate -L zsh
 
-    clipboard-paste $@
+
+if ! has-display; then
+local fake_clipboard=/tmp/clipboard-data.txt
+[[ -e $fake_clipboard ]] && cat $fake_clipboard
+return
+fi
+
+if is-darwin; then
+pbpaste
+elif is-cygwin; then
+cat /dev/clipboard
+else
+if command-exists xclip; then
+xclip -out -selection clipboard
+elif command-exists xsel; then
+xsel --clipboard --output
+else
+message="clipboard-paste: Platform $GRML_OSTYPE not supported "
+message+="or xclip/xsel not installed"
+print $message >&2
+return 1
+fi
+fi
+}
+
+clipboard-paste $@
 #+END_EXAMPLE
 
 * Problem: Pasting text is interpreted literally in a terminal
-   :PROPERTIES:
-   :CUSTOM_ID: org41175b2
-   :END:
+*问题:粘贴文本在终端中按字面意思解释
+:PROPERTIES:
+属性:
+:CUSTOM_ID: org41175b2
+:CUSTOM_ID org41175b2
+:END:
+结束:
 
 When you paste something in a terminal, a terminal will default to interpreting
+当你在终端上粘贴东西时，终端会默认解释
 what you pasted the same as entering a sequence of commands. See [[https://thejh.net/misc/website-terminal-copy-paste][this site]] for
+粘贴的内容与输入命令序列相同。参见[[https://thejh.net/misc/website-terminal-copy-paste][本网站]]
 an example of a posioned clipboard attack. The resulting [[https://news.ycombinator.com/item?id=5508225][Hacker News]] and [[https://www.reddit.com/r/netsec/comments/1bv359/dont_copypaste_from_website_to_terminal_demo/][Reddit]]
+一个定位剪贴板攻击的例子。由此产生的[[https://news.ycombinator.com/item?id=5508225][Hacker News]和[[https://www.reddit.com/r/netsec/comments/1bv359/dont_copypaste_from_website_to_terminal_demo/][Reddit]]
 discussion are also worth a look.
+讨论也值得一看。
 
 We want to be able to seww what we pasted without it executing. ZSH has the
+我们希望能够在不执行的情况下缝合粘贴的内容。ZSH有
 capability to edit multi-line text entries with the [[http://zsh.sourceforge.net/Doc/Release/Zsh-Line-Editor.html][ZSH line editor]] (ZLE) and
+使用[[http://zsh.sourceforge.net/doc/release/zsh-lineeditor.html][ZSH line editor]] (ZLE)和编辑多行文本条目的功能
 [[http://zsh.sourceforge.net/Doc/Release/Zsh-Line-Editor.html#Zle-Widgets][widgets]]. Therefore, we can dump the pasted text into the edit buffer knowing
+[[http://zsh.sourceforge.net/Doc/Release/Zsh-Line-Editor.html Zle-Widgets][工具]]。因此，我们可以将粘贴的文本转储到编辑缓冲区中
 that it won't be executed.
+它不会被执行。
 
 NOTE: Bracketed paste mode doesn't seem necessary with this approach but I'm not
+注意:括号内的粘贴模式似乎没有必要与此方法，但我不是
 100% certain this prevents all clipboard attacks.
+100%肯定这可以防止所有剪贴板攻击。
 
 #+BEGIN_EXAMPLE
-    zsh
+zsh
 
-     
-    function widget-paste-from-clipboard() {
-     local paste_data=$(clipboard-paste \
-     | remove-trailing-empty-lines \
-     | remove-leading-empty-lines)
-     zle copy-region-as-kill "$paste_data"
-     LBUFFER=${LBUFFER}${paste_data}
-    }
+
+function widget-paste-from-clipboard() {
+local paste_data=$(clipboard-paste      | remove-trailing-empty-lines      | remove-leading-empty-lines)
+zle copy-region-as-kill "$paste_data"
+LBUFFER=${LBUFFER}${paste_data}
+}
 #+END_EXAMPLE
 
 Now, we need to bind this function in ZSH.
+现在，我们需要在ZSH中绑定这个函数。
 
 #+BEGIN_EXAMPLE
-     
-    bindkey -M emacs '\C-y' widget-paste-from-clipboard
-    bindkey -M viins '\C-y' widget-paste-from-clipboard
-    bindkey -M vicmd '\C-y' widget-paste-from-clipboard
+
+bindkey -M emacs 'C-y' widget-paste-from-clipboard
+bindkey -M viins 'C-y' widget-paste-from-clipboard
+bindkey -M vicmd 'C-y' widget-paste-from-clipboard
 #+END_EXAMPLE
 
 * Problem: Terminal Emacs lacks clipboard access
-   :PROPERTIES:
-   :CUSTOM_ID: org74b37b7
-   :END:
+*问题:终端Emacs缺少剪贴板访问
+:PROPERTIES:
+属性:
+:CUSTOM_ID: org74b37b7
+:CUSTOM_ID org74b37b7
+:END:
+结束:
 
 In a GUI Emacs, everything is nicely integrated for us. In terminal mode,
+在GUI Emacs中，一切都很好地集成在一起。在终端模式下,
 i.e. =emacs -nw=, [[http://stackoverflow.com/questions/4580835][Emacs isn't linked]] to any of the X11 libraries. So, in
+即=emacs -nw=， [[http://stackoverflow.com/questions/4580835]]没有链接到任何X11库。所以,在
 terminal mode, Emacs has no idea how to read or put data on the clipboard. We
+终端模式，Emacs不知道如何读取或将数据放在剪贴板上。我们
 can enable clipboard access for a terminal Emacs in two steps.
+可以在两个步骤中为终端Emacs启用剪贴板访问。
 
 1. From tmux, identify when we're pasting into Emacs.
+1. 从tmux，识别我们什么时候粘贴到Emacs。
 2. Use emacsclient to call a function with the paste data.
+2. 使用emacsclient调用带有粘贴数据的函数。
 
 NOTE: This relies on the assumption that Emacs will always run in a tmux session.
+注意:这依赖于Emacs将始终在tmux会话中运行的假设。
 
 For the first step, we need the following shell function on the =$PATH=.
+对于第一步，我们需要在=$PATH=上使用以下shell函数。
 
 #+BEGIN_EXAMPLE
-    zsh
+zsh
 
-     
-    function tmux-smart-paste() {
-     
-     local current_program=$(tmux display-message -p '#{window_name}')
-     if [[ $current_program == 'zsh' ]]; then
-     
-     tmux send-keys 'C-y'
-     elif [[ ${current_program:l} == 'emacs' ]]; then
-     emacsclient --no-wait --alternate-editor=false --quiet \
-     --eval "(my:paste-from-emacs-client)" \
-     2>&1 > /dev/null
-     else
-     tmux set-buffer "$(clipboard-paste)"
-     tmux paste-buffer
-     fi
-    }
-    tmux-smart-paste
+
+function tmux-smart-paste() {
+
+local current_program=$(tmux display-message -p '#{window_name}')
+if [[ $current_program == 'zsh' ]]; then
+
+tmux send-keys 'C-y'
+elif [[ ${current_program:l} == 'emacs' ]]; then
+emacsclient --no-wait --alternate-editor=false --quiet      --eval "(my:paste-from-emacs-client)"      2>&1 > /dev/null
+else
+tmux set-buffer "$(clipboard-paste)"
+tmux paste-buffer
+fi
+}
+tmux-smart-paste
 #+END_EXAMPLE
 
 Next, we bind =tmux-smart-paste= in tmux.conf to =C-y=.
+接下来，我们在tmux.conf中绑定=tmux-smart-paste=到=C-y=。
 
 #+BEGIN_EXAMPLE
-    bind-key -T root C-y run-shell "tmux-smart-paste"
+bind-key -T root C-y run-shell "tmux-smart-paste"
 #+END_EXAMPLE
 
 For step two, we need the following emacs-lisp function.
+对于第二步，我们需要以下emacs-lisp函数。
 
 #+BEGIN_EXAMPLE
-    (defun my:paste-from-emacs-client ()
-     "Paste into a terminal Emacs."
-     (if window-system
-     (error "Trying to paste into GUI emacs.")
-     (let ((paste-data (s-trim (shell-command-to-string "clipboard-paste"))))
-     
-     
-     (with-current-buffer (window-buffer)
-     (insert paste-data))
-     
-     (kill-new paste-data))))
+(defun my:paste-from-emacs-client ()
+"Paste into a terminal Emacs."
+(if window-system
+(error "Trying to paste into GUI emacs.")
+(let ((paste-data (s-trim (shell-command-to-string "clipboard-paste"))))
+
+
+(with-current-buffer (window-buffer)
+(insert paste-data))
+
+(kill-new paste-data))))
 #+END_EXAMPLE
 
 NOTE: The terminal Emacs must be running the [[https://www.gnu.org/software/emacs/manual/html_node/emacs/Emacs-Server.html][server]] for this to work.
+注意:终端Emacs必须运行[[https://www.gnu.org/software/emacs/manual/html_node/emacs/Emacs-Server.html][服务器]]才能工作。
 
 * Problem: tmux uses paste buffers instead of clipboard
-   :PROPERTIES:
-   :CUSTOM_ID: org22a8106
-   :END:
+问题:tmux使用粘贴缓冲区而不是剪贴板
+:PROPERTIES:
+属性:
+:CUSTOM_ID: org22a8106
+:CUSTOM_ID org22a8106
+:END:
+结束:
 
 In newer tmux versions, the =copy-pipe-and-cancel= is just what we need. This
+在较新的tmux版本中，=copy-pipe-and-cancel=正是我们所需要的。这
 only handles the case using a visual selection and using =y= to yank the
+只处理使用可视选择和使用=y=猛拉的情况
 selection.
+选择。
 
 #+BEGIN_EXAMPLE
-    bind-key -T copy-mode-vi 'y' send-keys -X copy-pipe-and-cancel "clipboard-copy"
+bind-key -T copy-mode-vi 'y' send-keys -X copy-pipe-and-cancel "clipboard-copy"
 #+END_EXAMPLE
 
 * Problem: tmux under macOS lacks clipboard access
-   :PROPERTIES:
-   :CUSTOM_ID: org4700e37
-   :END:
+*问题:macOS下的tmux缺乏剪贴板访问
+:PROPERTIES:
+属性:
+:CUSTOM_ID: org4700e37
+:CUSTOM_ID org4700e37
+:END:
+结束:
 
 The canonical reference for tmux and macOS integreation is Chris Johnsen's
+tmux和macOS整合的规范参考是Chris Johnsen的
 [[https://github.com/ChrisJohnsen/tmux-MacOSX-pasteboard][tmux-MacOSX-pasteboard]] repo. The problem is that =pbpaste= and =pbcopy= do not
+[[https://github.com/ChrisJohnsen/tmux-MacOSX-pasteboard] [tmux-MacOSX-pasteboard]]回购。问题是=pbpaste=和=pbcopy= not
 work under tmux. The problem is solvable with undocumented functions.
+在tmux下工作。这个问题可以通过无文档的函数来解决。
 
 1. Install =reattach-to-user-namespace=.
-
-   #+BEGIN_EXAMPLE
-       brew install reattach-to-user-namespace
-   #+END_EXAMPLE
-
-2. Configure tmux to invoke the shell with =reattach-to-user-namespace=.
-
-   tmux.conf - load Darwin conf
-
-   #+BEGIN_EXAMPLE
-        
-        
-       if-shell '[ "$(uname -s)" = "Darwin" ]' 'source-file ~/.config/tmux/osx.conf'
-   #+END_EXAMPLE
-
-   ~/.config/tmux/osx.conf
-
-   #+BEGIN_EXAMPLE
-        
-
-        
-        
-       set-option -g default-command 'reattach-to-user-namespace -l zsh'
-   #+END_EXAMPLE
-
-* Problem: Remote SSH sesssions lack clipboard access to local session
-   :PROPERTIES:
-   :CUSTOM_ID: orga3ac8e2
-   :END:
-
-When you're SSHed into a remote computer, it would be really nice to copy text
-from the terminal and make it available on your local computer. Usually, the
-way people do this is by selecting the text via mouse and invoking copy from the
-terminal emulator, e.g. /iterm2/.
-
-We want to be able to copy text from a remote SSH session and have it be
-available on our local clipboard using normal tmux commands. [[https://github.com/wincent/clipper][Clipper]] is tailor
-made for this use case because it provides “clipboard access for local and
-remote tmux sessions.” Once you have clipper running on the remote server and
-locally, we can send data to it by modifying the =clipboard-copy= function.
+1. 安装= reattach-to-user-namespace =。
 
 #+BEGIN_EXAMPLE
-    function clipboard-copy() {
-     local clipper_port=8377
-     if is-ssh && is-port-in-use $clipper_port; then
-     
-     nc localhost $clipper_port
-     return
-     fi
-     
-    }
+brew install reattach-to-user-namespace
+#+END_EXAMPLE
+
+2. Configure tmux to invoke the shell with =reattach-to-user-namespace=.
+2. 将tmux配置为使用= reattachto -user-namespace=调用shell。
+
+tmux.conf - load Darwin conf
+tmux.conf -加载Darwin conf
+
+#+BEGIN_EXAMPLE
+
+
+if-shell '[ "$(uname -s)" = "Darwin" ]' 'source-file ~/.config/tmux/osx.conf'
+#+END_EXAMPLE
+
+~/.config/tmux/osx.conf
+~ / .config tmux / osx.conf
+
+#+BEGIN_EXAMPLE
+
+
+
+
+set-option -g default-command 'reattach-to-user-namespace -l zsh'
+#+END_EXAMPLE
+
+* Problem: Remote SSH sesssions lack clipboard access to local session
+*问题:远程SSH sesssions缺乏剪贴板访问本地会话
+:PROPERTIES:
+属性:
+:CUSTOM_ID: orga3ac8e2
+:CUSTOM_ID orga3ac8e2
+:END:
+结束:
+
+When you're SSHed into a remote computer, it would be really nice to copy text
+当你潜入一台远程计算机时，拷贝文本会非常好
+from the terminal and make it available on your local computer. Usually, the
+让它在本地计算机上可用。通常,
+way people do this is by selecting the text via mouse and invoking copy from the
+方法是通过鼠标选择文本并从
+terminal emulator, e.g. /iterm2/.
+终端仿真器，例如/iterm2/。
+
+We want to be able to copy text from a remote SSH session and have it be
+我们希望能够从远程SSH会话复制文本并使其成为
+available on our local clipboard using normal tmux commands. [[https://github.com/wincent/clipper][Clipper]] is tailor
+使用普通tmux命令可在我们的本地剪贴板上使用。[[https://github.com/wincent/clipper][快船]]是裁缝
+made for this use case because it provides “clipboard access for local and
+为这个用例做的，因为它提供了“本地和剪贴板访问”
+remote tmux sessions.” Once you have clipper running on the remote server and
+远程tmux会话。一旦你有clipper运行在远程服务器上
+locally, we can send data to it by modifying the =clipboard-copy= function.
+在本地，我们可以通过修改=clipboard-copy=函数向它发送数据。
+
+#+BEGIN_EXAMPLE
+function clipboard-copy() {
+local clipper_port=8377
+if is-ssh && is-port-in-use $clipper_port; then
+
+nc localhost $clipper_port
+return
+fi
+
+}
 #+END_EXAMPLE
 
 * Most up-to-date code in my dotfiles
-   :PROPERTIES:
-   :CUSTOM_ID: org6e0f726
-   :END:
+*最新的代码在我的点文件
+:PROPERTIES:
+属性:
+:CUSTOM_ID: org6e0f726
+:CUSTOM_ID org6e0f726
+:END:
+结束:
 
 The most up-to-date code is in my [[https://github.com/jschaf/dotfiles/blob/master/bin/clipboard-copy][dotfiles]] repo. The interesting bits are
+最新的代码在我的[[https://github.com/jschaf/dotfiles/blob/master/bin/clipboard-copy][dotfiles]] repo中。有趣的是
 [[https://github.com/jschaf/dotfiles/blob/master/bin/clipboard-copy][clipboard-copy]], [[https://github.com/jschaf/dotfiles/blob/master/bin/clipboard-paste][clipboard-paste]], [[https://github.com/jschaf/dotfiles/blob/master/layers/joe/config.el#L828][Emacs integration]] and [[https://github.com/jschaf/dotfiles/blob/master/tmux.conf#L66][tmux integration]].
+[[https://github.com/jschaf/dotfiles/blob/master/bin/clipboard-copy] [clipboard-copy]], [[https://github.com/jschaf/dotfiles/blob/master/bin/clipboard-paste] [clipboard-paste]], [[https://github.com/jschaf/dotfiles/blob/master/layers/joe/config.el L828] [Emacs集成]]和[[https://github.com/jschaf/dotfiles/blob/master/tmux.conf L66] [tmux集成]]。
 
 * Bibliography
-   :PROPERTIES:
-   :CUSTOM_ID: orgedd7683
-   :END:
+*参考书目
+:PROPERTIES:
+属性:
+:CUSTOM_ID: orgedd7683
+:CUSTOM_ID orgedd7683
+:END:
+结束:
 
 [[https://en.wikipedia.org/w/index.php?title=X_Window_selection&oldid=744898565][X Window Selection]]
+[[https://en.wikipedia.org/w/index.php?title = X_Window_selection&oldid = 744898565] [X窗口选择]]
 
 Published on 14 May 2017 by
+发表于2017年5月14日
 
 Joe Schafer
+乔·谢弗
 
 .
