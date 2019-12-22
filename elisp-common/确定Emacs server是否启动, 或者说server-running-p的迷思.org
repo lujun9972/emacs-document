@@ -1,0 +1,62 @@
+#+TITLE: 确定Emacs server是否启动, 或者说server-running-p的迷思
+#+URL: http://emacshorrors.com/posts/determining-if-the-server-is-started-or-the-wonders-of-server-running-p.html
+#+AUTHOR: lujun9972
+#+TAGS: elisp-common
+#+DATE: [2018年 07月 05日 星期四 17:12:02 CST]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+一个小问题:如何确定当前Emacs实例是否启动了服务器？
+
+快速搜索一下，我们可以得到三种方法: =server-mode=， =(daemonp)= 和 =(server-running-p)=. 
+这太多了，看是其中一个肯定是正确答案对吗? 然而, 并不是. 因为这个小问题的真正答案是：你无能为力。
+
+- 且仅当服务器使用 =server-mode= 函数启动时 =server-mode= 的值才为 =t=。但是我们还有其他方法可以启动服务器，比如 =M-x server-start= 或 =emacs --daemon= 。
+- 且仅当Emacs在守护进程模式下启动时, =(daemonp)= 才会返回 =t=.
+
+What about =(server-running-p)=, then? Well, it may look friendly,
+那么 =(server-run-p)= 呢?它看起来可能很不错，但是也有坑.
+
+它初看起来很不错:执行 =M-x server-start= 后， =(server-running-p)= 会返回 =t=! 
+那么我们是不是就可以选它了呢? 还不行!
+让我们启动一个新的Emacs实例，在不启动服务器的情况下执行 =(server-run-p)= 会发现依然返回 =t=!
+
+怎么回事？事实上 =(server-running-p)= 有点名不符实. 以下是其完整的源代码:
+
+#+begin_src emacs-lisp
+  (defun server-running-p (&optional name)
+    "Test whether server NAME is running.
+
+  Return values:
+  nil the server is definitely not running.
+  t the server seems to be running.
+  something else we cannot determine whether it's running without using
+  commands which may have to wait for a long time."
+    (unless name (setq name server-name))
+    (condition-case nil
+        (if server-use-tcp
+            (with-temp-buffer
+              (insert-file-contents-literally (expand-file-name name server-auth-dir))
+              (or (and (looking-at "127\.0\.0\.1:[0-9]+ \([0-9]+\)")
+                       (assq 'comm
+                             (process-attributes
+                              (string-to-number (match-string 1))))
+                       t)
+                  :other))
+          (delete-process
+           (make-network-process
+            :name "server-client-test" :family 'local :server nil :noquery t
+            :service (expand-file-name name server-socket-dir)))
+          t)
+      (file-error nil)))
+#+end_src
+
+doc-string中描述了恐怖的细节。函数中的 =-p= 后缀说明这是一个谓词，即布尔函数。
+但在 =server-running-p=, 返回 非 =nil= 值并不一定就是响亮而明确的 “是!”, 它的意思其实是“嗯，也许吧，谁知道呢?”
+这是第三种可能，因为Emacs并不是黑白分明的。
+
+但是这个函数做什么呢?它试图确定一个名叫 =NAME= 的服务器是否正在运行,方法是假设该服务器的配置与正在运行的实例完全一致。
+它可能最终会查看当前服务器的套接字文件，或者尝试启动一个TCP连接(这个开销非常昂贵)。
+你可能会在构建mode line是调用 =server-running-p= 函数: 但是它会让你立刻冻结Emacs运行而且还无法恢复. 
+它的使用场景目前还不太清楚. 它无法确定正在运行的实例是否启用了服务器 --- 但是它会使用该服务器的配置去搜索潜在的完全不同的其他服务器.
+
