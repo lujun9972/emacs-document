@@ -1,0 +1,110 @@
+#+TITLE: 将style-check.rb作为Emacs中的flycheck检查工具
+#+URL: https://www.macs.hw.ac.uk/~rs46/posts/2018-12-29-stylecheck-flycheck.html
+#+AUTHOR: lujun9972
+#+TAGS: emacs-common
+#+DATE: [2019年 02月 11日 星期一 15:38:49 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+这篇文章向你展示了如何在Emacs文本编辑器中集成 [[https://www.cs.umd.edu/~nspring/software/style-check-readme.html][style-check.rb]] 和 [[https://www.flycheck.org][flycheck]]。
+
+style-check.rb可以检查:
+
+- 语法
+- 正确的大小写
+- 短语 例如. “few in number” → “few”
+- 拼写错误
+- 忽略 latex 命令
+- Latex 源码检查 例如. 标签应该在句号之前(而不是之后)
+
+* 案例截图
+:PROPERTIES:
+:CUSTOM_ID: example-screenshot
+:END:
+
+When the style-check.rb flychecker checker is functional, an example Flycheck Errors buffer is:
+当style-check.rb工作时，会有一个类似下面的Flycheck错误缓冲区:
+
+[[https://www.macs.hw.ac.uk/~rs46/images/site/style-check-flycheck.jpg]]
+
+* 安装style-check.rb
+:PROPERTIES:
+:CUSTOM_ID: style-check.rb-installation
+:END:
+
+从 [[https://www.cs.umd.edu/~nspring/software/style-check-readme.html]] 下载.
+
+为了测试 =style-check.rb=, 我们先创建一个 =test.tex= 文件包含下面内容:
+
+#+BEGIN_EXAMPLE
+documentclass{article}
+begin{document}
+section{Heading}
+The way in which.
+end{document}
+#+END_EXAMPLE
+
+然后测试 =style-check.rb= (路径要正确):
+
+#+BEGIN_EXAMPLE
+/path/to/style-check.rb test.tex
+#+END_EXAMPLE
+
+它应该输出:
+
+#+BEGIN_EXAMPLE
+test.tex:4:1: The way in which. (The way in which)
+#+END_EXAMPLE
+
+* flycheck集成
+:PROPERTIES:
+:CUSTOM_ID: flycheck-integration
+:END:
+
+在你的 =~/.emacs=, =~/.emacs.el=, 或 =~/.emacs.d/init.el= (或其他) 文件中填入下面内容.
+
+=style-check.rb= 的路径需要修改为真实路径.
+
+#+begin_src emacs-lisp
+  (require 'flycheck)
+  (flycheck-define-checker style-check
+    "A linter for style-check.rb"
+    :command ("/path/to/style-check.rb"
+              source-inplace)
+    :error-patterns
+    ((warning line-start (file-name) ":" line ":" column ": "
+              (message (one-or-more not-newline)
+                       (zero-or-more "n" (any " ") (one-or-more not-newline)))
+              line-end))
+    :modes latex-mode
+    )
+  (add-to-list 'flycheck-checkers 'style-check)
+#+end_src
+
+启用latex-mode的flycheck:
+
+#+begin_src emacs-lisp
+  (add-hook 'latex-mode-hook 'flycheck-mode)
+#+end_src
+
+当你打开 =.tex= 文件时， =style-check.rb= 会被调用来针对 latex 内容进行检查. 且每次保存变更时都会执行一次 =style-check.rb=.
+
+按下 =C-c ! l= 就会在一个 Flycheck 错误buffer显示 =file.txt= 的 文本分析(textlint) 警告
+
+*调试* 若flycheck错误buffer中没有显示任何警告, 按下 =C-c ! C-c= 可以对 =style-check.rb= 进行调试。 它会在新 buffer 中运行 =style-check.rb= 并显示其原始输出.
+
+* 与其他latex检查器整合
+:PROPERTIES:
+:CUSTOM_ID: chaining-other-latex-checkers
+:END:
+
+Flycheck可以在单个文件上执行多个检查器。例如你可以将 [[./2018-12-25-textlint-flycheck.html][textlint flycheck check]] 和 =style-check.rb= 检查起连用起来。
+你需要在Emacs配置文件(例如 =~/.init.el=)中定义文本检查工具然后将之加入 =style-check.rb= 中的检查器配置
+
+#+BEGIN_EXAMPLE
+:next-checkers ((warning . textlint))
+#+END_EXAMPLE
+
+Flycheck现在将列出来自两个检查器的警告。
+
+多个检查器链接在一起的一个潜在缺点是来自不同检查器会对相同错误产生多个警告，例如拼写、措辞和大小写之类的错误。
