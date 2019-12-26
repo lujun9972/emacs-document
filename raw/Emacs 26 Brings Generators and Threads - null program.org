@@ -6,115 +6,36 @@
 #+LANGUAGE:  zh-CN
 #+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
 
-Emacs 26.1 was [[https://lists.gnu.org/archive/html/emacs-devel/2018-05/msg00765.html][recently released]]. As you would expect from a
-Emacs 26.1是[[https://lists.gnu.org/archive/html/emacs-devel/2018-05/msg00765.html][最近发布]]。正如你对a的期望
-major release, it comes with lots of new goodies. Being [[/tags/emacs/][a bit of an
-主要发布，它带来了很多新的好东西。是[[/tags/emacs/][有点
-Emacs Lisp enthusiast]], the two most interesting new features
-Emacs Lisp爱好者]]，两个最有趣的新功能
-are [[https://www.gnu.org/software/emacs/draft/manual/html_node/elisp/Generators.html][generators]] (=iter=) and [[https://www.gnu.org/software/emacs/draft/manual/html_node/elisp/Threads.html][native threads]]
-是[[https://www.gnu.org/software/emacs/draft/manual/html_node/elisp/Generators.html][生成器]](=iter=)和[[https://www.gnu.org/software/emacs/draft/manual/html_node/elisp/Threads.html][原生线程]]
-(=thread=).
-(= =)线程。
+Emacs 26.1 was [[https://lists.gnu.org/archive/html/emacs-devel/2018-05/msg00765.html][recently released]]. As you would expect from a major release, it comes with lots of new goodies. Being [[/tags/emacs/][a bit of an Emacs Lisp enthusiast]], the two most interesting new features are [[https://www.gnu.org/software/emacs/draft/manual/html_node/elisp/Generators.html][generators]] (=iter=) and [[https://www.gnu.org/software/emacs/draft/manual/html_node/elisp/Threads.html][native threads]] (=thread=).
 
-*Correction*: Generators were actually introduced in Emacs 25.1
-*更正*:Emacs 25.1中实际上引入了生成器
-(Sept. 2016), not Emacs 26.1. Doh!
-(2016年9月)，而不是Emacs 26.1。哎!
+*Correction*: Generators were actually introduced in Emacs 25.1 (Sept. 2016), not Emacs 26.1. Doh!
 
 * Generators
-*发电机
 :PROPERTIES:
-属性:
 :CUSTOM_ID: generators
-:CUSTOM_ID:发电机
 :END:
-结束:
 
-Generators are one of those cool language features that provide a lot of
-生成器是那些提供了很多功能的很酷的语言特性之一
-power at a small implementation cost. They're like a constrained form of
-以很小的实现成本获得强大的功能。它们就像是
-coroutines, but, unlike coroutines, they're typically built entirely on
-协同程序，但是，不同于协同程序，它们通常是完全建立在
-top of first-class functions (e.g. closures). This means no additional
-顶级函数(例如闭包)。这意味着没有额外的
-run-time support is needed in order to add generators to a language.
-为了将生成器添加到语言中，需要运行时支持。
-The only complication is the changes the compiler. Generators are not
-唯一复杂的是编译器的变化。发电机没有
-compiled the same way as normal functions despite looking so similar.
-尽管看起来很相似，但编译的方式与普通函数相同。
+Generators are one of those cool language features that provide a lot of power at a small implementation cost. They're like a constrained form of coroutines, but, unlike coroutines, they're typically built entirely on top of first-class functions (e.g. closures). This means no additional run-time support is needed in order to add generators to a language. The only complication is the changes the compiler.
+Generators are not compiled the same way as normal functions despite looking so similar.
 
-What's perhaps coolest of all about lisp-family generators, including
-lisp家族生成器最酷的地方是什么
-Emacs Lisp, is that the compiler component can be implemented
-是可以实现的编译器组件
-entirely with macros. The compiler need not be modified at all,
-完全与宏。编译器根本不需要修改，
-making generators no more than a library, and not actually part of the
-使发电机只是一个图书馆，而不是实际上的一部分
-language. That's exactly how they've been implemented in Emacs Lisp
-语言。这正是它们在Emacs Lisp中实现的方式
-(=emacs-lisp/generator.el=).
-(= emacs -lisp generator.el =)。
+What's perhaps coolest of all about lisp-family generators, including Emacs Lisp, is that the compiler component can be implemented entirely with macros. 
+The compiler need not be modified at all, making generators no more than a library, and not actually part of the language.
+That's exactly how they've been implemented in Emacs Lisp (=emacs-lisp/generator.el=).
 
-So what's a generator? It's a function that returns an iterator
-发电机是什么?它是一个返回迭代器的函数
-object. When an iterator object is invoked (e.g. =iter-next=) it
-对象。当调用迭代器对象时(例如=iter-next=)
-evaluates the body of the generator. Each iterator is independent.
-计算生成器的主体。每个迭代器都是独立的。
-What makes them unusual (and useful) is that the evaluation is
-使它们不同寻常(和有用)的是评估
-paused in the middle of the body to return a value, saving all the
-在正文中间暂停以返回一个值，保存所有
-internal state in the iterator. Normally pausing in the middle of
-迭代器中的内部状态。通常在中间停下来
-functions isn't possible, which is what requires the special compiler
-函数是不可能的，这就需要特殊的编译器
-support.
-支持。
+So what's a generator? It's a function that returns an iterator object. When an iterator object is invoked (e.g. =iter-next=) it evaluates the body of the generator. Each iterator is independent.
+What makes them unusual (and useful) is that the evaluation is paused in the middle of the body to return a value, saving all the internal state in the iterator. Normally pausing in the middle of functions isn't possible, which is what requires the special compiler support.
 
-Emacs Lisp generators appear to be most closely modeled after [[https://wiki.python.org/moin/Generators][Python
-Emacs Lisp生成器似乎是模仿[[https://wiki.python.org/moin/generator][Python]的
-generators]], though it also shares some similarities to
-发电机]]，虽然它也有一些相似之处
-[[https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Iterators_and_Generators][JavaScript generators]]. What makes it most like Python is the use
-[[https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Iterators_and_Generators] [JavaScript发电机]]。最像Python的是它的用途
-of signals for flow control --- something I'm [[http://wiki.c2.com/?DontUseExceptionsForFlowControl][not personally enthused
-我是[[http://wiki.c2.com/?DontUseExceptionsForFlowControl][不是个人热情
-about]] (though [[https://stackoverflow.com/questions/7799610/exceptions-signaling-end-of-iterator-why-is-it-bad-in-java-and-normal-in-pyth][see also]]). When a Python generator
-关于]](尽管[[https://stackoverflow.com/questions/7799610])。当Python生成器
-completes, it throws a =StopItertion= exception. In Emacs Lisp, it's
-完成后，它抛出一个=StopItertion=异常。在Emacs Lisp中，它是
-an =iter-end-of-sequence= signal. A signal is out-of-band and avoids
-一个= iter-end-of-sequence =信号。信号是带外和避免
-the issue relying on some special in-band value to communicate the end
-该问题依靠一些特殊的带内值来通信结束
-of iteration.
-的迭代。
+Emacs Lisp generators appear to be most closely modeled after [[https://wiki.python.org/moin/Generators][Python generators]], though it also shares some similarities to
+[[https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Iterators_and_Generators][JavaScript generators]]. What makes it most like Python is the use of signals for flow control --- something I'm [[http://wiki.c2.com/?DontUseExceptionsForFlowControl][not personally enthused about]] (though [[https://stackoverflow.com/questions/7799610/exceptions-signaling-end-of-iterator-why-is-it-bad-in-java-and-normal-in-pyth][see also]]). 
+When a Python generator completes, it throws a =StopItertion= exception. In Emacs Lisp, it's an =iter-end-of-sequence= signal. 
+A signal is out-of-band and avoids the issue relying on some special in-band value to communicate the end of iteration.
 
-In contrast, JavaScript's solution is to return a “rich” object wrapping
-相反，JavaScript的解决方案是返回一个“富”对象包装
-the actual yield value. This object has a =done= field that communicates
-实际收益率。这个对象有一个交流的=done=字段
-whether iteration has completed. This avoids the use of exceptions for
-迭代是否完成。这避免了使用异常
-flow control, but the caller has to unpack the rich object.
-流控制，但调用方必须解包富对象。
+In contrast, JavaScript's solution is to return a “rich” object wrapping the actual yield value. This object has a =done= field that communicates whether iteration has completed. 
+This avoids the use of exceptions for flow control, but the caller has to unpack the rich object.
 
-Fortunately the flow control issue isn't normally exposed to Emacs Lisp
-幸运的是，流控制问题通常不会暴露给Emacs Lisp
-code. Most of the time you'll use the =iter-do= macro or (my preference)
-代码。大多数情况下你会使用=iter-do=宏或者(我的偏好)
-the new =cl-loop= keyword =iter-by=.
-新的=cl-loop= keyword =iter-by=。
+Fortunately the flow control issue isn't normally exposed to Emacs Lisp code. Most of the time you'll use the =iter-do= macro or (my preference) the new =cl-loop= keyword =iter-by=.
 
-To illustrate how a generator works, here's a really simple iterator
-为了说明生成器如何工作，这里有一个非常简单的迭代器
-that iterates over a list:
-迭代一个列表:
+To illustrate how a generator works, here's a really simple iterator that iterates over a list:
 
 #+BEGIN_EXAMPLE
 (iter-defun walk (list)
@@ -122,7 +43,6 @@ that iterates over a list:
 (iter-yield (pop list))))
 #+END_EXAMPLE
 
-Here's how it might be used:
 下面是它的用法:
 
 #+BEGIN_EXAMPLE
@@ -134,81 +54,18 @@ Here's how it might be used:
 (iter-next i) ; error: iter-end-of-sequence
 #+END_EXAMPLE
 
-The iterator object itself is opaque and you shouldn't rely on any
-迭代器对象本身是不透明的，不应该依赖于任何对象
-part of its structure. That being said, I'm a firm believer that we
-它的一部分结构。话虽如此，我坚信我们
-should understand how things work underneath the hood so that we can
-应该了解事情是如何运作的，这样我们才能
-make the most effective use of at them. No program should rely on the
-最有效地利用at。任何程序都不应该依赖于
-particulars of the iterator object internals for correctness, but a
-迭代器对象内部细节的正确性，但是
-well-written program should employ them in a way that [[/blog/2017/01/30/][best exploits
-编写良好的程序应该以[[/blog/2017/01/30/]][最佳利用]的方式使用它们
-their expected implementation]].
-他们的预期实现]]。
+The iterator object itself is opaque and you shouldn't rely on any part of its structure. 
+That being said, I'm a firm believer that we should understand how things work underneath the hood so that we can make the most effective use of at them. No program should rely on the particulars of the iterator object internals for correctness, but a well-written program should employ them in a way that [[/blog/2017/01/30/][best exploits their expected implementation]].
 
-Currently iterator objects are closures, and =iter-next= invokes the
-当前的迭代器对象是闭包，而=iter-next=将调用
-closure with its own internal protocol. It asks the closure to return
-闭包有自己的内部协议。它要求闭包返回
-the next value (=:next= operation), and =iter-close= asks it to clean
-下一个值(=:next= operation)和=iter-close=请求清除
-itself up (=:close= operation).
-本身向上(=:close= operation)。
+Currently iterator objects are closures, and =iter-next= invokes the closure with its own internal protocol. It asks the closure to return the next value (=:next= operation), and =iter-close= asks it to clean itself up (=:close= operation).
 
-Since they're just closures, another really cool thing about Emacs
-因为它们只是闭包，所以Emacs的另一个很酷的地方是
-Lisp generators is that [[/blog/2013/12/30/][iterator objects are generally readable]].
-Lisp生成器是[[/blog/2013/12/30/][迭代器对象通常是可读的]]。
-That is, you can serialize them out with =print= and bring them back to
-也就是说，您可以使用=print=将它们序列化出来，并将它们带回到
-life with =read=, even in another instance of Emacs. They exist
-使用=read=，即使在Emacs的另一个实例中也是如此。它们的存在
-independently of the original generator function. This will not work if
-独立于原始的生成器函数。这是行不通的
-one of the values captured in the iterator object is not readable (e.g.
-在迭代器对象中捕获的值之一是不可读的(例如。
-buffers).
-缓冲区)。
+Since they're just closures, another really cool thing about Emacs Lisp generators is that [[/blog/2013/12/30/][iterator objects are generally readable]]. That is, you can serialize them out with =print= and bring them back to life with =read=, even in another instance of Emacs. They exist independently of the original generator function. This will not work if one of the values captured in the iterator object is not readable (e.g. buffers).
 
-How does pausing work? Well, one of other exciting new features of
-暂停是如何起作用的?另一个令人兴奋的新特点是
-Emacs 26 is the introduction of a jump table opcode, =switch=. I'd
-Emacs 26引入了一个跳转表操作码=switch=。我
-lamented in the past that large =cond= and =cl-case= expressions could
-过去遗憾的是，large =cond=和=cl-case=表达式可以
-be a lot more efficient if Emacs' byte code supported jump tables. It
-如果Emacs的字节码支持跳转表，那么效率会高得多。它
-turns an O(n) sequence of comparisons into an O(1) lookup and jump.
-将O(n)序列的比较转换为O(1)查找和跳转。
-It's essentially the perfect foundation for a generator since it can
-它基本上是一个完美的基础，因为它可以
-be used to jump straight back to the position where evaluation was
-用于直接跳转到评估位置
-paused.
-暂停。
+How does pausing work? Well, one of other exciting new features of Emacs 26 is the introduction of a jump table opcode, =switch=. I'd lamented in the past that large =cond= and =cl-case= expressions could be a lot more efficient if Emacs' byte code supported jump tables. It turns an O(n) sequence of comparisons into an O(1) lookup and jump. It's essentially the perfect foundation for a generator since it can be used to jump straight back to the position where evaluation was paused.
 
-Buuut, generators do not currently use jump tables. The generator
-但是，生成器目前不使用跳转表。发电机
-library predates the new =switch= opcode, and, being independent of it,
-库先于新的=switch=操作码，并且，由于与它无关，
-its author, Daniel Colascione, went with the best option at the time.
-它的作者Daniel Colascione选择了当时最好的方案。
-Chunks of code between yields are packaged as individual closures. These
-收益之间的代码块被打包成单独的闭包。这些
-closures are linked together a bit like nodes in a graph, creating a
-闭包链接在一起，有点像图中的节点，创建一个
-sort of state machine. To get the next value, the iterator object
-某种状态机。要获取下一个值，即迭代器对象
-invokes the closure representing the next state.
-调用表示下一状态的闭包。
+Buuut, generators do not currently use jump tables. The generator library predates the new =switch= opcode, and, being independent of it, its author, Daniel Colascione, went with the best option at the time. Chunks of code between yields are packaged as individual closures. These closures are linked together a bit like nodes in a graph, creating a sort of state machine. To get the next value, the iterator object invokes the closure representing the next state.
 
-I've manually macro expanded the =walk= generator above into a form
-我手动将上面的=walk=生成器扩展为一个表单
-that roughly resembles the expansion of =iter-defun=:
-这大致类似于=iter-defun=的扩展:
+I've manually macro expanded the =walk= generator above into a form that roughly resembles the expansion of =iter-defun=:
 
 #+BEGIN_EXAMPLE
 (defun walk (list)
@@ -229,47 +86,14 @@ that roughly resembles the expansion of =iter-defun=:
 (funcall state)))))
 #+END_EXAMPLE
 
-This omits the protocol I mentioned, and it doesn't have yield results
-这忽略了我提到的协议，并且没有产生结果
-(values passed to the iterator). The actual expansion is a whole lot
-(传递给迭代器的值)。实际的扩展是一个整体
-messier and less optimal than this, but hopefully my hand-rolled
-比这更混乱，也不是最优的，但希望我是手卷的
-generator is illustrative enough. Without the protocol, this iterator is
-生成器足以说明问题。如果没有协议，这个迭代器就是
-stepped using =funcall= rather than =iter-next=.
-步进使用=funcall=而不是=iter-next=。
+This omits the protocol I mentioned, and it doesn't have yield results (values passed to the iterator). The actual expansion is a whole lot messier and less optimal than this, but hopefully my hand-rolled generator is illustrative enough. Without the protocol, this iterator is stepped using =funcall= rather than =iter-next=.
 
-The =state= variable keeps track of where in the body of the generator
-变量=state=跟踪生成器体中的位置
-this iterator is currently “paused.” Continuing the iterator is
-此迭代器当前“暂停”。继续迭代器是
-therefore just a matter of invoking the closure that represents this
-因此，只需调用表示这个的闭包即可
-state. Each state closure may update =state= to point to a new part of
-状态。每个状态闭包可以更新=state=指向的新部分
-the generator body. The terminal state is obviously =state-2=. Notice
-发电机的身体。终端状态显然是=state-2=。请注意
-how state transitions occur around branches.
-状态转换如何在分支周围发生。
+The =state= variable keeps track of where in the body of the generator this iterator is currently “paused.” Continuing the iterator is therefore just a matter of invoking the closure that represents this state. Each state closure may update =state= to point to a new part of the generator body. The terminal state is obviously =state-2=. Notice how state transitions occur around branches.
 
-I had said generators can be implemented as a library in Emacs Lisp.
-我说过，生成器可以在Emacs Lisp中实现为一个库。
-Unfortunately theres a hole in this: =unwind-protect=. It's not valid to
-不幸的是，这里有个漏洞:=unwind-protect=。这是无效的
-yield inside an =unwind-protect= form. Unlike, say, a throw-catch,
-内收益率=unwind-protect=形式。不像抛接球，
-there's no mechanism to trap an unwinding stack so that it can be
-没有任何机制来捕获一个解除堆栈，使它可以
-restarted later. The state closure needs to return and fall through the
-稍后重新启动。状态闭合需要返回并通过
-=unwind-protect=.
-= unwind-protect =。
+I had said generators can be implemented as a library in Emacs Lisp. Unfortunately theres a hole in this: =unwind-protect=. It's not valid to yield inside an =unwind-protect= form. Unlike, say, a throw-catch, there's no mechanism to trap an unwinding stack so that it can be restarted later. The state closure needs to return and fall through the =unwind-protect=.
 
 A jump table version of the generator might look like the following.
-生成器的跳转表版本可能如下所示。
 I've used =cl-labels= since it allows for recursion.
-我使用了=cl-label =，因为它允许递归。
 
 #+BEGIN_EXAMPLE
 (defun walk (list)
@@ -288,19 +112,9 @@ I've used =cl-labels= since it allows for recursion.
 #'closure)))
 #+END_EXAMPLE
 
-When byte compiled on Emacs 26, that =cl-case= is turned into a jump
-当字节在Emacs 26上编译时，将=cl-case=转换为跳转
-table. This “switch” form is closer to how generators are implemented in
-表格这种“开关”形式更接近于生成器的实现方式
-other languages.
-其他语言。
+When byte compiled on Emacs 26, that =cl-case= is turned into a jump table. This “switch” form is closer to how generators are implemented in other languages.
 
-Iterator objects can [[/blog/2017/12/14/][share state between themselves]] if they
-迭代器对象可以[[/blog/2017/12/14/][在它们之间共享状态]]
-close over a common environment (or, of course, use the same global
-关闭一个公共环境(当然，也可以使用相同的全局环境)
-variables).
-变量)。
+Iterator objects can [[/blog/2017/12/14/][share state between themselves]] if they close over a common environment (or, of course, use the same global variables).
 
 #+BEGIN_EXAMPLE
 (setf foo
@@ -320,84 +134,22 @@ variables).
 (iter-next (nth 0 foo)) ; => :c
 #+END_EXAMPLE
 
-For years there has been a very crude way to “pause” a function and
-多年来，一直有一种非常粗糙的方法来“暂停”一个函数
-allow other functions to run: =accept-process-output=. It only works in
-允许其他函数运行:=accept-process-output=。它只适用于
-the context of processes, but five years ago this was [[/blog/2013/01/14/][sufficient for me
-过程的上下文，但是五年前这对我来说已经足够了
-to build primitives on top of it]]. Unlike this old process
-在其上构建原语]]。不像这个老过程
-function, generators do not block threads, including the user interface,
-函数，生成器不阻塞线程，包括用户界面，
-which is really important.
-这很重要。
+For years there has been a very crude way to “pause” a function and allow other functions to run: =accept-process-output=. It only works in the context of processes, but five years ago this was [[/blog/2013/01/14/][sufficient for me to build primitives on top of it]]. Unlike this old process function, generators do not block threads, including the user interface, which is really important.
 
 * Threads
-*线程
 :PROPERTIES:
-属性:
 :CUSTOM_ID: threads
-:CUSTOM_ID:线程
 :END:
-结束:
 
-Emacs 26 also bring us threads, which have been attached in a very
-Emacs 26也为我们带来了线程，这些线程已经附加在一个very中
-bolted on fashion. It's not much more than a subset of pthreads: shared
-螺栓在时尚。它只不过是pthreads的一个子集:shared
-memory threads, recursive mutexes, and condition variables. The
-内存线程、递归互斥对象和条件变量。的
-interfaces look just like they do in pthreads, and there hasn't been
-接口看起来就像它们在pthreads中所做的一样，实际上并没有
-much done to integrate more naturally into the Emacs Lisp ecosystem.
-为了更自然地集成到Emacs Lisp生态系统中，我们做了很多工作。
+Emacs 26 also bring us threads, which have been attached in a very bolted on fashion. It's not much more than a subset of pthreads: shared memory threads, recursive mutexes, and condition variables. The interfaces look just like they do in pthreads, and there hasn't been much done to integrate more naturally into the Emacs Lisp ecosystem.
 
-This is also only the first step in bringing threading to Emacs Lisp.
-这也是将线程引入Emacs Lisp的第一步。
-Right now there's effectively a global interpreter lock (GIL), and
-现在有一个全局解释器锁(GIL)
-threads only run one at a time cooperatively. Like with generators, the
-线程一次只能协同运行一个。就像发电机一样
-Python influence is obvious. In theory, sometime in the future this
-Python的影响是显而易见的。理论上，在未来的某个时候
-interpreter lock will be removed, making way for actual concurrency.
-解释器锁将被移除，为实际的并发性让路。
+This is also only the first step in bringing threading to Emacs Lisp. Right now there's effectively a global interpreter lock (GIL), and threads only run one at a time cooperatively. Like with generators, the Python influence is obvious. In theory, sometime in the future this interpreter lock will be removed, making way for actual concurrency.
 
-This is, again, where I think it's useful to contrast with JavaScript,
-这也是我认为比较JavaScript很有用的地方，
-which was also initially designed to be single-threaded. Low-level
-它最初也是设计成单线程的。低级
-threading primitives weren't exposed --- though mostly because
-线程基元没有公开——尽管主要是因为
-JavaScript typically runs sandboxed and there's no safe way to expose
-JavaScript通常运行沙箱，没有安全的方式来公开
-those primitives. Instead it got a [[/blog/2013/01/26/][web worker API]] that exposes
-这些原语。相反，它得到了一个[[/blog/2013/01/26/][web worker API]]，暴露了
-concurrency at a much higher level, along with an efficient interface
-并发性要高得多，并且有一个高效的接口
-for thread coordination.
-线程协调。
+This is, again, where I think it's useful to contrast with JavaScript, which was also initially designed to be single-threaded. Low-level threading primitives weren't exposed --- though mostly because JavaScript typically runs sandboxed and there's no safe way to expose those primitives. Instead it got a [[/blog/2013/01/26/][web worker API]] that exposes concurrency at a much higher level, along with an efficient interface for thread coordination.
 
-For Emacs Lisp, I'd prefer something safer, more like the JavaScript
-对于Emacs Lisp，我更喜欢更安全的，更像JavaScript的东西
-approach. Low-level pthreads are now a great way to wreck Emacs with
-的方法。低级的pthread现在是破坏Emacs的好方法
-deadlocks (with no =C-g= escape). Playing around with the new
-死锁(no =C-g= escape)。玩新的
-threading API for just a few days, I've already had to restart Emacs a
-线程API只有几天，我已经重新启动Emacs a
-bunch of times. Bugs in Emacs Lisp are normally a lot more forgiving.
-很多次了。Emacs Lisp中的bug通常要宽容得多。
+For Emacs Lisp, I'd prefer something safer, more like the JavaScript approach. Low-level pthreads are now a great way to wreck Emacs with deadlocks (with no =C-g= escape). Playing around with the new threading API for just a few days, I've already had to restart Emacs a bunch of times. Bugs in Emacs Lisp are normally a lot more forgiving.
 
-One important detail that has been designed well is that dynamic
-一个设计良好的重要细节是动态
-bindings are thread-local. This is really essential for correct
-绑定是线程局部。这对正确是很重要的
-behavior. This is also an easy way to create thread-local storage
-的行为。这也是创建线程本地存储的一种简单方法
-(TLS): dynamically bind variables in the thread's entrance function.
-(TLS):在线程的入口函数中动态绑定变量。
+One important detail that has been designed well is that dynamic bindings are thread-local. This is really essential for correct behavior. This is also an easy way to create thread-local storage (TLS): dynamically bind variables in the thread's entrance function.
 
 #+BEGIN_EXAMPLE
 ;;; -*- lexical-binding: t; -*-
@@ -413,148 +165,36 @@ behavior. This is also an easy way to create thread-local storage
 ...))))
 #+END_EXAMPLE
 
-However, *=cl-letf= “bindings” are not thread-local*, which makes
-但是，*=cl-letf= " bindings "不是线程本地的*，这使得
-this [[/blog/2017/10/27/][otherwise incredibly useful macro]] quite dangerous in the
-这个[[/blog/2017/10/27/][其他非常有用的宏]]在这个领域非常危险
-presence of threads. This is one way that the new threading API feels
-线程的存在。这是新线程API的一种感觉
-bolted on.
-螺栓。
+However, *=cl-letf= “bindings” are not thread-local*, which makes this [[/blog/2017/10/27/][otherwise incredibly useful macro]] quite dangerous in the presence of threads. This is one way that the new threading API feels bolted on.
 
 ** Building generators on threads
-**在线程上构建生成器
 :PROPERTIES:
-属性:
 :CUSTOM_ID: building-generators-on-threads
-:CUSTOM_ID building-generators-on-threads
 :END:
-结束:
 
-In [[/blog/2017/06/21/][my stack clashing article]] I showed a few different ways to
-在[[/blog/2017/06/21/][我的堆栈冲突文章]]中，我展示了几种不同的方法
-add coroutine support to C. One method spawned per-coroutine threads,
-将协同程序支持添加到c中。
-and coordinated using semaphores. With the new threads API in Emacs,
-并使用信号量进行协调。使用Emacs中的新线程API，
-it's possible to do exactly the same thing.
-做完全相同的事情是可能的。
+In [[/blog/2017/06/21/][my stack clashing article]] I showed a few different ways to add coroutine support to C. One method spawned per-coroutine threads, and coordinated using semaphores. With the new threads API in Emacs, it's possible to do exactly the same thing.
 
-Since generators are just a limited form of coroutines, this means
-因为生成器只是协同程序的一种有限形式，这意味着
-threads offer another, very different way to implement them. The
-线程提供了另一种非常不同的实现方法。的
-threads API doesn't provide semaphores, but condition variables can fill
-线程API不提供信号量，但是条件变量可以填充
-in for them. To “pause” in the middle of the generator, just wait on a
-对他们来说。要在生成器中间“暂停”，只需等待a
-condition variable.
-条件变量。
+Since generators are just a limited form of coroutines, this means threads offer another, very different way to implement them. The threads API doesn't provide semaphores, but condition variables can fill in for them. To “pause” in the middle of the generator, just wait on a condition variable.
 
-So, naturally, I just had to see if I could make it work. I call it a
-所以，很自然，我只是想看看我是否能做到。我称之为a
-“thread iterator” or “thriter.” The API is very similar to =iter=:
-“线程迭代器”或“thriter”。这个API与=iter=非常相似:
+So, naturally, I just had to see if I could make it work. I call it a “thread iterator” or “thriter.” The API is very similar to =iter=:
 
 *[[https://github.com/skeeto/thriter]]*
-* [[https://github.com/skeeto/thriter]] *
 
-This is merely a proof of concept so don't actually use this library
-这只是一个概念证明，所以不要实际使用这个库
-for anything. These thread-based generators are about 5x slower than
-对任何事情。这些基于线程的生成器要慢5倍
-=iter= generators, and they're a lot more heavy-weight, needing an
-=iter=发电机，它们更重，需要an
-entire thread per iterator object. This makes =thriter-close= all the
-每个迭代器对象的整个线程。这使得= thritter -close=所有的
-more important. On the other hand, these generators have no problem
-更重要的是。另一方面，这些发电机没有问题
-yielding inside =unwind-protect=.
-内部收益率= unwind-protect =。
+This is merely a proof of concept so don't actually use this library for anything. These thread-based generators are about 5x slower than =iter= generators, and they're a lot more heavy-weight, needing an entire thread per iterator object. This makes =thriter-close= all the more important. On the other hand, these generators have no problem yielding inside =unwind-protect=.
 
-Originally this article was going to dive into the details of how
-最初，本文将深入探讨如何实现这一目标的细节
-these thread-iterators worked, but =thriter= turned out to be quite a
-这些线程迭代器工作得很好，但是=thriter=结果相当不错
-bit more complicated than I anticipated, especially as I worked
-比我预想的要复杂一些，尤其是在我工作的时候
-towards feature matching =iter=.
-朝向特征匹配=iter=。
+Originally this article was going to dive into the details of how these thread-iterators worked, but =thriter= turned out to be quite a bit more complicated than I anticipated, especially as I worked towards feature matching =iter=.
 
-The gist of it is that each side of a next/yield transaction gets its
-它的要点是下一个/收益交易的每一边都得到它
-own condition variable, but share a common mutex. Values are passed
-拥有条件变量，但共享一个公共互斥锁。值传递
-between the threads using slots on the iterator object. The side that
-在线程之间使用迭代器对象上的槽。的一面
-isn't currently running waits on a condition variable until the other
-当前正在运行的是在一个条件变量上等待另一个条件变量
-side frees it, after which the releaser waits on its own condition
-side释放它，然后释放器等待它自己的条件
-variable for the result. This is similar to [[/blog/2017/02/14/][asynchronous requests in
-结果的变量。这类似于[[/blog/2017/02/14/][异步请求in]
-Emacs dynamic modules]].
-Emacs动态模块]]。
+The gist of it is that each side of a next/yield transaction gets its own condition variable, but share a common mutex. Values are passed between the threads using slots on the iterator object. The side that isn't currently running waits on a condition variable until the other side frees it, after which the releaser waits on its own condition variable for the result. This is similar to [[/blog/2017/02/14/][asynchronous requests in Emacs dynamic modules]].
 
-Rather than use signals to indicate completion, I modeled it after
-我没有使用信号来表示完成，而是按照它建模
-JavaScript generators. Iterators return a cons cell. The car indicates
-JavaScript发电机。迭代器返回一个cons单元格。汽车显示
-continuation and the cdr holds the yield result. To terminate an
-延拓和cdr保持产量结果。终止一个
-iterator early (=thriter-close= or garbage collection), =thread-signal=
-迭代器早期(= thritter -close=或垃圾收集)，=thread-signal=
-is used to essentially “cancel” the thread and knock it off the
-本质上是用来“取消”线程并将其从
-condition variable.
-条件变量。
+Rather than use signals to indicate completion, I modeled it after JavaScript generators. Iterators return a cons cell. The car indicates continuation and the cdr holds the yield result. To terminate an iterator early (=thriter-close= or garbage collection), =thread-signal= is used to essentially “cancel” the thread and knock it off the condition variable.
 
-Since threads aren't (and shouldn't be) garbage collected, failing to
-因为线程没有(也不应该)被垃圾回收，所以失败了
-run a thread-iterator to completion would normally cause a memory leak,
-运行一个线程迭代器来完成通常会导致内存泄漏，
-as the thread [[https://www.youtube.com/watch?v=AK3PWHxoT_E][sits there forever waiting on a “next” that will never
-作为线程[[https://www.youtube.com/watch?]永远坐在那里等待一个永远不会到来的“下一个”
-come]]. To deal with this, there's a finalizer is attached to the
-]]。要处理这个，有一个终结器连接到
-iterator object in such a way that it's not visible to the thread. A
-以线程不可见的方式迭代器对象。一个
-lost iterator is eventually cleaned up by the garbage collector, but, as
-丢失的迭代器最终会被垃圾收集器清理掉，但是
-usual with finalizers, this is [[https://utcc.utoronto.ca/~cks/space/blog/programming/GoFinalizersStopLeaks][only a last resort]].
-通常使用终结器，这是[[https://utcc.utoronto。ca/~cks/space/blog/programming/GoFinalizersStopLeaks[最后一招]]。
+Since threads aren't (and shouldn't be) garbage collected, failing to run a thread-iterator to completion would normally cause a memory leak, as the thread [[https://www.youtube.com/watch?v=AK3PWHxoT_E][sits there forever waiting on a “next” that will never come]]. To deal with this, there's a finalizer is attached to the iterator object in such a way that it's not visible to the thread. A lost iterator is eventually cleaned up by the garbage collector, but, as usual with finalizers, this is [[https://utcc.utoronto.ca/~cks/space/blog/programming/GoFinalizersStopLeaks][only a last resort]].
 
 ** The future of threads
-线程的未来
 :PROPERTIES:
-属性:
 :CUSTOM_ID: the-future-of-threads
-:CUSTOM_ID the-future-of-threads
 :END:
-结束:
 
-This thread-iterator project was my initial, little experiment with
-这个线程迭代器项目是我最初的小实验
-Emacs Lisp threads, similar to why I [[/blog/2016/11/05/][connected a joystick to Emacs
-Emacs Lisp线程，类似于为什么我[[博客/2016/11/05/]][连接一个操纵杆到Emacs
-using a dynamic module]]. While I don't expect the current thread
-使用一个动态模块]]。虽然我不期望当前线程
-API to go away, it's not really suitable for general use in its raw
-API消失了，它的原始版本并不适合一般使用
-form. Bugs in Emacs Lisp programs should virtually never bring down
-的形式。Emacs Lisp程序中的错误实际上永远不会停止
-Emacs and require a restart. Outside of threads, the few situations
-并要求重新启动。线程之外的少数情况
-that break this rule are very easy to avoid (and very obvious that
-打破这个规则是很容易避免的
-something dangerous is happening). Dynamic modules are dangerous by
-危险的事情正在发生)。动态模块是危险的
-necessity, but concurrency doesn't have to be.
-必要性，但并发不一定是。
+This thread-iterator project was my initial, little experiment with Emacs Lisp threads, similar to why I [[/blog/2016/11/05/][connected a joystick to Emacs using a dynamic module]]. While I don't expect the current thread API to go away, it's not really suitable for general use in its raw form. Bugs in Emacs Lisp programs should virtually never bring down Emacs and require a restart. Outside of threads, the few situations that break this rule are very easy to avoid (and very obvious that something dangerous is happening). Dynamic modules are dangerous by necessity, but concurrency doesn't have to be.
 
-There really needs to be a safe, high-level API with clean thread
-确实需要一个安全的、高级别的API和干净的线程
-isolation. Perhaps this higher-level API will eventually build on top of
-隔离。也许这个更高级的API最终将构建在其上
-the low-level threading API.
-低级线程API。
+There really needs to be a safe, high-level API with clean thread isolation. Perhaps this higher-level API will eventually build on top of the low-level threading API.
