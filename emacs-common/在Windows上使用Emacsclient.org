@@ -1,0 +1,123 @@
+#+TITLE: 在Windows上使用Emacsclient
+#+URL: https://scripter.co/emacsclient-on-windows/
+#+AUTHOR: lujun9972
+#+TAGS: emacs-common
+#+DATE: [2018年 06月 06日 星期三 21:35:55 CST]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+But for this to work on Windows, we need some more elisp and Windows environment variable configuration than just the below code,
+使用emacsclient替代emacs二进制文件是一种非常有用的技术，可以防止每次打开新文件时都从新开始加载emacs。
+这项技术在Windows上也很有用。但是要在Windows上使用该技术，仅仅使用下面的配置是不够的,我们需要更多的elisp配置并且配置一些Windows环境变量:
+
+#+begin_src emacs-lisp
+  (require 'server)
+  ;; Start a server if (server-running-p) does not return t (e.g. if it
+  ;; returns nil or :other)
+  (or (eq (server-running-p) t)
+      (server-start))
+#+end_src
+
+* elisp配置 [[#setup-in-elisp][#]]
+:PROPERTIES:
+:CUSTOM_ID: setup-in-elisp
+:END:
+
+** 使用 TCP sockets [[#use-tcp-sockets][#]]
+:PROPERTIES:
+:CUSTOM_ID: use-tcp-sockets
+:END:
+
+By default the value of =server-use-tcp= is =nil=. So for Windows, we need this,
+我不明白为什么是这样，但要在Windows上启动服务，你需要使用TCP套接字，而不是本地套接字。默认情况下 =server-use-tcp= 的值为 =nil= 。因此在Windows上，我们需要这样做，
+
+#+begin_src emacs-lisp
+  (when (equal window-system 'w32)
+    (setq server-use-tcp t))
+#+end_src
+
+** 规范化服务器认证目录 [[#uniquify-the-server-authentication-directory][#]]
+:PROPERTIES:
+:CUSTOM_ID: uniquify-the-server-authentication-directory
+:END:
+
+当 =server-use-tcp= 值非nil时， =server-auth-dir= 用于存储服务器身份验证文件。对于我来说，在两台不同的机器上运行相同的emacs是很正常的(在罕见的情况下可能在同一台机器上运行不同版本的emacs)，通过Dropbox共享相同的 =~/.emacs.d/= 目录。所以我对 =server-auth-dir= 进行了规范。
+
+#+begin_src emacs-lisp
+  ;; Below needs to be set before you require 'server
+  (setq server-auth-dir
+        (let ((dir (concat user-emacs-directory
+                           "server_" (format "%s_%s"
+                                             emacs-major-version
+                                             emacs-minor-version)
+                           "_" (system-name) ; Use the var `system-name' directly
+                                          ; if using emacs older than 25.1.
+                           "/")))
+          (make-directory dir :parents)
+          dir))
+#+end_src
+
+因此，如果我正在运行emacs 25.1，并且我的Windows机器名是 =FOO= ，那么 =server-auth-dir= 的值将被设置为 =~/.emacs.d/server_25_1_FOO/= 。
+
+** 预防 ‘server is unsafe' 错误 [[#prevent-server-is-unsafe-errors][#]]
+:PROPERTIES:
+:CUSTOM_ID: prevent-server-is-unsafe-errors
+:END:
+
+为了让服务器在Windows上启动，还需要使用下面的技巧。
+
+#+begin_src emacs-lisp
+  (with-eval-after-load 'server
+    (when (equal window-system 'w32)
+      ;; Suppress error "directory ~/.emacs.d/server is unsafe". It is needed
+      ;; needed for the server to start on Windows.
+      (defun server-ensure-safe-dir (dir) "Noop" t)))
+#+end_src
+
+* Windows环境变量[[# Windows -environment-variables][#]]
+:PROPERTIES:
+:CUSTOM_ID: windows-environment-variables
+:END:
+
+You will need to set =EMACS_SERVER_FILE= and =HOME= environment variables in Windows. I came up with the below steps that work on Windows 7.
+您需要在Windows中设置 =EMACS_SERVER_FILE= 和 =HOME= 环境变量。下面步骤适用于Windows 7。
+
+- 点击开始>控制面板。
+- 在搜索域中搜索environment。
+- 点击编辑用户的环境变量。
+- 点击用户变量下的新建…
+- 在变量名字段中输入 =EMACS_SERVER_FILE= ，并在变量值字段中输入适当的值，其值为 =server-auth-dir= 中设置的值加上 =server= 。
+
+- 我 =server-auth-dir= 的值为 =~/.emacs.d/server_25_1_FOO/=. 因此我设置变量值为 =C:\Users\KModi\Dropbox\home\.emacs.d\server_25_1_FOO\server=. 这里使用 =/= 代替 了 =\= 。
+- 我还在使用相同的步骤在Windows上将用户环境变量 =HOME= 设置为 =C:\Users\KModi\Dropbox\home=.
+
+- 点击确定保存环境变量。
+
+* 启动服务器 [[#start-the-server][#]]
+:PROPERTIES:
+:CUSTOM_ID: start-the-server
+:END:
+
+下面代码在启动emacs时启动服务器。
+
+#+begin_src emacs-lisp
+  (require 'server)
+  ;; Start a server if (server-running-p) does not return t (e.g. if it
+  ;; returns nil or :other)
+  (or (eq (server-running-p) t)
+      (server-start))
+#+end_src
+
+* 使用 emacsclient [[#using-the-emacsclient][#]]
+:PROPERTIES:
+:CUSTOM_ID: using-the-emacsclient
+:END:
+
+1. 在启动Window后， 第一次启动Emacs 使用 =runemacs.exe= 启动.
+2. 之后使用 =emacsclientw.exe=.
+
+为了方便，我将 =runemacs.exe= 快捷方式添加到 所有程序>启动 中。这样每次我启动Windows时，emacs都会自动启动。
+
+如果你经常需要使用emacsclient在emacs中打开文件，可以 按住Shift键+右键单击文件,-选择打开方式,-点击选择默认程序并选择 =emacsclientw.exe= 可执行文件。
+
+- 你可以在 [[https://github.com/kaushalmodi/.emacs.d/blob/6c7b77af6ea39fd6e016a873fad763a712547223/setup-files/setup-server.el][这里]] 找到我的完整配置
+- 本方法在 [[https://ftp.gnu.org/gnu/emacs/windows/][官方Windows版Emacs]] 和 [[https://github.com/zklhp/emacs-w64/releases][emacs-w64]] 都通过测试,测试版本为Emacs 25.1
