@@ -1,0 +1,178 @@
+#+TITLE: Org-mode中的Capture mode 与 Date Trees
+#+URL: http://members.optusnet.com.au/~charles57/GTD/datetree.html
+#+AUTHOR: lujun9972
+#+TAGS: org-mode
+#+DATE: [2018年 09月 19日 星期三 19:08:18 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+org-mode一个重要的功能是能够捕获笔记和想法(使用 *capture* 模式)并存储在一个制定位置中。日期树是一种根据日期指定位置的方法
+
+** 何为Capture?
+:PROPERTIES:
+:CUSTOM_ID: sec-1_1
+:END:
+
+Capture 是一种快速添加内容到org文件中的工具，它讲究最小化的干扰工作流. 
+它取代了 *remember* 模块但是操作上很类似. 使用 capture 的基本流程为:
+
+1. 调用 capture. 我在 =.emacs= 文件中设置 org-capture 的快捷键为 F6:
+=(global-set-key (kbd "<f6>") 'org-capture)=
+2. 一个带有模板列表的新窗口显示出来. 每个木板都有一个对应的快捷键，比如 =n= 表示 笔记(notes) =t= 表示 待办(Todo-list)事项.
+3. 输入快捷键, 例如输入 =n= 表示记录笔记
+4. 输入内容
+5. 通过 =C-c C-c= 保存笔记
+6. 继续工作。
+
+如果您想进到内容保存的位置，请输入 =C-u C-u F6=,这个命令非常有用。
+
+** Capture 模板
+:PROPERTIES:
+:CUSTOM_ID: sec-1_2
+:END:
+
+每个模板都在 =.emacs= 文件中通过定制org-mode选项进行设置.
+捕获元素组件说明在手册第9.1.3.1节有所说明，以下是概要:
+
+- 一个 *快捷键* (字母)
+- 一个针对该模板的 *描述*
+- 一个条目的 *类型* 说明. 可以一个带标题的 org-mode *条目* (节点), 一个列表项, 一个复选框项(*checkitem*) , 一个表格行(*table-line*) 或 *纯* 文本.
+- 一个 *目标*, 指定捕获的目的地
+- 一个 *模板* - 一段文本，可以通过特殊转译符代表日期、提示输入字符串等
+- 而外的行为属性(我仍然对如何设置属性列表感到困惑)
+
+这是我办公室电脑上的Capture模板:
+
+#+begin_src emacs-lisp
+  '(org-capture-templates
+    (quote (
+            ("a" "Appointment" entry (file+headline
+                                      "c:/charles/My Dropbox/GTD/taskdiary.org" "Calendar")
+             "* APPT %^{Description} %^g
+    %?
+    Added: %U")
+            ("n" "Notes" entry (file+datetree
+                                "c:/charles/My Dropbox/GTD/taskdiary.org")
+             "* %^{Description} %^g %?
+    Added: %U")
+            ("t" "Task Diary" entry (file+datetree
+                                     "c:/charles/My Dropbox/GTD/taskdiary.org")
+             "* TODO %^{Description} %^g
+  %?
+  Added: %U")
+            ("j" "Journal" entry (file+datetree
+                                  "c:/charles/My Dropbox/GTD/workjournal.org")
+             "** %^{Heading}")
+
+            ("l" "Log Time" entry (file+datetree
+                                   "c:/charles/My Dropbox/GTD/timelog.org" )
+             "** %U - %^{Activity} :TIME:")
+            )))
+#+end_src
+
+
+注意模板是如何扩展成多行的。如果你想要一些换行的文本，那么根据需要格式化模板即可。
+例如例子中的“Added:”文本就是从新行开始到。
+
+下面是按下 =F6= 后出现的 capture mode的截屏.可以根上面的描述做个对比。
+
+[[http://members.optusnet.com.au/~charles57/GTD/capture1.png]]
+
+关于这个配置的一些注意事项:
+
+- 我将文件存放在一个通过基于web的 [[https://www.dropbox.com][DropBox]] 服务来同步办公室和家庭电脑的目录中。
+- =%^g= 表示提示输入标签
+- 所有捕获的内容都通过 =Added: %U= 加上时间戳。
+- 有些内容放在文件中特定的目录下，比如约会就方式 *标题* 目录下
+- 其他条目在日期树中归档。下一节中对此进行了解释。
+
+** 日期树格式
+:PROPERTIES:
+:CUSTOM_ID: sec-1_3
+:END:
+
+日期树是一组以日期基准捕获信息的标题。
+标题有三层，每一层都有特定的格式:
+
+- 第一级标题是 *年* (=YYYY=)
+- 第二级标题是 *月* (=YYYY-MM 月名=)
+- 第三级标题是 *日* (=YYYY-MM-DD 日名=)
+
+这是我的文件的一个截屏，展示了一个日期树。
+
+[[http://members.optusnet.com.au/~charles57/GTD/datetree1.png]]
+
+** 捕获内容到日期树中
+:PROPERTIES:
+:CUSTOM_ID: sec-1_4
+:END:
+
+Capture使用模板定义(存储在您的 =.emacs= 启动文件中)来定义信息存储在哪个文件的哪个位置。
+其中一类位置是日期树: =(file+datetree "path/to/file")=.
+
+在日期树中创建新标题时，Capture在目标文件的开头查找匹配年份。如果如果没有找到，则创建第一级标题。月和日也是重复这一过程。间隔的月和日标题不会被创建来填补空白.
+
+你也可以不经过Capture，直接在对应的标题下添加内容. 
+这使我可以手工输入周几 (从agenda视图中读取，这可以帮助我识别一周的开始日期). 
+你还可以为这些标题添加标签
+
+** 捕获和日期树的实际用途
+:PROPERTIES:
+:CUSTOM_ID: sec-1_5
+:END:
+
+我习惯在精装笔记本上记笔记。我在笔记上每一天开始划上一条线，写下日期和星期，然后记下这一天的笔记。
+Date tree和Capture允许我重现这个功能。
+
+我也习惯用日记来确定约会和最后期限。日程视图为我提供了这个功能，使我可以在org-mode文件中移动分支(标题)。
+
+日期树提供了类似在“日记”的日期页面的中写入内容的功能。我使用一个名为 =taskdiary.org= 的文件来存放我捕获的笔记，并将“to Do”列表项作为树的分支。
+
+*笔记* 模板提示输入标题，然后将光标放在标题下面以便输入或粘帖内容.
+
+*任务* 模板也提示输入标题作为类别标签，模板中中包含 TODO 关键字.
+
+在这两个模板中，我都添加了创建条目时的日期和时间，因为这提供了有用的跟踪信息，特别是当内容需要重新归档时。
+
+我本可以把笔记和代办任务分文件存放，但我希望笔记和任务共存于同一地方。
+有时我会把一个笔记转换成代办事项，当这两者在同一文件中时，这种转换就很容易了。
+
+*日志* 模板用于记录长期的信息，例如日记，读书笔记和我做过的事。
+我不会再移动日志文件中的内容，且日志文件仅存在于我家里的电脑上。
+
+
+我这周开始记录时间日志,它被用于追踪我一整天的工作内容. 每次我开始一个新任务或者中断一个任务，我都会记录一个简短的描述。
+下面是迄今为止我一天的工作安排:
+
+[[http://members.optusnet.com.au/~charles57/GTD/timelog.png]]
+
+*收据* 用来记录网上银行和电子商务网站上的付款细节的. 我发现将财务信息与其他日记内容区分开比较合适。
+
+该模板仅在我的家庭电脑上设置，因为我只在家里进行个人财务方面的工作。
+
+*** 我的生产率系统
+
+:PROPERTIES:
+:CUSTOM_ID: sec-1_5_1
+:END:
+
+下面截屏显示了部分任务日志
+
+[[http://members.optusnet.com.au/~charles57/GTD/datetree3.png]]
+
+你可以看到2010-10-06(周三)有一个计算机相关的代办任务以及两个笔记事项。
+2010-10-19(周二)有两个代办事项和三个已完成的任务。
+
+此日期树正是我任务管理系统的基础。
+
+Items are added as follows:-
+增加项目的步骤如下:-
+
+- *代办* 事项通过 *t* 对应的捕获模板添加，并通过一个标签来表明其上下文环境。然后通过合适的命令添加预定日期和结束日期(快捷键分别为 =C-c s= 和 =C-c d=)。
+- *笔记* 通过 *n* 对应的捕获模板添加.
+
+我通过下面方法来决定下一步要做什么:
+
+- *Agenda 视图* - 查看设置了预定日期和结束日期的项目
+- *Tag* 视图 - 查看带有某标签的项目(标签标识了我的GTD上下文, 比如家庭、办公室、金融、阅读、DVD等)
+- *每周回顾* - 每周我都会快速扫一下这周添加的项目.
