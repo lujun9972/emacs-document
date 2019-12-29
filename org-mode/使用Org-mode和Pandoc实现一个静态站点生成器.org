@@ -1,0 +1,137 @@
+#+TITLE: 使用Org-mode和Pandoc实现一个静态站点生成器
+#+URL: https://awarm.space/notes/computation/websites/org-and-pandoc-static-site
+#+AUTHOR: lujun9972
+#+TAGS: org-mode
+#+DATE: [2018年 10月 19日 星期五 12:50:45 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+我花了很多时间来寻找“完美的”静态站点生成器。我想要:
+
+- 快
+- 简单到能让我专注于写作
+- 容易道可以运行在别人的服务器上
+- 可扩展
+
+They had specific templating systems, or required set up and theming that I didn't want to get into.
+虽然现在已经有了一些很棒的网站生成器(我真的很喜欢 [[https://gohugo.io/][hugo]] 因为它零依赖而且速度够快),但大多数对我来说都太重型了。
+他们有特定的模板系统，或者需要配置和和主题设置，而这些我都不想做。
+
+我决定使用 [[https://pandoc.html][pandoc]] 来将一堆markdown文件转换成html, 并让它与一个简单的css文件进行配对. 
+这套方案工作的很好! 我拥有了一套极简的博客生成器,我可以将他很容易地放在Gitlab Pages上.
+
+然而最终我还是遇到了瓶颈. 我想为博客生成一个索引页面和一个更漂亮的目录. 
+为了解决这个问题，我最终在原本很小的bash脚本中添加了一些情况判断逻辑，这使得维护脚本变得痛哭起来。
+
+主要的问题是我想写的文章和对其进行管理的代码是分离的。
+*如果这两者能够结合在一起会怎么样呢?* 我曾经接触过 Donald Knuth 的 [[http://literateprogramming.com/][文学编程]] 的概念, 但从来没有实践过.
+
+当我开始使用org模式时，情况发生了变化。耐心听我说，我很快就要讲到博客生成了。
+
+* 什么是 Org Mode?
+:PROPERTIES:
+:CUSTOM_ID: what-is-org-mode
+:END:
+
+#+BEGIN_QUOTE
+Org mode使用快速有效的纯文本系统记录、维护待办事项列表、规划项目和编写文档。
+#+END_QUOTE
+
+Org是一个很有趣的软件。它简单而强大，结合了直观的标记和符合人体工程学的工具(大多数情况下)。关键是标记一眼就可读，而且这些工具提供了一些与之交互和操作的非常简洁的方法。
+
+它的核心组件相当简单:
+
+- =标题=,以许多 =*= 开头的行，提供层级结构，
+- 内联标记,例如如 =* *= 和 =/ /= 提供样式
+- 块(用 =#+= 标注)提供空间来做一些很酷的事情。
+- 关键字，如 =TODO= 与特定的工具连用并提供上下文
+
+这些都完美地结合在一起，成为文学编程的工具。
+
+** Literate blog generation
+:PROPERTIES:
+:CUSTOM_ID: literate-blog-generation
+:END:
+
+您可能已经注意到代码块块分散在这个站点周围。它们定义了如何生成下方的内容。它们只是代码块，但是通过 [[https://orgmode.html/worg/org-contrib/babel/][org-babel]] 我可以直接在编辑器中执行它们来实时生成下面的内容！
+我使用bash来生成该站点，但是babel(顾名思义)可以让你编写几乎任何内容。
+
+[[https://awarm.space/static/gifs/org-babel.gif]]
+
+使用bash构建博客列表
+
+这是不是有点太小体大作了?是的。但是它比我以前使用的bash脚本更容易维护。
+
+如果你只是想写博客，它可能不是适合你的静态网站生成器，但是它很有趣，也是一个很好的学习经历。
+
+将代码与你的博客内容放在一起会鼓励你维护并编写更多内容。这个过程永无止尽，促使我创造出想要的作品。
+
+** Getting Started
+:PROPERTIES:
+:CUSTOM_ID: getting-started
+:END:
+
+Org-babel的文档有些分散，但是通过挖掘 [[https://orgmode.html/manual/][Org手册]] 最终让我找到了需要的内容。
+Howard Abrams 的这篇文章 [[http://howardism.html/Technical/Emacs/literate-devops.html][Literate Dev-Ops]] 也介绍了大量有用的信息和技术。
+
+* 本网站是如何建造出来的
+:PROPERTIES:
+:CUSTOM_ID: how-this-site-is-actually-built
+:END:
+
+大致的想法是将一堆代码片段以org-babel块的形式分布在整个站点中。然后我们在每一层使用类似这样的代码块。
+
+#+begin_src emacs-lisp
+  (find-file "./blog/index.org")
+  (org-babel-execute-buffer )
+  (save-buffer)
+#+end_src
+
+这将进入一个特定的文件，并执行包含的所有 org-babel 块。
+And if that file includes a similar block, it'll go down into others!
+
+顶层( =index.org= 文件)包含有启动所有文件的代码。
+
+** 生成HTML
+:PROPERTIES:
+:CUSTOM_ID: getting-some-html
+:END:
+
+一旦所有的文件都设置好了，我们用一个小bash脚本来将所有的标记文件转换成html文件。
+
+#+BEGIN_SRC shell
+  #!/bin/bash
+
+  rm -rf _public
+  root="$(pwd)"
+
+  #emacs --batch -l ./build-assets/build.el
+  for folder in $(find . -type d -not -path '*/.*'); do
+      (cd $folder
+       for file in `find . -maxdepth 1 -name "*.org"`; do
+           [ -e "$file" ] || continue
+           mkdir -p "$root/_public/${folder#./}"
+
+           pandoc -f org -t html "$file" -o "$root/_public/${folder#./}/`basename "$file" .org`.html" --lua-filter $root/scripts/changeLinks.lua --lua-filter $root/scripts/task-list.lua -B $root/static/html/header.html -H $root/static/html/includes.html -c "/static/styles.css" -s
+       done)
+  done
+
+  cp -r static _public/
+#+END_SRC
+
+脚本非常小，因为繁重的工作是由[[https://pandoc.html][pandoc]]完成的。但是这一次，这个脚本之所以可以保持较小的规模，是因为我们让org-babel来完成繁重的工作。
+
+* 接下来做什么?
+:PROPERTIES:
+:CUSTOM_ID: whats-next
+:END:
+
+这是我个人的想法. 我已经有了基础，是时候开始使用它了!
+
+当然，我还有一些额外的想法 :)
+
+- 实现 git-hook 来让我提交后自动运行顶层脚本
+- 实现评论和回复
+- [0/2] 把我的其他org文件纳入站点:
+  - 代办事项,
+  - 链接
