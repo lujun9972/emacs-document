@@ -4,97 +4,91 @@
 #+TAGS: raw
 #+DATE: [2019年 06月 14日 星期五 18:25:58 HKT]
 #+LANGUAGE:  zh-CN
-#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
 You may want to do some additional things when a link is activated. For example, maybe it makes sense for different parts of the link to have different actions, or colors. Here is an example where we make an rgb link of three numbers, and color each number, and make the link color dynamic.
-当链接被激活时，您可能需要做一些额外的事情。例如，链接的不同部分使用不同的操作或颜色可能是有意义的。下面是一个例子，我们创建了一个包含三个数字的rgb链接，并为每个数字上色，使链接的颜色是动态的。
 
 We make a keymap so C-up increments a color, and C-down decrements a color.
-我们做一个键映射，C-up增加一个颜色，C-down减少一个颜色。
 
 #+BEGIN_EXAMPLE
-(require 'color)
+    (require 'color)
 
-(defun rgb-face (path)
-(let* ((f (split-string path ","))
-(red (/ (string-to-number (nth 0 f)) 255.0))
-(green (/ (string-to-number (nth 1 f)) 255.0))
-(blue (/ (string-to-number (nth 2 f)) 255.0))
-(hex (color-rgb-to-hex red green blue)))
-(list :foreground hex)))
-
-
-(defun rgb-func (start end path bracketp)
-(save-excursion
-(goto-char start)
-(save-match-data
-(cl-loop for num in (split-string path ",")
-for face in (list '(:foreground "red")
-'(:foreground "green")
-'(:foreground "blue"))
-do
-(progn
-(re-search-forward num end t)
-(add-text-properties
-(match-beginning 0)
-(match-end 0)
-(list 'face face)))))))
-
-(defun ninc ()
-(interactive)
-(skip-chars-backward "0-9")
-(or (looking-at "[0-9]+")
-(error "No number at point"))
-(replace-match (number-to-string (1+ (string-to-number (match-string 0))))))
+    (defun rgb-face (path)
+     (let* ((f (split-string path ","))
+     (red (/ (string-to-number (nth 0 f)) 255.0))
+     (green (/ (string-to-number (nth 1 f)) 255.0))
+     (blue (/ (string-to-number (nth 2 f)) 255.0))
+     (hex (color-rgb-to-hex red green blue)))
+     (list :foreground hex)))
 
 
-(defun NINC ()
-(interactive)
-(let* ((link (org-element-context))
-(path (org-element-property :path link))
-(beg (org-element-property :begin link))
-(end (org-element-property :end link))
-(rgb (mapcar 'string-to-number (split-string path ","))))
-(setq rgb (mapcar (lambda (x) (+ x 10)) rgb))
-(setf (buffer-substring beg end)
-(format "rgb:%s" (mapconcat 'identity (mapcar 'number-to-string rgb) ",")))))
+    (defun rgb-func (start end path bracketp)
+     (save-excursion
+     (goto-char start)
+     (save-match-data
+     (cl-loop for num in (split-string path ",")
+     for face in (list '(:foreground "red")
+     '(:foreground "green")
+     '(:foreground "blue"))
+     do
+     (progn
+     (re-search-forward num end t)
+     (add-text-properties
+     (match-beginning 0)
+     (match-end 0)
+     (list 'face face)))))))
 
-(defun NDEC ()
-(interactive)
-(let* ((link (org-element-context))
-(path (org-element-property :path link))
-(beg (org-element-property :begin link))
-(end (org-element-property :end link))
-(rgb (mapcar 'string-to-number (split-string path ","))))
-(setq rgb (mapcar (lambda (x) (- x 10)) rgb))
-(setf (buffer-substring beg end)
-(format "rgb:%s" (mapconcat 'identity (mapcar 'number-to-string rgb) ",")))))
+    (defun ninc ()
+     (interactive)
+     (skip-chars-backward "0-9")
+     (or (looking-at "[0-9]+")
+     (error "No number at point"))
+     (replace-match (number-to-string (1+ (string-to-number (match-string 0))))))
 
 
-(defun ndec ()
-(interactive)
-(skip-chars-backward "0-9")
-(or (looking-at "[0-9]+")
-(error "No number at point"))
-(replace-match (number-to-string (1- (string-to-number (match-string 0))))))
+    (defun NINC ()
+     (interactive)
+     (let* ((link (org-element-context))
+     (path (org-element-property :path link))
+     (beg (org-element-property :begin link))
+     (end (org-element-property :end link))
+     (rgb (mapcar 'string-to-number (split-string path ","))))
+     (setq rgb (mapcar (lambda (x) (+ x 10)) rgb))
+     (setf (buffer-substring beg end)
+     (format "rgb:%s" (mapconcat 'identity (mapcar 'number-to-string rgb) ",")))))
 
-(org-link-set-parameters "rgb" :face 'rgb-face
-:activate-func 'rgb-func
-:keymap (let ((map (copy-keymap org-mouse-map)))
-(define-key map (kbd "C-<up>") 'ninc)
-(define-key map (kbd "C-<down>") 'ndec)
-(define-key map (kbd "s-<up>") 'NINC)
-(define-key map (kbd "s-<down>") 'NDEC)
-map))
+    (defun NDEC ()
+     (interactive)
+     (let* ((link (org-element-context))
+     (path (org-element-property :path link))
+     (beg (org-element-property :begin link))
+     (end (org-element-property :end link))
+     (rgb (mapcar 'string-to-number (split-string path ","))))
+     (setq rgb (mapcar (lambda (x) (- x 10)) rgb))
+     (setf (buffer-substring beg end)
+     (format "rgb:%s" (mapconcat 'identity (mapcar 'number-to-string rgb) ",")))))
+
+
+    (defun ndec ()
+     (interactive)
+     (skip-chars-backward "0-9")
+     (or (looking-at "[0-9]+")
+     (error "No number at point"))
+     (replace-match (number-to-string (1- (string-to-number (match-string 0))))))
+
+    (org-link-set-parameters "rgb" :face 'rgb-face
+     :activate-func 'rgb-func
+     :keymap (let ((map (copy-keymap org-mouse-map)))
+     (define-key map (kbd "C-<up>") 'ninc)
+     (define-key map (kbd "C-<down>") 'ndec)
+     (define-key map (kbd "s-<up>") 'NINC)
+     (define-key map (kbd "s-<down>") 'NDEC)
+     map))
 #+END_EXAMPLE
 
 [[file:83,29,238]] This is a violet color. [[file:112,17,19]]
-这是紫色的。[[19]文件:112年,17日)
 
 This is an rgb link with three comma separated numbers. We color each number accordingly, and set the rgb link to the color represented by the RGB pair.
-这是一个用逗号分隔数字的rgb链接。我们相应地为每个数字着色，并将rgb链接设置为rgb对所表示的颜色。
 
 [[file:225,225,225]] This is a light gray.
-[[档案:225,225,225]]这是浅灰色。
 
 A subtle point in this example is the need to save-match-data. Some functions modify the match-data, and this will mess up the whole font-lock system. I learned that by trial and error.
-这个例子中的一个微妙之处是需要保存match-data。一些函数会修改匹配数据，这将会破坏整个字体锁定系统。我是通过反复试验才明白这一点的。
