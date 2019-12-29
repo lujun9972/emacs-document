@@ -1,0 +1,228 @@
+#+TITLE: Ivy, Counsel 和 Swiper
+#+URL: https://writequit.org/denver-emacs/presentations/2017-04-11-ivy.html
+#+AUTHOR: lujun9972
+#+TAGS: emacs-common
+#+DATE: [2018年 06月 04日 星期一 12:59:02 CST]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+* 1什么是Ivy?
+:PROPERTIES:
+:CUSTOM_ID: org121eea9
+:END:
+
+Ivy是一个类似Helm的补全框架。它和Counsel与Swiper在一起，这两者后面马上会讲到. 
+Ivy本身不会大包大揽，相反，它只提供一个对集合进行列出、搜索、筛选和执行操作的接口.
+集合的范围从字符串到缓冲区，Ivy并不在乎集合的内容是什么。它只是为用户提供与该集合的一种交互方式。
+
+* 2安装
+:PROPERTIES:
+:CUSTOM_ID: orgc2d4898
+:END:
+
+通过MELPA安装Ivy。如果你不确定MELPA是什么或者如何启用MELPA，那么请看 [[http://melpa.milkbox.net/#/getting-started]]. 
+MELPA被添加成您的包存档源后，运行
+
+#+BEGIN_EXAMPLE
+M-x package-install counsel
+#+END_EXAMPLE
+
+安装Counsel将同时安装Ivy和Swiper作为依赖。
+
+* 3 使用方法
+:PROPERTIES:
+:CUSTOM_ID: orgac4d444
+:END:
+
+通过 =ivy-mode= 启用 Ivy (或在Emacs配置文件中加入 =(ivy-mode 1)=) 你就搞定了！
+启动 =execute-extended-command= (默认快捷键为 =M-x=) 或 =switch-to-buffer= (默认快捷键是 =C-x b=)，你就能发现不同之处了。
+无需任何设置, Ivy 已经对某些Emacs命令生效了.^{[[fn.1][1]]}
+
+[[file:files/m-x-usage.gif]]
+
+While Ivy works without any configuration there are a couple of
+lines the maintainers suggest everyone throw in their Emacs' file.}
+虽然Ivy可以在没有任何配置的情况下工作，但作者还是建议在Emacs配置文件^{[[fn.2][2]]}中加一些配置:
+
+#+begin_src emacs-lisp
+  (use-package ivy :demand
+    :config
+    (setq ivy-use-virtual-buffers t
+          ivy-count-format "%d/%d "))
+#+end_src
+
+- =ivy-use-virtual-buffers= :: 添加近期打开的文件或书签到 =ivy-switch-buffer= 中
+- =ivy-count-format= :: 显示集合中的符合过滤条件的数量和总数量
+
+还有许多其他配置可用。你可以通过查看文档(在参考资料中列出)或 =M-x customize-group ivy=(如果你安装了Ivy)来发现.
+
+好神奇啊，而且这只是冰山一角。我们还可以扩展Ivy的功能，来对列表进行不同的操作。
+我们将会在 [[#org13b1c6d][Demo]] 部分展示如何添加这些操作，同时我们还会在 [[#org2d4e119][Counsel]] 章节中展示如何使用其预先定义好的操作。
+
+** 3.1 快捷键
+:PROPERTIES:
+:CUSTOM_ID: org932cd86
+:END:
+
+当Ivy minibuffer处于活动状态时，有以下快捷键案
+
+| 快捷键键       | 命令                      | 描述                               |
+|----------------+---------------------------+------------------------------------|
+| =M-n=          | =ivy-next-line=           | 下一行                             |
+| =M-p=          | =ivy-previous-line=       | 上一行                             |
+| =M-<=          | =ivy-beginning-of-buffer= | Ivy minibuffer开头位置             |
+| =M->=          | =ivy-end-of-buffer=       | Ivy minibuffer结尾                 |
+| =C-v=          | =ivy-scroll-up-command=   | 上一页                             |
+| =M-v=          | =ivy-scroll-down-command= | 下一页                             |
+| =C-m= or =RET= | =ivy-done=                | 执行默认动作                       |
+| =C-M-m=        | =ivy-call=                | 执行默认动作，但保持Ivy依旧打开    |
+| =M-o=          | =ivy-dispatching-done=    | 显示可用的操作                     |
+| =C-M-o=        | =ivy-dispacthing-call=    | 显示可用的操作,同时保持Ivy依旧打开 |
+| =C-'=          | =ivy-avy=                 | 使用Avy进行选择                    |
+| =TAB=          | =ivy-partial-or-done=     | Tab补全, 重复按下TAB会执行默认动作 |
+|                | =ivy-resume=              | 重启Ivy                            |
+
+* 4 Demo
+:PROPERTIES:
+:CUSTOM_ID: org13b1c6d
+:END:
+
+使用Ivy非常简单，为了演示这一点，我们将尝试使用Ivy创建一个简化版本的缓冲区列表。
+
+#+begin_src emacs-lisp
+  (ivy-read "My buffers: " (mapcar #'buffer-name (buffer-list)))
+#+end_src
+
+就像这样，我们就有一个基于Ivy的缓冲区列表，虽然没什么用.请注意缓冲区列表会随着的输入收缩和展开。然而，选中某项并不会有任何操作。让我们来让它做点什么。
+
+** 4.1 Actions
+:PROPERTIES:
+:CUSTOM_ID: org29359ae
+:END:
+
+=ivy-read= 函数在结果集合后面可以接受一些可选的关键字.我们这里不会讲解所有的关键字,先来看一下 =:actions= 关键字
+
+Actions 在选定的对象上调用一个函数. 默认动作帮顶在 =RET= 上，但是你也可以定义多个动作。
+在Ivy minibuffer中按下 =M-o= 可以查看所有动作。让我们为上一个例子添加一个动作。
+
+#+begin_src emacs-lisp
+  (ivy-read "My buffers: "
+            (mapcar #'buffer-name (buffer-list))
+            :action '(1 ;; index (1 based) of the default action
+                      ("s" (lambda (x)
+                             (switch-to-buffer x)) "switch")))
+#+end_src
+
+现在，如果我们再试一次，选择一个对象将打开对应的缓冲区。
+
+* 5 Counsel
+:PROPERTIES:
+:CUSTOM_ID: org2d4e119
+:END:
+
+为了保持关注点的分离，Ivy并没有很多其他的功能. 这也是Counsel的作用了。Counsel是Ivy附带的,并提供了一些有用的命令，例如 =counsel-M-x= 和 =counsel-find-file=.
+这些函数内部使用了 =ivy-read= 函数并提供了一些有用的actions.
+一个action就是一个作用于选择项的函数.
+
+试试在多个Counsel命令上调用action (在Ivy minibuffer中，其默认快捷键为 =C-o=).
+
+[[file:files/action.gif]]
+
+** 5.1 有用的命令
+:PROPERTIES:
+:CUSTOM_ID: org0be1c7d
+:END:
+
+即使你已经有了足够的知识来扩展Ivy以满足自己的需求, 但是依然值得看一下 Counsel 为你提供了哪些功能,因为它自带了许多功能.
+
+| Command                      | Actions                                        |
+|------------------------------+------------------------------------------------|
+| =counsel-find-file=          | 使用外部程序打开文件, 打开其他window, ...      |
+| =counsel-M-x=                | 查找符号，执行函数                             |
+| =counsel-describe-function=  | 查找符号，打开函数定义                         |
+| =counsel-describe-variable=  | 查找符号，打开变量定义                         |
+| =counsel-find-library=       | 没有额外的行为, 只是跳转到指定 library/feature |
+| =counsel-info-lookup-symbol= | 没有额外的行为, 只是跳转到符号定义处           |
+
+以下命令依赖于外部程序
+
+| Command            | Action                                                            |
+|--------------------+-------------------------------------------------------------------|
+| =counsel-git=      | 使用外部程序打开git仓库中的文件,在其他window中打开git仓库中的文件 |
+| =counsel-git-grep= | 在git仓库中搜索字符串                                             |
+| =counsel-ag=       | 使用agt来搜索多个文件中的字符串                                   |
+| =counsel-locate=   | 使用外部程序打开文件,或使用dired打开目录                          |
+| =counsel-rythmbox= |                                                                   |
+
+** 5.2 Extending Counsel
+:PROPERTIES:
+:CUSTOM_ID: org5467c13
+:END:
+
+假设你读完这篇文章后觉得Ivy超棒而且很有用，于是你安装了它并觉得它很有用。这时你发现你需要能够在使用 =counsel-find-file= 查找文件时能够有删除文件的能力。不用担心，我们可以为其添加这项能力。
+
+#+begin_src emacs-lisp
+  (ivy-set-actions
+   'counsel-find-file
+   '(("d" delete-file "delete")))
+#+end_src
+
+* 6 MELPA
+:PROPERTIES:
+:CUSTOM_ID: org01d3391
+:END:
+
+MELPA上有一些 Ivy/Counsel 的相关包
+
+| 包名                   | 描述                                  |
+|------------------------+---------------------------------------|
+| =counsel-bbdb=         | 从BBDB上搜索和输入电子邮件            |
+| =counsel-dash=         | 浏览Dash文档集                        |
+| =counsel-gtags=        | 为GNU Global tag 提供了操作界面       |
+| =counsel-osx-app=      | 在Ivy中执行OSX应用                    |
+| =counsel-projectile=   | 与Projectilez(项目管理和导航工具)整合 |
+| =ivy-gitlab=           | 与Gitlab进行整合                      |
+| =ivy-rich=             | Ivy 切换buffer的另一个接口            |
+| =ivy-todo=             | 通过Ivy管理org代办                    |
+| =ivy-youtube=          | 查询YouTube视频并在浏览器中播放       |
+| =flyspell-correct-ivy= | Ivy的Flyspell界面                     |
+
+* 7 Swiper
+:PROPERTIES:
+:CUSTOM_ID: org2a0607f
+:END:
+
+Swiper是搜索当前缓冲区的一种简单方法。非常类似于Helm的swoop包。
+
+[[file:files/swiper.gif]]
+
+* 8 Ivy 对比 Helm
+:PROPERTIES:
+:CUSTOM_ID: org799b785
+:END:
+
+我使用Helm的时间很短，因此可能比较不会那么公平。 我在使用Helm的过程中从未遇到过问题. 只不过我总有一种感觉，就是我没有发挥出Helm的所有潜力. 
+这就好像我手拿倚天剑，可以无敌天下，却只是用来切蔬菜.
+
+Ivy 给人感觉简单且恰如其分. 它避开了大部分的工作，只是让某些任务，比如切换buffer，查找文件等任务变得简单。
+
+* 9 资源
+:PROPERTIES:
+:CUSTOM_ID: org75d9679
+:END:
+
+- Github :: [[https://github.com/abo-abo/swiper]]
+- 文档 :: [[http://oremacs.com/swiper/]]
+- 从 Helm, 到 Ivy :: [[https://sam217pa.github.io/2016/09/13/from-helm-to-ivy/]]
+
+* 附录:
+
+** fn.1
+Emacs提供变量 =completing-read-function= 来让用户设置使用的补完框架.
+调用 =ivy-mode= 时, 它会将该值设置为 =ivy-completing-read=. 
+如果你觉得好奇，试着启用/禁用 ivy 但是调用 =completing-read= 函数来观察这两者的区别.
+
+** fn.2
+不熟悉 use-package? 不用担心, 只需要把 =(setq  ...)= 表达式放到合适的配置文件中即可.
+然而，如果你尚未开始使用它，那么真的很推荐你使用它。
+我这里不会详细对它进行介绍，但是我强烈建议你看看那这里： [[https://github.com/jwiegley/use-package]]。
