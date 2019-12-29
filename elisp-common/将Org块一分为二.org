@@ -1,0 +1,277 @@
+#+TITLE: 将Org块一分为二
+#+URL: https://scripter.co/splitting-an-org-block-into-two/
+#+AUTHOR: lujun9972
+#+TAGS: elisp-common
+#+DATE: [2018年 09月 17日 星期一 17:02:10 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+* 问题描述
+假设我有一个巨大的Org代码块，我想把它拆分成多个Org代码块，以便在之间填写解释内容。
+
+也就是说，我想快速地把
+所以我想快速地分解一下:
+
+#+begin_src org
+  ,#+begin_src emacs-lisp
+  (message "one")
+  (message "two")
+  ,#+end_src
+#+end_src
+
+拆分成
+
+#+begin_src org
+  ,#+begin_src emacs-lisp
+  (message "one")
+  ,#+end_src
+
+  ,#+begin_src emacs-lisp
+  (message "two")
+  ,#+end_src
+#+end_src
+
+* 行动计划
+:PROPERTIES:
+:CUSTOM_ID: action-plan
+:END:
+
+1. 写一个函数，当光标处于 *任意* Org块中(不仅仅是“src”, “example”, “export” 或任何一个内建的Org块，还包括类似 =#+begin_foo .. #+end_foo= 这样特殊的Org块。)返回非nil值
+2. 编写一个函数来对块进行拆分。
+3. 重载 M-return 键绑定，只有当光标在Org块中时才会调用该块拆分函数(使用第一个函数进行检测)。
+
+感谢读者 *Mankoff* 的评论，我学到了 =org-babel-demarcate-block= 函数(默认绑定到 C-c C-v d 和 C-c C-v C-d).
+
+这个函数至少在两个方面与本文中的解决方案有所不同:
+
+1. 它只对Org Src块有效。
+2. 它在光标处将块进行拆分，而我希望只在行末或行首处进行拆分
+
+不过我可以看出 =org-babel-demarcate-block= 可以覆盖大部分块分割的情况。
+
+* 我在Org 块中吗?
+:PROPERTIES:
+:CUSTOM_ID: org-in-any-block-p
+:END:
+
+在开始编写这个函数之前，我查看了下面这些现有函数，但没有一个是我真正想要的:
+
+- =org-in-src-block-p= :: 仅当光标位于 =#+begin_src .. #+end_src= 块时返回非nil; 其他Org块则无效.
+- =org-in-block-p= :: 仅当光标位于预先定义好的块名（一个列表,例如 ='("src" "example" "quote" ..)= ）时才返回非nil. 因此这个也不行，因为我无法预先定义好所有的特殊块.
+
+因此我定义了下面这个 =modi/org-in-any-block-p= 函数，它在光标处于任何 =#+begin_FOOBAR .. #+end_FOOBAR= 之间时，返回非nil。
+好在我可以重用 =org-between-regexps-p= 函数中的大量逻辑(=org-in-block-p= 内部使用该函数).
+
+<<code-snippet-1>>
+
+#+begin_src emacs-lisp
+  (defun modi/org-in-any-block-p ()
+    "Return non-nil if the point is in any Org block.
+
+  The Org block can be *any*: src, example, verse, etc., even any
+  Org Special block.
+
+  This function is heavily adapted from `org-between-regexps-p'."
+    (save-match-data
+      (let ((pos (point))
+            (case-fold-search t)
+            (block-begin-re "^[[:blank:]]*#\+begin_\(?1:.+?\)\(?: .*\)*$")
+            (limit-up (save-excursion (outline-previous-heading)))
+            (limit-down (save-excursion (outline-next-heading)))
+            beg end)
+        (save-excursion
+          ;; Point is on a block when on BLOCK-BEGIN-RE or if
+          ;; BLOCK-BEGIN-RE can be found before it...
+          (and (or (org-in-regexp block-begin-re)
+                   (re-search-backward block-begin-re limit-up :noerror))
+               (setq beg (match-beginning 0))
+               ;; ... and BLOCK-END-RE after it...
+               (let ((block-end-re (concat "^[[:blank:]]*#\+end_"
+                                           (match-string-no-properties 1)
+                                           "\( .*\)*$")))
+                 (goto-char (match-end 0))
+                 (re-search-forward block-end-re limit-down :noerror))
+               (> (setq end (match-end 0)) pos)
+               ;; ... without another BLOCK-BEGIN-RE in-between.
+               (goto-char (match-beginning 0))
+               (not (re-search-backward block-begin-re (1+ beg) :noerror))
+               ;; Return value.
+               (cons beg end))))))
+#+end_src
+
+[[code-snippet-1][Code Snippet 1]]
+
+: 检查光标是否在Org块中的函数
+
+- =(case-fold-search t)= 确保 =#+BEGIN_ ..= 或 =#+begin_ ..= 都能够匹配。
+- 正则表达式 =block-begin-re= 匹配 ="#+begin_src foo"= , =" #+begin_src foo"= , ="#+BEGIN_EXAMPLE"= , ="#+begin_FOOBAR"= 等等
+- =limit-up= 和 =limit-down= 设置为上一个和下一个Org标题在buffer中的位置. 为了性能，下面的正则搜索局限在这个范围内.
+- =block-end-re= 基于 =block-begin-re= 的匹配字符串动态组建. 因此若首先找到的是 ="#+begin_quote"= , 那么它对应的块结束符是 ="#+end_quote"= 而不是 ="#+end_src"=.
+- 如果光标不是在 =#+begin_FOOBAR .. #+end_FOOBAR= 之间，则返回nil.
+
+- 警告 :: 我没有对嵌套块的情况做支持，尤其是当光标在最内块和最外层块之间的情况。
+
+
+#+begin_src org
+  ,#+begin_src org
+  ▮
+  ,#+begin_src emacs-lisp
+  (message "hello!")
+  ,#+end_src
+  ,#+end_src
+#+end_src
+
+* 如果是，则拆分block
+:PROPERTIES:
+:CUSTOM_ID: org-block-split
+:END:
+
+"光标在Org块中"的检测完成后，我需要准照如下规则进行拆分
+
+1. 如果光标不在某行的行首(BOL),
+
+- 跳转到行末, 然后将块拆分.
+
+因此如果光标在第一个 =message= 之后, 或者在第一个 =message= 行的末尾,那么:
+
+#+begin_src org
+  ,#+begin_src emacs-lisp
+  (message "one")▮
+  (message "two")
+  ,#+end_src
+#+end_src
+
+将块会在 =(message "one")= *之后* 拆分，并将光标移动到拆分后的块之间:
+
+#+begin_src org
+  ,#+begin_src emacs-lisp
+  (message "one")
+  ,#+end_src
+  ▮
+  ,#+begin_src emacs-lisp
+  (message "two")
+  ,#+end_src
+#+end_src
+
+2. 否则(如果光标在行首)，
+
+- 在光标处拆分块.
+
+因此，如果光标位于第二个 =message= 行的开头:
+
+#+begin_src org
+  ,#+begin_src emacs-lisp
+  (message "one")
+  ▮(message "two")
+  ,#+end_src
+#+end_src
+
+会在 =(message "two")= *之前* 拆分块，并将光标移动到拆分后的块之间:
+
+#+begin_src org
+  ,#+begin_src emacs-lisp
+  (message "one")
+  ,#+end_src
+  ▮
+  ,#+begin_src emacs-lisp
+  (message "two")
+  ,#+end_src
+#+end_src
+
+下面是遵循该规范的代码:
+
+<<code-snippet-2>>
+
+#+begin_src emacs-lisp
+  (defun modi/org-split-block ()
+    "Sensibly split the current Org block at point."
+    (interactive)
+    (if (modi/org-in-any-block-p)
+        (save-match-data
+          (save-restriction
+            (widen)
+            (let ((case-fold-search t)
+                  (at-bol (bolp))
+                  block-start
+                  block-end)
+              (save-excursion
+                (re-search-backward "^\(?1:[[:blank:]]*#\+begin_.+?\)\(?: .*\)*$" nil nil 1)
+                (setq block-start (match-string-no-properties 0))
+                (setq block-end (replace-regexp-in-string
+                                 "begin_" "end_" ;Replaces "begin_" with "end_", "BEGIN_" with "END_"
+                                 (match-string-no-properties 1))))
+              ;; Go to the end of current line, if not at the BOL
+              (unless at-bol
+                (end-of-line 1))
+              (insert (concat (if at-bol "" "n")
+                              block-end
+                              "nn"
+                              block-start
+                              (if at-bol "n" "")))
+              ;; Go to the line before the inserted "#+begin_ .." line
+              (beginning-of-line (if at-bol -1 0)))))
+      (message "Point is not in an Org block")))
+#+end_src
+
+[[code-snippet-2][Code Snippet 2]]
+
+: 以合理的方式分割当前的Org块的函数
+
+- 抽取 =block-start= 的正则表达式与代码快 [[code-snippet-1][1]] 中的 =block-begin-re= 一样, 只是子组不同而已.
+- =block-end= 字符串脱胎于 =block-start= 字符串中的1号子组 -- 只是把 “begin_” 替换成 “end_”而已.
+- 然后基于光标是否在行首 (=at-bol=), 执行对应的换行插入和光标移动.
+
+* 让 M-return 执行工作
+:PROPERTIES:
+:CUSTOM_ID: M-return-split-block-dwim
+:END:
+
+运行两个函数后,就可以直接通过 =M-x modi/org-split-block= 完成工作了.
+
+但是这样有什么意思呢？
+
+我需要一个直观的快捷键来拆分块 -- 比如 M-return.
+
+- 默认情况下, M-return 根据上下文环境执行创建新标题,插入项目,将区域转换成表格等工作. 查看 =org-meta-return= 的doc-string(默认该快捷键绑定的函数) 来获取更多信息.
+- 但是它的上下文不包括 “光标在Org块中”. 因此这时它会插入一个标题,显得莫名其妙.
+- 因此我们需要通过添加上下文环境来解决这个问题.
+
+因此我 *建议* =org-meta-return= 在光标位于Org块中时调用 =modi/org-split-block=.
+
+建议函数 =modi/org-meta-return= 与被建议函数 =org-meta-return= 一样, 除了添加了一个新的上下文 =(modi/org-in-any-block-p)=.
+
+你可以通过将 =((modi/org-in-any-block-p) #'modi/org-split-block)= 移动到 =cond= 中来添加这个新的上下文.
+
+<<code-snippet-3>>
+
+#+begin_src emacs-lisp
+  (defun modi/org-meta-return (&optional arg)
+    "Insert a new heading or wrap a region in a table.
+
+    Calls `org-insert-heading', `org-insert-item',
+    `org-table-wrap-region', or `modi/org-split-block' depending on
+    context. When called with an argument, unconditionally call
+    `org-insert-heading'."
+    (interactive "P")
+    (org-check-before-invisible-edit 'insert)
+    (or (run-hook-with-args-until-success 'org-metareturn-hook)
+        (call-interactively (cond (arg #'org-insert-heading)
+                                  ((org-at-table-p) #'org-table-wrap-region)
+                                  ((org-in-item-p) #'org-insert-item)
+                                  ((modi/org-in-any-block-p) #'modi/org-split-block)
+                                  (t #'org-insert-heading)))))
+  (advice-add 'org-meta-return :override #'modi/org-meta-return)
+#+end_src
+
+[[code-snippet-3][Code Snippet 3]] 为 =org-meta-return= 添加光标处于Org块中时的上下文
+
+: 建议函数添加光标处于Org块中时的上下文
+
+现在当光标位于Org块中时， 按下 M-return 就可以了！
+
+* 完整的代码
+:PROPERTIES:
+:CUSTOM_ID: full-code
+:END:
+
+请查看我Emacs配置 [[https://github.com/kaushalmodi/.emacs.d/blob/master/setup-files/setup-org.el][=setup-org.el=]] 文件 中 =modi/org-split-block= （及其依赖函数）的源代码。
