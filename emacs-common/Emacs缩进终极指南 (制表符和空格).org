@@ -1,0 +1,229 @@
+#+TITLE: Emacs缩进终极指南 (制表符和空格)
+#+URL: https://dougie.io/emacs/indentation/
+#+AUTHOR: lujun9972
+#+TAGS: emacs-common
+#+DATE: [2018年 08月 17日 星期五 11:19:38 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+[[https://dougie.io/static/img/blog/tabs-in-emacs/screenshot.png]]
+
+* 完整配置:
+:PROPERTIES:
+:CUSTOM_ID: tldr-the-full-configuration
+:END:
+
+这个配置是为喜欢制表符多过空格的用户设计的。 要了解如何以不同的方式自定义制表符和空格的行为，请参阅分解部分。
+
+#+begin_src emacs-lisp
+  ; START TABS CONFIG
+  ;; Create a variable for our preferred tab width
+  (setq custom-tab-width 2)
+
+  ;; Two callable functions for enabling/disabling tabs in Emacs
+  (defun disable-tabs () (setq indent-tabs-mode nil))
+  (defun enable-tabs ()
+    (local-set-key (kbd "TAB") 'tab-to-tab-stop)
+    (setq indent-tabs-mode t)
+    (setq tab-width custom-tab-width))
+
+  ;; Hooks to Enable Tabs
+  (add-hook 'prog-mode-hook 'enable-tabs)
+  ;; Hooks to Disable Tabs
+  (add-hook 'lisp-mode-hook 'disable-tabs)
+  (add-hook 'emacs-lisp-mode-hook 'disable-tabs)
+
+  ;; Language-Specific Tweaks
+  (setq-default python-indent-offset custom-tab-width) ;; Python
+  (setq-default js-indent-level custom-tab-width) ;; Javascript
+
+  ;; Making electric-indent behave sanely
+  (setq-default electric-indent-inhibit t)
+
+  ;; Make the backspace properly erase the tab instead of
+  ;; removing 1 space at a time.
+  (setq backward-delete-char-untabify-method 'hungry)
+
+  ;; (OPTIONAL) Shift width for evil-mode users
+  ;; For the vim-like motions of ">>" and "<<".
+  (setq-default evil-shift-width custom-tab-width)
+
+  ;; WARNING: This will change your life
+  ;; (OPTIONAL) Visualize tabs as a pipe character - "|"
+  ;; This will also show trailing characters as they are useful to spot.
+  (setq whitespace-style '(face tabs tab-mark trailing))
+  (custom-set-faces
+   '(whitespace-tab ((t (:foreground "#636363")))))
+  (setq whitespace-display-mappings
+        '((tab-mark 9 [124 9] [92 9]))) ; 124 is the ascii ID for '|'
+  (global-whitespace-mode) ; Enable whitespace mode everywhere
+  ; END TABS CONFIG
+#+end_src
+
+* 分解
+:PROPERTIES:
+:CUSTOM_ID: breaking-it-down
+:END:
+
+** 启用/禁用tab的函数
+:PROPERTIES:
+:CUSTOM_ID: functions-for-enablingdisabling-tabs
+:END:
+
+#+begin_src emacs-lisp
+  ;; Our Custom Variable
+  (setq custom-tab-width 2)
+
+  (defun disable-tabs () (setq indent-tabs-mode nil))
+  (defun enable-tabs ()
+    (local-set-key (kbd "TAB") 'tab-to-tab-stop)
+    (setq indent-tabs-mode t)
+    (setq tab-width custom-tab-width))
+#+end_src
+
+这是两个不同的函数，我们可以很容易地在自定义钩子中调用它们。如果你想动态激活这些函数，那么通过 =M-x= 来激活(您需要添加Emacs Lisp中的 =(interactive)= 函数)。[[https://www.gnu.org/software/emacs/manual/html_node/elisp/Interactive-Examples.html][这是相关文档]]。
+
+=enable-tabs= 函数中要做的第一件事是将TAB键设置为 =tab-to-tab-stop=. 在我看来，这比默认值更合理。当您按tab键时，它将按预期的方式缩进一个tab,而不会出现什么神奇的或混乱的情况。
+
+之后我们启用 [[https://www.gnu.org/software/emacs/manual/html_node/eintr/Indent-Tabs-Mode.html][indent-tabs-mode]] 同时设置自定义 [[https://www.gnu.org/software/emacs/manual/html_node/efaq/Changing-the-length-of-a-Tab.html][tab宽度]].
+
+** 为不同的文件中分别设置使用制表符或空格
+:PROPERTIES:
+:CUSTOM_ID: using-tabs-or-spaces-in-different-files
+:END:
+
+#+begin_src emacs-lisp
+  (add-hook 'prog-mode-hook 'enable-tabs)
+
+  (add-hook 'lisp-mode-hook 'disable-tabs)
+  (add-hook 'emacs-lisp-mode-hook 'disable-tabs)
+#+end_src
+
+我们创建了 [[#functions-for-enablingdisabling-tabs][这些钩子函数之后]], 再决定在哪类文件/模式中启用制表符/空格就很简单了.
+
+本例中, 我们为 [[https://www.emacswiki.org/emacs/ProgMode][prog-mode]] 启用制表符. 如果您想为几乎所有代码类的文件进行设置，那么prog-mode是一个不错的挂钩。
+
+然后，在Lisp和ELisp文件中禁用制表符(使用空格)。Lisp是一种特殊的编程语言，它不能很好地与制表符配合使用，因此我强烈建议使用空格。
+为什么会这样呢?因为缩进的概念在Lisp中并不存在。它只要求对齐的，而制表符会破坏Lisp所要求的精确对齐。
+
+** 更改制表符的宽度
+:PROPERTIES:
+:CUSTOM_ID: changing-the-tab-width
+:END:
+
+#+begin_src emacs-lisp
+  ;; Our Custom Variable
+  (setq custom-tab-width 2)
+
+  (setq-default python-indent-offset custom-tab-width)
+  (setq-default evil-shift-width custom-tab-width)
+#+end_src
+
+记住不要定义变量 =custom-tab-width= 两次!它应该在启用/禁用制表符函数之前定义。我将它包含在这个代码片段中，只是为了进行说明。
+
+在本例中，我们将制表符宽度设置为自定义的变量。第一行使用基础的 =tab-width= 属性。我建议不要像上面描述的那样设置tab-width，而是将它放在一个函数中，并通过hook调用。 [[#functions-for-enablingdisabling-tabs][这样做的细节可以看这里]].
+
+接下来，我们将Python缩进大小设置为自定义的制表符宽度变量。其默认符合[[https://www.python.org/dev/peps/pep-0008/][pep8]]标准，为4个空格，但如果您喜欢有自己的默认值，可以通过该变量来更改它。
+
+最后，我们将 evil-shift-width 设置为自定义的制表符宽度变量。这只有在您使用 Evil 包来获得类似于vm的键绑定而不是使用光荣的Emacs键绑定时才有用。当使用 =>>= 或 =<<= 缩进或取消缩进文本时， =evil-shift-width= 控制制表符宽度大小。
+
+** 明智的缩进行为(自动缩进)
+:PROPERTIES:
+:CUSTOM_ID: making-indentation-behave-sanely-electric-indent
+:END:
+
+让我抓狂的是，当我按下回车键时，Emacs的 electric-indent 会对前一行进行缩进。幸运的是，有一天我找到了一个解决方案。
+
+#+begin_src emacs-lisp
+  (setq-default electric-indent-inhibit t)
+#+end_src
+
+** 向左或向右缩进所选内容
+:PROPERTIES:
+:CUSTOM_ID: indent-a-selection-left-or-right
+:END:
+
+To accomplish this, refer to my guide.
+要做到这一点，请参考我的 [[https://dougie.io/emacs/indent-selection][如何缩进Emacs中的选择内容]]。
+
+** 以不同的方式突出显示制表符和空格
+:PROPERTIES:
+:CUSTOM_ID: highlighting-tabs-and-spaces-differently
+:END:
+
+我觉得在编辑器中有一种很重要的东西，那就是一种很容易识别空格和制表符的方法。它们都是空格字符，很容易混淆。
+
+我们将通过以“|”(管道)字符的形式显示制表符来实现这一点。如果您也想突出显示空格，请参考[[http://ergoemacs.org/emacs/whitespace-mode.html][ErgoEmacs关于使空格可见的文章]]。
+
+#+begin_src emacs-lisp
+  (global-whitespace-mode)
+  (setq whitespace-style '(face tabs tab-mark trailing))
+  (custom-set-faces
+   '(whitespace-tab ((t (:foreground "#636363")))))
+
+  (setq whitespace-display-mappings
+        '((tab-mark 9 [124 9] [92 9])))
+#+end_src
+
+我将代码段中 =whitespace-display-mappings= 这部分用换行分隔开，因为它是代码段中比较难以理解的部分。
+
+代码片段的前四行非常容易理解。
+
+1. 首先启用 =global-whitespace-mode=. 这使得我们配置的空白在所有buffer中自动可见。
+2. 接下来，将空白的样式设置为显示制表符和行尾的空格。您需要在其中包含 =face= 和 =tabs=. 原因不明，但需要它们来设置管道字符的颜色。
+3. 然后，调用 =custom-set-faces= 定制制表符空白的外观。我将我们的管道字符的文本颜色设置为 *#636363*, 如果您使用的是深色主题的Emacs，这个颜色不错。如果您在Emacs中使用浅色主题，那么您将需要更亮的颜色，比如 *#c1c1c1*.
+
+这是 #636363 在黑暗背景下的一个例子。它应该很淡。
+
+这是一个在浅色背景上的 #c1c1c1 的例子。它应该很淡。
+
+很难理解的那一行我设置了管道字符。
+
+您真正需要知道的是= 124= 是管道字符的ascii码(“|”)。您可以查看 [[http://rmhh.co.uk/ascii.html][ASCII码列表]].
+
+** 使退格正确删除制表符
+:PROPERTIES:
+:CUSTOM_ID: making-backspace-properly-delete-tabs
+:END:
+
+Emacs has a strange default behavior when backspacing tabs. Instead of backspacing the whole tab, it backspaces the tab one space at a time.
+当后退制表符时，Emacs有一个奇怪的默认行为。当它回退多个制表符时，它不是回退所有制表符，而是而是一次回退一个制表符。
+
+你可以用下面的方法来解决这个问题。
+
+#+begin_src emacs-lisp
+  (setq backward-delete-char-untabify-method 'hungry)
+#+end_src
+
+** SmartTabs (福利)
+:PROPERTIES:
+:CUSTOM_ID: smarttabs-bonus
+:END:
+
+[[https://www.emacswiki.org/emacs/SmartTabs][Smart-tabs-mode]] 包帮助Emacs在各种语言中缩进标签和对齐空格。
+
+我个人不使用它，但它可能会勾起你的幻想。
+
+如果您不确定如何在Emacs中安装包，您可以参考[[https://www.emacswiki.org/emacs/InstallingPackages][此wiki条目]]或[[https://www.youtube.com/watch?v=Cf6tRBPbWKs][视频]]。
+
+安装后，你可以在多种语言环境中启用它，如下所示:
+
+#+begin_src emacs-lisp
+  (smart-tabs-insinuate 'c 'javascript 'python)
+#+end_src
+
+** Python 制表符支持
+:PROPERTIES:
+:CUSTOM_ID: python-tabs-support
+:END:
+
+更新:曾经在Python中，让制表符正常工作是一个非常繁琐的事情。幸运的是，在使用本文的新配置之后，它工作得很好。用[[#tldr-the-full-configuration][我的新代码]]更新您的代码就行了。
+
+你也可以试试 [[#smarttabs-bonus][SmartTabs]].
+
+** 最后结语
+:PROPERTIES:
+:CUSTOM_ID: final-notes
+:END:
+
+就是这样!如果您对此有任何疑问或有任何改进建议，请告诉我。
