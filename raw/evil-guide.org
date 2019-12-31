@@ -2,1585 +2,912 @@
 #+LINK: evil-collection https://github.com/emacs-evil/evil-collection
 
 # NOTE: If you are viewing this in org-mode, it is recommended that you install and enable [[https://github.com/snosov1/toc-org][toc-org]], so that all internal links open correctly
-注意:如果您是在组织模式下查看的，建议您安装并启用[[https://github.com/snosov1/toc-org][toc-org]]，以便所有内部链接都能正确打开
 
 
 * Emacs/Evil for Vim Users
-* Emacs/邪恶的Vim用户
 This is not meant to be a comprehensive introductory guide to emacs or a comparison between vim and emacs. It is meant to focus specifically on evil and address questions vim users might have when first using emacs with evil. Where there are already detailed, informative resources on other related topics, I will include references instead of re-explaining things myself. This aims to be a general guide to teach the reader about how to use and configure evil as opposed to a collection of configuration snippets.
-本文并不是emacs的全面入门指南，也不是vim和emacs之间的比较。它的目的是专门关注evil，并解决vim用户第一次使用带有evil的emacs时可能遇到的问题。如果已经有关于其他相关主题的详细信息资源，我将包括参考资料，而不是自己重新解释。这篇文章的目的是作为一个一般性的指南，教导读者如何使用和配置evil，而不是一组配置片段。
 
 If you have any suggestions for questions or problems it would be useful to discuss, feel free to make an issue or pull request.
-如果你有任何问题或问题的建议，这将是有益的讨论，随时提出一个问题或拉请求。
 
 * Bare Minimum Emacs Knowledge
-*最少的Emacs知识
 ** Terminology
-* *的术语
 For a more complete list of terminology, see the emacs manual's [[https://www.gnu.org/software/emacs/manual/html_node/emacs/Glossary.html][glossary]]
-有关更完整的术语列表，请参见emacs手册[[https://www.gnu.org/software/emacs/manual/html_node/emacs/Glossary.html][glossary]]
 
 *** Cutting and Pasting
-***剪切和粘贴
 In emacs, cutting is called "killing." Pasting is called "yanking." This is probably the most confusing terminology difference between vim and emacs. Just remember that emacs packages that talk about "yanking" are talking about pasting, whereas evil-related packages will use "yanking" to mean the same thing as in vim (copying).
-在emacs中，切割被称为“杀戮”。粘贴被称为“猛拉”。这可能是vim和emacs之间最令人困惑的术语区别。请记住，emacs包谈论的“收缩”是关于粘贴的，而与evil相关的包将使用“收缩”来表示与vim(复制)相同的东西。
 
 *** Buffer, Window, Frame, etc.
-***缓冲区、窗口、帧等。
 Buffers and windows basically mean the same thing in emacs as they do in vim. A window in emacs displays a buffer, and a "frame" can hold multiple windows (some people refer to them as "splits"). An emacs frame is basically a system-level window. Emacs does not have vim-like tabs builtin, but there are various plugins for storing multiple window configurations in the same frame (see does-emacs-have-vim-like-tabs-distinct-window-configurations). Also [[http://www.braveclojure.com/basic-emacs/][this]] excellent article has some screenshots to give you visual explanation.
-缓冲区和窗口在emacs中的含义与在vim中的含义基本相同。emacs中的一个窗口显示一个缓冲区，一个“框架”可以容纳多个窗口(有些人称之为“分割”)。emacs框架基本上是一个系统级窗口。Emacs没有类似于vm的选项卡，但是有各种各样的插件可以将多个窗口配置存储在同一个框架中(参见does- Emacs -have- vm -like-tab -distinct-window-configurations)。还有[[http://www.braveclojure.com/basic-emacs/]这篇优秀的文章有一些截图给你视觉上的解释。
 
 *** Point and Mark
-点和标记
 The point refers to the cursor. The mark refers to the other side of a selected region (the "active region").
-点指的是光标。标记是指所选区域的另一侧(“活动区域”)。
 
 *** Minibuffer
-会显示* * *
 The minibuffer is located at the bottom of emacs. It is used for the evil ex command line among other things. This is also the location of the "echo area" where non-popup messages are be displayed (e.g. ~(message "message")~).
-minibuffer位于emacs的底部。它用于邪恶的ex命令行和其他内容。这也是“回显区”的位置，在这里显示非弹出消息(例如~(消息“消息”)~)。
 
 For more information on the minibuffer, see the [[https://www.gnu.org/software/emacs/manual/html_node/emacs/Minibuffer.html][corresponding section]] in the emacs manual.
-有关minibuffer的更多信息，请参见emacs手册中的[[https://www.gnu.org/software/emacs/manual/html_node/emacs/Minibuffer.html][对应部分]]。
 
 *** Modes
-* * *模式
 In emacs, the word "mode" is already taken, so evil refers to vim's modes as "states" (e.g. "normal state"). In emacs, there are major modes and minor modes. Each buffer usually only has one major mode, which is comparable to the filetype in vim. A buffer can have multiple minor modes that can be toggled on and off. An example is =flyspell-mode=, which enables spell checking. Modes have their own keymaps that apply only when the mode is active.
-在emacs中，“模式”这个词已经被使用了，所以evil将vim的模式称为“状态”(例如，“正常状态”)。在emacs中，有主要模式和次要模式。每个缓冲区通常只有一个主模式，与vim中的文件类型类似。一个缓冲区可以有多个小模式，可以打开和关闭。例如=flyspell-mode=，它支持拼写检查。模式有自己的键映射，仅在模式激活时才应用。
 
 *** Hooks
-* * *钩子
 A hook is similar to =autocmd= in vim.
-钩子类似于vim中的=autocmd=。
 
 *** Commands and Functions
-***命令和函数
 In emacs, commands are functions that can be bound to a key (interactive) or run with =M-x= (=<a-x>=). Most commands can also be run from evil's ex command line with =:command-name<cr>=. An exception is commands that have numbers in them such as ~w3m~ or ~mu4e~. I will be referring to commands as ~command-name~.
-在emacs中，命令是可以绑定到键(交互)或使用=M-x= (=<a-x>=)运行的函数。大多数命令也可以通过=:command-name<cr>=从evil的ex命令行运行。一个例外是包含数字的命令，例如~w3m~或~mu4e~。我将把命令称为~command-name~。
 
 If you want to evaluate a function, you can use =M-:= (=<a-:>=) to evaluate an expression in the minibuffer. You can also run elisp by using the ~eval-...~ functions (e.g. ~eval-defun~) in an emacs lisp mode buffer or by using ~ielm~ or ~eshell~.
-如果要计算函数的值，可以使用=M-:= (=<a-:>=)来计算minibuffer中的表达式。您还可以使用~eval-…来运行elisp。在emacs lisp模式缓冲区中或通过使用~ielm~或~eshell~实现~函数(例如~eval-defun~)。
 
 ** Key Notation
-* *关键符号
 In vim, Space followed by Control+a would be written as =<space><c+a>=. In emacs, it would be written as =SPC C-a=. See the Emacs Wiki [[https://www.emacswiki.org/emacs/EmacsKeyNotation][entry on key notation]] for more information.
-在vim中，空格后面跟Control+a可以写成=< Space ><c+a>=。在emacs中，它被写成=SPC C-a=。有关更多信息，请参见Emacs Wiki [[https://www.emacswiki.org/emacs/emacs/emacskeynotation][关于键符号的条目]]。
 
 ** Default Keybindings and Getting Help
-**默认键绑定和获取帮助
 Some people prefer to learn emacs' keybindings first without using evil. I never did, but Sacha Chua's [[http://sachachua.com/blog/2013/05/how-to-learn-emacs-a-hand-drawn-one-pager-for-beginners/][visual guide]] for emacs beginners might be a good resource for those who want to. [[https://tuhdo.github.io/][Tuhdo's guides]] are also very good.
-有些人宁愿先学习emacs的键绑定而不使用evil。我从来没有做过，但是Sacha Chua的[[http://sachachua.com/blog/2013/05/howto - learnemacs -a-手绘-一页-for-beginners/][视觉指南]]对于emacs初学者来说可能是一个很好的资源。[[https://tuhdo.github。io/][图拉多的指南]]也很好。
 
 I've been able to get by without almost ever using emacs' default keybindings. The exceptions for me are =C-g= and =C-h=. Even if you don't plan on learning emacs' keybindings in full, I recommend learning these when starting out.
-我几乎从未使用过emacs的默认键绑定。我的例外是=C-g=和=C-h=。即使您不打算全面学习emacs的键绑定，我也建议您在开始时学习这些内容。
 
 =C-g= is bound to ~keyboard-quit~ (or an equivalent) by default. You use it, for example, to exit the minibuffer (e.g. if you type =M-:= which is bound to ~eval-expression~ and want to exit). You can replace =C-g= with =<escape>= for most cases (see Using Escape to Exit the Minibuffer), but it is still useful to know about it. If emacs freezes from a long-running command or infinite loop, you can use =C-g= to cancel it.
-=C-g=默认情况下绑定到~键盘-退出~(或等效)。例如，您可以使用它来退出minibuffer(例如，如果您键入=M-:=，它被绑定到~eval-expression~，并且想要退出)。对于大多数情况，可以将=C-g=替换为=<escape>=(请参阅使用escape退出Minibuffer)，但是了解它仍然很有用。如果emacs冻结了长时间运行的命令或无限循环，您可以使用=C-g=来取消它。
 
 =C-h= is a prefix key for getting help. Since emacs has a different help system, =:help= will not work the same as in vim. If you want to find out about a variable, you can use =C-h v= (~describe-variable~). To find out what a key is bound to, you can use =C-h k= to pop open a help buffer with information about the command. For example, you can find out that =C-h k= is bound to ~describe-key~ by pressing =C-h k C-h k=. Knowing about =C-h k= can be useful, for example, if you want to find out what a nested key is bound to. By "nested key", I mean that you can type =d C-h k i w= (=d<c-h>kiw=) to find out that =iw= here is bound to ~evil-inner-word~.
-=C-h=是获取帮助的前缀键。由于emacs具有不同的帮助系统，=:help=的工作方式与vim中的不一样。如果你想找出一个变量，你可以使用=C-h v= (~describe-variable~)。要查明键被绑定到什么，可以使用=C-h k=打开包含有关该命令的信息的帮助缓冲区。例如，您可以通过按=C-h k C-h k=找到=C-h k=被绑定到~ description -key~。了解=C-h k=可能很有用，例如，如果您想知道嵌套键绑定到什么地方。通过“嵌套键”，我的意思是你可以输入=d C-h k I w= (=d< C-h >kiw=)来发现=iw=这里一定会有邪恶的词~。
 
 To make things more friendly, you can use something like ~ivy-mode~ from [[https://github.com/abo-abo/swiper][ivy]] or ~helm-mode~ from [[https://github.com/emacs-helm/helm][helm]] to allow you to quickly narrow your selection. Helm also provides a ~helm-apropos~ command that will allow you to search commands, functions, and variables all at once (as well as faces).
-为了让事情变得更友好，你可以使用~ivy-mode~ from [[https://github.com/abo-abo/swiper][ivy]]或者~helm-mode~ from [[https://github.com/emacs-helm/helm][helm]]来快速缩小你的选择范围。Helm还提供了一个~ Helm -apropos~命令，允许您同时搜索命令、函数和变量(以及人脸)。
 
 Another useful package is [[https://github.com/purcell/elisp-slime-nav][elisp-slime-nav]] which provides commands that allow you to jump to the definition or corresponding help page for emacs lisp symbols.
-另一个有用的包是[[https://github.com/purcell/elisp-slime-nav][elisp-slime-nav]]，它提供的命令允许您跳转到emacs lisp符号的定义或相应的帮助页面。
 
 For more information on getting help, see the [[https://www.gnu.org/software/emacs/manual/html_node/emacs/Help.html][corresponding section from the emacs manual]].
-有关获得帮助的更多信息，请参见[[https://www.gnu.org/software/emacs/manual/html_node/emacs/Help.html][emacs手册的相应部分]]。
 
 ** Quoting
-* *引用
 Quoting is used to prevent evaluation of a symbol or a list. Quoting is done with ~(quote ...)~ or by prefixing the symbol or list with a single quote/apostrophe. When using a function as an argument, you use a sharp quote (equivalent to ~(function ...)~). For example:
-引号用于防止对符号或列表求值。引号是用~(引号…)~或用单引号/撇号在符号或列表前加上前缀来完成的。当使用函数作为参数时，使用一个尖引号(相当于~(function…)~)。例如:
 #+begin_src emacs-lisp
-# + begin_src emacs lisp
 (+ 1 3 1)
 ;; => 5
 (apply #'+ '(1 3 1))
-(应用#'+ '(1 3 1))
 ;; => 5
 #+end_src
-# + end_src
 
 In this example, the ~+~ function is sharp quoted so that it is not treated as a variable. The list of arguments to pass to the ~+~ function is quoted so that it is treated as a literal list. Otherwise, =(1 3 1)= would be treated as a function call to ~1~. Note that ~(quote (1 3 1))~ is not the same as ~(list 1 3 1)~. Either works in this case, but the latter creates a fresh list.
-在这个例子中，~+~函数是尖引号括起来的，所以它不是一个变量。传递给~+~函数的参数列表被加引号，因此它被视为一个文字列表。否则，=(1 3 1)=将被视为对~1~的函数调用。注意~(引用(1 31 1))~与~(列表1 31)~不同。这两种方法在本例中都有效，但是后者创建了一个新的列表。
 
 Here is what will happen if you did not quote the arguments:
-以下是如果你不引用这些论点会发生的事情:
 #+begin_src emacs-lisp
-# + begin_src emacs lisp
 (apply + '(1 3 1))
-(应用+ '(1 3 1))
 ;; => Symbol's value as a variable is void: +
-;;=>符号的变量值为void: +
 ;; if you actually want to store a function name in a variable:
-;;如果你想在一个变量中存储一个函数名:
 (setq my-plus-func #'+)
-(setq my-plus-func # +)
 (apply my-plus-func '(1 3 1))
-(应用my-plus-func '(1 3 1))
 ;; => 5
 (apply #'+ (1 3 1))
-(应用#'+ (1 3 1))
 ;; => Invalid function: 1
-;;=>无效函数:1
 ;; if you wanted to store the argument list in a variable:
-;;如果你想把参数列表存储在一个变量:
 (setq my-arg-list '(1 3 1))
-(setq my- argi -list '(1 3 1))
 (apply #'+ my-arg-list)
-(适用于# ' + my-arg-list)
 ;; => 5
 #+end_src
-# + end_src
 
 This can be confusing to a beginner when setting options or using functions. To simplify things, if you don't want a function argument to be treated as a variable, you must quote it since functions evaluate their arguments. Note that this applies to /symbols/ and not /literals/ (i.e. you do not need to quote strings, numbers, etc).
-在设置选项或使用函数时，初学者可能会感到困惑。为了简化问题，如果您不希望函数参数被视为变量，那么您必须引用它，因为函数对它们的参数求值。注意，这适用于/symbols/而不是/literals/(即不需要引用字符串、数字等)。
 
 There are some exceptions to this rule. For example, =nil= and =t= do not need to be quoted since they evaluate to themselves. Some macros do not require symbols to be quoted; the most common examples would probably be ~defun~ and ~setq~. For convenience, the name of the function being defined or variable being set does not need to be quoted:
-这条规则有一些例外。例如，=nil=和=t=不需要加引号，因为它们对自身求值。一些宏不需要引用符号;最常见的例子可能是~defun~和~setq~。为方便起见，被定义的函数名或被设置的变量名不需要加引号:
 #+begin_src emacs-lisp
-# + begin_src emacs lisp
 (defun hello-world ()
-(defun hello world ()
-(message "Hello world"))
-(消息“Hello world”))
+  (message "Hello world"))
 
 (setq my-var t)
-(setq my-var t)
 #+end_src
-# + end_src
 
 For more information, see the [[https://www.gnu.org/software/emacs/manual/html_node/elisp/Quoting.html][corresponding section]] in the emacs manual.
-有关更多信息，请参见emacs手册中的[[https://www.gnu.org/software/emacs/manual/html_node/elisp/Quoting.html][对应部分]]。
 
 * Other Resources
-*其他资源
 In addition to the [[https://www.gnu.org/software/emacs/manual/][emacs manual]] and [[https://tuhdo.github.io/][Tuhdo's emacs mini manual]] for general emacs information, there is also the evil manual for specific evil information. It's very short, and this guide goes into more depth about a lot of things mentioned (e.g. ~evil-define-key~). It might be useful for reading about some of the basic settings (though it leaves most settings out). It can be read from emacs with =M-x info RET= or simply =C-h i=, searching for evil, and following the link. If you plan on writing motions, operators, and text objects, you may want to read those sections under "Macros."
-除了[[https://www.gnu.org/software/emacs/manual/][emacs手册]]和[[https://tuhdo.github]。[][Tuhdo的emacs迷你手册]]对于一般的emacs信息，也有专门的邪恶信息手册。它非常简短，并且本指南对提到的许多事情进行了更深入的介绍(例如~evil-define-key~)。它可能对阅读一些基本设置很有用(尽管它忽略了大多数设置)。它可以从emacs读取=M-x信息RET=或简单=C-h i=，搜索邪恶，并遵循链接。如果您打算编写动作、操作符和文本对象，您可能希望阅读“宏”下的这些部分。
 
 Emacs is configured and extended in emacs lisp, so if you want to learn more about emacs lisp at some point, you may want to read [[https://www.gnu.org/software/emacs/manual/html_node/eintr/][An Introduction to Programming in Emacs Lisp]]. This (and the emacs manual of course) can be read from emacs in info mode as well.
-Emacs是在Emacs lisp中配置和扩展的，因此如果您想了解更多关于Emacs lisp的信息，您可以阅读[[https://www.gnu.org/software/emacs/manual/html_node/eintr/][Emacs lisp编程简介]]。这个(当然还有emacs手册)也可以在info模式下从emacs中读取。
 
 For asking questions, there is the [[https://emacs.stackexchange.com/][emacs stack exchange]] and the [[https://www.reddit.com/r/emacs/][emacs subreddit]].
-关于询问问题，有[[https://emacs.stackexchange.com/][emacs堆栈交换]]和[[https://www.reddit.com/r/emacs/][emacs subreddit]]。
 
 * Settings and Hooks
-*设置和挂钩
 The basic syntax for emacs settings is ~(setq <variable> <value> ...)~. Note that ~setq~ can be used to set multiple options at once:
-emacs设置的基本语法是~(setq <变量> <值>…)~。注意~setq~可以用来一次设置多个选项:
 #+begin_src emacs-lisp
-# + begin_src emacs lisp
 (setq evil-search-wrap t
-(setq evil-search-wrap t
-evil-regexp-search t)
-evil-regexp-search t)
+      evil-regexp-search t)
 #+end_src
-# + end_src
 
 For settings that have buffer local values by default (the help for the variable will tell you if this is the case), you'll want to use ~setq-default~ to set the default value instead:
-对于默认具有缓冲区本地值的设置(变量的帮助将告诉您是否是这种情况)，您将使用~setq-default~来设置默认值:
 #+begin_src emacs-lisp
-# + begin_src emacs lisp
 (setq-default indent-tabs-mode nil
-(setq-default indent-tabs-mode零
-tab-width 4)
-标签4)
+              tab-width 4)
 #+end_src
-# + end_src
 
 You can use ~setq-local~ set the local value of a variable. If the variable is not already buffer local, it will be made buffer local. You could use this with a mode hook, for example, to determine whether indentation is done with tabs or spaces for a specific programming language. Note that the hook should be quoted:
-可以使用~setq-local~设置变量的局部值。如果这个变量还不是buffer local，那么它将被设置为buffer local。例如，您可以将其与模式挂钩一起使用，以确定是否对特定编程语言的制表符或空格进行缩进。注意，挂钩应该引用:
 #+begin_src emacs-lisp
-# + begin_src emacs lisp
 (add-hook 'c-mode-hook
-(add-hook c-mode-hook
-(lambda () (setq-local indent-tabs-mode t)))
-() (setq-local缩进-tab -mode t))
+          (lambda () (setq-local indent-tabs-mode t)))
 #+end_src
-# + end_src
 
 This would be the vim equivalent:
-这相当于vim:
 #+begin_src vimrc
-# + begin_src vimrc
 au c_settings
-在c_settings
-au!
-给!
-au FileType c setlocal noexpandtab
-au文件类型c setlocal noexpandtab
+	au!
+	au FileType c setlocal noexpandtab
 augroup END
-augroup结束
 #+end_src
-# + end_src
 
 Functions will only be added to hooks once, even if they are anonymous functions (lambdas).
-函数只会被添加到钩子一次，即使它们是匿名函数(lambdas)。
 
 Also note that for variables created by packages, you can set them before the package is loaded without issues. In some cases, you /need/ to set them before a package is loaded (e.g. the evil manual gives some of the =evil-want-...= variables as an example). You can also use ~add-hook~ with a hook that does not yet exist.
-还要注意，对于包创建的变量，您可以在加载包之前设置它们，而不会出现问题。在某些情况下，您/需要/在加载包之前设置它们(例如，evil manual给出了一些=evil-want-…=变量作为一个例子)。您还可以使用~add-hook~与尚未存在的钩子一起使用。
 
 Emacs also provides a [[https://www.gnu.org/software/emacs/manual/html_node/emacs/Easy-Customization.html][GUI for customization]], but this probably won't be all that interesting to most vim users.
-Emacs还提供了一个[[https://www.gnu.org/software/emacs/manual/html_node/emacs/easy - customiz.html][用于定制的GUI]]，但是这对于大多数vim用户来说可能不是那么有趣。
 
 * Keybindings and States
-*键绑定和状态
 ** Keybindings in Emacs
-** Emacs中的键绑定
 Unlike in vim where keybindings are often made in terms of other keys, in emacs you usually bind keys to named commands. You /can/ bind keys to act as other keys, but there is no concept of "default" keybindings, so there is no exact equivalent of vim's ~noremap~ (though the key translation functions provided by general.el and evil-collection are similar). When possible, you should prefer to bind to named commands and keymaps, but there are some cases where it may be simpler to use keyboard macros (see Binding Keys to Keys (Keyboard Macros)).
-在vim中，键绑定通常根据其他键进行，而在emacs中，通常将键绑定到指定的命令。您/can/ bind键可以充当其他键，但是没有“默认”键绑定的概念，所以没有与vim的~noremap~完全等价的键(尽管general提供了键转换功能)。el和邪恶收集是相似的)。如果可能，您应该选择绑定到指定的命令和键映射，但是在某些情况下，使用键盘宏可能更简单(请参阅绑定键到键(键盘宏))。
 
 The main function you'll use as an evil user for binding keys is ~evil-define-key~. Here are some of the other ones provided to you:
-作为绑定键的恶意用户，您将使用的主要函数是~evil-define-key~。这里是一些其他的提供给你:
 
 - ~global-set-key~
-- ~ global-set-key ~
 - ~evil-global-set-key~
-- ~ evil-global-set-key ~
 - ~evil-local-set-key~
-- ~ evil-local-set-key ~
 - ~evil-define-minor-mode-key~
-- ~ evil-define-minor-mode-key ~
 
 ~evil-define-key~ can be used instead of any of these. All of these, including ~evil-define-key~, are just wrappers around ~define-key~, but they all serve different purposes. I will elaborate on how these functions work and what they can be used for in the upcoming sections. I'd highly recommend looking at [[https://github.com/noctuid/general.el][general.el]] for a unified wrapper for all keybinding functions that reduces the verbosity of key definition and provides functions that are more similar to vim's (such as ~general-nmap~) among other things.
-可以使用~evil-define-key~来代替这些。所有这些，包括~evil-define-key~，只是~define-key~的包装，但是它们都有不同的用途。我将在接下来的小节中详细介绍这些函数的工作原理以及它们的用途。我强烈建议您查看[[https://github.com/noctuid/general.el][general.el]]，以获得所有键绑定函数的统一包装，从而减少键定义的冗长，并提供与vim更相似的函数(比如~general-nmap~)和其他一些函数。
 
 As a quick disclaimer, I'm going to be quoting (instead of sharp quoting) commands in example key definitions. Sharp quoting commands (since they are functions) is perfectly valid and, if anything, is more correct. You generally want to sharp quote functions, but for keybindings, you'll hardly ever see people do it (including in the emacs manual). I think this is mainly for historical reasons, but it may also be a stylistic preference for some.
-作为一个快速的免责声明，我将在示例键定义中引用命令(而不是直接引用)。尖锐的引用命令(因为它们是函数)是完全有效的，如果有的话，也是更正确的。您通常希望锐化引用函数，但是对于键绑定，您几乎看不到有人这样做(包括在emacs手册中)。我认为这主要是历史原因，但也可能是一些人的风格偏好。
 
 ** Keymap Precedence
-* * Keymap优先
 In emacs, there is a [[https://www.gnu.org/software/emacs/manual/html_node/elisp/Searching-Keymaps.html][hierarchy of keymaps]] that are searched one by one until a definition for a key is found. Evil keymaps are found in =emulation-mode-map-alists= which puts them close to the top in terms of precedence. Here is the order of precedence of evil's keymaps as explained in =evil-core.el=:
-在emacs中，有一个[[https://www.gnu.org/software/emacs/manual/html_node/elisp/Searching-Keymaps.html][keymaps的层次结构]]被逐个搜索，直到找到键的定义。在= emul- mode-map-alists=中找到了错误的键映射，这使它们在优先级方面接近于顶级。这里是evil的键映射的优先顺序，如=evil-core.el=:
 
 - Intercept keymaps   - ~evil-make-intercept-map~
--拦截键映射- - -恶使- -拦截映射- -
 - Local state keymap  - ~evil-local-set-key~
--本地状态键映射- -恶- -本地-设置键- -
 - Minor-mode keymaps  - ~evil-define-minor-mode-key~
-- Minor-mode键映射- ~evil-define-minor-mode-key -
 - Auxiliary keymaps   - ~evil-define-key~
--辅助键映射- -邪恶定义- -键
 - Overriding keymaps  - ~evil-make-overriding-map~
--覆盖键映射- ~恶补-覆盖-映射-
 - Global state keymap - ~evil-global-set-key~
--全局状态键映射-邪恶-全局-设置键-
 
 I will be bringing up precedence later on when it is relevant. For more information, see [[https://github.com/syl20bnr/spacemacs/wiki/Keymaps-guide][spacemacs' keymap guide]] (though it is missing minor-mode keymaps) and the commentary in =evil-core.el=.
-我稍后会提到相关的优先级。有关更多信息，请参见[[https://github.com/syl20bnr/spacemacs/wiki/Keymaps-guide][spacemacs的keymap指南]](尽管它缺少了小众模式的keymap)和=evil-core.el=中的注释。
 
 ** Global Keybindings and Evil States
-**全局键绑定和错误状态
 To make global keybindings in emacs without evil, one would normally use ~global-set-key~. ~global-set-key~ is just a small wrapper function around ~define-key~ that defines a key in the current global map and signals a error when the key isn't a string or vector. As an evil user, you won't often use this function since evil provides several of its own global keymaps corresponding to vim modes. They are as follows:
-要使emacs中的全局键绑定没有问题，通常会使用~global-set-key~。global-set-key只是一个围绕define-key的小包装函数，它定义了当前全局映射中的一个键，并在键不是字符串或向量时发出错误信号。作为一个邪恶的用户，您不会经常使用这个函数，因为邪恶提供了几个与vim模式相对应的全局键映射。它们如下:
 
 - =evil-insert-state-map=
-- = evil-insert-state-map =
 - =evil-emacs-state-map=
-- = evil-emacs-state-map =
 - =evil-normal-state-map=
-- = evil-normal-state-map =
 - =evil-visual-state-map=
-- = evil-visual-state-map =
 - =evil-motion-state-map=
-- = evil-motion-state-map =
 - =evil-operator-state-map=
-- = evil-operator-state-map =
 - =evil-outer-text-objects-map=
-- = evil-outer-text-objects-map =
 - =evil-inner-text-objects-map=
-- = evil-inner-text-objects-map =
 - =evil-replace-state-map=
-- = evil-replace-state-map =
 
 There are also buffer local versions of these (e.g. ~evil-normal-state-local-map~).
-也有这些的缓冲区本地版本(例如~evil-normal-state-local-map~)。
 
 Most of these should be self-explanatory coming from vim. Emacs state is similar to insert state but uses emacs keybindings (e.g. =C-n= is bound to ~next-line~ instead of to ~evil-complete-next~). For the most part, the keys are the same as if you weren't using evil at all in emacs state (apart from =evil-toggle-key= which enters/exits emacs state, =C-z= by default).
-其中大部分应该是来自vim的不言自明的。Emacs状态类似于insert状态，但是使用Emacs键绑定(例如=C-n=绑定到~下一行~，而不是绑定到~evil-complete-next~)。在大多数情况下，键值与您在emacs状态下完全不使用evil时相同(除了=evil-toggle-key=进入/退出emacs状态，=C-z=默认情况下)。
 
 Motion state is a bit strange. Keys bound in motion state are inherited in the normal, visual, and operator state keymaps if they are not shadowed. The same inheritance rules apply to normal state, and the main reason motion state exists is for use with read-only modes where insertion keybindings aren't useful. For example, motion state is the default state for =help-mode=. This means that, by default, only keys bound in motion state will work in =help-mode=.
-运动状态有点奇怪。在运动状态中绑定的键在正常、可视和操作符状态键映射中继承，如果它们没有被隐藏。相同的继承规则也适用于正常状态，存在移动状态的主要原因是用于只读模式，在这种模式中插入键绑定没有用处。例如，运动状态是=help-mode=的默认状态。这意味着，默认情况下，只有在运动状态下绑定的键才会在=help-mode=下工作。
 
 I personally think that the existence of motion state is a bad idea since it often confuses beginners as there is no vim equivalent and its purpose may not be immediately clear, has a misleading name (it isn't only used for motions), addresses what I consider a non-issue (e.g. accidentally pressing =i= in a read-only buffer), and addresses this issue poorly. For example, motion state isn't suitable for all read-only modes (e.g. motions don't make sense in =ediff-mode=), and remapping insertion commands to be ignored (which is what [[https://github.com/emacs-evil/evil-collection][evil-collection]] now does) is a more foolproof and unobtrusive alternative to creating new states. That said, as long as you remember that evil binds motions and some other commands in motion state by default and are aware of =evil-motion-state-modes= and ~evil-set-initial-state~ (see Make Evil Normal State the Initial State Always for information on using normal state instead of motion state in all modes), you shouldn't encounter any issues.
-我个人认为运动状态的存在是一个坏主意,因为它常常使初学者没有vim等效和它的目的可能不清楚,有一个误导性名称(不仅仅是用于运动),地址我考虑一个问题(如不小心压=我=一个只读缓冲区),和地址这个问题不佳。例如,运动状态不适合所有只读模式(如运动= ediff-mode =没有意义),和重新映射插入命令被忽视(这是现在[[https://github.com/emacs-evil/evil-collection] [evil-collection]])是一个更简单和不显眼的选择创建新的状态。说,只要你记住,邪恶结合运动和其他一些命令默认运动状态,了解= evil-motion-state-modes = ~ evil-set-initial-state ~(见让邪恶的正常状态的初始状态总是使用正常状态而非运动状态信息在所有模式下),你不会遇到任何问题。
 
 If you are ever want to know what state a key is bound in, you can check =evil-maps.el= or use ~lookup-key~. For example, ~evil-next-visual-line~ is bound to =gj= in motion state instead of in the normal state keymap (you can check this with ~(lookup-key evil-normal-state-map "gj")~ which will return =nil=). Similarly, if you look up the operator keys such as =d=, you will find that they are only explicitly bound in normal state and not in visual state. Generally, keys are only bound directly in visual state when they have a different behavior from the normal state keys (e.g. =u= and =U= for altering case).
-如果您想知道键被绑定在什么状态，您可以检查=evil-maps。el=或使用~查找键~。例如，~evil-next-visual-line~被绑定到=gj= in motion状态，而不是在正常状态键映射中(您可以使用~(查找-key evil-normal-state-map "gj")~，它将返回=nil=)。类似地，如果您查找操作符键，如=d=，您将发现它们仅在正常状态下显式绑定，而不在可视状态下。通常，只有当键具有与正常状态键不同的行为时(例如=u=和=u= for case)，键才会直接绑定到可视状态。
 
 Also note that defining a key in =evil-visual-state-map= is more like =xmap= in vim since there is no "select" state in evil.
-还要注意，在=evil-visual-state-map=中定义键更类似于在vim中定义=xmap=，因为evil中没有“select”状态。
 
 These are the other evil keymaps that might be useful:
-以下是其他可能有用的邪恶键图:
 
 - =evil-ex-search-keymap= (=/= and =?=)
-- =evil-ex-search-keymap=(=/=和=?=)
 - =evil-ex-completion-map= (=:=)
-- = evil-ex-completion-map = (=。=)
 - =evil-command-window-mode-map= (=q:=; you'd use =evil-define-key= for this)
-- = evil-command-window-mode-map = =问:=;你可以使用=evil-define-key=这个)
 - =evil-window-map= (a prefix map for the =C-w= keys)
-- =evil-window-map= (C-w=键的前缀映射)
 
 Since =define-key= is the basis for key definition in emacs, I will begin by explaining it. The basic format of ~define-key~ is ~(define-key <keymap> <key> <definition>)~. The specified key can be a string (or something that evaluates to a string) or a vector. You probably won't want to use a vector of characters instead of a string, but you can use a vector to [[https://www.gnu.org/software/emacs/manual/html_node/elisp/Remapping-Commands.html][remap a command]], for example. The definition will normally be a command (or something that evaluates to one), but it can also be a keymap or a string. A key bound to a keymap is a prefix key. Binding a key to a string will cause emacs to execute that string as a keyboard macro (see Binding Keys to Keys (Keyboard Macros) for examples). See the help text for ~define-key~ (e.g. =C-h f define-key RET=) for more information on valid definitions.
-由于=define-key=是emacs中键定义的基础，所以我将从解释它开始。~define-key~的基本格式是~(define-key <keymap> <key> <definition>)~。指定的键可以是字符串(或计算结果为字符串的内容)或向量。您可能不想使用字符向量而不是字符串，但是您可以使用向量来[[https://www.gnu.org/software/emacs/manual/html_node/elisp/Remapping-Commands.html][remap a command]]，例如。定义通常是一个命令(或计算结果为1的东西)，但它也可以是一个键映射或一个字符串。绑定到密钥映射的密钥是前缀密钥。将键绑定到字符串将导致emacs将该字符串作为键盘宏执行(有关示例，请参阅绑定键到键(键盘宏))。有关有效定义的更多信息，请参见~define-key~的帮助文本(例如=C-h f define-key RET=)。
 
 Here is what a basic =nmap= command equivalent would look like in emacs:
-在emacs中，基本的=nmap=命令是这样的:
 #+begin_src emacs-lisp
-# + begin_src emacs lisp
 (define-key evil-normal-state-map "j" 'evil-next-visual-line)
-(定义-关键字恶魔-正常状态地图“j”’恶魔-下一个可视化线)
 (define-key evil-normal-state-map "k" 'evil-previous-visual-line)
-(定义-key evil-normal-state-map“k”’evil- before -visual-line)
 
 ;; with `evil-define-key'
-;;与“evil-define-key”
 (evil-define-key nil evil-normal-state-map
-(evil-define-key nil evil-normal-state-map
-"j" 'evil-next-visual-line
-“j”evil-next-visual-line
-"k" 'evil-previous-visual-line)
-“k”“evil-previous-visual-line)
+  "j" 'evil-next-visual-line
+  "k" 'evil-previous-visual-line)
 
 ;; with general.el
-;;与general.el
 (general-nmap
-(general-nmap
-"j" 'evil-next-visual-line
-“j”evil-next-visual-line
-"k" 'evil-previous-visual-line)
-“k”“evil-previous-visual-line)
+  "j" 'evil-next-visual-line
+  "k" 'evil-previous-visual-line)
 #+end_src
-# + end_src
 
 Evil also provides a convenience function called ~evil-global-set-key~ that allows you to simply specify the name of the state as opposed to the full keymap name:
-Evil还提供了一个名为~ Evil -global-set-key~的方便函数，允许您简单地指定状态名，而不是完整的keymap名:
 #+begin_src emacs-lisp
-# + begin_src emacs lisp
 (evil-global-set-key 'motion "j" 'evil-next-visual-line)
-(恶魔全球设置键‘动作’j’恶魔下一个视觉线)
 (evil-global-set-key 'motion "k" 'evil-previous-visual-line)
-(evil-global-set-key 'motion "k" evil- before -visual-line)
 
 ;; `evil-define-key' can also used with "global"
-;;‘evil-define-key’也可以和‘global’一起使用。
 (evil-define-key 'motion 'global
-(evil-define-key '运动'全球
-"j" 'evil-next-visual-line
-“j”evil-next-visual-line
-"k" 'evil-previous-visual-line)
-“k”“evil-previous-visual-line)
+  "j" 'evil-next-visual-line
+  "k" 'evil-previous-visual-line)
 #+end_src
-# + end_src
 Remember that binding a key in motion state is like binding a key in the normal, visual, and operator states all at once (unless that key is already bound in one of those states).
-请记住，绑定处于运动状态的键就像绑定处于正常、可视和操作符状态的键一样(除非该键已经绑定在这些状态之一)。
 
 You can write the key portion as just a string, but often people will use ~kbd~ to conveniently write keys that have special characters in them like control and space. This follows the format mentioned in Key Notation. These are equivalent:
-您可以将键部分仅作为一个字符串来编写，但是通常人们会使用~kbd~来方便地编写包含特殊字符(如control和空格)的键。这遵循了键符号中提到的格式。这些是等价的:
 #+begin_src emacs-lisp
-# + begin_src emacs lisp
-(define-key evil-normal-state-map "C-j" 'evil-next-visual-line)
-(定义键恶魔-正常状态映射“C-j”恶魔-下一个可视化线)
+(define-key evil-normal-state-map "\C-j" 'evil-next-visual-line)
 (define-key evil-normal-state-map (kbd "C-j") 'evil-next-visual-line)
-(定义键邪恶-正常状态地图(kbd“C-j”)“evil-next-visual-line)
 ;; general.el implicitily adds a kbd by default
-;;将军。el默认增加了kbd
 (general-nmap "C-j" 'evil-next-visual-line)
-(general-nmap C-j evil-next-visual-line)
 #+end_src
-# + end_src
 
 ** Unbinding a Key
-**解锁密钥
 There is no dedicated alternative to ~define-key~ for unbinding a key in emacs (though there are wrappers around ~define-key~ like ~global-unset-key~). To unbind a key, you simply bind it to =nil=.
-在emacs中，没有一个专用的方法可以替代~define-key~来解绑定一个键(尽管围绕~define-key~类似~global-unset-key~有包装器)。要取消键的绑定，只需将其绑定到=nil=。
 
 ** Leader Key
-* *领袖的关键
 There is no exact equivalent of a "leader" key in evil. You can have named prefix keys with a package like [[https://github.com/noctuid/general.el][general.el]] or bind a prefix key to a named keymap. This will allow you to easily change your "leader"/prefix key later. Here's an example that doesn't use any extra packages:
-在《邪恶》中，没有与“领袖”完全等同的钥匙。您可以使用[[https://github.com/noctuid/general.el]]这样的包来命名前缀键，或者将前缀键绑定到指定的keymap。这将使您可以方便地更改您的“领导人”/前缀键以后。下面是一个不使用任何额外包的例子:
 #+begin_src emacs-lisp
-# + begin_src emacs lisp
 (defvar my-leader-map (make-sparse-keymap)
-(defvar my-leader-map (make-sparse-keymap)
-"Keymap for "leader key" shortcuts.")
-"快捷键"的键图)
+  "Keymap for \"leader key\" shortcuts.")
 
 ;; binding "," to the keymap
-;;绑定“，”到键映射
 (define-key evil-normal-state-map "," my-leader-map)
-(定义键邪恶-正常状态地图"，" my-leader-map)
 
 ;; binding ",b"
-;;绑定”,b”
 (define-key my-leader-map "b" 'list-buffers)
-(定义键my-leader-map“b”的列表缓冲区)
 
 ;; change the "leader" key to space
-;;将“leader”键改为空格键
 (define-key evil-normal-state-map "," 'evil-repeat-find-char-reverse)
-(定义键恶-正常状态映射”，“恶-重复查找-查表-反向”)
 (define-key evil-normal-state-map (kbd "SPC") my-leader-map)
-(定义键邪恶-正常状态地图(kbd“SPC”)my-leader-map)
 
 ;; general.el can automate the process of prefix map/command creation
-;;将军。el可以自动地创建前缀映射/命令
 (general-nmap
-(general-nmap
-:prefix "SPC"
-:前缀“SPC”
-:prefix-map 'my-leader-map
-:prefix-map my-leader-map
-"," 'list-buffers)
-”、“list-buffers)
+  :prefix "SPC"
+  :prefix-map 'my-leader-map
+  "," 'list-buffers)
 #+end_src
-# + end_src
 
 This isn't quite the same as the leader key in vim. In vim, =<leader>= is builtin and sometimes used by plugins to bind keys (despite being considered bad practice). This could potentially be convenient since it gives you some control over what you would like to use as a "main" prefix key without having to manually make keybindings for it with every plugin. In emacs, evil packages generally do not force the use of some extra package that provides "leader" functionality onto the user, and there is no standard, generic "leader" prefix map provided by evil. This means that "leader" keybindings in emacs will be your personal ones. Note that some packages do provide prefix keymaps that you can then choose a prefix key for though (e.g. =projectile-command-map=).
-这与vim中的leader键不太一样。在vim中，=<leader>=是内置的，有时被插件用来绑定键(尽管被认为是不好的做法)。这可能会很方便，因为它让您可以控制要使用什么作为“主”前缀键，而不必在每个插件中手动为其进行键绑定。在emacs中，evil包通常不会强制用户使用提供“leader”功能的额外包，而且evil也没有提供标准的通用“leader”前缀映射。这意味着emacs中的“leader”键绑定将是您个人的。注意，有些包确实提供了前缀键映射，然后您可以为其选择一个前缀键(例如=project -command-map=)。
 
 In terms of functionality, it might be said that named prefixes are actually slightly more convenient in emacs than =<leader>=. You can use as many prefix keymaps as you would like and can bind as many keys to the same prefix keymap as you would like (which may be useful if you want to use a different key to access a prefix keymap in insert state). Note that you can essentially achieve the same functionality (multiple named prefixes) in vim using =<Plug>= mappings.
-在功能方面，可以这样说，在emacs中，命名前缀实际上比=<leader>=更方便。您可以使用任意多的前缀键映射，也可以将任意多的键绑定到相同的前缀键映射(如果您希望使用不同的键来访问处于插入状态的前缀键映射，那么这可能非常有用)。注意，您可以使用=<Plug>= mappings在vim中实现相同的功能(多个命名前缀)。
 
 For an example of a prefix keymap used by evil, see =evil-window-map= which is used for =C-w= commands. From =evil-maps.el=:
-有关evil使用的前缀keymap的示例，请参见=evil-window-map=，它用于=C-w=命令。从= evil-maps.el =:
 #+begin_src emacs-lisp
-# + begin_src emacs lisp
 (define-prefix-command 'evil-window-map)
-(define-prefix-command ' evil-window-map)
 (define-key evil-window-map "b" 'evil-window-bottom-right)
-(定义-key evil-window-map "b" 'evil-window-bottom-right)
 (define-key evil-window-map "c" 'evil-window-delete)
-(定义-key evil-window-map "c" 'evil-window-delete)
 ...
-(define-key evil-motion-state-map "C-w" 'evil-window-map)
-(定义-key evil-motion-state-map "C-w" 'evil-window-map)
+(define-key evil-motion-state-map "\C-w" 'evil-window-map)
 #+end_src
-# + end_src
 
 Note the use of ~define-prefix-command~ instead of ~defvar~. Either way works, but ~define-prefix-command~ is specifically intended for this purpose (see its documentation for more information).
-注意使用~define-前缀-command~而不是~defvar~。这两种方法都可以，但是~define-前缀-command~是专门为此目的设计的(更多信息请参阅其文档)。
 
 You can check out another alternative for emulating the leader key in the [[https://github.com/noctuid/evil-guide/wiki#using-hydra-for-leader-key][wiki]]
-您可以在[[https://github.com/noctuid/evil-guide/wiki# using---key]
 
 ** Mode Specific Keybindings
-模式特定的键绑定
 ~evil-define-key~ can be used to define keys in specific states for specific modes. The basic format is ~(evil-define-key <state> <keymap> <key> <definition> ...)~. Unlike with ~define-key~, ~evil-define-key~ can be used to define multiple keys at once. The state argument can be a single state or a list of states. ~evil-define-key~ will also defer keybindings if the specified keymap does not exist. This means that you can use it without putting it in an ~eval-after-load~ for packages that haven't been loaded yet.
-可用于为特定模式定义特定状态下的键。基本格式是~(evil-define-key <state> <keymap> <key> <definition>…)~。与~define-key~不同，~evil-define-key~可以同时定义多个键。状态参数可以是单个状态，也可以是状态列表。如果指定的键映射不存在，也将延迟键绑定。这意味着您可以使用它，而不必将它放在尚未加载的包的加载后值中。
 
 Here is an example:
-下面是一个例子:
 #+begin_src emacs-lisp
-# + begin_src emacs lisp
 (evil-define-key 'normal org-mode-map
-(evil-define-key org-mode-map正常
-(kbd "TAB") 'org-cycle
-(kbd“选项卡”)“org-cycle
-">" 'org-shiftmetaright
-“>”org-shiftmetaright
-"<" 'org-shiftmetaleft)
-“<”org-shiftmetaleft)
+  (kbd "TAB") 'org-cycle
+  ">" 'org-shiftmetaright
+  "<" 'org-shiftmetaleft)
 #+end_src
-# + end_src
 
 Coming from vim, this is a lot nicer than using buffer local keybindings with autocommands or ftplugin files in my opinion.
-在我看来，这比使用带有自动命令或ftplugin文件的缓冲区本地键绑定要好得多。
 
 The state can also be nil, so you could also use it like ~define-key~ except to define multiple keys at once, for example, in ~evil-normal-state-map~. I'd recommend using general.el instead if you want this functionality.
-状态也可以是nil，所以您也可以像~define-key~那样使用它，除了同时定义多个键之外，例如在~ev -normal-state-map~中。我建议用general。相反，如果你想要这个功能。
 
 If you don't need keybindings to be deferred and would rather use a function (~evil-define-key~ is a macro), ~evil-define-key*~ was recently added. Also note that ~evil-declare-key~ is an alias for ~evil-define-key~.
-如果不需要延迟键绑定，而希望使用一个函数(~evil-define-key~是一个宏)，则最近添加了~evil-define-key*~。还要注意~evil-declare-key~是~evil-define-key~的别名。
 
 There is also a function called ~evil-define-minor-mode-key~ that is similar to ~evil-define-key~. Some differences are that ~evil-define-minor-mode-key~ only works with minor modes, only allows specifying a single state that cannot be nil, and keys defined with it have a higher precedence than those defined with ~evil-define-key~. You probably won't need to use this function often, but it has a main practical difference that allows it to be used as a workaround for some shortcomings of ~evil-define-key~ (see [Why don't keys defined with ~evil-define-key~ work (immediately)?]).
-还有一个类似于~evil-define-min -mode-key~的函数。不同之处在于~evil-define-min -mode-key~只在次要模式下工作，只允许指定一个不能为nil的状态，用它定义的键的优先级比用~evil-define-key~定义的键的优先级高。您可能不需要经常使用这个函数，但是它有一个主要的实际区别，允许将它用作~evil-define-key~的一些缺点的解决方案(参见[为什么不使用~evil-define-key~ work(立即)来定义键?])。
 
 ** Buffer Local Keybindings
-缓冲本地键绑定
 Emacs does not have a builtin function for creating buffer local keybindings (that's not to say there is no such thing as local keymaps; any variable in emacs can be made buffer-local). There is ~local-set-key~, but it will bind a key for a mode instead of for a buffer. General.el provides a way to locally bind keys for both evil and non-evil keybindings. Evil also provides ~evil-local-set-key~ which will work as expected. It is similar to ~evil-global-set-key~ in that it is a simple wrapper around ~define-key~ and can only take a single key and definition. For example:
-Emacs没有用于创建缓冲区本地键绑定的内置函数(这并不是说不存在本地键映射;emacs中的任何变量都可以成为缓冲区本地变量)。有~local-set-key~，但是它将绑定一个模式的键而不是一个缓冲区的键。将军。el为恶意和非恶意密钥绑定提供了一种本地绑定密钥的方法。Evil还提供了~ Evil -local-set-key~，它将按预期工作。它类似于~evil-global-set-key~，因为它是~define-key~的简单包装，并且只能使用一个键和定义。例如:
 #+begin_src emacs-lisp
-# + begin_src emacs lisp
 (evil-local-set-key 'normal key def)
-(恶本地设置键‘正常键定义)
 ;; is the same as
-;;和
 (define-key evil-normal-state-local-map key def)
-定义键邪恶-正常状态-本地地图键定义
 
 ;; alternatively with `evil-define-key'
-;;另外与“evil-define-key”
 (evil-define-key 'normal 'local key def)
-(邪恶定义键‘正常’本地键定义)
 #+end_src
-# + end_src
 
 There are good use cases for local keybindings (e.g. maybe you want to bind keys to jump to particular headings in a specific org file), but most are specific to the person and not generally useful. Here's an example that is a workaround to a deficiency with ~evil-define-key~ (again, [why-dont-keys-defined-with-evil-define-key-work-immediately] for a preferable solution). Maybe you want to bind =SPC '= to toggle editing an org source block. Keys bound with ~evil-define-key~ in =org-src-mode-map= won't take effect immediately, so you can use a hook and local keybindings as one possible workaround:
-对于本地键绑定有很好的用例(例如，您可能希望绑定键以跳转到特定组织文件中的特定标题)，但是大多数都是针对个人的，通常没有用处。这里有一个例子，这是一个使用~evil-define-key~(同样，[why-don -keys-defined-with-evil-define-key-work-immediately]来解决缺陷的解决方案)。也许你想绑定=SPC '=来切换编辑一个组织源块。与~evil-define-key~ in =org-src-mode-map=绑定的键不会立即生效，所以你可以使用钩子和本地键绑定作为一个可能的解决方案:
 #+begin_src emacs-lisp
-# + begin_src emacs lisp
 (evil-define-key 'normal org-mode-map
-(evil-define-key org-mode-map正常
-(kbd "SPC '") 'org-edit-special)
-(kbd“SPC”)“org-edit-special)
+  (kbd "SPC '") 'org-edit-special)
 
 ;; you can do this, but the key won't work immediately
-;;你可以这么做，但这把钥匙不会马上起作用
 ;; (evil-define-key 'normal org-src-mode-map
-;;(evil-define-key org-src-mode-map正常
 ;;   (kbd "SPC '") 'org-edit-src-exit)
-;;你”org-edit-src-exit)
 
 ;; this is a potential workaround
-;;这是一种可能的变通方法
 (defun my-setup-org-edit-src-exit ()
-(defun my-setup-org-edit-src-exit ()
-(evil-local-set-key 'normal (kbd "SPC '") 'org-edit-src-exit))
-(恶魔-地方-设定键‘正常’(kbd‘SPC’)“org-edit-src-exit))
+  (evil-local-set-key 'normal (kbd "SPC '") 'org-edit-src-exit))
 
 (add-hook 'org-src-mode-hook #'my-setup-org-edit-src-exit)
-(add-hook org-src-mode-hook # my-setup-org-edit-src-exit)
 #+end_src
-# + end_src
 
 This is closer to how you might define local keybindings in vim (with an autocommand and buffer local keybindings). Note that you can replace the =#'my-setup...= with the actual =(defun...)= without problems, but =defun='s return value is technically undefined, so this may not work in future versions of Emacs.
-这更接近于在vim中定义本地键绑定的方式(使用自动命令和缓冲区本地键绑定)。注意，您可以替换=#'my-setup…=实际的=(defun…)=没有问题，但是=defun=的返回值在技术上是未定义的，因此在Emacs的未来版本中可能无法工作。
 
 ** Binding Keys to Keys (Keyboard Macros)
-**键与键的绑定(键盘宏)
 While you should generally avoid binding keys to keyboard macros when you can bind directly to a command or keymap, binding to a sequence of keys can be simpler than creating new commands:
-当您可以直接绑定到命令或键映射时，通常应该避免将键绑定到键盘宏，但是绑定到一系列键要比创建新命令简单得多:
 #+begin_src emacs-lisp
-# + begin_src emacs lisp
 (evil-define-key 'normal 'global
-(evil-define-key '正常'全球
-;; select the previously pasted text
-;;选择之前粘贴的文本
-"gp" "`[v`]"
-“约伯记”,“‘黑v’铝章”
-;; run the macro in the q register
-;;在q寄存器中运行宏
-"Q" "@q")
-“Q”“@q”)
+  ;; select the previously pasted text
+  "gp" "`[v`]"
+  ;; run the macro in the q register
+  "Q" "@q")
 
 (evil-define-key 'visual 'global
-(evil-define-key '视觉'全球
-;; run macro in the q register on all selected lines
-;;在q寄存器的所有选定行上运行宏
-"Q" (kbd ":norm @q RET")
-“Q”(kbd“:norm @q RET”)
-;; repeat on all selected lines
-;;在所有选中的行上重复
-"." (kbd ":norm . RET"))
-“。”(kbd”:常态。RET”))
+  ;; run macro in the q register on all selected lines
+  "Q" (kbd ":norm @q RET")
+  ;; repeat on all selected lines
+  "." (kbd ":norm . RET"))
 
 ;; alternative command version
-;;选择命令版本
 (defun my-norm@q ()
-(defun my-norm@q ()
-"Apply macro in q register on selected lines."
-“应用宏在q寄存器选定的行。”
-(interactive)
-(互动)
-(evil-ex-normal (region-beginning) (region-end) "@q"))
-(evil-ex-normal(地区)(region-end)“@q”))
+  "Apply macro in q register on selected lines."
+  (interactive)
+  (evil-ex-normal (region-beginning) (region-end) "@q"))
 
 (evil-define-key 'visual 'global "Q" #'my-norm@q)
-(evil-define-key‘visual’global‘Q’# my-norm@q)
 #+end_src
-# + end_src
 
 These examples are similar to how you might do things in vim. Keyboard macros are fine for simple cases, but note that they do have some limitations. For example:
-这些示例类似于在vim中执行操作的方式。键盘宏适用于简单的情况，但是注意它们有一些限制。例如:
 - The prefix argument/count will apply to the macro (i.e. it will run that many times), not to the next command that runs
--前缀参数/计数将适用于宏(即，它将运行多次)，而不是下一个命令运行
 - Macro are not suitable for incomplete sequences (e.g. =C-c= or another key bound to a keymap)
--宏不适合不完整的序列(例如=C-c=或另一个键绑定到keymap)
 - Using =C-h k=, the help buffer will just show the keyboard macro, not the help text for the actual command that will run
--使用=C-h k=，帮助缓冲区将只显示键盘宏，而不是实际运行的命令的帮助文本
 
 For a potentially better approach for simulating keys see [Using Emacs Keybindings in Normal State].
-要了解模拟键的更好方法，请参见[在正常状态下使用Emacs键绑定]。
 
 ** Mapping Under Keys That Aren't Prefix Keys
-**映射在不是前缀键的键下
 In vim, it is somewhat common to bind non-operator functionality under operators (e.g. =co<keys>= to toggling options). It's is also somewhat common for people to do something like remap =cw= to =ciw=. With evil, it is not possible to bind something like =cow= directly since =c= is not a prefix key (it is already bound to ~evil-change~). For this specific case, you can bind under ~evil-operator-state-map~. If you want to have different things executed based on the specific operator (=d= vs. =c=) you can check =evil-this-operator=. [[https://github.com/emacs-evil/evil-collection/blob/6ddfc3f7ffc09ae8fcee05e044d3a35aaddacf94/evil-collection-vdiff.el#L40][This]] is how evil-collection defines =dp= and =do= for vdiff mode and how I would recommend other packages implement this functionality when possible.
-在vim中，在操作符下绑定非操作符功能是比较常见的(例如=co<keys>= to tooptions)。人们通常也会这样做:remap =cw= to =ciw=。使用evil，不可能直接绑定=cow=之类的东西，因为=c=不是前缀键(它已经绑定到~evil-change~)。对于此特定情况，可以在~evil-operator-state-map~下绑定。如果希望基于特定的操作符(=d= vs. =c=)执行不同的操作，可以检查=evil-this-operator=。[https://github.com/emacs-evil/evil- collection/blob/6ddfc3ffc09ae8fcee05e044d3a35aaddacf94/evil -collection-vdiff.el#L40][这]]是evil-collection如何为vdiff模式定义=dp=和=do=，以及我如何建议其他包实现这个功能。
 
 This method won't work, however, if you wanted to rebind something like =ct<key>= or =cw= (you'd have to redefine ~evil-find-char-to~ and ~evil-forward-word-begin~). For a more general solution that will work for both cases, there is general.el's ~general-key-dispatch~ macro. For more information and specific examples see [[https://github.com/noctuid/general.el#mapping-under-non-prefix-keys][here]].
-但是，如果希望重新绑定=ct<key>=或=cw=(必须重新定义~evil-find-char-to~和~evil-forward-word-begin~)，则此方法无法工作。对于两种情况都适用的更通用的解决方案，有通用的。el的~ general-key-dispatch ~宏。有关更多信息和具体示例，请参见[[https://github.com/noctuid/general.el#映射-下无前缀键][此处]]。
 
 * Advice
-*建议
 Since this functionality is used in the next section, I'll go ahead and mention it now. Emacs allows "advising" a function. This means that you can have certain code execute before, after, or even instead of a function. The examples in this guide are fairly simple, but you can see the [[https://www.gnu.org/software/emacs/manual/html_node/elisp/Advising-Functions.html][corresponding section]] of the emacs manual for more information.
-由于该功能将在下一节中使用，所以我将继续介绍它。Emacs允许“通知”功能。这意味着您可以让某些代码在函数之前、之后甚至代替函数执行。本指南中的示例相当简单，但是您可以查看emacs手册的[[https://www.gnu.org/software/emacs/manual/html_node/elisp/Advising-Functions.html][对应部分]]了解更多信息。
 
 * Further Integrating Evil and Emacs
-*进一步整合Evil和Emacs
 There is a common misconception that evil is unable integrate well with certain parts of emacs. What is true is that evil has some default configuration that may be annoying and does not provide default keybindings for all emacs packages. That said, once you know about the tools evil gives you, the process of integration becomes much easier. In the following sections, I will present various techniques for reconciling emacs and evil keybindings.
-有一个普遍的误解，认为evil不能很好地与emacs的某些部分集成。事实是evil有一些默认的配置，这些配置可能很烦人，并且没有为所有emacs包提供默认的键绑定。也就是说，一旦您了解了evil提供给您的工具，集成的过程就会变得容易得多。在下面的小节中，我将介绍各种协调emacs和错误键绑定的技术。
 
 Some people prefer to use evil only for text editing and use the default emacs keybindings for applications such as dired and mail clients. Evil makes this easy to do by altering initial states or using overriding keymaps for these modes. I personally prefer to use evil everywhere. Some people argue that the lack of default keybindings for applications like dired means that far too much work is required to use evil with them. Some argue that the lack of consistency makes evil not worth using at all. In my experience, making your own keybindings for some application like mu4e takes significantly less time than reading the documentation and can be done simultaneously. Even if you disagree, it's no longer the case that most modes have no evil support. In many cases there are packages for specific modes that will make evil keybindings for you, such as [[https://github.com/justbur/evil-magit][evil-magit]]. I don't personally use these unless they provide new functionality too, but some people find these packages indispensable. On the other hand, I'd highly recommend looking at [[evil-collection][evil-collection]]. The main difference between this package and others is that it attempts to cover everything as opposed to a single mode. The main benefit of this approach is that =evil-collection= uses a consistent set of rules for what keys are bound to what types of actions. Because of this, I will likely switch my personal configuration for all relevant modes to use =evil-collection= as a base in the future. Even if you don't agree with the specific key choices, it is easy enough to swap them for your own. On the other hand, most emacs applications use inconsistent keybindings for common actions such as filtering, sorting, marking, etc., so one might even argue that with evil-collection, using evil for such applications is actually easier and more consistent than using them normally.
-有些人倾向于仅将evil用于文本编辑，而将缺省的emacs密钥绑定用于dired和邮件客户机等应用程序。Evil通过改变初始状态或为这些模式使用覆盖键映射，使得这一点很容易实现。我个人更喜欢在任何地方使用邪恶。有些人认为，像dired这样的应用程序缺少默认的键绑定，这意味着使用evil需要做太多的工作。一些人认为，缺乏一致性使得邪恶根本不值得使用。根据我的经验，与阅读文档相比，为mu4e这样的应用程序创建自己的键绑定所花费的时间要少得多，而且可以同时完成。即使你不同意，大多数模式不再有邪恶的支持。在许多情况下，有一些特定模式的包会为您提供错误的密钥绑定，比如[[https://github.com/justbur/evil-magit][evil-magit]]。我个人并不使用它们，除非它们也提供了新的功能，但是有些人发现这些包是必不可少的。另一方面，我强烈推荐看[[恶集][恶集]]。此包与其他包的主要区别在于，它试图覆盖所有内容，而不是单一模式。这种方法的主要好处是=evil-collection=使用一致的规则集来确定哪些键绑定到哪些操作类型。因此，我可能会在将来将我的个人配置切换为所有相关模式，使用=evil-collection=作为基础。即使您不同意特定的密钥选择，也很容易用您自己的密钥替换它们。另一方面，大多数emacs应用程序在过滤、排序、标记等常见操作上使用不一致的键绑定，因此有人甚至会认为，使用evil-collection实际上比正常使用它们更容易、更一致。
 
 ** What Overrides Evil?
-什么能压倒邪恶?
 If you've ever entered some buffer and noticed that your normal state keybindings weren't working, it was probably because of some configuration done by evil (see =evil-integration.el=). There are very few cases where another keymap takes precedence over an evil one.
-如果您曾经输入某个缓冲区并注意到您的正常状态键绑定无法工作，那么这可能是由evil(参见=evil-integration.el=)完成的一些配置造成的。在很少的情况下，另一个键映射优先于另一个键映射。
 
 Referring back to the fact that evil's keymaps are located in =emulation-mode-map-alists= and the [[https://www.gnu.org/software/emacs/manual/html_node/elisp/Searching-Keymaps.html][Searching Keymaps]] section of the emacs manual, you'll notice that emacs will check in the keymap char property before reaching evil's keymaps. An example of where this would override evil keybindings is when the point is in a magit diff section in the magit status buffer. See [prevent-text-property-maps-from-overriding-evil] for information on how to deal with this.
-回顾邪恶的键盘映射位于= emulation-mode-map-alists =和[[https://www.gnu.org/software/emacs/manual/html_node/elisp/Searching-Keymaps.html][搜索键盘映射]]的emacs手册,你会注意到emacs会检查在keymap char属性达到邪恶的键盘映射。当这个点位于magit状态缓冲区的magit diff部分时，它将覆盖错误的键绑定。有关如何处理此问题的信息，请参见[防止-文本-属性-地图从-覆盖-邪恶]。
 
 The other main case where evil keybindings will be overridden is by keybindings in =overriding-terminal-local-map=, which has the highest precedence in emacs. Normally it is used by ~set-transient-map~ to temporarily to elevate a keymap to the highest precedence. Note that generally this will not get in the way of evil keybindings (e.g. this is the mechanism used by =hydra=) For an example of packages that use ~set-transient-map~, see [[http://oremacs.com/2014/12/31/keymap-arms-race/][this article]].
-将被覆盖的另一种主要情况是在=覆盖-终端-本地-map=中的键绑定，它在emacs中具有最高的优先级。通常，~set-transient-map~使用它来临时将键映射提升到最高优先级。请注意，这通常不会妨碍错误的键绑定(例如，这是=hydra=使用的机制)，对于使用~set- transientmap ~的包示例，请参阅[[http://oremacs.com/2014/12/31/keymap-arms-race/][本文]]。
 
 Finally, it may be possible for other keymaps in =emulation-mode-map-alists= to override evil. For example, when the company popup is active, keys in ~company-active-map~ will have precedence. If this causes any annoyances, you can unbind the offending key in ~company-active-map~.
-最后，在= emul- mode-map-alists=中，其他键映射可能会覆盖evil。例如，当公司弹出窗口处于活动状态时，~company-active-map~中的键将具有优先级。如果这导致任何麻烦，您可以在~company-active-map~中取消绑定违规键。
 
 ** Evil's Tools
-* *恶的工具
 Evil provides a way to set the initial state for a mode as well as to allow keybindings in a keymap to override global keybindings for some/all states. I will be referencing these variables/functions in later sections, so I will briefly explain them now.
-Evil提供了一种方法来设置模式的初始状态，以及允许keymap中的键绑定覆盖某些/所有状态的全局键绑定。我将在后面的章节中引用这些变量/函数，所以现在我将简要地解释它们。
 
 *Initial States*
-*初始状态*
 
 Evil has "initial state" lists containing modes. For example, if you wanted =org-mode= buffers to start in emacs state, you could add =org-mode= to =evil-emacs-state-modes= and remove it from the list it was previously in or just use ~(evil-set-initial-state 'org-mode 'emacs)~.
-Evil有包含模式的“初始状态”列表。例如，如果您希望=org-mode= buffer在emacs状态下启动，您可以添加=org-mode= to =evil-emacs-state-modes=并将其从先前的列表中移除，或者直接使用~(evil-set-initial-state 'org-mode 'emacs)~。
 
 *Overriding/Intercept Keymaps*
-*覆盖/拦截键盘映射
 
 Evil has two variables called =evil-overriding-maps= and =evil-intercept-maps=. They both have a similar effect. Keybindings made in keymaps listed in =evil-override-maps= will override global evil keybindings. For example, =(Info-mode-map . motion)= is in this list by default, meaning that keys bound in =Info-mode-map= (when it is active) will override keys bound in =evil-motion-state-map=. If no state is specified (e.g. =(compilation-mode-map)=, another default), keybindings in all global keymaps will be overridden. The difference between intercept and overriding keymaps has to do with precedence (refer back to [Keymap Precedence]). Keys bound in a overriding keymap will not override keys bound with ~evil-local-set-key~, ~evil-define-minor-mode-key~, or ~evil-define-key~, but keys bound in an intercept keymap will.
-Evil有两个变量，分别称为= Evil -overriding-maps=和= Evil -intercept-maps=。它们都有相似的效果。在=evil-override-maps=中列出的密钥映射中生成的密钥绑定将覆盖全局的evil密钥绑定。例如，=(Info-mode-map。默认情况下，motion)=在这个列表中，这意味着键绑定在=Info-mode-map=(当它是活动的时候)将覆盖键绑定在=evil-motion-state-map=。如果没有指定状态(例如=(编译模式映射)=，另一个默认值)，那么将覆盖所有全局键映射中的键绑定。拦截和覆盖键映射之间的区别与优先级有关(请参阅[键映射优先级])。在覆盖键映射中绑定的键不会覆盖与~evil-local-set-key~、~evil-define-min -mode-key~或~evil-define-key~绑定的键，但是在拦截键映射中绑定的键会覆盖这些键。
 
 Note that changing these variables after evil is loaded using ~setq~ will have no effect. You can use customize, but I recommend using the corresponding functions instead: ~evil-make-overriding-map~ and ~evil-make-intercept-map~.
-注意，在使用~setq~加载evil后更改这些变量不会有任何效果。您可以使用customize，但我建议使用相应的函数:~evil-make- overridding -map~和~evil-make-intercept-map~。
 
 Evil also has a function called ~evil-add-hjkl-bindings~ that can be used to add back =hjkl= movement keybindings for a mode after making its keymap an overriding keymap.
-Evil还有一个名为~ Evil -add-hjkl-bindings的函数，在使其keymap成为覆盖的keymap后，可以使用该函数为模式添加回=hjkl=移动键绑定。
 
 *Evil Command Properties*
-* *邪恶命令属性
 
 Evil has a concept of "command properties" that can be added with ~evil-add-command-properties~, ~evil-set-command-property~, or ~evil-set-command-properties~ and gotten with ~evil-get-command-property~ or ~evil-get-command-properties~. These can be used to, for example, customize whether or not and how a command will be repeated later with =.= (~evil-repeat~).
-Evil有一个“命令属性”的概念，可以用~ Evil -add-command-properties~， ~ Evil -set-command-property~，或~ Evil -set-command-properties~来添加，然后用~ Evil -get-command-property~或~ Evil -get-command-properties~来获得。例如，可以使用=来定制命令是否重复以及如何重复。= (~ evil-repeat ~)。
 
 ** Preventing Certain Keys From Being Overridden
-**防止某些键被覆盖
 Regardless of whether you want to sometimes have emacs keys override keys in normal/motion state, you may want to have certain keys universally available (e.g. prefix keys used for window/workgroup/buffer/file navigation). The suggested method for doing this is to use evil intercept keymaps since they have the highest precedence. This means that no standard method a package could use to define an evil key (~evil-define-key~, ~evil-define-minor-mode-key~, ~evil-local-set-key~, etc.) can override keys you've bound in an intercept keymap. Here's an example of how to create such a mode/keymap yourself:
-不管您是否希望emacs键有时在正常/运动状态下覆盖键，您可能希望某些键是通用的(例如，用于窗口/工作组/缓冲区/文件导航的前缀键)。建议的方法是使用evil intercept密钥映射，因为它们具有最高的优先级。这意味着没有一个包可以用来定义恶键的标准方法(~evil-define-key~、~evil-define-min -mode-key~、~evil-local-set-key~等)可以覆盖您在拦截键图中绑定的键。下面是一个如何自己创建这样一个模式/键映射的例子:
 #+begin_src emacs-lisp
-# + begin_src emacs lisp
 (defvar my-intercept-mode-map (make-sparse-keymap)
-(defvar my-intercept-mode-map (make-sparse-keymap)
-"High precedence keymap.")
-“高优先keymap。”)
+  "High precedence keymap.")
 
 (define-minor-mode my-intercept-mode
-(define-minor-mode my-intercept-mode
-"Global minor mode for higher precedence evil keybindings."
-"更高优先级的邪恶键绑定的全局副模式。"
-:global t)
-:全球t)
+  "Global minor mode for higher precedence evil keybindings."
+  :global t)
 
-(my-intercept-mode)
 (my-intercept-mode)
 
 (dolist (state '(normal visual insert))
-(dolist(状态'(正常视觉插入))
-(evil-make-intercept-map
-(evil-make-intercept-map
-;; NOTE: This requires an evil version from 2018-03-20 or later
-;;注意:这需要一个邪恶的版本从2018-03-20或更晚
-(evil-get-auxiliary-keymap my-intercept-mode-map state t t)
-(evil-get-辅助性keymap my-intercept-mode-map state t t)
-state))
-州))
+  (evil-make-intercept-map
+   ;; NOTE: This requires an evil version from 2018-03-20 or later
+   (evil-get-auxiliary-keymap my-intercept-mode-map state t t)
+   state))
 
 (evil-define-key 'normal my-intercept-mode-map
-(evil-define-key my-intercept-mode-map正常
-(kbd "SPC f") 'find-file)
-f (kbd“SPC”)查找文件)
+  (kbd "SPC f") 'find-file)
 ;; ...
 #+end_src
-# + end_src
 
 If you are using [[https://github.com/noctuid/general.el][https://github.com/noctuid/general.el]], this configuration is done automatically, so you can just use the ='override= keymap:
-如果你正在使用[[https://github.com/noctuid/general.el][https://github.com/noctuid/general.el]]，这个配置是自动完成的，所以你可以使用='override= keymap:
 #+begin_src emacs-lisp
-# + begin_src emacs lisp
-(general-override-mode)
 (general-override-mode)
 
 (general-def 'normal 'override
-(general-def“正常”覆盖
-"SPC f" 'find-file)
-“SPC f”查找文件)
+  "SPC f" 'find-file)
 #+end_src
-# + end_src
 
 *** Prevent Text Property Maps from Overriding Evil
-防止文本属性映射覆盖邪恶
 Locations in a buffer can have their own keymaps. As these keymaps have a higher precedence than evil, you will have to clear them to prevent them from overriding your keys. As of emacs 25, help pages will tell you where a key is bound, so to find the keymap you could press =C-h k <key that is being overriden>=. A good example of when you might encounter these keymaps is for links (enter and mouse clicks are often remapped) and for magit-status diff sections. To control the keybindings in these locations, you need to clear the keymap (or at least unbind the keys you don't want) and then define the keys as you like. Note that you should use ~define-key~ and not ~evil-define-key~ for this.
-缓冲区中的位置可以有自己的键映射。由于这些键映射的优先级高于evil，因此您必须清除它们，以防止它们覆盖您的键。在emacs 25中，帮助页面将告诉您键的绑定位置，因此要找到键映射，您可以按=C-h k <键，该键正在覆盖>=。您可能会遇到这些键映射的一个好例子是链接(输入和鼠标单击通常会重新映射)和magit-status diff部分。要控制这些位置上的键绑定，您需要清除keymap(或至少取消您不想要的键的绑定)，然后根据需要定义键。注意，您应该使用~define-key~而不是~evil-define-key~。
 
 #+begin_src emacs-lisp
-# + begin_src emacs lisp
-(setq magit-hunk-section-map (make-sparse-keymap))
 (setq magit-hunk-section-map (make-sparse-keymap))
 (define-key magit-hunk-section-map "s" 'magit-stage)
-(定义-key magit- chunk -section-map“s”的magit-stage)
 #+end_src
-# + end_src
 
 ** Use Some Emacs Keybindings
-使用一些Emacs键绑定
 *** Switching Between Evil and Emacs
-在Evil和Emacs之间切换
 Some people prefer to just use evil for editing and stick to emacs keybindings elsewhere. This method just involves altering the initial state for certain modes or using ~evil-make-overriding-map~. For example, if you just wanted to use dired's keybindings as they are without touching your normal state keybindings in dired-mode, you could do the following:
-有些人喜欢只使用evil进行编辑，而在其他地方坚持使用emacs键绑定。这种方法只涉及改变某些模式的初始状态或使用~evil-make-overriding-map~。例如，如果您只是想使用dired的键绑定，而不需要在dired模式下接触您的正常状态键绑定，您可以执行以下操作:
 #+begin_src emacs-lisp
-# + begin_src emacs lisp
 (evil-set-initial-state 'dired-mode 'emacs)
-(evil-set-initial-state dired-mode emacs)
 #+end_src
-# + end_src
 
 If you wanted to override normal state with dired's keybindings, you could do this:
-如果你想用dired的键绑定覆盖正常状态，你可以这样做:
 #+begin_src emacs-lisp
-# + begin_src emacs lisp
 (evil-make-overriding-map dired-mode-map 'normal)
-(evil-make-overriding-map dired-mode-map“正常)
 #+end_src
-# + end_src
 The latter is what evil does by default (followed by an ~evil-add-hjkl-bindings~).
-后者是evil默认情况下所做的(后面跟着一个~evil-add-hjkl-bindings~)。
 
-Note that at any time you can use =C-z= (bound to ~evil-emacs-state~) to enter emacs state or == (bound to ~evil-execute-in-emacs-state~) to execute the next command in emacs state. In emacs state, =C-z= and =ESC= are bound to switch to the previous state. This may not be what you want if you've entered emacs state from insert state, so you may want to rebind =ESC= to always enter normal state instead:
-注意，在任何时候都可以使用=C-z=(绑定到~evil-emacs-state~)来进入emacs状态，或者==(绑定到~evil- executes -in-emacs-state~)来执行emacs状态中的下一个命令。在emacs状态下，=C-z=和=ESC=一定会切换到前一状态。这可能不是你想要的，如果你已经进入emacs状态从插入状态，所以你可能想重新绑定=ESC=总是进入正常状态:
+Note that at any time you can use =C-z= (bound to ~evil-emacs-state~) to enter emacs state or =\= (bound to ~evil-execute-in-emacs-state~) to execute the next command in emacs state. In emacs state, =C-z= and =ESC= are bound to switch to the previous state. This may not be what you want if you've entered emacs state from insert state, so you may want to rebind =ESC= to always enter normal state instead:
 #+begin_src emacs-lisp
-# + begin_src emacs lisp
 (define-key evil-emacs-state-map [escape] 'evil-normal-state)
-(定义-key evil-emacs-state-map [escape] 'evil-normal-state])
 #+end_src
-# + end_src
 Note that in this case, attempting to rebind =(kbd "ESC")= will not work.
-注意，在这种情况下，尝试重新绑定=(kbd“ESC”)=将不起作用。
 
 If you want to use emacs keybindings instead of the ones that evil makes in insert state, you can change the =evil-insert-state-bindings= variable to your liking or set =evil-disable-insert-state-bindings= to =t= before loading evil (or use customize to set it afterwards). I recommend doing this instead of aliasing or overriding ~evil-insert-state~ to ~evil-emacs-state~ because the result is pretty much the same and evil intentionally does not record repeat information in emacs state.
-如果您想要使用emacs的键绑定而不是evil在insert状态下创建的键绑定，您可以根据自己的喜好更改=evil-insert-state-bindings=变量，或者在加载evil之前将set =evil-disable-insert-state-bindings= to =t=(或者在加载evil之后使用customize来设置它)。我建议这样做，而不是混叠或覆盖~evil-insert-state~到~evil-emacs-state~，因为结果几乎是相同的，并且evil故意不记录emacs状态中的重复信息。
 
 These are the keybindings evil makes in insert state by default:
-以下是evil在insert状态下默认设置的键绑定:
 
 | key       | command                        | emacs default            |
-|键|命令| emacs默认|
 |-----------+--------------------------------+--------------------------|
 | =C-v=     | ~quoted-insert~                | ~scroll-up-command~      |
-| =C-v= | ~引用插入~ | ~滚动命令~ |
 | =C-k=     | ~evil-insert-digraph~          | ~kill-line~              |
-| =C-k= | ~evil-insert-digraph~ | ~kill-line~ |
 | =C-o=     | ~evil-execute-in-normal-state~ | ~open-line~              |
-| =C-o= | ~邪恶执行者在正常状态~ | ~开线~ |
 | =C-r=     | ~evil-paste-from-register~     | ~isearch-backward~       |
-| =C-r= | ~evil-粘贴-from-register~ | ~isearch-back ~ |
 | =C-y=     | ~evil-copy-from-above~         | ~yank~                   |
-| =C-y= | ~从上面邪恶复制~ | ~yank~ |
 | =C-e=     | ~evil-copy-from-below~         | ~move-end-of-line~       |
-| =C-e= | ~从下方邪恶复制~ | ~移动行尾~ |
 | =C-n=     | ~evil-complete-next~           | ~next-line~              |
-| =C-n= | ~evil-complete-next~ | ~next-line~ |
 | =C-p=     | ~evil-complete-previous~       | ~previous-line~          |
-| =C-p= | ~evil-complete- before ~ | ~ before -line~ |
 | =C-x C-n= | ~evil-complete-next-line~      | ~set-goal-column~        |
-| =C-x C-n= | ~evil-complete-next-line~ | ~set-goal-column~ |
 | =C-x C-p= | ~evil-complete-previous-line~  | ~mark-page~              |
-| =C-x C-p= | ~evil-complete- before -line~ | ~mark-page~ |
 | =C-t=     | ~evil-shift-right-line~        | ~transpose-chars~        |
-| =C-t= | ~右移右移~ | ~转座标~ |
 | =C-d=     | ~evil-shift-left-line~         | ~delete-char~            |
-| =C-d= | ~换档-左行~ | ~删除-char~ |
 | =C-a=     | ~evil-paste-last-insertion~    | ~move-beginning-of-line~ |
-| =C-a= | ~粘贴最后一次插入~ | ~移动行开始~ |
 | =C-w=     | ~evil-delete-backward-word~    | ~kill-region~            |
-| =C-w= | ~evil-delete-back -word~ | ~kill-region~ |
 |           | or ~evil-window-map~           |                          |
-| |或~evil-window-map~ | |
 |           | (see =evil-want-C-w-delete=)   |                          |
-| |(参见=evil-want-C-w-delete=) | |
 
 In =evil-insert-state-bindings=, evil also replaces ~delete-backward-char~ with ~evil-delete-backward-char-and-join~ and binds =<mouse-2>= to ~mouse-yank-primary~ (same as the default). Regardless of the value of =evil-insert-state-bindings= or =evil-disable-insert-state-bindings=, evil will bind the following in insert state:
-在=evil-insert-state-bindings=中，evil还使用~evil-delete-back -char~替换~delete-back -char- join~，并绑定=<mouse-2>= to ~mouse- pull -primary~(与默认值相同)。不管=evil-insert-state-bindings=或=evil-disable-insert-state-bindings=的值是多少，evil都会在insert状态下绑定以下内容:
 
 | key               | command                        | emacs default         |
-|键|命令| emacs默认|
 |-------------------+--------------------------------+-----------------------|
 | =<delete>=        | ~delete-char~                  | ~delete-forward-char~ |
-| =<删除>= | ~delete-char~ | ~delete-forward-char~ |
 | =<escape>=        | ~evil-normal-state~            | acts like meta/alt    |
-| =<escape>= | ~evil-normal-state~ |作用类似于meta/alt |
 | =evil-toggle-key= | ~evil-execute-in-normal-state~ | depends               |
-| =evil- togger -key= | ~evil- executer -in-normal-state~ |取决于|
 
 If you don't like these, you can always unbind or rebind them. =evil-toggle-key= defaults to =C-z= (bound to ~suspend-frame~ by default).
-如果您不喜欢这些，您可以随时取消绑定或重新绑定它们。=evil- togger -key= default to =C-z=(默认绑定到~suspend-frame~)
 
 *** Using Emacs Keybindings in Normal State
-***在正常状态下使用Emacs键绑定
 For modes that still involve editing text but add extra keybindings, you don't always have to rely on a package to make keybindings for you in normal state or rebind everything yourself. =C-c= is used as a mode-specific prefix in emacs, and if you are okay with the keys under it for a mode, you can simply change the prefix to something else in normal state. While this won't always cover all the keybindings made by a mode (e.g. org-mode), it can be helpful.
-对于仍然需要编辑文本但添加了额外的键绑定的模式，您不必总是依赖于一个包来在正常状态下为您生成键绑定，或者自己重新绑定所有内容。=C-c=在emacs中用作特定于模式的前缀，如果您对模式下的键没有问题，您可以简单地将前缀更改为正常状态下的其他内容。虽然这并不总是覆盖由模式(例如org-mode)生成的所有键绑定，但它是有帮助的。
 
 For example, using [[https://github.com/noctuid/general.el#simulating-keypresses][~general-simulate-key~ or ~general-key~]]:
-例如，使用[[https://github.com/noctuid/general.el#simulating-keypress][~general- simulatekey ~ or ~general-key~]]:
 #+begin_src emacs-lisp
-# + begin_src emacs lisp
 (define-key evil-normal-state-map (kbd "SPC") (general-simulate-key "C-c"))
-(定义键evil-normal-state-map (kbd“SPC”)(通用模拟键“C-c”)
 ;; act as whatever C-n is currently bound to in emacs state (eg. `next-line' or
-;;充当emacs状态下当前绑定的任何C-n(例如。下一行或
 ;; `dired-next-line')
-;;“dired-next-line”)
 (define-key evil-normal-state-map (kbd "j") (general-key "C-n" :state 'emacs))
-(定义键evil-normal-state-map (kbd“j”)(通用键“C-n”:state’emacs)
 #+end_src
-# + end_src
 
 With the above configuration, you could, for example, press =SPC C-e= in normal state in org mode to bring up the export dispatcher. Emacs allows you to bind keys to keymaps, so the following is also possible:
-使用上述配置，您可以，例如，在org模式下按=SPC C-e=处于正常状态，以打开导出调度程序。Emacs允许您将密钥绑定到密钥映射，因此也可以执行以下操作:
 #+begin_src emacs-lisp
-# + begin_src emacs lisp
 (define-key evil-normal-state-map (kbd "SPC h") help-map)
-(定义键邪恶-正常状态地图(kbd“SPC h”)帮助地图)
 (define-key evil-normal-state-map (kbd "SPC x") ctl-x-map)
-(定义键邪恶-正常状态地图(kbd“SPC x”)ctl-x地图)
 #+end_src
-# + end_src
 
 There are other ways to simulate keys of course, but the way listed here is well-suited for keybindings. This method allows prefix arguments to work properly for the command that ends up running, whereas a keyboard macro would eat the prefix argument. I personally also prefer this method to the key translation methods mentioned [[https://www.emacswiki.org/emacs/Evil#toc13][here]].
-当然，还有其他方法可以模拟键，但是这里列出的方法非常适合于键绑定。这个方法允许前缀参数为最终运行的命令正常工作，而键盘宏会吃掉前缀参数。我个人也更喜欢这个方法比关键的翻译方法提到[[https://www.emacswiki.org/emacs/Evil#toc13][这里]]。
 
 ** Use Evil Everywhere
-到处使用邪恶
 *** Make Evil Normal State the Initial State Always
-***使邪恶的正常状态总是初始状态
 You can use the following configuration to have all modes start in normal state:
-您可以使用以下配置，使所有模式启动在正常状态:
 #+begin_src emacs-lisp
-# + begin_src emacs lisp
-(setq evil-emacs-state-modes nil)
 (setq evil-emacs-state-modes nil)
 (setq evil-insert-state-modes nil)
-(setq evil-insert-state-modes nil)
-(setq evil-motion-state-modes nil)
 (setq evil-motion-state-modes nil)
 #+end_src
-# + end_src
 
 Since =evil-default-state= defaults to =normal=, you can simply clear the other mode lists. If you want to be more explicit, you can do this before clearing them.
-由于=evil-default-state= default to =normal=，您可以简单地清除其他模式列表。如果您想更明确，您可以在清除它们之前这样做。
 #+begin_src emacs-lisp
-# + begin_src emacs lisp
 (setq evil-normal-state-modes
-(setq evil-normal-state-modes
-(append evil-emacs-state-modes
-(附加evil-emacs-state-modes
-evil-insert-state-modes
-evil-insert-state-modes
-evil-normal-state-modes
-evil-normal-state-modes
-evil-motion-state-modes))
-evil-motion-state-modes))
+      (append evil-emacs-state-modes
+              evil-insert-state-modes
+              evil-normal-state-modes
+              evil-motion-state-modes))
 #+end_src
-# + end_src
 
 If you'd rather have REPLs start in insert state, you may want to keep =evil-insert-state-modes= as it is.
-如果您希望让REPLs以插入状态启动，您可能希望保持=evil-insert-state-modes=原样。
 
 Later if you want to change the state a mode starts in, you should use ~evil-set-initial-state~ as it will automatically remove the mode from any other state list.
-稍后，如果您想要更改模式开始时的状态，您应该使用~evil-set-initial-state~，因为它将自动从任何其他状态列表中删除模式。
 
 *** Undo/Prevent Overriding/Intercept Maps
-***撤销/阻止覆盖/拦截映射
 As a disclaimer, overriding keymaps will not interfere with keys [defined in intercept keymaps], and the default =evil-intercept-maps= (which contains =edebug-mode-map= at the time of writing) is something you might want to leave as is. If you just never want emacs keys overriding any evil keys (e.g. there are some keys that you don't want the same everywhere but don't want overridden by emacs keys either, you want to make all your keybindings for used modes, or you are using [[evil-collection][evil-collection]] which already provides evil keybindings for used modes), the following information may be useful.
-作为免责声明，覆盖密钥映射不会干扰密钥[在intercept keymaps中定义]，您可能希望保留缺省的=evil-intercept-maps=(在编写本文时包含=edebug-mode-map=)。如果你不希望emacs键覆盖任何邪恶的键(例如有一些钥匙你不想到处都相同,但不希望被emacs的钥匙,你想让所有的快捷键的使用模式,或您使用[[evil-collection] [evil-collection]]邪恶已经提供了快捷键的使用模式),以下信息可能是有用的。
 
 Undoing an override or intercept involves unbinding either =[override-state]= or =[intercept-state]= like so:
-撤销覆盖或拦截需要取消绑定=[override-state]=或=[intercept-state]=这样:
 #+begin_src emacs-lisp
-# + begin_src emacs lisp
 (define-key keymap [override-state] nil)
-(定义-key keymap [override-state] nil)
 (define-key keymap [intercept-state] nil)
-(定义-key keymap[截取状态]nil)
 #+end_src
-# + end_src
 
 As an example, to undo evil's default overriding of =Info-mode-map=:
-例如，撤消evil的默认覆盖=Info-mode-map=:
 #+begin_src emacs-lisp
-# + begin_src emacs lisp
 (define-key Info-mode-map [override-state] nil)
-(定义键信息模式映射[override-state] nil)
 #+end_src
-# + end_src
 
 Instead of specifically undoing all the overrides that evil makes, you may want to instead prevent evil from ever overriding anything using a more generic method. Evil provides variables containing keymaps to elevate. They must be set to nil /before/ evil is loaded:
-您可能想要阻止evil使用更通用的方法覆盖任何内容，而不是具体地取消evil所做的所有覆盖。Evil提供了包含提升键映射的变量。它们必须被设置为nil /在/ evil被加载之前:
 #+begin_src emacs-lisp
-# + begin_src emacs lisp
 (setq evil-overriding-maps nil
-(setq evil-overriding-maps零
-evil-intercept-maps nil)
-evil-intercept-maps nil)
+      evil-intercept-maps nil)
 ;; ...
 (require 'evil)
-(需要的邪恶)
 #+end_src
-# + end_src
 
 If you don't want anything to be overriden, this is not enough. In =evil-integration.el=, ~evil-make-overriding-map~ is used for dired and ibuffer. If you want to prevent =evil-integration.el= from being loaded, you can set =evil-want-integration= to nil /before/ loading evil. If you use [[evil-collection][evil-collection]], which provides the useful functionality from =evil-integration.el= without creating overriding keymaps, you should set this variable to nil.
-如果你不希望任何东西被滥用，这是不够的。在= evil-integration。el=， ~evil-make-overriding-map~用于dired和ibuffer。如果你想防止=邪恶整合。el=加载后，可以将=evil-want-integration=设置为nil /before/ loading evil。如果您使用[[evil-collection][evil-collection]]，它提供了来自=evil-integration的有用功能。在不创建覆盖键映射的情况下，应该将该变量设置为nil。
 
 If you really want to prevent overriding maps from ever being created (e.g. some other evil package could do it), you can advise ~evil-overiding-map~ to prevent it from ever doing anything:
-如果你真的想防止覆盖地图被创建(例如，一些其他邪恶的包可以做这件事)，你可以建议~邪恶-覆盖地图~来阻止它做任何事情:
 #+begin_src emacs-lisp
-# + begin_src emacs lisp
 (advice-add 'evil-make-overriding-map :override #'ignore)
-(建议添加“邪恶-使-覆盖-地图:覆盖#”忽略)
 #+end_src
-# + end_src
 
 You can always remove this advice later:
-你可以随时删除这个建议:
 #+begin_src emacs-lisp
-# + begin_src emacs lisp
 (advice-remove 'evil-make-overriding-map #'ignore)
-(advice-remove evil-make-overriding-map #忽略)
 #+end_src
-# + end_src
 
 *** Modal Minibuffer
-* * *会显示模态
 Normal state does /kind of/ work in the minibuffer if you bind a key to ~evil-normal-state~. Evil collection  For the ex command line specifically, it's worth noting that evil provides =q:=.
-如果将键绑定到~非正常状态~，则正常状态在minibuffer中起作用。具体来说，值得一提的是Evil提供了=q:=。
 
 Missing using normal mode with Unite, I wrote
-我在Unite中没有使用普通模式，我写道
 [[https://noctuid.github.io/blog/2015/02/03/a-more-evil-helm/][a blog post]] a while back with the idea of using a hydra to implement modality for helm. Since then, people have created improved versions of my hydra [[https://github.com/abo-abo/hydra/wiki/Helm][for helm]], and ivy has such a hydra builtin.
-[[https://noctuid.github。io/blog/2015/02/03/a-more-evil-helm/ [a blog post]]前段时间提出利用hydra实现helm的方式。从那以后，人们创造了我的hydra的改进版本[[https://github.com/abo-abo/肼/wiki/helm][用于helm]]，而ivy就有这样一个hydra。
 
 *** Example: Integration with Pdf Tools
-例子:与Pdf工具的集成
 Configuring a package for evil is not all that different from configuring a package for vanilla emacs. Often the main difference is that you'll be using ~evil-define-key~ instead of ~define-key~ to change keybindings. You start off by reading the documentation for the package to learn how it works and what keybindings it provides.
-为evil配置一个包与为普通的emacs配置一个包并没有什么不同。通常，主要的区别是您将使用~evil-define-key~而不是~define-key~来更改键绑定。首先阅读包的文档，了解它是如何工作的，以及它提供了哪些键绑定。
 
 Pdf-tools has a [[https://github.com/politza/pdf-tools#some-keybindings][section in the readme]] that lists its keybindings. If you are happy with them, you could simply let pdf-tool's keymap override normal state (excluding your "special" non-overridable keys). The readme doesn't tell you the mode's keymap name specifically, but it is not hard to figure out. After setting up the basics for pdf-tools, you can open a pdf and evaluate =major-mode= to find out that you are in =pdf-view-mode=. You can get a lot more information with =C-h m= (~describe-mode~). Mode's keymaps generally match their mode's name, and in this case the main keymap is =pdf-view-mode-map=.
-Pdf-tools有一个[[https://github.com/politza/pdf-tools#some-keybindings][readme中的部分]]，其中列出了它的键绑定。如果您对它们满意，您可以简单地让pdf-tool的keymap覆盖正常状态(不包括您的“特殊”不可覆盖的键)。readme并没有明确告诉您模式的键映射名，但是这并不难理解。在设置了pdf-tools的基础之后，您可以打开一个pdf并计算=major-mode=，以发现您处于=pdf-view-mode=中。使用=C-h m=(~描述模式~)可以获得更多信息。模式的键映射通常与其模式名匹配，在本例中，主键映射是=pdf-view-mode-map=。
 #+begin_src emacs-lisp
-# + begin_src emacs lisp
 (evil-make-overriding-map pdf-view-mode-map 'normal)
-(evil-make-overriding-map pdf-view-mode-map“正常)
 #+end_src
-# + end_src
 Alternatively, you can find out what keymaps pdf-tools provides by typing =pdf map= after running ~helm-apropos~.
-或者，您也可以通过键入=pdf map=运行~helm-apropos~后找到keymaps pdf-tools提供的内容。
 
 Pdf-tools has some other modes, the other main one being the outline mode (=pdf-outline-buffer-mode-map=). For packages that have 2+ main modes for different contexts, you can just repeat this process as necessary and be done with things if you are content with the default keybindings.
-Pdf-tools有一些其他模式，其他主要模式是outline模式(=pdf-out -buffer-mode-map=)。对于具有2+主要模式的包，可以根据需要重复这个过程，如果满足于默认的键绑定，就可以完成这些工作。
 
 If you're like me though, you'll prefer to use vim-like keybindings everywhere. You can either change a few keybindings and use the previous configuration (keys bound with ~evil-define-key~ here won't be overriden) or bind all the keys you use yourself. You can either look at the keys mentioned in the readme and check what they are bound to with =C-h k= or use =C-h m= to look at all the keys bound. Here are some basic =hjkl= keybindings:
-如果您像我一样，那么您将更喜欢在任何地方使用类似于vm的键绑定。您可以更改一些键绑定并使用前面的配置(这里使用~evil-define-key~绑定的键不会被覆盖)，或者绑定您自己使用的所有键。您可以查看readme中提到的键并检查它们与=C-h k=绑定的内容，或者使用=C-h m=查看所有键绑定的内容。下面是一些基本的=hjkl=键绑定:
 #+begin_src emacs-lisp
-# + begin_src emacs lisp
 (evil-define-key 'normal pdf-view-mode-map
-(evil-define-key pdf-view-mode-map正常
-"h" 'pdf-view-previous-page-command
-“h”pdf-view-previous-page-command
-"j" (lambda () (interactive) (pdf-view-next-line-or-next-page 5))
-"j" (lambda()(交互式)(pdf-view-next-line-or-next-page 5)
-"k" (lambda () (interactive) (pdf-view-previous-line-or-previous-page 5))
-“k”(lambda()(交互式)(pdf-view- before -line-or- before -page 5))
-"l" 'pdf-view-next-page-command)
-“l”“pdf-view-next-page-command)
+  "h" 'pdf-view-previous-page-command
+  "j" (lambda () (interactive) (pdf-view-next-line-or-next-page 5))
+  "k" (lambda () (interactive) (pdf-view-previous-line-or-previous-page 5))
+  "l" 'pdf-view-next-page-command)
 #+end_src
-# + end_src
 
 You could even bind things in terms of =general-simulate-keys= without even looking up the keys if you preferred to:
-你甚至可以绑定的东西=通用模拟键=甚至不需要查找键，如果你喜欢:
 #+begin_src emacs-lisp
-# + begin_src emacs lisp
 (general-evil-define-key 'normal pdf-view-mode-map
-(general-evil-define-key pdf-view-mode-map正常
-"h" (general-simulate-keys "p" t)
-“h”(通用模拟键“p”t)
-"j" (general-simulate-keys "C-n" t)
-“j”(通用模拟键“C-n”t)
-"k" (general-simulate-keys "C-p" t)
-“k”(通用模拟键“C-p”t)
-;; alternatively to scroll more
-;;或者滚动更多
-"j" (general-simulate-keys "SPC" t)
-“j”(通用模拟键“SPC”t)
-"k" (general-simulate-keys "DEL" t)
-“k”(通用模拟键“DEL”t)
-"l" (general-simulate-keys "n" t))
-“l”(通用模拟键“n”t)
+  "h" (general-simulate-keys "p" t)
+  "j" (general-simulate-keys "C-n" t)
+  "k" (general-simulate-keys "C-p" t)
+  ;; alternatively to scroll more
+  "j" (general-simulate-keys "SPC" t)
+  "k" (general-simulate-keys "DEL" t)
+  "l" (general-simulate-keys "n" t))
 #+end_src
-# + end_src
 
 We can go further if we want:
-我们可以更进一步，如果我们想:
 #+begin_src emacs-lisp
-# + begin_src emacs lisp
 (evil-define-key 'normal pdf-view-mode-map
-(evil-define-key pdf-view-mode-map正常
-"g" 'pdf-view-first-page
-“g”pdf-view-first-page
-"G" 'pdf-view-last-page
-“G”pdf-view-last-page
-;; alternatively
-;;另外
-"g" 'image-bob
-“g”image-bob
-"G" 'image-eob
-“G”image-eob
-(kbd "C-o") 'pdf-history-backward
-(kbd“切断”)“pdf-history-backward
-(kbd "C-i") 'pdf-history-forward
-(kbd“我”)“pdf-history-forward
-"m" 'pdf-view-position-to-register
-“m”pdf-view-position-to-register
-"'" 'pdf-view-jump-to-register
-““pdf-view-jump-to-register
-"/" 'pdf-occur
-“/”“pdf-occur
-"o" 'pdf-outline
-“o”pdf-outline
-"f" 'pdf-links-action-perform
-“f”pdf-links-action-perform
-"b" 'pdf-view-midnight-minor-mode
-“b”pdf-view-midnight-minor-mode
-...)
+  "g" 'pdf-view-first-page
+  "G" 'pdf-view-last-page
+  ;; alternatively
+  "g" 'image-bob
+  "G" 'image-eob
+  (kbd "C-o") 'pdf-history-backward
+  (kbd "C-i") 'pdf-history-forward
+  "m" 'pdf-view-position-to-register
+  "'" 'pdf-view-jump-to-register
+  "/" 'pdf-occur
+  "o" 'pdf-outline
+  "f" 'pdf-links-action-perform
+  "b" 'pdf-view-midnight-minor-mode
+  ...)
 #+end_src
-# + end_src
 
 Using the tools mentioned in this section, none of this is difficult. It may be time consuming, but I think reading the documentation for a new mode takes the majority of the time when compared to making 10-20 basic keybindings for it.
-使用本节中提到的工具，这一切都不难。这可能很费时间，但我认为阅读新模式的文档要比为它制作10-20个基本的键绑定花费更多的时间。
 
 As a bonus, here are some functions I wrote to make pdf-tools even more vimmy. Want to have =G= double as a way for jumping to a specific page number? No problem:
-另外，下面是我编写的一些函数，它们使pdf工具更适合vimmy。想要使用=G= double作为跳转到特定页码的方法吗?没有问题:
 #+begin_src emacs-lisp
-# + begin_src emacs lisp
 (defun noct:pdf-view-goto-page (count)
-(defun noct: pdf-view-goto-page(计数)
-"Goto page COUNT.
-“Goto页面计数。
+  "Goto page COUNT.
 If COUNT is not supplied, go to the last page."
-如果没有提供计数，请转到最后一页。”
-(interactive "P")
-(互动“P”)
-(if count
-(如果数
-(pdf-view-goto-page count)
-(pdf-view-goto-page计数)
-(pdf-view-last-page)))
-(pdf-view-last-page)))
+  (interactive "P")
+  (if count
+      (pdf-view-goto-page count)
+    (pdf-view-last-page)))
 
 (evil-define-key 'normal pdf-view-mode-map
-(evil-define-key pdf-view-mode-map正常
-"G" 'noct:pdf-view-goto-page)
-“G”noct pdf-view-goto-page):
+  "G" 'noct:pdf-view-goto-page)
 #+end_src
-# + end_src
 
 Want to copy text using vim keys? Pdf-tools displays pdfs using images, but you can open the current page in a text buffer and use vim keys for selection/copying there:
-想要使用vim键复制文本?Pdf-tools使用图像显示pdf文件，但你可以在文本缓冲区中打开当前页面，并使用vim键进行选择/复制:
 #+begin_src emacs-lisp
-# + begin_src emacs lisp
 (defun noct:pdf-view-page-as-text ()
-(defun noct: pdf-view-page-as-text ()
-"Inserts current pdf page into a buffer for keyboard selection."
-将当前pdf页插入到键盘选择的缓冲区中。
-(interactive)
-(互动)
-(pdf-view-mark-whole-page)
-(pdf-view-mark-whole-page)
-(pdf-view-kill-ring-save)
-(pdf-view-kill-ring-save)
-(switch-to-buffer (make-temp-name "pdf-page"))
-(switch-to-buffer (make-temp-name pdf-page))
-(save-excursion
-(save-excursion
-(yank)))
-(拉)))
+  "Inserts current pdf page into a buffer for keyboard selection."
+  (interactive)
+  (pdf-view-mark-whole-page)
+  (pdf-view-kill-ring-save)
+  (switch-to-buffer (make-temp-name "pdf-page"))
+  (save-excursion
+    (yank)))
 
 (evil-define-key 'normal pdf-view-mode-map
-(evil-define-key pdf-view-mode-map正常
-"y" 'noct:pdf-view-page-as-text)
-“y”noct pdf-view-page-as-text):
+  "y" 'noct:pdf-view-page-as-text)
 #+end_src
-# + end_src
 
 Once you're done, you can delete the buffer (~kill-this-buffer~) and continue reading where you left off.
-完成后，可以删除缓冲区(~kill-this-buffer~)并继续从停止的地方读取数据。
 
 ** Command Properties
-* *命令属性
 Evil provides the following functions for customizing how it deals with commands:
-Evil提供了以下功能来定制它处理命令的方式:
 - ~evil-set-command-property~: Set one property of a command
-设置命令的一个属性
 - ~evil-put-command-property~: Alias for ~evil-set-command-property~
-- ~evil-put-command-property~: evil-set-command-property~的别名
 - ~evil-set-command-properties~: Set all the properties of a command
-设置命令的所有属性
 - ~evil-add-command-properties~: Set one or more command properties of a command
-设置一个命令的一个或多个命令属性
 
 Unless you want to remove command properties entirely from a command, you can just use ~evil-add-command-properties~.
-除非您想完全从命令中删除命令属性，否则只需使用~evil-add-command-properties~。
 
 When creating motions, text-objects, and commands, you can set command properties with keywords (e.g. to control whether an operator will move the point or exit visual state; see the =evil/Macros= info node). For example:
-在创建动作、文本对象和命令时，可以使用关键字设置命令属性(例如，控制操作符是移动点还是退出可视状态;参见=evil/Macros= info节点)。例如:
 #+begin_src emacs-lisp
-# + begin_src emacs lisp
 (evil-define-operator some-operator (args)
-(evil-define-operator某些算子(args)
-"Docstring."
-“所以。”
-;; command properties go after the docstring and before the interactive codes
-;;命令属性位于文档字符串之后和交互式代码之前
-:repeat nil
-:重复零
-(interactive "...")
-(互动“…”)
-;; ...
-)
+  "Docstring."
+  ;; command properties go after the docstring and before the interactive codes
+  :repeat nil
+  (interactive "...")
+  ;; ...
+  )
 #+end_src
-# + end_src
 
 Note that operators, commands, motions, and text objects all have default non-nil properties. Not all properties are applicable to all macros (again, see the =Macros= section of the evil info manual).
-注意，操作符、命令、动作和文本对象都有默认的非nil属性。并不是所有的属性都适用于所有的宏(同样，请参阅邪恶信息手册的= macros =部分)。
 
 The default properties for operators are =:repeat t :move-point t keep-visual t :supress-operator t=.
-操作符的默认属性是=:repeat t:move-point t keep-visual t:supress-operator t=。
 
 The default properties for commands are =:repeat t=.
-命令的默认属性是=:repeat t=。
 
 The default properties for motions are =:repeat 'motion :keep-visual t=.
-动作的默认属性是=:repeat 'motion:keep-visual t=。
 
 The default properties for text objects are =:repeat 'motion :extend-selection t :keep-visual t=.
-文本对象的默认属性是=:repeat 'motion:extend-selection t:keep-visual t=。
 
 *** :repeat
-* * *:重复
 The =:repeat= property is used to determine how evil records information for repeating later with ~evil-repeat~. These symbols are the possible values by default:
-属性的作用是:确定恶意记录信息的方式，以便以后使用~evil-repeat~进行重复。这些符号是可能的默认值:
 - =t=: record by keystrokes
-- =t=:击键记录
 - =motion=: record by keystrokes only in insert state
-- =motion=:仅在插入状态下按击键记录
 - =change=: record by changes to the buffer
-- =change=:记录对缓冲区的更改
 - =ignore= or =nil=: don't record the command
-- =ignore= or =nil=:不记录命令
 - =abort=: immediately abort recording
-- =abort=:立即中止记录
 
 There is also =insert-at-point= which has a less common use case. If a command does not have a =:repeat= property, evil will treat it as if the repeat property was =t=. You can also create your own recording functions and use them by setting the repeat property to that function's name. You could also use a custom symbol by adding something like =(my-repeat-type . my-repeat-function)= to =evil-repeat-types=.
-还有=insert-at-point=，它有一个不太常用的用例。如果一个命令没有=:repeat=属性，那么邪恶就会将其视为repeat属性=t=。您还可以创建自己的记录函数，并通过将repeat属性设置为该函数的名称来使用它们。您还可以通过添加=(my-repeat-type)之类的内容来使用自定义符号。my-repeat-function) = = evil-repeat-types =。
 
 Evil also provides some wrappers around ~evil-add-command-properties~ to set the repeat property for a command:
-Evil还提供了一些关于~ Evil -add-command-properties的包装器，用于设置命令的repeat属性:
 - ~evil-declare-repeat~: set to =t=
-- ~evil-declare-repeat~:设置=t=
 - ~evil-declare-not-repeat~: set to =nil=
-- ~evil-declare-not-repeat~:设置为=nil=
 - ~evil-declare-change-repeat~: set to =change=
-- ~宣布错误-更改-重复~:设置=change=
 - ~evil-declare-ignore-repeat~: set to =ignore=
-- ~evil-declare-ignore-repeat~:设置为=ignore=
 - ~evil-delare-abort-repeat~: set to =abort=
-- ~evil- delay -abort-repeat~:设置为=abort=
 
 ~evil-declare-repeat~ and ~evil-declare-not-repeat~ are the most commonly useful ones. You'll use them for configuring whether a command should be repeatable. See the help text and functions in =evil-repeat.el= for more information. For examples of these being used, I'd recommend looking at =evil-integration.el=.
-最常用的是~evil-declare-repeat~和~evil-declare-not-repeat~。您将使用它们来配置一个命令是否应该是可重复的。参见=evil-repeat中的帮助文本和函数。el=获取更多信息。对于正在使用的这些示例，我建议查看=evil-integration.el=。
 
 *** :jump
-* * *:跳
 The =:jump= property takes a boolean value. If a command has a non-nil jump property value, the location prior to running the command will be recorded in the jump list to later be navigated to with =C-o= (~evil-jump-backward~) and =C-i= (~evil-jump-forward~). Commands without this command property will not add a position to the jump list. For example, you could use this to have git-gutter's commands for navigating hunks save the current location before jumping:
-属性接受一个布尔值。如果一个命令有一个非空的跳转属性值，那么运行该命令之前的位置将被记录在跳转列表中，以便以后使用=C-o= (~evil-jump-back ~)和=C-i= (~evil-jump-forward~)来导航。没有此命令属性的命令将不会向跳转列表添加位置。例如，你可以使用这个来让git-gutter的导航块命令在跳跃之前保存当前位置:
 #+begin_src emacs-lisp
-# + begin_src emacs lisp
 (evil-add-command-properties #'git-gutter:next-hunk :jump t)
-下一个目标:跳跃t
 (evil-add-command-properties #'git-gutter:previous-hunk :jump t)
-(evil-add-command-properties #'git-gutter: previong -hunk:jump t)
 #+end_src
-# + end_src
 
 *** :type
-* * *类型:
 The =:type= command property determines how commands, motions, and text objects act with operators (e.g. see ~evil-delete~ as an example of how an operator can be defined to handle different types). The possible values by default are as follows:
-type=命令属性决定命令、动作和文本对象如何与操作符操作(例如，参见~ev -delete~作为如何定义操作符来处理不同类型的示例)。默认可能的值如下:
 - =:line=
-- = = =
 - =:inclusive=
--包括:= = = =
 - =:exclusive=
--:独家= = = =
 - =:block=
-= - =:块
 
 This property is mainly useful for evil text objects and motions, but it can also be used for non-evil commands. For example, if you bound =j= ~next-line~ in operator state and set its type to =:inclusive=, =dj= would no longer delete both lines entirely (~next-line~ has a type of =line= by default). Evil allows adding new types using ~evil-define-type~ (see the =Macros= section of the evil manual for more information).
-此属性主要用于邪恶文本对象和动作，但也可用于非邪恶命令。例如，如果在操作符状态中绑定=j= ~下一行~并将其类型设置为=:inclusive=， =dj=将不再完全删除这两行(~下一行~默认情况下有=line=类型)。Evil允许使用~ Evil -define-type~添加新类型(有关更多信息，请参见Evil手册的=Macros=部分)。
 
 *** :move-point
-* * *:move-point
 The =:move-point= property applies when defining operators and determines whether evil will move the point to the beginning of the operator range before running the operator code. Note that it defaults to =t=.
-在定义运算符时应用=:move-point=属性，并确定evil是否会在运行运算符代码之前将该点移动到运算符范围的开头。注意，它的默认值是=t=。
 
 *** :keep-visual
-* * *:keep-visual
 TODO
-所有
 
 *** :suppress-operator
-* * *:suppress-operator
 Commands with a non-nil =:suppress-operator= property (e.g. ~keyboard-quit~, ~evil-force-normal-state~, and operators) will cause the operator (and repeat recording) to be aborted. For example, if you press =d ESC= or =d C-g=, ~evil-delete~ will quit and not delete anything.
-带有非nil =:suppress-operator=属性的命令(例如~keyboard-quit~、~evil-force-normal-state~和操作符)将导致操作符(和重复记录)中止。例如，如果您按=d ESC=或=d C-g=， ~evil-delete~将退出，不会删除任何内容。
 
 *** :motion
-* * *动议:
 The =:motion= command property is used for operators to automatically use the range given by some motion. This means that the defined operator will not be usable with motions/text objects, so it is generally not useful. For example, this is how =s= / ~evil-substitute~ is defined:
-=:motion=命令属性用于操作符自动使用某个动作给出的范围。这意味着所定义的操作符不能用于动作/文本对象，因此它通常是无用的。例如，=s= / ~代入邪恶的~是这样定义的:
 #+begin_src emacs-lisp
-# + begin_src emacs lisp
 (evil-define-operator evil-substitute (beg end type register)
-(evil-define-operator - evil-substitute)
-"Change a character."
-“改变一个字符”。
-:motion evil-forward-char
-:运动evil-forward-char
-(interactive "<R><x>")
-(互动“< R > < x >”)
-(evil-change beg end type register))
-(恶变乞求端型寄存器)
+  "Change a character."
+  :motion evil-forward-char
+  (interactive "<R><x>")
+  (evil-change beg end type register))
 #+end_src
-# + end_src
 
 *** Declaring a Motion
-宣布一项动议
 As an example, you don't always need use ~evil-define-motion~ to create new motions. If all you want is to do is control the repeating behavior or the behavior in visual state, you can simply change the command properties of a command. To have an emacs command act like a motion, evil provides ~evil-declare-motion~, which will set the =:repeat= property to =motion= and the =:keep-visual= property to =t=. Usually the =:keep-visual= property doesn't matter for emacs commands (they already won't exit visual state). Setting the =repeat= property will cause a command to only be part of a recorded repeat in insert state (for example, after a =C-o=).
-例如，您并不总是需要使用~evil- defined -motion~来创建新动作。如果您只想控制重复行为或可视化状态下的行为，则只需更改命令的命令属性即可。要使emacs命令像动作一样，evil提供了~evil-declare-motion~，它将=:repeat= property设置为=motion=，而=:keep-visual= property设置为=t=。通常，=:keep-visual=属性与emacs命令无关(它们已经不会退出可视状态)。设置=repeat=属性将导致命令在插入状态下只成为记录的repeat的一部分(例如，在a =C-o=之后)。
 
 * Other Evil Tips
-*其他小窍门
 ** State Indicator
-* *状态指示器
 I prefer not to have a state indicator on my mode line and instead to just rely on the color and shape of the cursor to determine what state I'm in. For example:
-我不喜欢在我的模式行上有一个状态指示器，而是仅仅依靠光标的颜色和形状来确定我所处的状态。例如:
 #+begin_src emacs-lisp
-# + begin_src emacs lisp
 (setq evil-mode-line-format nil
-(setq evil-mode-line-format零
-evil-insert-state-cursor '(bar "White")
-evil-insert-state-cursor”(酒吧“白色”)
-evil-visual-state-cursor '(box "#F86155"))
-evil-visual-state-cursor”(框“# F86155”))
+      evil-insert-state-cursor '(bar "White")
+      evil-visual-state-cursor '(box "#F86155"))
 #+end_src
-# + end_src
 
 See the =Settings/The cursor= section of the evil info node for more information.
-有关更多信息，请参见邪恶信息节点的=Settings/ the cursor=部分。
 
 ** User Created States
-**用户创建的状态
 Evil lets you create new states with ~evil-define-state~ (see =Macros/States= under the evil info node). You may never need to use this, and if you're looking for something like [[https://github.com/kana/vim-submode][vim-submode]], I'd highly recommend looking at [[https://github.com/abo-abo/hydra][hydra]] instead.
-Evil允许您使用~ Evil -define-state~创建新的状态(参见Evil info节点下的=Macros/ states =)。您可能永远都不需要使用这个，如果您正在寻找类似[[https://github.com/kana/vim-submode][vim-submode]]的内容，我强烈建议您查看[[https://github.com/abo-abo/hydra][hydra]]。
 
 ** Using Escape to Exit the Minibuffer
-**使用Escape退出Minibuffer
 Escape is used as a prefix key in some parts of emacs, so you need to rebind it to =keyboard-escape-quit= in certain minibuffer-related keymaps for it to always act as expected. You could, for example, use [[https://github.com/emacs-evil/evil-collection/blob/master/evil-collection-minibuffer.el][evil-collection-minibuffer.el]] to do this.
-Escape在emacs的某些部分中用作前缀键，因此您需要将它重新绑定为=keyboard-escape-quit=在某些与minibuffer相关的键映射中，以便它始终按预期的方式工作。例如，您可以使用[[https://github.com/emacs-evil/evil-collection/blob/master/evil-collection-minibuffer.el][evil-collection-minibuffer.el]]来完成此任务。
 
 ** Ex Command Definition
-** Ex命令定义
 You can define your own ex commands using ~evil-ex-define-cmd~. For example, this is how =copy= is defined:
-你可以使用~evil-ex-define-cmd~来定义你自己的ex命令。例如，=copy=是这样定义的:
 #+begin_src emacs-lisp
-# + begin_src emacs lisp
 (evil-ex-define-cmd "co[py]" 'evil-copy)
-(evil-ex-define-cmd“co . py”evil-copy)
 (evil-ex-define-cmd "t" "copy")
-(evil-ex-define-cmd“t”“复制”)
 #+end_src
-# + end_src
 
 You could, for example, use this to get some emacs commands with numbers in them to work from the command line (this won't work with "w3m" because of the write command):
-例如，您可以使用此命令从命令行获得一些包含数字的emacs命令(这在“w3m”中不起作用，因为是write命令):
 #+begin_src emacs-lisp
-# + begin_src emacs lisp
 (evil-ex-define-cmd "mu[4e]" 'mu4e)
-(evil-ex-define-cmd“μ(4 e)”“mu4e)
 #+end_src
-# + end_src
 
 * Autocommand Equivalents (unfinished)
-*自动命令等价物(未完成)
 Here the hooks that are closest to common vim autocommands are listed. This is fairly incomplete, and in many cases there are not direct/exact equivalents, or common use cases of the vim hooks are unnecessary (e.g. you don't need to use hooks in emacs to make keybindings for specific filetypes). See [[https://www.gnu.org/software/emacs/manual/html_node/elisp/Standard-Hooks.html][here]] for the standard hooks that are part of emacs.
-这里列出了最接近通用vim自动命令的挂钩。这是相当不完整的，而且在许多情况下没有直接/确切的对等项，或者vim钩子的公共用例是不必要的(例如，您不需要在emacs中使用钩子为特定的文件类型进行键绑定)。参见[[https://www.gnu.org/software/emacs/manual/html_node/elisp/standardhooks.html][此处]]，了解属于emacs一部分的标准挂钩。
 
 | vim               | emacs                                    |
-| vim | emacs |
 |-------------------+------------------------------------------|
 | =InsertLeave=     | =evil-insert-state-exit-hook=            |
-| =InsertLeave= | =evil-insert-state-exit-hook= |
 | =FileType python= | =python-mode-hook=                       |
-| FileType python = = = | python-mode-hook |
 | =BufReadPost=     | =find-file-hook=                         |
-| =BufReadPost= | =find-file-hook= |
 | =BufWrite(Pre)=   | =before-save-hook= or =write-file-hooks= |
-| =BufWrite(Pre)= | =before-save-hook= or =write-file-hooks= |
 | =BufWritePost=    | =after-save-hook=                        |
-| =BufWritePost= | =after-save-hook= |
 | =FocusGained=     | =focus-in-hook=                          |
-| =FocusGained= | =focus-in-hook= |
 | =FocusLost=       | =focus-out-hook=                         |
-| =FocusLost= | =focus-out-hook= |
 | =VimLeave(Pre)=   | =kill-emacs-hook=                        |
-| =VimLeave(Pre)= | =kill-emacs-hook= |
 
 * Other Emacs Tips
-*其他Emacs提示
 ** Packages/Plugins
-* *包/插件
 Unlike vim, emacs has a standard way to install plugins (=package.el=). This has some upsides such as allowing a package author to specify dependencies. There are also some differences vim users might consider to be downsides. For example, you normally install packages through a package repository such as [[https://melpa.org/#/][MELPA]]. If you want to install a package that is not in a package repository immediately (without having to add it yourself), you can use [[https://github.com/raxod502/straight.el][straight.el]] or [[https://github.com/dimitri/el-get][elget]] or [[https://github.com/quelpa/quelpa][quelpa]] to grab it from the source repository like you would with a vim plugin manager. Quelpa and straight.el are also useful if you want the latest version of a package from MELPA (or with your own recipe). MELPA builds packages daily, but sometimes you may want the latest commit for testing a bug fix. You can, of course, always manually clone a repo and put it in your =load-path=. For comparison, =package.el= and other emacs package managers additionally compile all elisp files and generate autoloads from autoload cookies. I personally use and recommend [[https://github.com/raxod502/straight.el][straight.el]] which can use MELPA's recipes but also allows you to specify your own and is trivial to switch to if you are using [[https://github.com/jwiegley/use-package][use-package]].
-与vim不同，emacs有一个标准的方法来安装插件(=package.el=)。这有一些好处，比如允许包作者指定依赖项。vim用户可能也会考虑一些缺点。例如，您通常通过诸如[[https://melpa.org/#/][MELPA]]这样的包存储库来安装包。如果你想安装一个包不包存储库中的立即(无需添加它自己),您可以使用[[https://github.com/raxod502/straight.el] [straight.el]]或[[https://github.com/dimitri/el-get] [elget]]或[[https://github.com/quelpa/quelpa] [quelpa]]抓住它从源库就像vim插件管理器。Quelpa和直。如果您需要MELPA提供的最新版本的包(或您自己的配方)，el也非常有用。MELPA每天都构建包，但是有时您可能需要最新的提交来测试bug修复。当然，您总是可以手动克隆一个repo并将其放入=load-path=中。相比之下,=包。el=和其他emacs包管理器另外编译所有elisp文件并从autoload cookie生成autoload。我个人使用并推荐[[https://github.com/raxod502/line.el][line.el]]，它可以使用MELPA的食谱，但也允许你指定你自己的食谱，如果你使用[[https://github.com/jwiegley/use-package][use-package]]就很简单了。
 
 For basic functionality, you can use ~package-list-packages~ (or just ~list-packages~) to view and install available packages or just  ~package-install~.
-对于基本功能，您可以使用~package-list-packages~(或者只是~list-packages~)来查看和安装可用的包，或者只是~package-install~。
 
 ** Debugging Your Init File
-调试你的Init文件
 You can start emacs with the =--debug-init= flag when there is some problem in your init to put you in the debugger with a backtrace. You can use [[https://emacs.stackexchange.com/questions/7852/show-line-number-on-error?lq=1][wasamasa's hack]] to have the line number where the error was encountered displayed as well.
-当init中出现问题时，可以使用=——debug-init=标志启动emacs，以便使用回溯跟踪将您置于调试器中。您可以使用[[https://emacs.stackexchange.com/questions/7852/show-linenumber -on-error?]lq=1][wasamasa的hack]]也显示遇到错误的行号。
 
 [[https://github.com/flycheck/flycheck][Flycheck]] can help to prevent some errors. If you don't have flycheck installed, you can also byte-compile your init file to get information about detectable errors and jump to them using ~byte-compile-file~; byte-compiling your init file will also give you other nice information such as telling you when you're using obsolete functions/variables. The emacs manual [[https://www.gnu.org/software/emacs/manual/html_node/emacs/Init-File.html][does not recommend]] using a byte-compiled init file, so you may want to remove the corresponding "elc" file afterwards if you do this.
-[[https://github.com/flycheck/flycheck][Flycheck]]可以帮助防止一些错误。如果你没有安装flycheck，你也可以字节编译你的init文件来获取关于可检测错误的信息，然后使用~字节编译-文件~跳转到它们;字节编译init文件还可以提供其他有用的信息，比如告诉您何时使用过时的函数/变量。emacs手册[[https://www.gnu.org/software/emacs/manual/html_node/emacs/initfile.html][不推荐]]使用字节编译的init文件，因此如果您这样做，可能需要在以后删除相应的“elc”文件。
 
 * FAQ
-*常见问题解答
 ** Is emacs slow to start?
-emacs启动缓慢吗?
 No, people's init files are usually the problem. To test emacs' startup speed, you can start it without loading your init file using ~emacs -Q~. Even with hundreds of packages, the startup time shouldn't be increased very much if you properly defer the loading of your packages when possible.
-不，人们的init文件通常是问题所在。要测试emacs的启动速度，可以使用~emacs -Q~在不加载init文件的情况下启动它。即使有数百个包，如果在可能的情况下适当地延迟包的加载，启动时间也不会增加太多。
 
 Deferring a package from loading often just involves not putting a ~(require 'package)~ in your config. When you install a package through =package.el= (and most alternative package managers), autoloads are automatically generated for functions that have autoload cookies (=;;;###autoload=). This means that if you bind a key to one of these autoloaded commands, the corresponding package will be loaded when you first press that key. Major modes should normally only be loaded when a file of the corresponding type is first loaded. Minor mode activation commands also should be autoloaded. A common way of activating minor modes is by using hooks (e.g. ~(add-hook 'emacs-lisp-mode #'lispy-mode)~).
-延迟一个包的加载通常只是不把~(要求'包)~放在你的配置中。当您通过=package安装一个包时。el=(和大多数可选包管理器)，autoload是为具有autoload cookie (=;;;###autoload=)的函数自动生成的。这意味着，如果您将一个键绑定到这些自动加载的命令之一，那么当您第一次按下该键时，相应的包将被加载。主模式通常只在首次加载相应类型的文件时加载。次要的模式激活命令也应该自动加载。激活次要模式的一种常见方法是使用钩子(例如~(附加钩子'emacs-lisp-mode #'lispy-mode)~)。
 
 Even if your init is not too optimized, you can you can use emacs' server functionality so that you only need to start emacs once. You can start the server either putting ~(server-start)~ in your init file or by using ~emacsclient~ or ~emacs~ (with the =--daemon= flag) to create it. You can connect to a server using ~emacsclient~. I personally use ~emacsclient~ as my EDITOR and have a key bound to ~emacsclient -a "" -c~, which will open a new graphical emacs frame and start the server if it isn't already running. See the ~emacsclient~ manpage and the [[https://www.gnu.org/software/emacs/manual/html_node/emacs/Emacs-Server.html][corresponding emacs manual section]] for more information.
-即使您的init没有经过优化，您也可以使用emacs的服务器功能，这样您只需启动emacs一次。可以在init文件中放入~(server-start)~来启动服务器，也可以使用~emacsclient~或~emacs~(使用=——daemon=标志)来创建它。可以使用~emacsclient~连接到服务器。我个人使用~emacsclient~作为我的编辑器，并有一个键绑定到~emacsclient -a "" -c~，它将打开一个新的图形化emacs框架并启动服务器(如果它还没有运行的话)。有关更多信息，请参见~emacsclient~ manpage和[[https://www.gnu.org/software/emacs/manual/html_node/emacs/Emacs-Server.html][对应的emacs手册部分]]。
 
 For a convenient way to control package loading, see [[https://github.com/jwiegley/use-package][use-package]]. For a way to profile your init file(s), see [[https://github.com/dholm/benchmark-init-el][benchmark-init]] and [[https://github.com/jschaf/esup][esup]].
-有关控制包加载的方便方法，请参见[[https://github.com/jwiegley/use-package][use-package]]。有关配置您的init文件的方法，请参见[[https://github.com/dholm/benchmark- initel][benchmark-init]]和[[https://github.com/jschaf/esup][esup]]。
 
 ** How do I improve emacs' performance?
-**如何提高emacs的性能?
 If you're encountering lag while using emacs, it's likely due to part of your configuration. A common culprit for slowdown is =linum-mode=. =nlinum= is a faster alternative, and emacs now has line numbers builtin which should be preferred (see the =display-line-numbers= variable).
-如果您在使用emacs时遇到延迟，这可能是由于您的部分配置造成的。减速的一个常见原因是=linum-mode=。=nlinum=是一种更快的替代方法，emacs现在内置了行号，这应该是首选的(请参阅=display-line-numbers= variable)。
 
 I've also found that =git-gutter=, for example, can cause major slowdowns in large buffers with a lot of changes. I've heard that =fic-mode= can also cause problems. In really large files, you may need to disable some of your minor modes, switch to fundamental mode, or use [[https://github.com/m00natic/vlfi][vlf]]. If you're having trouble quickly finding the culprit of slowdowns, you should try profiling with ~profiler-start~.
-例如，我还发现=git-gutter=可能会导致大量更改的大型缓冲区发生重大减速。我听说= fici -mode=也会导致问题。在非常大的文件中，您可能需要禁用一些次要模式，切换到基本模式，或者使用[[https://github.com/m00natic/vlfi][vlf]]。如果您在快速查找慢速的罪魁祸首时遇到了困难，那么您应该尝试使用~profiler-start~进行分析。
 
 ** Does emacs have vim-like tabs (distinct window configurations)?
-** emacs是否有类似于vm的选项卡(不同的窗口配置)?
 No, but there are plenty of packages that add this feature. Elscreen is often recommended, but it is limited to 10 tabs/screens, old, and not as good as the alternatives in my opinion. I personally use [[https://github.com/pashinin/workgroups2][workgroups2]]. It probably has the most features compared with alternatives, but it is unmaintained, so I'd probably recommend using [[https://github.com/wasamasa/eyebrowse][eyebrowse]] instead. There are other alternatives listed in the eyebrowse readme as well.
-没有，但是有很多包都添加了这个特性。Elscreen经常被推荐，但是它被限制在10个标签/屏幕上，很旧，而且在我看来不如其他选项好。我个人使用[[https://github.com/pashinin/workgroups2][workgroups2]]。与其他选择相比，它可能拥有最多的功能，但它没有得到维护，因此我可能会建议使用[[https://github.com/wasamasa/eyebrowse][eyebrowse]]。在eyebrowse readme中还列出了其他选项。
 
 ** What's the equivalent of ~nnoremap Y y$~?
-**什么是~nnoremap Y Y $~?
 You can of course bind =Y= to simulate =y$= or redefine the operator, but evil has an option for this builtin. You can set =evil-want-Y-yank-to-eol= to a non-nil value before loading emacs to make this change.
-当然，您可以绑定=Y=来模拟=Y $=或重新定义操作符，但是evil对此构建有一个选项。您可以在加载emacs进行此更改之前将=evil-want-Y-yank-to-eol=设置为非空值。
 
 You might also want to look at the other ~evil-want~ variables in =evil-vars.el= such as =evil-want-change-word-to-end=.
-您可能还需要查看=evil-vars中的其他~evil-want~变量。el= such =evil-want-change-word-to-end=恶意的
 
 ** What's the equivalent of ~nnoremap n nzz~?
-**什么是~nnoremap nzz~?
 You can advise ~evil-search-next~ to have the command =zz= is bound to run afterwards.
-您可以建议~evil-search-next~命令=zz=将在以后运行。
 #+begin_src emacs-lisp
-# + begin_src emacs lisp
 (defun my-center-line (&rest _)
-(defun my-center-line (&rest _))
-(evil-scroll-line-to-center nil))
-(evil-scroll-line-to-center nil))
+  (evil-scroll-line-to-center nil))
 
 (advice-add 'evil-search-next :after #'my-center-line)
-(建议在#'my-center-line之后添加'evil-search-next: 'my-center-line)
 #+end_src
-# + end_src
 
 You could advise several commands at once like this using ~dolist~.
-您可以使用~dolist~同时建议几个命令，就像这样。
 
 ** What's the equivalent of ~inoremap jk <escape>~?
-** inoremap jk <escape>~是什么意思?
 As this is not possible by default with emacs' keybinding system, you have to use one of a few [[https://github.com/noctuid/general.el#mapping-under-non-prefix-keys][workarounds]].
-由于这在emacs的键绑定系统中是不可能的，所以您必须使用几个[[https://github.com/noctuid/general.el#映射-under- unprefix-keys][workarounds]]中的一个。
 
 ** What's the equivalent of ~nnoremap cw ciw~?
-** * nnoremap cw ciw的同义词是什么?
 This is also not possible by default. See the previous link.
-这在默认情况下也是不可能的。请参阅前面的链接。
 
 ** What's the equivalent of vim-unimpaired's =cow=?
-** vim- un' s =cow=什么意思?
 This is also not possible by default. See the previous link.
-这在默认情况下也是不可能的。请参阅前面的链接。
 
 ** How do I copy and paste to/from the clipboard in terminal emacs?
-**如何复制和粘贴到/从终端emacs剪贴板?
 For osx (with pbcopy) and linux (with xclip), you can install =xclip.el= for this functionality. I have this in my configuration to turn it on when I open emacs in a terminal:
-对于osx(使用pbcopy)和linux(使用xclip)，可以安装=xclip。el=用于此功能。我有这个在我的配置打开它时，我在终端的emacs:
 #+begin_src emacs-lisp
-# + begin_src emacs lisp
 (defun noct:conditionally-toggle-xclip-mode ()
-(defun noct: conditionally-toggle-xclip-mode ()
-(if (display-graphic-p)
-(如果(display-graphic-p)
-(if (bound-and-true-p xclip-mode)
-(如果(bound-and-true-p xclip-mode)
-(xclip-mode -1))
-(xclip-mode 1))
-(xclip-mode)))
-(xclip-mode)))
+  (if (display-graphic-p)
+      (if (bound-and-true-p xclip-mode)
+          (xclip-mode -1))
+    (xclip-mode)))
 
 (noct:conditionally-toggle-xclip-mode)
-(noct conditionally-toggle-xclip-mode):
 
 (add-hook 'focus-in-hook
-(add-hook focus-in-hook
-#'noct:conditionally-toggle-xclip-mode)
-# ' noct conditionally-toggle-xclip-mode):
+          #'noct:conditionally-toggle-xclip-mode)
 #+end_src
-# + end_src
 
 If you don't use emacsclient for terminal instances, you don't need to use a hook at all. If you do use emacsclient for both graphical and terminal instances, then this should work in theory if your terminal supports =focus-in-hook= (e.g. st and kitty). That said, even though the mode is correctly toggled for me, it doesn't work in an emacsclient terminal frame unfortunately.
-如果您不为终端实例使用emacsclient，则根本不需要使用钩子。如果您确实为图形化和终端实例使用了emacsclient，那么在理论上，如果您的终端支持=focus-in-hook=(例如st和kitty)，那么这应该是可行的。也就是说，尽管模式为我正确地切换了，但不幸的是，它不能在emacsclient终端帧中工作。
 
 ** Can I have better completion in the ex command line?
-**我可以有更好的完成在前命令行?
 ~ivy-mode~, for example, does work in the ex command line, but it must be manually triggered. Because of how completion in the command line works, there is no way as far as I'm aware to have automatic completion popups. Company does work with =q:=, but by default, the completions it suggests may not be too useful.
-例如，~ivy-mode~在ex命令行中工作，但必须手动触发。由于命令行中的补全是如何工作的，所以据我所知，不可能有自动补全弹出窗口。Company确实使用=q:=，但是默认情况下，它建议的补全可能不是太有用。
 
 ** How do I prevent parentheses becoming unbalanced in my init file?
-**如何防止括号在init文件中失去平衡?
 The simplest way is to install and use a package like [[https://github.com/luxbock/evil-cleverparens][evil-cleverparens]] or [[https://github.com/noctuid/lispyville][lispyville]] that will prevent evil's operators from unbalancing parentheses. Lispyville only remaps evil's operators by default, so you can ignore its other functionality (and lispy too) if you want.
-最简单的方法是安装和使用一个像[[https://github.com/luxbock/evil-cleverparens][evil-cleverparens]]或[[https://github.com/noctuid/lispyville][lispyville]]这样的包，它可以防止evil的操作符不平衡括号。在默认情况下，Lispyville只会重新映射evil的操作符，因此如果需要，您可以忽略它的其他功能(以及lispy)。
 
 ** How can I have relative line numbers?
-**如何获得相对的行号?
 Using builtin line numbers is now the best solution. Here's my configuration that mimics [[https://github.com/myusuf3/numbers.vim][numbers.vim]]:
-使用内建行号是目前最好的解决方案。这是我的配置，模拟[[https://github.com/myusuf3/numbers.vim][numbers.vim]]:
 #+begin_src emacs-lisp
-# + begin_src emacs lisp
 (setq-default display-line-numbers 'visual
-(setq-default display-line-numbers视觉
-display-line-numbers-widen t
-display-line-numbers-widen t
-;; this is the default
-;;这是默认设置
-display-line-numbers-current-absolute t)
-display-line-numbers-current-absolute t)
+              display-line-numbers-widen t
+              ;; this is the default
+              display-line-numbers-current-absolute t)
 
 (defun noct:relative ()
-(defun noct:相对()
-(setq-local display-line-numbers 'visual))
-(setq-local display-line-numbers“视觉)
+  (setq-local display-line-numbers 'visual))
 
 (defun noct:absolute ()
-(defun noct:绝对的()
-(setq-local display-line-numbers t))
-(setq-local display-line-numbers t))
+  (setq-local display-line-numbers t))
 
 (add-hook 'evil-insert-state-entry-hook #'noct:absolute)
-(add-hook evil-insert-state-entry-hook # noct:绝对)
 (add-hook 'evil-insert-state-exit-hook #'noct:relative)
-(add-hook evil-insert-state-exit-hook # noct:相对)
 
 ;; example of customizing colors
-;;定制颜色的例子
 (custom-set-faces '(line-number-current-line ((t :weight bold
-(线号-电流)(t:粗体表示重量)
-:foreground "goldenrod"
-前景:“秋麒麟草”
-:background "slate gray"))))
-背景:“石板灰色”))))
+                                                 :foreground "goldenrod"
+                                                 :background "slate gray"))))
 #+end_src
-# + end_src
 
 ** Does emacs have support for folding?
-** emacs是否支持折叠?
 Yes, evil has integration with various emacs "folding" mechanisms builtin (such as origami, hideshow, and outline-mode/org-mode/markdown-mode; see =evil-fold-list=). Not all of vim's =z= keys will work though.
-是的，evil集成了各种emacs内置的“折叠”机制(比如origami、hideshow、out -mode/org-mode/markdown-mode;见= evil-fold-list =)。不过，并不是所有的vim =z=键都能工作。
 
 For manual creation of folds from selected regions, there are the [[https://github.com/mrkkrp/vimish-fold][vimish-fold]] and [[https://github.com/alexmurray/evil-vimish-fold][evil-vimish-fold]] packages.
-对于从选定区域手动创建折叠，有[[https://github.com/mrkkrp/vimish-fold][vimish-fold]]和[[https://github.com/alexmurray/evil-vimish-fold][evil-vimish-fold]]包。
 
 ** Why don't keys defined with ~evil-define-key~ work (immediately)?
-**为什么键不定义~邪恶定义-键~工作(立即)?
 This has been a known problem for a while (see [[https://github.com/emacs-evil/evil/issues/130][issue 130]] and especially [[https://github.com/emacs-evil/evil/issues/301][issue 301]], which explains some of the issues with ~evil-define-key~). This doesn't happen for most modes, but when it does happen, it's annoying.
-这是一个众所周知的问题有一段时间了(见[[https://github.com/emacs-evil/evil/issues/130][issue 130]]，特别是[[https://github.com/emacs-evil/evil/issues/301][issue 301]]，它解释了~evil-define-key~的一些问题)。这在大多数模式下都不会发生，但当它发生时，就很烦人了。
 
 There are several possible workarounds. You can use the mode's hook to either bind the keys locally with ~evil-local-set-key~ as shown in the [Buffer Local Keybindings] section. A more direct solution would be to continue to use ~evil-define-key~ and to use the hook to call ~evil-normalize-keymaps~:
-有几种可能的变通方法。您可以使用模式的钩子将键与~ev - Local -set-key~绑定到本地，如[Buffer Local Keybindings]一节所示。一个更直接的解决方案是继续使用~evil-define-key~并使用钩子来调用~evil-normalize-keymaps~:
 #+begin_src emacs-lisp
-# + begin_src emacs lisp
 (add-hook 'org-src-mode-hook #'evil-normalize-keymaps)
-(add-hook org-src-mode-hook # evil-normalize-keymaps)
 #+end_src
-# + end_src
 
 The other way would be to use ~evil-define-minor-mode-key~ which was introduced specifically as a result of this issue:
-另一种方法是使用~evil-define-minor-mode-key~，它是由这个问题特别引入的:
 #+begin_src emacs-lisp
-# + begin_src emacs lisp
 (evil-define-minor-mode-key 'normal 'org-src-mode
-(evil-define-minor-mode-key org-src-mode“正常”
-(kbd "SPC '") 'org-edit-src-exit)
-你”org-edit-src-exit)
+  (kbd "SPC '") 'org-edit-src-exit)
 
 ;; `evil-define-key' with a quoted symbol instead of a keymap works the same
-;;' evil-define-key'使用引号而不是键映射，其工作原理是一样的
 (evil-define-key 'normal 'org-src-mode
-(evil-define-key org-src-mode“正常”
-(kbd "SPC '") 'org-edit-src-exit)
-你”org-edit-src-exit)
+  (kbd "SPC '") 'org-edit-src-exit)
 #+end_src
-# + end_src
 
 * Plan to Add
-*计划增加
 - Add a section on configuring undo (e.g. =evil-want-fine-undo=, =evil-with-undo=, =evil-with-single-undo=, etc.)
--添加一个关于配置undo的章节(例如=evil-want-fine-undo=， =evil-with-undo=， =evil-with-single-undo=，等等)
 - Add section explaining evil interactive codes
--增加解释邪恶的互动代码
 - Explain all command properties
--解释所有命令属性
 - Add section on evil's supported/missing functionality (e.g. numerical prefixes before operators aren't repeated and =:put=, =:next=, =:rewind=, etc. are missing)
--增加了evil的支持/缺失功能(例如，在不重复操作符前的数字前缀和=:put=， =:next=， =:rewind=，等等)
 - Mention =evil-ex-map=
-——提到= evil-ex-map =
 - Mention =evil-without-repeat=
-——提到= evil-without-repeat =
