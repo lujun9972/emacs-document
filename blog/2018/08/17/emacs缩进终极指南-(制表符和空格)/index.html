@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Emacs缩进终极指南 (制表符和空格) - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="emacs-common" />
+  <!-- <link rel="stylesheet" href="../../../../../media/css/main.css" type="text/css"/>
+       <link rel="stylesheet" href="../../../../../media/css/comment.css" type="text/css"/> -->
+  <link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/kognise/water.css@latest/dist/dark.css'>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="../../../../../">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <ul class="trigger">
+        <li><a href="../../../../../years/">Years</a></li>
+        <li><a href="../../../../../authors/">Authors</a></li>
+        <li><a href="../../../../../tags/">Tags</a></li>
+        <li><a href="../../../../../about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="../../../../../rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="https://www.bing.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">Emacs缩进终极指南 (制表符和空格)</h1>
+<div id="table-of-contents">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#tldr-the-full-configuration">完整配置:</a></li>
+<li><a href="#breaking-it-down">分解</a>
+<ul>
+<li><a href="#functions-for-enablingdisabling-tabs">启用/禁用tab的函数</a></li>
+<li><a href="#using-tabs-or-spaces-in-different-files">为不同的文件中分别设置使用制表符或空格</a></li>
+<li><a href="#changing-the-tab-width">更改制表符的宽度</a></li>
+<li><a href="#making-indentation-behave-sanely-electric-indent">明智的缩进行为(自动缩进)</a></li>
+<li><a href="#indent-a-selection-left-or-right">向左或向右缩进所选内容</a></li>
+<li><a href="#highlighting-tabs-and-spaces-differently">以不同的方式突出显示制表符和空格</a></li>
+<li><a href="#making-backspace-properly-delete-tabs">使退格正确删除制表符</a></li>
+<li><a href="#smarttabs-bonus">SmartTabs (福利)</a></li>
+<li><a href="#python-tabs-support">Python 制表符支持</a></li>
+<li><a href="#final-notes">最后结语</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+
+<div class="figure">
+<p><img src="https://dougie.io/static/img/blog/tabs-in-emacs/screenshot.png" alt="screenshot.png" />
+</p>
+</div>
+
+<div id="outline-container-org173ebc0" class="outline-2">
+<h2 id="tldr-the-full-configuration"><a id="org173ebc0"></a>完整配置:</h2>
+<div class="outline-text-2" id="text-tldr-the-full-configuration">
+<p>
+这个配置是为喜欢制表符多过空格的用户设计的。 要了解如何以不同的方式自定义制表符和空格的行为，请参阅分解部分。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp"><span style="font-weight: bold; font-style: italic;">; </span><span style="font-weight: bold; font-style: italic;">START TABS CONFIG</span>
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Create a variable for our preferred tab width</span>
+(<span style="font-weight: bold;">setq</span> custom-tab-width 2)
+
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Two callable functions for enabling/disabling tabs in Emacs</span>
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">disable-tabs</span> () (<span style="font-weight: bold;">setq</span> indent-tabs-mode nil))
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">enable-tabs</span> ()
+  (local-set-key (kbd <span style="font-style: italic;">"TAB"</span>) 'tab-to-tab-stop)
+  (<span style="font-weight: bold;">setq</span> indent-tabs-mode t)
+  (<span style="font-weight: bold;">setq</span> tab-width custom-tab-width))
+
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Hooks to Enable Tabs</span>
+(add-hook 'prog-mode-hook 'enable-tabs)
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Hooks to Disable Tabs</span>
+(add-hook 'lisp-mode-hook 'disable-tabs)
+(add-hook 'emacs-lisp-mode-hook 'disable-tabs)
+
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Language-Specific Tweaks</span>
+(<span style="font-weight: bold;">setq-default</span> python-indent-offset custom-tab-width) <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Python</span>
+(<span style="font-weight: bold;">setq-default</span> js-indent-level custom-tab-width) <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Javascript</span>
+
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Making electric-indent behave sanely</span>
+(<span style="font-weight: bold;">setq-default</span> electric-indent-inhibit t)
+
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Make the backspace properly erase the tab instead of</span>
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">removing 1 space at a time.</span>
+(<span style="font-weight: bold;">setq</span> backward-delete-char-untabify-method 'hungry)
+
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">(OPTIONAL) Shift width for evil-mode users</span>
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">For the vim-like motions of "&gt;&gt;" and "&lt;&lt;".</span>
+(<span style="font-weight: bold;">setq-default</span> evil-shift-width custom-tab-width)
+
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">WARNING: This will change your life</span>
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">(OPTIONAL) Visualize tabs as a pipe character - "|"</span>
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">This will also show trailing characters as they are useful to spot.</span>
+(<span style="font-weight: bold;">setq</span> whitespace-style '(face tabs tab-mark trailing))
+(custom-set-faces
+ '(whitespace-tab ((t (<span style="font-weight: bold;">:foreground</span> <span style="font-style: italic;">"#636363"</span>)))))
+(<span style="font-weight: bold;">setq</span> whitespace-display-mappings
+      '((tab-mark 9 [124 9] [92 9]))) <span style="font-weight: bold; font-style: italic;">; </span><span style="font-weight: bold; font-style: italic;">124 is the ascii ID for '|'</span>
+(global-whitespace-mode) <span style="font-weight: bold; font-style: italic;">; </span><span style="font-weight: bold; font-style: italic;">Enable whitespace mode everywhere</span>
+<span style="font-weight: bold; font-style: italic;">; </span><span style="font-weight: bold; font-style: italic;">END TABS CONFIG</span>
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org3fa67c5" class="outline-2">
+<h2 id="breaking-it-down"><a id="org3fa67c5"></a>分解</h2>
+<div class="outline-text-2" id="text-breaking-it-down">
+</div>
+
+<div id="outline-container-org8f28a4d" class="outline-3">
+<h3 id="functions-for-enablingdisabling-tabs"><a id="org8f28a4d"></a>启用/禁用tab的函数</h3>
+<div class="outline-text-3" id="text-functions-for-enablingdisabling-tabs">
+<div class="org-src-container">
+<pre class="src src-emacs-lisp"><span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Our Custom Variable</span>
+(<span style="font-weight: bold;">setq</span> custom-tab-width 2)
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">disable-tabs</span> () (<span style="font-weight: bold;">setq</span> indent-tabs-mode nil))
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">enable-tabs</span> ()
+  (local-set-key (kbd <span style="font-style: italic;">"TAB"</span>) 'tab-to-tab-stop)
+  (<span style="font-weight: bold;">setq</span> indent-tabs-mode t)
+  (<span style="font-weight: bold;">setq</span> tab-width custom-tab-width))
+</pre>
+</div>
+
+<p>
+这是两个不同的函数，我们可以很容易地在自定义钩子中调用它们。如果你想动态激活这些函数，那么通过 <code>M-x</code> 来激活(您需要添加Emacs Lisp中的 <code>(interactive)</code> 函数)。<a href="https://www.gnu.org/software/emacs/manual/html_node/elisp/Interactive-Examples.html">这是相关文档</a>。
+</p>
+
+<p>
+<code>enable-tabs</code> 函数中要做的第一件事是将TAB键设置为 <code>tab-to-tab-stop</code>. 在我看来，这比默认值更合理。当您按tab键时，它将按预期的方式缩进一个tab,而不会出现什么神奇的或混乱的情况。
+</p>
+
+<p>
+之后我们启用 <a href="https://www.gnu.org/software/emacs/manual/html_node/eintr/Indent-Tabs-Mode.html">indent-tabs-mode</a> 同时设置自定义 <a href="https://www.gnu.org/software/emacs/manual/html_node/efaq/Changing-the-length-of-a-Tab.html">tab宽度</a>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org2123888" class="outline-3">
+<h3 id="using-tabs-or-spaces-in-different-files"><a id="org2123888"></a>为不同的文件中分别设置使用制表符或空格</h3>
+<div class="outline-text-3" id="text-using-tabs-or-spaces-in-different-files">
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(add-hook 'prog-mode-hook 'enable-tabs)
+
+(add-hook 'lisp-mode-hook 'disable-tabs)
+(add-hook 'emacs-lisp-mode-hook 'disable-tabs)
+</pre>
+</div>
+
+<p>
+我们创建了 <a href="#functions-for-enablingdisabling-tabs">这些钩子函数之后</a>, 再决定在哪类文件/模式中启用制表符/空格就很简单了.
+</p>
+
+<p>
+本例中, 我们为 <a href="https://www.emacswiki.org/emacs/ProgMode">prog-mode</a> 启用制表符. 如果您想为几乎所有代码类的文件进行设置，那么prog-mode是一个不错的挂钩。
+</p>
+
+<p>
+然后，在Lisp和ELisp文件中禁用制表符(使用空格)。Lisp是一种特殊的编程语言，它不能很好地与制表符配合使用，因此我强烈建议使用空格。
+为什么会这样呢?因为缩进的概念在Lisp中并不存在。它只要求对齐的，而制表符会破坏Lisp所要求的精确对齐。
+</p>
+</div>
+</div>
+
+<div id="outline-container-org0f9704f" class="outline-3">
+<h3 id="changing-the-tab-width"><a id="org0f9704f"></a>更改制表符的宽度</h3>
+<div class="outline-text-3" id="text-changing-the-tab-width">
+<div class="org-src-container">
+<pre class="src src-emacs-lisp"><span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Our Custom Variable</span>
+(<span style="font-weight: bold;">setq</span> custom-tab-width 2)
+
+(<span style="font-weight: bold;">setq-default</span> python-indent-offset custom-tab-width)
+(<span style="font-weight: bold;">setq-default</span> evil-shift-width custom-tab-width)
+</pre>
+</div>
+
+<p>
+记住不要定义变量 <code>custom-tab-width</code> 两次!它应该在启用/禁用制表符函数之前定义。我将它包含在这个代码片段中，只是为了进行说明。
+</p>
+
+<p>
+在本例中，我们将制表符宽度设置为自定义的变量。第一行使用基础的 <code>tab-width</code> 属性。我建议不要像上面描述的那样设置tab-width，而是将它放在一个函数中，并通过hook调用。 <a href="#functions-for-enablingdisabling-tabs">这样做的细节可以看这里</a>.
+</p>
+
+<p>
+接下来，我们将Python缩进大小设置为自定义的制表符宽度变量。其默认符合<a href="https://www.python.org/dev/peps/pep-0008/">pep8</a>标准，为4个空格，但如果您喜欢有自己的默认值，可以通过该变量来更改它。
+</p>
+
+<p>
+最后，我们将 evil-shift-width 设置为自定义的制表符宽度变量。这只有在您使用 Evil 包来获得类似于vm的键绑定而不是使用光荣的Emacs键绑定时才有用。当使用 <code>&gt;&gt;</code> 或 <code>&lt;&lt;</code> 缩进或取消缩进文本时， <code>evil-shift-width</code> 控制制表符宽度大小。
+</p>
+</div>
+</div>
+
+<div id="outline-container-org5502607" class="outline-3">
+<h3 id="making-indentation-behave-sanely-electric-indent"><a id="org5502607"></a>明智的缩进行为(自动缩进)</h3>
+<div class="outline-text-3" id="text-making-indentation-behave-sanely-electric-indent">
+<p>
+让我抓狂的是，当我按下回车键时，Emacs的 electric-indent 会对前一行进行缩进。幸运的是，有一天我找到了一个解决方案。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">setq-default</span> electric-indent-inhibit t)
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgee8c032" class="outline-3">
+<h3 id="indent-a-selection-left-or-right"><a id="orgee8c032"></a>向左或向右缩进所选内容</h3>
+<div class="outline-text-3" id="text-indent-a-selection-left-or-right">
+<p>
+To accomplish this, refer to my guide.
+要做到这一点，请参考我的 <a href="https://dougie.io/emacs/indent-selection">如何缩进Emacs中的选择内容</a>。
+</p>
+</div>
+</div>
+
+<div id="outline-container-org2e1407f" class="outline-3">
+<h3 id="highlighting-tabs-and-spaces-differently"><a id="org2e1407f"></a>以不同的方式突出显示制表符和空格</h3>
+<div class="outline-text-3" id="text-highlighting-tabs-and-spaces-differently">
+<p>
+我觉得在编辑器中有一种很重要的东西，那就是一种很容易识别空格和制表符的方法。它们都是空格字符，很容易混淆。
+</p>
+
+<p>
+我们将通过以“|”(管道)字符的形式显示制表符来实现这一点。如果您也想突出显示空格，请参考<a href="http://ergoemacs.org/emacs/whitespace-mode.html">ErgoEmacs关于使空格可见的文章</a>。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(global-whitespace-mode)
+(<span style="font-weight: bold;">setq</span> whitespace-style '(face tabs tab-mark trailing))
+(custom-set-faces
+ '(whitespace-tab ((t (<span style="font-weight: bold;">:foreground</span> <span style="font-style: italic;">"#636363"</span>)))))
+
+(<span style="font-weight: bold;">setq</span> whitespace-display-mappings
+      '((tab-mark 9 [124 9] [92 9])))
+</pre>
+</div>
+
+<p>
+我将代码段中 <code>whitespace-display-mappings</code> 这部分用换行分隔开，因为它是代码段中比较难以理解的部分。
+</p>
+
+<p>
+代码片段的前四行非常容易理解。
+</p>
+
+<ol class="org-ol">
+<li>首先启用 <code>global-whitespace-mode</code>. 这使得我们配置的空白在所有buffer中自动可见。</li>
+<li>接下来，将空白的样式设置为显示制表符和行尾的空格。您需要在其中包含 <code>face</code> 和 <code>tabs</code>. 原因不明，但需要它们来设置管道字符的颜色。</li>
+<li>然后，调用 <code>custom-set-faces</code> 定制制表符空白的外观。我将我们的管道字符的文本颜色设置为 <b>#636363</b>, 如果您使用的是深色主题的Emacs，这个颜色不错。如果您在Emacs中使用浅色主题，那么您将需要更亮的颜色，比如 <b>#c1c1c1</b>.</li>
+</ol>
+
+<p>
+这是 #636363 在黑暗背景下的一个例子。它应该很淡。
+</p>
+
+<p>
+这是一个在浅色背景上的 #c1c1c1 的例子。它应该很淡。
+</p>
+
+<p>
+很难理解的那一行我设置了管道字符。
+</p>
+
+<p>
+您真正需要知道的是= 124= 是管道字符的ascii码(“|”)。您可以查看 <a href="http://rmhh.co.uk/ascii.html">ASCII码列表</a>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org348feba" class="outline-3">
+<h3 id="making-backspace-properly-delete-tabs"><a id="org348feba"></a>使退格正确删除制表符</h3>
+<div class="outline-text-3" id="text-making-backspace-properly-delete-tabs">
+<p>
+Emacs has a strange default behavior when backspacing tabs. Instead of backspacing the whole tab, it backspaces the tab one space at a time.
+当后退制表符时，Emacs有一个奇怪的默认行为。当它回退多个制表符时，它不是回退所有制表符，而是而是一次回退一个制表符。
+</p>
+
+<p>
+你可以用下面的方法来解决这个问题。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">setq</span> backward-delete-char-untabify-method 'hungry)
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgbf9903e" class="outline-3">
+<h3 id="smarttabs-bonus"><a id="orgbf9903e"></a>SmartTabs (福利)</h3>
+<div class="outline-text-3" id="text-smarttabs-bonus">
+<p>
+<a href="https://www.emacswiki.org/emacs/SmartTabs">Smart-tabs-mode</a> 包帮助Emacs在各种语言中缩进标签和对齐空格。
+</p>
+
+<p>
+我个人不使用它，但它可能会勾起你的幻想。
+</p>
+
+<p>
+如果您不确定如何在Emacs中安装包，您可以参考<a href="https://www.emacswiki.org/emacs/InstallingPackages">此wiki条目</a>或<a href="https://www.youtube.com/watch?v=Cf6tRBPbWKs">视频</a>。
+</p>
+
+<p>
+安装后，你可以在多种语言环境中启用它，如下所示:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(smart-tabs-insinuate 'c 'javascript 'python)
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgc9363da" class="outline-3">
+<h3 id="python-tabs-support"><a id="orgc9363da"></a>Python 制表符支持</h3>
+<div class="outline-text-3" id="text-python-tabs-support">
+<p>
+更新:曾经在Python中，让制表符正常工作是一个非常繁琐的事情。幸运的是，在使用本文的新配置之后，它工作得很好。用<a href="#tldr-the-full-configuration">我的新代码</a>更新您的代码就行了。
+</p>
+
+<p>
+你也可以试试 <a href="#smarttabs-bonus">SmartTabs</a>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org9630d51" class="outline-3">
+<h3 id="final-notes"><a id="org9630d51"></a>最后结语</h3>
+<div class="outline-text-3" id="text-final-notes">
+<p>
+就是这样!如果您对此有任何疑问或有任何改进建议，请告诉我。
+</p>
+</div>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2018-08-17</span>
+            <span title="last modification date" class="post-info">2019-12-30</span>
+            <span title="tags" class="post-info">:<a href="../../../../../tags/emacs-common">emacs-common</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-4350ea14-e25e-47dc-9c37-c8f0484961a5">lujun9972</a></span>
+        </div>
+    <script src="../../../../../media/js/jquery-2.1.3.min.js"></script>
+    <script src="../../../../../media/js/md5.min.js"></script>
+        <section>
+            <div id="gitalk-container"></div>
+            <script type="text/javascript">
+             var gitalk = new Gitalk({
+                 clientID: 'fdcb5d9da3f4acb4862c',
+                 clientSecret: 'dd0a16312a206782cb7669dcec5e96874ab48170',
+                 repo: 'lujun9972.github.com',
+                 owner: 'lujun9972',
+                 admin: ['lujun9972'],
+                 id: md5(location.pathname),      // Ensure uniqueness and length less than 50
+                 distractionFreeMode: false  // Facebook-like distraction free mode
+             })
+             gitalk.render('gitalk-container')
+            </script>
+        </section>
+    <script src="../../../../../media/js/main.js"></script>
+        <script>
+         var _hmt = _hmt || [];
+         (function() {
+             var hm = document.createElement("script");
+             hm.src = "https://hm.baidu.com/hm.js?7bac4fd0247f69c27887e0d4e3aee41e";
+             var s = document.getElementsByTagName("script")[0]; 
+             s.parentNode.insertBefore(hm, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-4350ea14-e25e-47dc-9c37-c8f0484961a5">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="../../../../../instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>

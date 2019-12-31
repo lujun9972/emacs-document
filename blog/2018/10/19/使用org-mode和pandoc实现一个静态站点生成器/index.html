@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>使用Org-mode和Pandoc实现一个静态站点生成器 - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="org-mode" />
+  <!-- <link rel="stylesheet" href="../../../../../media/css/main.css" type="text/css"/>
+       <link rel="stylesheet" href="../../../../../media/css/comment.css" type="text/css"/> -->
+  <link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/kognise/water.css@latest/dist/dark.css'>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="../../../../../">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <ul class="trigger">
+        <li><a href="../../../../../years/">Years</a></li>
+        <li><a href="../../../../../authors/">Authors</a></li>
+        <li><a href="../../../../../tags/">Tags</a></li>
+        <li><a href="../../../../../about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="../../../../../rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="https://www.bing.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">使用Org-mode和Pandoc实现一个静态站点生成器</h1>
+<div id="table-of-contents">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#what-is-org-mode">什么是 Org Mode?</a>
+<ul>
+<li><a href="#literate-blog-generation">Literate blog generation</a></li>
+<li><a href="#getting-started">Getting Started</a></li>
+</ul>
+</li>
+<li><a href="#how-this-site-is-actually-built">本网站是如何建造出来的</a>
+<ul>
+<li><a href="#getting-some-html">生成HTML</a></li>
+</ul>
+</li>
+<li><a href="#whats-next">接下来做什么?</a></li>
+</ul>
+</div>
+</div>
+<p>
+我花了很多时间来寻找“完美的”静态站点生成器。我想要:
+</p>
+
+<ul class="org-ul">
+<li>快</li>
+<li>简单到能让我专注于写作</li>
+<li>容易道可以运行在别人的服务器上</li>
+<li>可扩展</li>
+</ul>
+
+<p>
+They had specific templating systems, or required set up and theming that I didn't want to get into.
+虽然现在已经有了一些很棒的网站生成器(我真的很喜欢 <a href="https://gohugo.io/">hugo</a> 因为它零依赖而且速度够快),但大多数对我来说都太重型了。
+他们有特定的模板系统，或者需要配置和和主题设置，而这些我都不想做。
+</p>
+
+<p>
+我决定使用 <a href="https://pandoc.html">pandoc</a> 来将一堆markdown文件转换成html, 并让它与一个简单的css文件进行配对. 
+这套方案工作的很好! 我拥有了一套极简的博客生成器,我可以将他很容易地放在Gitlab Pages上.
+</p>
+
+<p>
+然而最终我还是遇到了瓶颈. 我想为博客生成一个索引页面和一个更漂亮的目录. 
+为了解决这个问题，我最终在原本很小的bash脚本中添加了一些情况判断逻辑，这使得维护脚本变得痛哭起来。
+</p>
+
+<p>
+主要的问题是我想写的文章和对其进行管理的代码是分离的。
+<b>如果这两者能够结合在一起会怎么样呢?</b> 我曾经接触过 Donald Knuth 的 <a href="http://literateprogramming.com/">文学编程</a> 的概念, 但从来没有实践过.
+</p>
+
+<p>
+当我开始使用org模式时，情况发生了变化。耐心听我说，我很快就要讲到博客生成了。
+</p>
+
+<div id="outline-container-org637d5a5" class="outline-2">
+<h2 id="what-is-org-mode"><a id="org637d5a5"></a>什么是 Org Mode?</h2>
+<div class="outline-text-2" id="text-what-is-org-mode">
+<blockquote>
+<p>
+Org mode使用快速有效的纯文本系统记录、维护待办事项列表、规划项目和编写文档。
+</p>
+</blockquote>
+
+<p>
+Org是一个很有趣的软件。它简单而强大，结合了直观的标记和符合人体工程学的工具(大多数情况下)。关键是标记一眼就可读，而且这些工具提供了一些与之交互和操作的非常简洁的方法。
+</p>
+
+<p>
+它的核心组件相当简单:
+</p>
+
+<ul class="org-ul">
+<li><code>标题</code>,以许多 <code>*</code> 开头的行，提供层级结构，</li>
+<li>内联标记,例如如 <code>* *</code> 和 <code>/ /</code> 提供样式</li>
+<li>块(用 <code>#+</code> 标注)提供空间来做一些很酷的事情。</li>
+<li>关键字，如 <code>TODO</code> 与特定的工具连用并提供上下文</li>
+</ul>
+
+<p>
+这些都完美地结合在一起，成为文学编程的工具。
+</p>
+</div>
+
+<div id="outline-container-org996b420" class="outline-3">
+<h3 id="literate-blog-generation"><a id="org996b420"></a>Literate blog generation</h3>
+<div class="outline-text-3" id="text-literate-blog-generation">
+<p>
+您可能已经注意到代码块块分散在这个站点周围。它们定义了如何生成下方的内容。它们只是代码块，但是通过 <a href="https://orgmode.html/worg/org-contrib/babel/">org-babel</a> 我可以直接在编辑器中执行它们来实时生成下面的内容！
+我使用bash来生成该站点，但是babel(顾名思义)可以让你编写几乎任何内容。
+</p>
+
+
+<div class="figure">
+<p><img src="https://awarm.space/static/gifs/org-babel.gif" alt="org-babel.gif" />
+</p>
+</div>
+
+<p>
+使用bash构建博客列表
+</p>
+
+<p>
+这是不是有点太小体大作了?是的。但是它比我以前使用的bash脚本更容易维护。
+</p>
+
+<p>
+如果你只是想写博客，它可能不是适合你的静态网站生成器，但是它很有趣，也是一个很好的学习经历。
+</p>
+
+<p>
+将代码与你的博客内容放在一起会鼓励你维护并编写更多内容。这个过程永无止尽，促使我创造出想要的作品。
+</p>
+</div>
+</div>
+
+<div id="outline-container-org293d38a" class="outline-3">
+<h3 id="getting-started"><a id="org293d38a"></a>Getting Started</h3>
+<div class="outline-text-3" id="text-getting-started">
+<p>
+Org-babel的文档有些分散，但是通过挖掘 <a href="https://orgmode.html/manual/">Org手册</a> 最终让我找到了需要的内容。
+Howard Abrams 的这篇文章 <a href="http://howardism.html/Technical/Emacs/literate-devops.html">Literate Dev-Ops</a> 也介绍了大量有用的信息和技术。
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org1fba999" class="outline-2">
+<h2 id="how-this-site-is-actually-built"><a id="org1fba999"></a>本网站是如何建造出来的</h2>
+<div class="outline-text-2" id="text-how-this-site-is-actually-built">
+<p>
+大致的想法是将一堆代码片段以org-babel块的形式分布在整个站点中。然后我们在每一层使用类似这样的代码块。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(find-file <span style="font-style: italic;">"./blog/index.org"</span>)
+(org-babel-execute-buffer )
+(save-buffer)
+</pre>
+</div>
+
+<p>
+这将进入一个特定的文件，并执行包含的所有 org-babel 块。
+And if that file includes a similar block, it'll go down into others!
+</p>
+
+<p>
+顶层( <code>index.org</code> 文件)包含有启动所有文件的代码。
+</p>
+</div>
+
+<div id="outline-container-org9868381" class="outline-3">
+<h3 id="getting-some-html"><a id="org9868381"></a>生成HTML</h3>
+<div class="outline-text-3" id="text-getting-some-html">
+<p>
+一旦所有的文件都设置好了，我们用一个小bash脚本来将所有的标记文件转换成html文件。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell"><span style="font-weight: bold; font-style: italic;">#</span><span style="font-weight: bold; font-style: italic;">!/bin/</span><span style="font-weight: bold;">bash</span>
+
+rm -rf _public
+<span style="font-weight: bold; font-style: italic;">root</span>=<span style="font-style: italic;">"$(</span><span style="font-weight: bold;">pwd</span><span style="font-style: italic;">)"</span>
+
+<span style="font-weight: bold; font-style: italic;">#</span><span style="font-weight: bold; font-style: italic;">emacs --batch -l ./build-assets/build.el</span>
+<span style="font-weight: bold;">for</span> folder<span style="font-weight: bold;"> in</span> $(<span style="font-weight: bold;">find</span> . -type d -not -path <span style="font-style: italic;">'*/.*'</span>); <span style="font-weight: bold;">do</span>
+    (<span style="font-weight: bold;">cd</span> $<span style="font-weight: bold; font-style: italic;">folder</span>
+     <span style="font-weight: bold;">for</span> file<span style="font-weight: bold;"> in</span> <span style="font-weight: bold;">`find . -maxdepth 1 -name "*.org"`</span>; <span style="font-weight: bold;">do</span>
+         [ -e <span style="font-style: italic;">"$file"</span> ] || <span style="font-weight: bold;">continue</span>
+         mkdir -p <span style="font-style: italic;">"$root/_public/${folder#./}"</span>
+
+         pandoc -f org -t html <span style="font-style: italic;">"$file"</span> -o <span style="font-style: italic;">"$root/_public/${folder#./}/`basename "$file" .org`.html"</span> --lua-filter $<span style="font-weight: bold; font-style: italic;">root</span>/scripts/changeLinks.lua --lua-filter $<span style="font-weight: bold; font-style: italic;">root</span>/scripts/task-list.lua -B $<span style="font-weight: bold; font-style: italic;">root</span>/static/html/header.html -H $<span style="font-weight: bold; font-style: italic;">root</span>/static/html/includes.html -c <span style="font-style: italic;">"/static/styles.css"</span> -s
+     <span style="font-weight: bold;">done</span>)
+<span style="font-weight: bold;">done</span>
+
+cp -r static _public/
+</pre>
+</div>
+
+<p>
+脚本非常小，因为繁重的工作是由<a href="https://pandoc.html">pandoc</a>完成的。但是这一次，这个脚本之所以可以保持较小的规模，是因为我们让org-babel来完成繁重的工作。
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgd44f14e" class="outline-2">
+<h2 id="whats-next"><a id="orgd44f14e"></a>接下来做什么?</h2>
+<div class="outline-text-2" id="text-whats-next">
+<p>
+这是我个人的想法. 我已经有了基础，是时候开始使用它了!
+</p>
+
+<p>
+当然，我还有一些额外的想法 :)
+</p>
+
+<ul class="org-ul">
+<li>实现 git-hook 来让我提交后自动运行顶层脚本</li>
+<li>实现评论和回复</li>
+<li><code>[0/2]</code> 把我的其他org文件纳入站点:
+<ul class="org-ul">
+<li>代办事项,</li>
+<li>链接</li>
+</ul></li>
+</ul>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2018-10-19</span>
+            <span title="last modification date" class="post-info">2019-12-29</span>
+            <span title="tags" class="post-info">:<a href="../../../../../tags/org-mode">org-mode</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-4350ea14-e25e-47dc-9c37-c8f0484961a5">lujun9972</a></span>
+        </div>
+    <script src="../../../../../media/js/jquery-2.1.3.min.js"></script>
+    <script src="../../../../../media/js/md5.min.js"></script>
+        <section>
+            <div id="gitalk-container"></div>
+            <script type="text/javascript">
+             var gitalk = new Gitalk({
+                 clientID: 'fdcb5d9da3f4acb4862c',
+                 clientSecret: 'dd0a16312a206782cb7669dcec5e96874ab48170',
+                 repo: 'lujun9972.github.com',
+                 owner: 'lujun9972',
+                 admin: ['lujun9972'],
+                 id: md5(location.pathname),      // Ensure uniqueness and length less than 50
+                 distractionFreeMode: false  // Facebook-like distraction free mode
+             })
+             gitalk.render('gitalk-container')
+            </script>
+        </section>
+    <script src="../../../../../media/js/main.js"></script>
+        <script>
+         var _hmt = _hmt || [];
+         (function() {
+             var hm = document.createElement("script");
+             hm.src = "https://hm.baidu.com/hm.js?7bac4fd0247f69c27887e0d4e3aee41e";
+             var s = document.getElementsByTagName("script")[0]; 
+             s.parentNode.insertBefore(hm, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-4350ea14-e25e-47dc-9c37-c8f0484961a5">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="../../../../../instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>

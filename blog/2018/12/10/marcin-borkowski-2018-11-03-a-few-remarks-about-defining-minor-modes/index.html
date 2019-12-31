@@ -19,14 +19,14 @@
 <div>
   <header class="masthead">
     <h1 class="masthead-title"><a href="../../../../../">EMACS-DOCUMENT</a></h1>
-    <p>=============&gt;集思广益</p>
+    <p>=============&gt;随便,谢谢</p>
     <nav class="site-nav">
       <ul class="trigger">
         <li><a href="../../../../../years/">Years</a></li>
         <li><a href="../../../../../authors/">Authors</a></li>
         <li><a href="../../../../../tags/">Tags</a></li>
         <li><a href="../../../../../about/">About</a></li>
-        <li><a href="https://github.com/lujun9972/emacs-document">Github</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
         <li><a href="../../../../../rss.xml">RSS</a></li>
       </ul>
     </nav>
@@ -42,60 +42,80 @@
 <h1 class="title">Marcin Borkowski: 2018-11-03 A few remarks about defining minor modes</h1>
 <p>
 Today's post is extremely technical and niche, but I just wanted to share an interesting story I had a few days ago.
+今天的帖子技术含量很高，但我想分享一个几天前的有趣故事。
 </p>
 
 <p>
-So I have this minor mode I defined, using the classical construction:<br />
+So I have this minor mode I defined, using the classical construction:\
 </p>
 
 <pre class="example">
 (defun cool-start ()
- "Start the cool-mode.")
+"Start the cool-mode.")
 
 (defun cool-stop ()
- "Stop the cool-mode.")
+"Stop the cool-mode.")
 
 (define-minor-mode my-cool-minor-mode
- "Toggle a mode for doing cool stuff."
- :init-value nil
- :lighter " 8-)"
- (if my-cool-minor-mode
- (cool-start)
- (cool-stop)))
+"Toggle a mode for doing cool stuff."
+:init-value nil
+:lighter " 8-)"
+(if my-cool-minor-mode
+(cool-start)
+(cool-stop)))
 </pre>
 
 <p>
 What I wanted to know is whether I could use the prefix argument to decide what to do when starting the mode. This seems a bit risky, since the prefix argument is already used to turn the mode on or off.
+我想知道的是我是否可以使用前缀参数来决定在启动模式时做什么。这似乎有点冒险，因为前缀参数已经用于打开或关闭模式。
 </p>
 
 <p>
 Actually, the documentation is a bit misleading on the treatment of the argument to <code>my-cool-minor-mode</code> command. Here an excerpt from what the Emacs manual says:
+实际上，文档在处理=my-cool-minor-mode=命令的参数上有点误导人。以下是Emacs手册中的一段摘录:
 </p>
 
 <ul class="org-ul">
 <li>If you invoke the mode command directly with no prefix argument (either via ‘M-x', or by binding it to a key and typing that key [...]), that “toggles” the minor mode. The minor mode is turned on if it was off, and turned off if it was on.</li>
+</ul>
+<p>
+-如果你直接调用mode命令而不带任何前缀参数(通过“M-x”，或通过绑定到一个键并键入该键[…])，就会“切换”次要模式。次要模式在关闭时打开，在打开时关闭。
+</p>
+<ul class="org-ul">
 <li>If you invoke the mode command with a prefix argument, the minor mode is unconditionally turned off if that argument is zero or negative; otherwise, it is unconditionally turned on.</li>
+</ul>
+<p>
+-如果你使用前缀参数调用mode命令，如果参数为0或负数，次要模式将无条件关闭;否则，它将被无条件地打开。
+</p>
+<ul class="org-ul">
 <li>If the mode command is called via Lisp, the minor mode is unconditionally turned on if the argument is omitted or ‘nil'. This makes it easy to turn on a minor mode from a major mode's mode hook [...]. A non-‘nil' argument is handled like an interactive prefix argument, as described above.</li>
 </ul>
+<p>
+如果通过Lisp调用mode命令，如果参数被省略或为“nil”，则次要模式将无条件打开。这使得从主模式的模式钩子打开副模式变得很容易。非' nil'参数的处理方式类似于前面描述的交互式前缀参数。
+</p>
 
 <p>
 And here is a quote from the Elisp manual:
+以下是Elisp手册中的一段话:
 </p>
 
 <p>
 The toggle command takes one optional (prefix) argument. If called interactively with no argument it toggles the mode on or off. A positive prefix argument enables the mode, any other prefix argument disables it. From Lisp, an argument of ‘toggle' toggles the mode, whereas an omitted or ‘nil' argument enables the mode. This makes it easy to enable the minor mode in a major mode hook, for example. If DOC is ‘nil', the macro supplies a default documentation string explaining the above.
+toggle命令接受一个可选的(前缀)参数。如果在没有参数的情况下以交互方式调用，它将打开或关闭模式。正的前缀参数启用模式，任何其他前缀参数将禁用模式。在Lisp中，‘toggle’参数切换模式，而省略或‘nil’参数启用模式。例如，这使得在主模式钩子中启用次要模式变得很容易。如果DOC为“nil”，则宏提供一个默认的文档字符串来解释上述内容。
 </p>
 
 <p>
 As you can see, from the Elisp manual it is not entirely clear whether you can supply numeric arguments from your code (obviously, you can't supply a <code>'toggle</code> argument interactively).
+正如您可以看到的，从Elisp手册中并不完全清楚您是否可以从您的代码中提供数值参数(显然，您不能交互地提供='toggle=参数)。
 </p>
 
 <p>
 It turns out that the <code>define-minor-mode</code> macro defines the function responsible for turning the mode on and off, and does it in a pretty complicated way.
+结果是，=define-minor-mode=宏定义了负责打开和关闭模式的函数，并且是以一种非常复杂的方式进行的。
 </p>
 
 <p>
-First of all, the macro contains this snippet:<br />
+First of all, the macro contains this snippet:\
 </p>
 
 <pre class="example">
@@ -104,83 +124,94 @@ First of all, the macro contains this snippet:<br />
 
 <p>
 which means that no argument (when called interactively) is precisely equivalent to an argument of <code>'toggle</code>.
+这意味着没有参数(在交互调用时)与='toggle=的参数完全等价。
 </p>
 
 <p>
-One of the next things that follow is this trick:<br />
+One of the next things that follow is this trick:\
 </p>
 
 <pre class="example">
 (,@setter
- (if (eq arg 'toggle)
- (not ,getter)
- ;; A nil argument also means ON now.
- (&gt; (prefix-numeric-value arg) 0)))
+(if (eq arg 'toggle)
+(not ,getter)
+;; A nil argument also means ON now.
+(&gt; (prefix-numeric-value arg) 0)))
 </pre>
 
 <p>
 Earlier, <code>define-minor-mode</code> sets <code>setter</code> to <code>(setq &lt;mode-name&gt;)</code> and <code>getter</code> to just <code>&lt;mode-name&gt;</code>. This is quite clever: <code>getter</code> is just the variable named after the mode, and <code>setter</code> is the beginning of the Elisp form setting that variable to some value. (In case you think this is too much abstraction, let me tell you that my account is a bit simplified: for global modes, for instance, both <code>setter</code> and <code>getter</code> are a bit different.)
+在前面，=define-minor-mode= set <code>setter</code> to <code>(setq &lt;mode-name&gt;)=和=getter</code> to =&lt;mode-name&gt;=。这非常聪明:=getter=只是根据模式命名的变量，而=setter=是将该变量设置为某个值的Elisp表单的开始。(如果您认为这太抽象，让我告诉您，我的帐户有一点简化:例如，对于全局模式，=setter=和=getter=都有一点不同。)
 </p>
 
 <p>
 As you can see from the trick above, my initial problem has an easy answer: yes, we can supply numerical arguments in Elisp code, in fact, supplying a negative argument is the only way to turn the mode off programmatically.
+正如您可以从上面的技巧中看到的，我的初始问题有一个简单的答案:是的，我们可以在Elisp代码中提供数值参数，实际上，提供一个负参数是通过编程关闭模式的唯一方法。
 </p>
 
 <p>
 Knowing this, we may now tackle the initial question. Since any positive prefix argument means “turn the mode on”, can we use its actual value to do various stuff?
+了解了这一点，我们现在可以着手解决最初的问题。因为任何正的前缀参数都意味着“打开模式”，我们可以使用它的实际值来做各种事情吗?
 </p>
 
 <p>
 The answer is (of course) yes. We may do one of two things. First of all, our mode's body may inspect <code>current-prefix-arg</code>. We also have another option, which is using <code>arg</code>. (This is what <code>define-minor-mode</code> macro calls the argument to the newly defined toggling function.) The latter is obviously much less clean (especially since it depends on an implementation detail that might be changed in another Emacs version), so let's forget about it. (Actually, instead of using the <code>arg</code> symbol, it would probably be better to use something like Common Lisp's <code>gensym</code>. Elisp does not have such a function. The <code>cl</code> package has <code>cl-gensym</code>, but understandably built-in features do not rely on <code>cl</code>.)
+答案当然是肯定的。我们可以做两件事中的一件。首先，我们的模式体可以检查=current-prefix-arg=。我们还有另一个选项，即使用=arg=。(这是=define-minor-mode= macro调用新定义的切换函数的参数。)后者显然没有那么干净(特别是因为它依赖于可能在另一个Emacs版本中更改的实现细节)，所以让我们忘记它。(实际上，与其使用=arg=符号，不如使用一些类似于Common Lisp的=gensym=的东西。Elisp没有这样的功能。=cl=包有=cl-gensym=，但是可以理解的是，内置的特性并不依赖于=cl=。
 </p>
 
 <p>
-But this is not the end of the story. There are quite a few keyword arguments of <code>define-minor-mode</code> not mentioned in the docstring nor in the manual, and one of them is <code>:extra-args</code>. (Funny sidenote: this <code>:extra-args</code> keyword is only mentioned three times in the whole Emacs sources. One is the definition, which (according to <code>git blame</code>) is last touched by Stefan Monnier on 2012-06-10. The second one is in the <code>use-hard-newlines</code> minor mode, last touched by Stefan Monnier on 2001-10-30. The third one is commented out in <code>global-font-lock-mode</code>, with a commentary saying<br />
-What was this :extra-args thingy for? --Stef<br />
+But this is not the end of the story. There are quite a few keyword arguments of <code>define-minor-mode</code> not mentioned in the docstring nor in the manual, and one of them is <code>:extra-args</code>. (Funny sidenote: this <code>:extra-args</code> keyword is only mentioned three times in the whole Emacs sources. One is the definition, which (according to <code>git blame</code>) is last touched by Stefan Monnier on 2012-06-10. The second one is in the <code>use-hard-newlines</code> minor mode, last touched by Stefan Monnier on 2001-10-30. The third one is commented out in <code>global-font-lock-mode</code>, with a commentary saying\
+What was this :extra-args thingy for? --Stef\
 last touched on 2009-09-13, by guess who.)
+最后一次提到2009-09-13，作者是猜猜是谁。)
 </p>
 
 <p>
 Here is how you can use it. The value after the <code>:extra-args</code> keyword should be an (unqouted) list which is just appended to the first argument of the function turning the mode on (i.e., the one which is the prefix argument when the mode command is called interactively). All these arguments (including the first one) are optional, and you can't supply the <code>:extra-args</code> on an interactive call. You can, however, supply them from Elisp code. Here is an example.
+你可以这样使用它。在=:extra-args=关键字之后的值应该是一个(unqouted)列表，它被附加到打开模式的函数的第一个参数之后(例如，即在以交互方式调用mode命令时作为前缀参数的那个)。所有这些参数(包括第一个参数)都是可选的，您不能在交互式调用中提供=:extra-args=。但是，您可以通过Elisp代码提供它们。这里有一个例子。
 </p>
 
 <pre class="example">
 (define-minor-mode my-cool-minor-mode
- "Toggle a mode for doing cool stuff."
- :init-value nil
- :lighter " 8-)"
- :extra-args (cool-arg-1 cool-arg-2)
- (if my-cool-minor-mode
- (progn
-    (cool-start)
-    (message "cool-arg-1: %s, cool-arg-2: %s" cool-arg-1 cool-arg-2))
- (cool-stop)))
+"Toggle a mode for doing cool stuff."
+:init-value nil
+:lighter " 8-)"
+:extra-args (cool-arg-1 cool-arg-2)
+(if my-cool-minor-mode
+(progn
+(cool-start)
+(message "cool-arg-1: %s, cool-arg-2: %s" cool-arg-1 cool-arg-2))
+(cool-stop)))
 </pre>
 
 <p>
 Try saying e.g. <code>M-: (my-cool-minor-mode 1 "this")</code> to see how <code>cool-arg-1</code> becomes <code>"this"</code> and <code>cool-arg-2</code> becomes nil.
+试着这样说:=M-:(my-cool-min -mode 1 "this")=看看如何=cool- arg1 <code>变成</code>"this"=和=cool- arg2 =变成nil。
 </p>
 
 <p>
-The last interesting tidbit I have about <code>define-minor-mode</code> is the default message of <code>My-Cool minor mode enabled in current buffer</code>. I noticed that when I put the <code>message</code> function in the mode starting code, this message stopped appearing. To understand why, at first I grepped the Emacs sources for the words “enabled” (2774 hits) and “disabled” (1324 hits). Hmmm. Then, I <a href="http://mbork.pl/2016-05-15_debug-on-whatever">recalled</a> the <code>debug-on-message</code> variable, and it turned out that my grepping was useless anyway. Here's the thing (simplified a bit):<br />
+The last interesting tidbit I have about <code>define-minor-mode</code> is the default message of <code>My-Cool minor mode enabled in current buffer</code>. I noticed that when I put the <code>message</code> function in the mode starting code, this message stopped appearing. To understand why, at first I grepped the Emacs sources for the words “enabled” (2774 hits) and “disabled” (1324 hits). Hmmm. Then, I <a href="http://mbork.pl/2016-05-15_debug-on-whatever">recalled</a> the <code>debug-on-message</code> variable, and it turned out that my grepping was useless anyway. Here's the thing (simplified a bit):\
 </p>
 
 <pre class="example">
 (message
- "Some-mode %sabled"
- (if mode-variable "en" "dis"))
+"Some-mode %sabled"
+(if mode-variable "en" "dis"))
 </pre>
 
 <p>
 Well, that made me cringe (especially that I have to deal a bit with i18n of software), but I admit that it is sweet in a way.
+好吧，这让我畏缩(特别是我必须处理一点i18n的软件)，但我承认它在某种程度上是甜蜜的。
 </p>
 
 <p>
 What's more interesting is that the “enabled/disabled” message is indeed turned off if the code responsible for initializing (or shutting down) the mode provides its own <code>message</code>. This is done with the help of the <code>current-message</code> function, which returns whatever is currently shown in the echo area.
+更有趣的是，如果负责初始化(或关闭)模式的代码提供了自己的=message=，那么“启用/禁用”消息实际上是关闭的。这是在=current-message=函数的帮助下完成的，该函数返回当前在echo区域中显示的内容。
 </p>
 
 <p>
 All in all, I only touched the surface. It you head to the file <code>easy-mmode.el</code> where all this code resides, you will find quite a few niceties (like about a dozen lines of code of the function <code>easy-mmode-pretty-mode-name</code> devoted only to the task of converting the symbol for the mode to a human-friendly version, using the mode lighter to infer capitalization!). This is yet another example of Emacs developers paying immense attention to details, even if there are a few questionable practices along the way. <img src="http://mbork.pl/smileys/24/mb-wink.gif" alt="mb-wink.gif" />
+总之，我只触及了表面。如果你选择file <code>easy-mmode。el =所有这些代码驻留的地方,你会发现相当多的细节(喜欢几十行代码的函数</code> easy-mmode-pretty-mode-name =只致力于的任务转换的符号模式,人性化的版本,使用打火机来推断资本化模式!)。这是Emacs开发人员非常关注细节的另一个例子，即使在开发过程中存在一些有问题的实践。<img src="http://mbork.pl/smileys/24/mb-wink.gif" alt="mb-wink.gif" />
 </p>
 
 </div>
@@ -188,9 +219,9 @@ All in all, I only touched the surface. It you head to the file <code>easy-mmode
 <div>
         <div class="post-meta">
             <span title="post date" class="post-info">2018-12-10</span>
-            <span title="last modification date" class="post-info">2018-12-10</span>
+            <span title="last modification date" class="post-info">2019-12-21</span>
             <span title="tags" class="post-info">:<a href="../../../../../tags/raw">raw</a>:</span>
-            <span title="author" class="post-info"><a href="mailto:lujun9972 &lt;at&gt; T520">lujun9972</a></span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-4350ea14-e25e-47dc-9c37-c8f0484961a5">lujun9972</a></span>
         </div>
     <script src="../../../../../media/js/jquery-2.1.3.min.js"></script>
     <script src="../../../../../media/js/md5.min.js"></script>
@@ -210,10 +241,19 @@ All in all, I only touched the surface. It you head to the file <code>easy-mmode
             </script>
         </section>
     <script src="../../../../../media/js/main.js"></script>
+        <script>
+         var _hmt = _hmt || [];
+         (function() {
+             var hm = document.createElement("script");
+             hm.src = "https://hm.baidu.com/hm.js?7bac4fd0247f69c27887e0d4e3aee41e";
+             var s = document.getElementsByTagName("script")[0]; 
+             s.parentNode.insertBefore(hm, s);
+         })();
+        </script>
     <div class="footer">
-        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 26.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
         <p>
-            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:lujun9972 &lt;at&gt; T520">lujun9972</a>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-4350ea14-e25e-47dc-9c37-c8f0484961a5">lujun9972</a>
             &nbsp;&nbsp;-&nbsp;&nbsp;
             Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
             <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>

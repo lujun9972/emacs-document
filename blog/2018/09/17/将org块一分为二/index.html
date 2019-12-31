@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>将Org块一分为二 - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="elisp-common" />
+  <!-- <link rel="stylesheet" href="../../../../../media/css/main.css" type="text/css"/>
+       <link rel="stylesheet" href="../../../../../media/css/comment.css" type="text/css"/> -->
+  <link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/kognise/water.css@latest/dist/dark.css'>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="../../../../../">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <ul class="trigger">
+        <li><a href="../../../../../years/">Years</a></li>
+        <li><a href="../../../../../authors/">Authors</a></li>
+        <li><a href="../../../../../tags/">Tags</a></li>
+        <li><a href="../../../../../about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="../../../../../rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="https://www.bing.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">将Org块一分为二</h1>
+<div id="table-of-contents">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#orgde8c32a">问题描述</a></li>
+<li><a href="#action-plan">行动计划</a></li>
+<li><a href="#org-in-any-block-p">我在Org 块中吗?</a></li>
+<li><a href="#org-block-split">如果是，则拆分block</a></li>
+<li><a href="#M-return-split-block-dwim">让 M-return 执行工作</a></li>
+<li><a href="#full-code">完整的代码</a></li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-orgde8c32a" class="outline-2">
+<h2 id="orgde8c32a">问题描述</h2>
+<div class="outline-text-2" id="text-orgde8c32a">
+<p>
+假设我有一个巨大的Org代码块，我想把它拆分成多个Org代码块，以便在之间填写解释内容。
+</p>
+
+<p>
+也就是说，我想快速地把
+所以我想快速地分解一下:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-org"><span style="font-weight: bold; font-style: italic;">#+begin_src emacs-lisp</span>
+(message <span style="font-style: italic;">"one"</span>)
+(message <span style="font-style: italic;">"two"</span>)
+<span style="font-weight: bold; font-style: italic;">#+end_src</span>
+</pre>
+</div>
+
+<p>
+拆分成
+</p>
+
+<div class="org-src-container">
+<pre class="src src-org"><span style="font-weight: bold; font-style: italic;">#+begin_src emacs-lisp</span>
+(message <span style="font-style: italic;">"one"</span>)
+<span style="font-weight: bold; font-style: italic;">#+end_src</span>
+
+<span style="font-weight: bold; font-style: italic;">#+begin_src emacs-lisp</span>
+(message <span style="font-style: italic;">"two"</span>)
+<span style="font-weight: bold; font-style: italic;">#+end_src</span>
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org74c7922" class="outline-2">
+<h2 id="action-plan"><a id="org74c7922"></a>行动计划</h2>
+<div class="outline-text-2" id="text-action-plan">
+<ol class="org-ol">
+<li>写一个函数，当光标处于 <b>任意</b> Org块中(不仅仅是“src”, “example”, “export” 或任何一个内建的Org块，还包括类似 <code>#+begin_foo .. #+end_foo</code> 这样特殊的Org块。)返回非nil值</li>
+<li>编写一个函数来对块进行拆分。</li>
+<li>重载 M-return 键绑定，只有当光标在Org块中时才会调用该块拆分函数(使用第一个函数进行检测)。</li>
+</ol>
+
+<p>
+感谢读者 <b>Mankoff</b> 的评论，我学到了 <code>org-babel-demarcate-block</code> 函数(默认绑定到 C-c C-v d 和 C-c C-v C-d).
+</p>
+
+<p>
+这个函数至少在两个方面与本文中的解决方案有所不同:
+</p>
+
+<ol class="org-ol">
+<li>它只对Org Src块有效。</li>
+<li>它在光标处将块进行拆分，而我希望只在行末或行首处进行拆分</li>
+</ol>
+
+<p>
+不过我可以看出 <code>org-babel-demarcate-block</code> 可以覆盖大部分块分割的情况。
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgb0d2a31" class="outline-2">
+<h2 id="org-in-any-block-p"><a id="orgb0d2a31"></a>我在Org 块中吗?</h2>
+<div class="outline-text-2" id="text-org-in-any-block-p">
+<p>
+在开始编写这个函数之前，我查看了下面这些现有函数，但没有一个是我真正想要的:
+</p>
+
+<dl class="org-dl">
+<dt><code>org-in-src-block-p</code></dt><dd>仅当光标位于 <code>#+begin_src .. #+end_src</code> 块时返回非nil; 其他Org块则无效.</dd>
+<dt><code>org-in-block-p</code></dt><dd>仅当光标位于预先定义好的块名（一个列表,例如 <code>'("src" "example" "quote" ..)</code> ）时才返回非nil. 因此这个也不行，因为我无法预先定义好所有的特殊块.</dd>
+</dl>
+
+<p>
+因此我定义了下面这个 <code>modi/org-in-any-block-p</code> 函数，它在光标处于任何 <code>#+begin_FOOBAR .. #+end_FOOBAR</code> 之间时，返回非nil。
+好在我可以重用 <code>org-between-regexps-p</code> 函数中的大量逻辑(<code>org-in-block-p</code> 内部使用该函数).
+</p>
+
+<p>
+<a id="org616873a"></a>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">modi/org-in-any-block-p</span> ()
+  <span style="font-style: italic;">"Return non-nil if the point is in any Org block.</span>
+
+<span style="font-style: italic;">The Org block can be *any*: src, example, verse, etc., even any</span>
+<span style="font-style: italic;">Org Special block.</span>
+
+<span style="font-style: italic;">This function is heavily adapted from `</span><span style="font-weight: bold; font-style: italic; text-decoration: underline;">org-between-regexps-p</span><span style="font-style: italic;">'."</span>
+  (<span style="font-weight: bold;">save-match-data</span>
+    (<span style="font-weight: bold;">let</span> ((pos (point))
+          (case-fold-search t)
+          (block-begin-re <span style="font-style: italic;">"^[[:blank:]]*#</span><span style="font-weight: bold; font-style: italic;">\</span><span style="font-style: italic;">+begin_</span><span style="font-weight: bold; font-style: italic;">\</span><span style="font-style: italic;">(?1:.+?</span><span style="font-weight: bold; font-style: italic;">\</span><span style="font-style: italic;">)</span><span style="font-weight: bold; font-style: italic;">\</span><span style="font-style: italic;">(?: .*</span><span style="font-weight: bold; font-style: italic;">\</span><span style="font-style: italic;">)*$"</span>)
+          (limit-up (<span style="font-weight: bold;">save-excursion</span> (outline-previous-heading)))
+          (limit-down (<span style="font-weight: bold;">save-excursion</span> (outline-next-heading)))
+          beg end)
+      (<span style="font-weight: bold;">save-excursion</span>
+        <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Point is on a block when on BLOCK-BEGIN-RE or if</span>
+        <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">BLOCK-BEGIN-RE can be found before it...</span>
+        (<span style="font-weight: bold;">and</span> (<span style="font-weight: bold;">or</span> (org-in-regexp block-begin-re)
+                 (re-search-backward block-begin-re limit-up <span style="font-weight: bold;">:noerror</span>))
+             (<span style="font-weight: bold;">setq</span> beg (match-beginning 0))
+             <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">... and BLOCK-END-RE after it...</span>
+             (<span style="font-weight: bold;">let</span> ((block-end-re (concat <span style="font-style: italic;">"^[[:blank:]]*#</span><span style="font-weight: bold; font-style: italic;">\</span><span style="font-style: italic;">+end_"</span>
+                                         (match-string-no-properties 1)
+                                         <span style="font-style: italic;">"</span><span style="font-weight: bold; font-style: italic;">\</span><span style="font-style: italic;">( .*</span><span style="font-weight: bold; font-style: italic;">\</span><span style="font-style: italic;">)*$"</span>)))
+               (goto-char (match-end 0))
+               (re-search-forward block-end-re limit-down <span style="font-weight: bold;">:noerror</span>))
+             (&gt; (<span style="font-weight: bold;">setq</span> end (match-end 0)) pos)
+             <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">... without another BLOCK-BEGIN-RE in-between.</span>
+             (goto-char (match-beginning 0))
+             (not (re-search-backward block-begin-re (1+ beg) <span style="font-weight: bold;">:noerror</span>))
+             <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Return value.</span>
+             (cons beg end))))))
+</pre>
+</div>
+
+<p>
+<a href="#org616873a">Code Snippet 1</a>
+</p>
+
+<pre class="example">
+检查光标是否在Org块中的函数
+
+</pre>
+
+<ul class="org-ul">
+<li><code>(case-fold-search t)</code> 确保 <code>#+BEGIN_ ..</code> 或 <code>#+begin_ ..</code> 都能够匹配。</li>
+<li>正则表达式 <code>block-begin-re</code> 匹配 <code>"#+begin_src foo"</code> , <code>" #+begin_src foo"</code> , <code>"#+BEGIN_EXAMPLE"</code> , <code>"#+begin_FOOBAR"</code> 等等</li>
+<li><code>limit-up</code> 和 <code>limit-down</code> 设置为上一个和下一个Org标题在buffer中的位置. 为了性能，下面的正则搜索局限在这个范围内.</li>
+<li><code>block-end-re</code> 基于 <code>block-begin-re</code> 的匹配字符串动态组建. 因此若首先找到的是 <code>"#+begin_quote"</code> , 那么它对应的块结束符是 <code>"#+end_quote"</code> 而不是 <code>"#+end_src"</code>.</li>
+<li>如果光标不是在 <code>#+begin_FOOBAR .. #+end_FOOBAR</code> 之间，则返回nil.</li>
+
+<li id="警告">我没有对嵌套块的情况做支持，尤其是当光标在最内块和最外层块之间的情况。</li>
+</ul>
+
+
+<div class="org-src-container">
+<pre class="src src-org"><span style="font-weight: bold; font-style: italic;">#+begin_src org</span>
+&#9646;
+#+begin_src emacs-lisp
+(message "hello!")
+<span style="font-weight: bold; font-style: italic;">#+end_src</span>
+<span style="font-weight: bold; font-style: italic;">#+end_src</span>
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgb480241" class="outline-2">
+<h2 id="org-block-split"><a id="orgb480241"></a>如果是，则拆分block</h2>
+<div class="outline-text-2" id="text-org-block-split">
+<p>
+"光标在Org块中"的检测完成后，我需要准照如下规则进行拆分
+</p>
+
+<ol class="org-ol">
+<li>如果光标不在某行的行首(BOL),</li>
+
+<li>跳转到行末, 然后将块拆分.</li>
+</ol>
+
+<p>
+因此如果光标在第一个 <code>message</code> 之后, 或者在第一个 <code>message</code> 行的末尾,那么:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-org"><span style="font-weight: bold; font-style: italic;">#+begin_src emacs-lisp</span>
+(message <span style="font-style: italic;">"one"</span>)&#9646;
+(message <span style="font-style: italic;">"two"</span>)
+<span style="font-weight: bold; font-style: italic;">#+end_src</span>
+</pre>
+</div>
+
+<p>
+将块会在 <code>(message "one")</code> <b>之后</b> 拆分，并将光标移动到拆分后的块之间:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-org"><span style="font-weight: bold; font-style: italic;">#+begin_src emacs-lisp</span>
+(message <span style="font-style: italic;">"one"</span>)
+<span style="font-weight: bold; font-style: italic;">#+end_src</span>
+&#9646;
+<span style="font-weight: bold; font-style: italic;">#+begin_src emacs-lisp</span>
+(message <span style="font-style: italic;">"two"</span>)
+<span style="font-weight: bold; font-style: italic;">#+end_src</span>
+</pre>
+</div>
+
+<ol class="org-ol">
+<li>否则(如果光标在行首)，</li>
+
+<li>在光标处拆分块.</li>
+</ol>
+
+<p>
+因此，如果光标位于第二个 <code>message</code> 行的开头:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-org"><span style="font-weight: bold; font-style: italic;">#+begin_src emacs-lisp</span>
+(message <span style="font-style: italic;">"one"</span>)
+&#9646;(message <span style="font-style: italic;">"two"</span>)
+<span style="font-weight: bold; font-style: italic;">#+end_src</span>
+</pre>
+</div>
+
+<p>
+会在 <code>(message "two")</code> <b>之前</b> 拆分块，并将光标移动到拆分后的块之间:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-org"><span style="font-weight: bold; font-style: italic;">#+begin_src emacs-lisp</span>
+(message <span style="font-style: italic;">"one"</span>)
+<span style="font-weight: bold; font-style: italic;">#+end_src</span>
+&#9646;
+<span style="font-weight: bold; font-style: italic;">#+begin_src emacs-lisp</span>
+(message <span style="font-style: italic;">"two"</span>)
+<span style="font-weight: bold; font-style: italic;">#+end_src</span>
+</pre>
+</div>
+
+<p>
+下面是遵循该规范的代码:
+</p>
+
+<p>
+<a id="org96ea497"></a>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">modi/org-split-block</span> ()
+  <span style="font-style: italic;">"Sensibly split the current Org block at point."</span>
+  (<span style="font-weight: bold;">interactive</span>)
+  (<span style="font-weight: bold;">if</span> (modi/org-in-any-block-p)
+      (<span style="font-weight: bold;">save-match-data</span>
+        (<span style="font-weight: bold;">save-restriction</span>
+          (widen)
+          (<span style="font-weight: bold;">let</span> ((case-fold-search t)
+                (at-bol (bolp))
+                block-start
+                block-end)
+            (<span style="font-weight: bold;">save-excursion</span>
+              (re-search-backward <span style="font-style: italic;">"^</span><span style="font-weight: bold; font-style: italic;">\</span><span style="font-style: italic;">(?1:[[:blank:]]*#</span><span style="font-weight: bold; font-style: italic;">\</span><span style="font-style: italic;">+begin_.+?</span><span style="font-weight: bold; font-style: italic;">\</span><span style="font-style: italic;">)</span><span style="font-weight: bold; font-style: italic;">\</span><span style="font-style: italic;">(?: .*</span><span style="font-weight: bold; font-style: italic;">\</span><span style="font-style: italic;">)*$"</span> nil nil 1)
+              (<span style="font-weight: bold;">setq</span> block-start (match-string-no-properties 0))
+              (<span style="font-weight: bold;">setq</span> block-end (replace-regexp-in-string
+                               <span style="font-style: italic;">"begin_"</span> <span style="font-style: italic;">"end_"</span> <span style="font-weight: bold; font-style: italic;">;</span><span style="font-weight: bold; font-style: italic;">Replaces "begin_" with "end_", "BEGIN_" with "END_"</span>
+                               (match-string-no-properties 1))))
+            <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Go to the end of current line, if not at the BOL</span>
+            (<span style="font-weight: bold;">unless</span> at-bol
+              (end-of-line 1))
+            (insert (concat (<span style="font-weight: bold;">if</span> at-bol <span style="font-style: italic;">""</span> <span style="font-style: italic;">"n"</span>)
+                            block-end
+                            <span style="font-style: italic;">"nn"</span>
+                            block-start
+                            (<span style="font-weight: bold;">if</span> at-bol <span style="font-style: italic;">"n"</span> <span style="font-style: italic;">""</span>)))
+            <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Go to the line before the inserted "#+begin_ .." line</span>
+            (beginning-of-line (<span style="font-weight: bold;">if</span> at-bol -1 0)))))
+    (message <span style="font-style: italic;">"Point is not in an Org block"</span>)))
+</pre>
+</div>
+
+<p>
+<a href="#org96ea497">Code Snippet 2</a>
+</p>
+
+<pre class="example">
+以合理的方式分割当前的Org块的函数
+
+</pre>
+
+<ul class="org-ul">
+<li>抽取 <code>block-start</code> 的正则表达式与代码快 <a href="#org616873a">1</a> 中的 <code>block-begin-re</code> 一样, 只是子组不同而已.</li>
+<li><code>block-end</code> 字符串脱胎于 <code>block-start</code> 字符串中的1号子组 -- 只是把 “begin_” 替换成 “end_”而已.</li>
+<li>然后基于光标是否在行首 (<code>at-bol</code>), 执行对应的换行插入和光标移动.</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-org9a3e50c" class="outline-2">
+<h2 id="M-return-split-block-dwim"><a id="org9a3e50c"></a>让 M-return 执行工作</h2>
+<div class="outline-text-2" id="text-M-return-split-block-dwim">
+<p>
+运行两个函数后,就可以直接通过 <code>M-x modi/org-split-block</code> 完成工作了.
+</p>
+
+<p>
+但是这样有什么意思呢？
+</p>
+
+<p>
+我需要一个直观的快捷键来拆分块 -- 比如 M-return.
+</p>
+
+<ul class="org-ul">
+<li>默认情况下, M-return 根据上下文环境执行创建新标题,插入项目,将区域转换成表格等工作. 查看 <code>org-meta-return</code> 的doc-string(默认该快捷键绑定的函数) 来获取更多信息.</li>
+<li>但是它的上下文不包括 “光标在Org块中”. 因此这时它会插入一个标题,显得莫名其妙.</li>
+<li>因此我们需要通过添加上下文环境来解决这个问题.</li>
+</ul>
+
+<p>
+因此我 <b>建议</b> <code>org-meta-return</code> 在光标位于Org块中时调用 <code>modi/org-split-block</code>.
+</p>
+
+<p>
+建议函数 <code>modi/org-meta-return</code> 与被建议函数 <code>org-meta-return</code> 一样, 除了添加了一个新的上下文 <code>(modi/org-in-any-block-p)</code>.
+</p>
+
+<p>
+你可以通过将 <code>((modi/org-in-any-block-p) #'modi/org-split-block)</code> 移动到 <code>cond</code> 中来添加这个新的上下文.
+</p>
+
+<p>
+<a id="orgfa07d28"></a>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">modi/org-meta-return</span> (<span style="font-weight: bold; text-decoration: underline;">&amp;optional</span> arg)
+  <span style="font-style: italic;">"Insert a new heading or wrap a region in a table.</span>
+
+<span style="font-style: italic;">  Calls `</span><span style="font-weight: bold; font-style: italic; text-decoration: underline;">org-insert-heading</span><span style="font-style: italic;">', `</span><span style="font-weight: bold; font-style: italic; text-decoration: underline;">org-insert-item</span><span style="font-style: italic;">',</span>
+<span style="font-style: italic;">  `</span><span style="font-weight: bold; font-style: italic; text-decoration: underline;">org-table-wrap-region</span><span style="font-style: italic;">', or `</span><span style="font-weight: bold; font-style: italic; text-decoration: underline;">modi/org-split-block</span><span style="font-style: italic;">' depending on</span>
+<span style="font-style: italic;">  context. When called with an argument, unconditionally call</span>
+<span style="font-style: italic;">  `</span><span style="font-weight: bold; font-style: italic; text-decoration: underline;">org-insert-heading</span><span style="font-style: italic;">'."</span>
+  (<span style="font-weight: bold;">interactive</span> <span style="font-style: italic;">"P"</span>)
+  (org-check-before-invisible-edit 'insert)
+  (<span style="font-weight: bold;">or</span> (run-hook-with-args-until-success 'org-metareturn-hook)
+      (call-interactively (<span style="font-weight: bold;">cond</span> (arg #'org-insert-heading)
+                                ((org-at-table-p) #'org-table-wrap-region)
+                                ((org-in-item-p) #'org-insert-item)
+                                ((modi/org-in-any-block-p) #'modi/org-split-block)
+                                (t #'org-insert-heading)))))
+(advice-add 'org-meta-return <span style="font-weight: bold;">:override</span> #'modi/org-meta-return)
+</pre>
+</div>
+
+<p>
+<a href="#orgfa07d28">Code Snippet 3</a> 为 <code>org-meta-return</code> 添加光标处于Org块中时的上下文
+</p>
+
+<pre class="example">
+建议函数添加光标处于Org块中时的上下文
+
+</pre>
+
+<p>
+现在当光标位于Org块中时， 按下 M-return 就可以了！
+</p>
+</div>
+</div>
+
+<div id="outline-container-org2062835" class="outline-2">
+<h2 id="full-code"><a id="org2062835"></a>完整的代码</h2>
+<div class="outline-text-2" id="text-full-code">
+<p>
+请查看我Emacs配置 <a href="https://github.com/kaushalmodi/.emacs.d/blob/master/setup-files/setup-org.el"><code>setup-org.el</code></a> 文件 中 <code>modi/org-split-block</code> （及其依赖函数）的源代码。
+</p>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2018-09-17</span>
+            <span title="last modification date" class="post-info">2019-12-29</span>
+            <span title="tags" class="post-info">:<a href="../../../../../tags/elisp-common">elisp-common</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-4350ea14-e25e-47dc-9c37-c8f0484961a5">lujun9972</a></span>
+        </div>
+    <script src="../../../../../media/js/jquery-2.1.3.min.js"></script>
+    <script src="../../../../../media/js/md5.min.js"></script>
+        <section>
+            <div id="gitalk-container"></div>
+            <script type="text/javascript">
+             var gitalk = new Gitalk({
+                 clientID: 'fdcb5d9da3f4acb4862c',
+                 clientSecret: 'dd0a16312a206782cb7669dcec5e96874ab48170',
+                 repo: 'lujun9972.github.com',
+                 owner: 'lujun9972',
+                 admin: ['lujun9972'],
+                 id: md5(location.pathname),      // Ensure uniqueness and length less than 50
+                 distractionFreeMode: false  // Facebook-like distraction free mode
+             })
+             gitalk.render('gitalk-container')
+            </script>
+        </section>
+    <script src="../../../../../media/js/main.js"></script>
+        <script>
+         var _hmt = _hmt || [];
+         (function() {
+             var hm = document.createElement("script");
+             hm.src = "https://hm.baidu.com/hm.js?7bac4fd0247f69c27887e0d4e3aee41e";
+             var s = document.getElementsByTagName("script")[0]; 
+             s.parentNode.insertBefore(hm, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-4350ea14-e25e-47dc-9c37-c8f0484961a5">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="../../../../../instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>

@@ -19,14 +19,14 @@
 <div>
   <header class="masthead">
     <h1 class="masthead-title"><a href="../../../../../">EMACS-DOCUMENT</a></h1>
-    <p>=============&gt;集思广益</p>
+    <p>=============&gt;随便,谢谢</p>
     <nav class="site-nav">
       <ul class="trigger">
         <li><a href="../../../../../years/">Years</a></li>
         <li><a href="../../../../../authors/">Authors</a></li>
         <li><a href="../../../../../tags/">Tags</a></li>
         <li><a href="../../../../../about/">About</a></li>
-        <li><a href="https://github.com/lujun9972/emacs-document">Github</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
         <li><a href="../../../../../rss.xml">RSS</a></li>
       </ul>
     </nav>
@@ -44,107 +44,150 @@
 <h2>&#30446;&#24405;</h2>
 <div id="text-table-of-contents">
 <ul>
-<li><a href="#defining-a-data-structure-from-scratch">Defining a data structure from scratch</a>
+<li><a href="#org1c62896">Defining a data structure from scratch</a>
 <ul>
-<li><a href="#two-pitfalls">Two pitfalls</a></li>
+<li><a href="#orgfbbf746">Two pitfalls</a></li>
 </ul>
 </li>
-<li><a href="#dynamic-dispatch">Dynamic dispatch</a></li>
+<li><a href="#orga5be4b4">*两个陷阱</a></li>
+<li><a href="#org3349b80">Dynamic dispatch</a></li>
 </ul>
 </div>
 </div>
 <p>
 So your Emacs package has grown beyond a dozen or so lines of code, and
+因此，您的Emacs包已经超过了十几行代码，并且
 the data it manages is now structured and heterogeneous. Informal plain
+它管理的数据现在是结构化和异构的。非正式的平原
 old lists, the bread and butter of any lisp, are not longer cutting it.
+旧的列表，任何口齿不清的人赖以为生的东西，已经不再起作用了。
 You really need to cleanly abstract this structure, both for your own
+您确实需要清楚地抽象这个结构，为了您自己
 organizational sake any for anyone reading your code.
+组织的目的任何读你的代码的人。
 </p>
 
 <p>
 With informal lists as structures, you might regularly ask questions
+使用非正式的列表结构，您可能会经常提出问题
 like, “Was the ‘name' slot stored in the third list element, or was
+例如，“Was ' name' slot存储在第三个列表元素中，或者Was
 it the fourth element?” A plist or alist helps with this problem, but
+是第四个元素吗?一个专家或学者可以帮助解决这个问题，但是
 those are better suited for informal, externally-supplied data, not
+它们更适合于非正式的、外部提供的数据，而不是
 for internal structures with fixed slots. Occasionally someone
+适用于有固定槽的内部结构。偶尔有人
 suggests using hash tables as structures, but Emacs Lisp's hash tables
+建议使用哈希表作为结构，但Emacs Lisp的哈希表
 are much too heavy for this. Hash tables are more appropriate when
+对这个来说太重了。这时哈希表更合适
 keys themselves are data.
+键本身就是数据。
 </p>
 
-<div id="outline-container-orgff67dbc" class="outline-2">
-<h2 id="defining-a-data-structure-from-scratch"><a id="orgff67dbc"></a>Defining a data structure from scratch</h2>
-<div class="outline-text-2" id="text-defining-a-data-structure-from-scratch">
+<div id="outline-container-org1c62896" class="outline-2">
+<h2 id="org1c62896">Defining a data structure from scratch</h2>
+<div class="outline-text-2" id="text-org1c62896">
+<p>
+*从零开始定义数据结构
+</p>
+<p>
+属性:
+:CUSTOM_ID: defining-a-data-structure-from-scratch
+:CUSTOM_ID defining-a-data-structure-from-scratch
+</p>
+<p>
+结束:
+</p>
+
 <p>
 Imagine a refrigerator package that manages a collection of food in a
+想象一下，一个冰箱的包装里有一堆食物
 refrigerator. A food item could be structured as a plain old list,
+冰箱。食物可以是一个普通的旧列表，
 with slots at specific positions.
+在特定的位置有槽。
 </p>
 
 <pre class="example">
 (defun fridge-item-create (name expiry weight)
- (list name expiry weight))
+(list name expiry weight))
 </pre>
 
 <p>
 A function that computes the mean weight of a list of food items might
+计算食品列表的平均重量的函数可能
 look like this:
+看起来像这样:
 </p>
 
 <pre class="example">
 (defun fridge-mean-weight (items)
- (if (null items)
- 0.0
- (let ((sum 0.0)
- (count 0))
- (dolist (item items (/ sum count))
- (setf count (1+ count)
- sum (+ sum (nth 2 item)))))))
+(if (null items)
+0.0
+(let ((sum 0.0)
+(count 0))
+(dolist (item items (/ sum count))
+(setf count (1+ count)
+sum (+ sum (nth 2 item)))))))
 </pre>
 
 <p>
 Note the use of <code>(nth 2 item)</code> at the end, used to get the item's
+注意，最后使用=(nth 2 item)=来获取该项
 weight. That magic number 2 is easy to mess up. Even worse, if lots of
+重量。这个神奇的数字2很容易搞砸。更糟糕的是，如果有很多的话
 code accesses “weight” this way, then future extensions will be
+代码以这种方式访问“权值”，那么将来的扩展将是这样的
 inhibited. Defining some accessor functions solves this problem.
+抑制。定义一些访问器函数可以解决这个问题。
 </p>
 
 <pre class="example">
 (defsubst fridge-item-name (item)
- (nth 0 item))
+(nth 0 item))
 
 (defsubst fridge-item-expiry (item)
- (nth 1 item))
+(nth 1 item))
 
 (defsubst fridge-item-weight (item)
- (nth 2 item))
+(nth 2 item))
 </pre>
 
 <p>
 The <code>defsubst</code> defines an inline function, so there's effectively no
+defsubst=定义了一个内联函数，所以实际上没有
 additional run-time costs for these accessors compared to a bare
+与裸机相比，这些访问器的额外运行时成本更高
 <code>nth</code>. Since these only cover getting slots, we should also define
+= n =。由于这些仅仅覆盖了获取插槽，我们还应该定义
 some setters using the built-in gv (generalized variable) package.
+一些setter使用内置的gv(通用变量)包。
 </p>
 
 <pre class="example">
 (require 'gv)
 
 (gv-define-setter fridge-item-name (value item)
- `(setf (nth 0 ,item) ,value))
+`(setf (nth 0 ,item) ,value))
 
 (gv-define-setter fridge-item-expiry (value item)
- `(setf (nth 1 ,item) ,value))
+`(setf (nth 1 ,item) ,value))
 
 (gv-define-setter fridge-item-weight (value item)
- `(setf (nth 2 ,item) ,value))
+`(setf (nth 2 ,item) ,value))
 </pre>
 
 <p>
 This makes each slot setf-able. Generalized variables are great for
+这使每个插槽可设置。广义变量很有用
 simplifying APIs, since otherwise there would need to be an equal
+简化api，因为否则就需要相等
 number of setter functions (<code>fridge-item-set-name</code>, etc.). With
+setter函数的数量(=fridg -item-set-name=，等等)。与
 generalized variables, both are at the same entrypoint:
+广义变量，两者在同一入口点:
 </p>
 
 <pre class="example">
@@ -153,136 +196,207 @@ generalized variables, both are at the same entrypoint:
 
 <p>
 There are still two more significant improvements.
+还有两个更重要的改进。
 </p>
 
 <ol class="org-ol">
-<li>As far as Emacs Lisp is concerned, this isn't a real type. The
-type-ness of it is just a fiction created by the conventions of the
-package. It would be easy to make the mistake of passing an
-arbitrary list to these <code>fridge-item</code> functions, and the mistake
-wouldn't be caught so long as that list has at least three items.
-An common solution is to add a type tag: a symbol at the
-beginning of the structure that identifies it.</li>
-
-<li>It's still a linked list, and <code>nth</code> has to walk the list (i.e.
-<code>O(n)</code>) to retrieve items. It would be much more efficient to use a
-vector, turning this into an efficient <code>O(1)</code> operation.</li>
+<li>As far as Emacs Lisp is concerned, this isn't a real type. The</li>
+<li>就Emacs Lisp而言，这不是一个真正的类型。的</li>
 </ol>
+<p>
+type-ness of it is just a fiction created by the conventions of the
+它的类型只是一个虚构的传统
+package. It would be easy to make the mistake of passing an
+包中。很容易犯通过考试的错误
+arbitrary list to these <code>fridge-item</code> functions, and the mistake
+任意列表到这些=fridg -item=函数，并出错
+wouldn't be caught so long as that list has at least three items.
+只要这个列表中至少有三项就不会被发现。
+An common solution is to add a type tag: a symbol at the
+一种常见的解决方案是添加类型标记:在
+beginning of the structure that identifies it.
+标识它的结构的开头。
+</p>
+
+<ol class="org-ol">
+<li>It's still a linked list, and <code>nth</code> has to walk the list (i.e.</li>
+<li>它仍然是一个链表，并且=nth=必须遍历该链表(即</li>
+</ol>
+<p>
+<code>O(n)</code>) to retrieve items. It would be much more efficient to use a
+<code>O(n)</code>)检索项目。使用a会更有效率
+vector, turning this into an efficient <code>O(1)</code> operation.
+向量，把它变成一个有效的操作=O(1)=运算。
+</p>
 
 <p>
 Addressing both of these at once:
+同时解决这两个问题:
 </p>
 
 <pre class="example">
 (defun fridge-item-create (name expiry weight)
- (vector 'fridge-item name expiry weight))
+(vector 'fridge-item name expiry weight))
 
 (defsubst fridge-item-p (object)
- (and (vectorp object)
- (= (length object) 4)
- (eq 'fridge-item (aref object 0))))
+(and (vectorp object)
+(= (length object) 4)
+(eq 'fridge-item (aref object 0))))
 
 (defsubst fridge-item-name (item)
- (unless (fridge-item-p item)
- (signal 'wrong-type-argument (list 'fridge-item item)))
- (aref item 1))
+(unless (fridge-item-p item)
+(signal 'wrong-type-argument (list 'fridge-item item)))
+(aref item 1))
 
 (defsubst fridge-item-name--set (item value)
- (unless (fridge-item-p item)
- (signal 'wrong-type-argument (list 'fridge-item item)))
- (setf (aref item 1) value))
+(unless (fridge-item-p item)
+(signal 'wrong-type-argument (list 'fridge-item item)))
+(setf (aref item 1) value))
 
 (gv-define-setter fridge-item-name (value item)
- `(fridge-item-name--set ,item ,value))
+`(fridge-item-name--set ,item ,value))
 
 ;; And so on for expiry and weight...
 </pre>
 
 <p>
 As long as <code>fridge-mean-weight</code> uses the <code>fridge-item-weight</code>
+只要=fridg -mean-weight=使用=fridg -item-weight=
 accessor, it continues to work unmodified across all these changes.
+访问器，它将继续在所有这些更改中不加修改地工作。
 But, whew, that's quite a lot of boilerplate to write and maintain
+但是，要编写和维护的样板文件太多了
 for each data structure in our package! Boilerplate code generation is
+对于我们包中的每个数据结构!样板代码生成是
 a perfect candidate for a macro definition. Luckily for us, Emacs
+一个宏定义的完美候选。幸运的是，Emacs
 already defines a macro to generate all this code: <code>cl-defstruct</code>.
+已经定义了一个宏来生成所有这些代码:=cl-defstruct=。
 </p>
 
 <pre class="example">
 (require 'cl)
 
 (cl-defstruct fridge-item
- name expiry weight)
+name expiry weight)
 </pre>
 
 <p>
 In Emacs 25 and earlier, this innocent looking definition expands into
+在Emacs 25和更早的版本中，这个看起来很简单的定义扩展为
 essentially all the above code. The code it generates is expressed in
+基本上所有上述代码。它生成的代码用表示
 <a href="file:///blog/2017/01/30/">the most optimal form</a> for its version of Emacs, and it
+<a href="file:///blog/2017/01/30/">最优形式</a>为其版本的Emacs，以及it
 exploits many of the available optimizations by using function
+通过使用函数来利用许多可用的优化
 declarations such as <code>side-effect-free</code> and <code>error-free</code>. It's
+声明如=副作用自由=和=错误自由=。这是
 configurable, too, allowing for the exclusion of a type tag (<code>:named</code>)
+也可配置，允许排除类型标记(<code>:named</code>)
 --- discarding all the type checks --- or using a list rather than a
+——丢弃所有类型检查——或者使用列表而不是a
 vector as the underlying structure (<code>:type</code>). As a crude form of
+向量作为底层结构(<code>:type</code>)。作为一种粗糙的形式
 structural inheritance, it even allows for directly embedding other
+结构继承，它甚至允许直接嵌入其他
 structures (<code>:include</code>).
+结构(<code>:包括</code>)。
 </p>
 </div>
 
-<div id="outline-container-orgc05302e" class="outline-3">
-<h3 id="two-pitfalls"><a id="orgc05302e"></a>Two pitfalls</h3>
-<div class="outline-text-3" id="text-two-pitfalls">
+<div id="outline-container-orgfbbf746" class="outline-3">
+<h3 id="orgfbbf746">Two pitfalls</h3>
+</div>
+</div>
+<div id="outline-container-orga5be4b4" class="outline-2">
+<h2 id="orga5be4b4">*两个陷阱</h2>
+<div class="outline-text-2" id="text-orga5be4b4">
+<p>
+属性:
+:CUSTOM_ID: two-pitfalls
+:CUSTOM_ID two-pitfalls
+</p>
+<p>
+结束:
+</p>
+
 <p>
 There a couple pitfalls, though. First, for historical reasons, *the
+不过，这里有几个陷阱。首先，由于历史原因，*the
 macro will define two namespace-unfriendly functions: <code>make-NAME</code> and
+宏将定义两个名称空间不友好的函数:=make-NAME=和
 <code>copy-NAME=*. I always override these, preferring the =-create</code>
+= copy-NAME = *。我总是重写这些，更喜欢=-create=
 convention for the constructor, and tossing the copier since it's
+构造函数的约定，因为它是
 either useless or, worse, semantically wrong.
+要么毫无用处，要么更糟，在语义上是错误的。
 </p>
 
 <pre class="example">
 (cl-defstruct (fridge-item (:constructor fridge-item-create)
- (:copier nil))
- name expiry weight)
+(:copier nil))
+name expiry weight)
 </pre>
 
 <p>
 If the constructor needs to be more sophisticated than just setting
+如果构造函数需要更复杂的设置
 slots, it's common to define a “private” constructor (double dash in
+槽，通常定义一个“私有”构造函数(双破折号)
 the name) and wrap it with a “public” constructor that has some
+用一个“public”构造函数封装它
 behavior.
+的行为。
 </p>
 
 <pre class="example">
 (cl-defstruct (fridge-item (:constructor fridge-item--create)
- (:copier nil))
- name expiry weight entry-time)
+(:copier nil))
+name expiry weight entry-time)
 
 (cl-defun fridge-item-create (&amp;rest args)
- (apply #'fridge-item--create :entry-time (float-time) args))
+(apply #'fridge-item--create :entry-time (float-time) args))
 </pre>
 
 <p>
 The other pitfall is related to printing. In Emacs 25 and earlier,
+另一个陷阱与印刷有关。在Emacs 25和更早的时候，
 types defined by <code>cl-defstruct</code> are still only types by convention.
+按照约定，由=cl-defstruct=定义的类型仍然只是类型。
 They're really just vectors as far as Emacs Lisp is concerned. One
+就Emacs Lisp而言，它们实际上只是向量。一个
 benefit from this is that <a href="file:///blog/2013/12/30/">printing and reading</a> these
+这样做的好处是<a href="file:///blog/2013/12/30/">打印和阅读</a>这些
 structures is “free” because vectors are printable. It's trivial to
-serialize <code>cl-defstruct</code> structures out to a file. This is <a href="file:///blog/2013/09/09/">exactly
+结构是“免费的”，因为向量是可打印的。是微不足道的
+serialize <code>cl-defstruct</code> structures out to a file. This is [[/blog/2013/09/09/][exactly
+序列化=cl-defstruct=构造出一个文件。这是<a href="file:///博客/ 2013/09/09 /">没错
 how the Elfeed database works</a>.
+Elfeed数据库如何工作]]。
 </p>
 
 <p>
-The pitfall is that <b>once a structure has been serialized, there's no
-more changing the <code>cl-defstruct</code> definition.</b> It's now a file format
+The pitfall is that *once a structure has been serialized, there's no
+问题是，一旦一个结构被序列化了，就没有了
+more changing the <code>cl-defstruct</code> definition.* It's now a file format
+更多更改=cl-defstruct=定义。*现在是文件格式
 definition, so the slots are locked in place. Forever.
+定义是，槽被锁定在一个地方。直到永远。
 </p>
 
 <p>
 Emacs 26 throws a wrench in all this, though it's worth it in the long
+Emacs 26给这一切带来了麻烦，尽管从长远来看是值得的
 run. There's a new primitive type in Emacs 26 with its own reader
-syntax: records. This is similar to hash tables <a href="file:///blog/2010/06/07/">becoming first class
-in the reader in Emacs 23.2</a>. In Emacs 26, <code>cl-defstruct</code> uses
+运行。Emacs 26中有一个新的原始类型，它有自己的阅读器
+syntax: records. This is similar to hash tables [[/blog/2010/06/07/][becoming first class
+语法:记录。这类似于哈希表[[/blog/2010/06/07/]成为第一类
+in the reader in Emacs 23.2]]. In Emacs 26, <code>cl-defstruct</code> uses
+在Emacs 23.2的读者中[]。在Emacs 26中，=cl-defstruct=使用
 records instead of vectors.
+记录而不是向量。
 </p>
 
 <pre class="example">
@@ -297,76 +411,114 @@ records instead of vectors.
 
 <p>
 So far slots are still accessed using <code>aref</code>, and all the type
+到目前为止，插槽仍然使用=aref=和所有类型进行访问
 checking still happens in Emacs Lisp. The only practical change is the
+检查仍然在Emacs Lisp中发生。唯一实际的变化是
 <code>record</code> function is used in place of the <code>vector</code> function when
+当使用=record=函数代替=vector=函数时
 allocating a structure. But it does pave the way for more interesting
+分配结构。但它确实为更有趣的事情铺平了道路
 things in the future.
+未来的事情。
 </p>
 
 <p>
 The major short-term downside is that this breaks printed compatibility
+主要的短期缺点是这会破坏打印兼容性
 across the Emacs 25/26 boundary. The <code>cl-old-struct-compat-mode</code>
+跨过Emacs 25/26边界。= cl-old-struct-compat-mode =
 function can be used for some degree of backwards, but not forwards,
+函数可以用于某种程度的向后，但不能用于向前，
 compatibility. Emacs 26 can read and use some structures printed by
+兼容性。Emacs 26可以读取和使用一些打印出来的结构
 Emacs 25 and earlier, but the reverse will never be true. This issue
+Emacs 25和更早，但反过来永远不会是真的。这个问题
 initially <a href="https://debbugs.gnu.org/cgi/bugreport.cgi?bug=27617">tripped up Emacs' built-in packages</a>, and when Emacs 26
+最初的<a href="https://debbugs.gnu.org/cgi/bugreport.cgi?bug=27617">绊倒了Emacs的内置包</a>，当Emacs 26
 is released we'll see more of these issues arise in external packages.
+我们将看到更多的这些问题出现在外部包。
 </p>
 </div>
 </div>
-</div>
 
-<div id="outline-container-org15972f7" class="outline-2">
-<h2 id="dynamic-dispatch"><a id="org15972f7"></a>Dynamic dispatch</h2>
-<div class="outline-text-2" id="text-dynamic-dispatch">
+<div id="outline-container-org3349b80" class="outline-2">
+<h2 id="org3349b80">Dynamic dispatch</h2>
+<div class="outline-text-2" id="text-org3349b80">
+<p>
+*动态调度
+</p>
+<p>
+属性:
+:CUSTOM_ID: dynamic-dispatch
+:CUSTOM_ID:动态调度)
+</p>
+<p>
+结束:
+</p>
+
 <p>
 Prior to Emacs 25, the major built-in package for dynamic dispatch ---
+在Emacs 25之前，动态调度的主要内置包——
 functions that specialize on the run-time type of their arguments --- was
+专门针对其参数的运行时类型的函数——was
 EIEIO, though it only supported single dispatch (specializing on a
+EIEIO，虽然它只支持单个分派(专门针对a
 single argument). EIEIO brought much of the Common Lisp Object System
+单参数)。EIEIO带来了许多常见的Lisp对象系统
 (CLOS) to Emacs Lisp, including classes and methods.
+(CLOS)到Emacs Lisp，包括类和方法。
 </p>
 
 <p>
 Emacs 25 introduced a more sophisticated dynamic dispatch package
+Emacs 25引入了更复杂的动态分派包
 called cl-generic. It focuses only on dynamic dispatch and supports
+叫cl-generic。它只关注动态调度和支持
 multiple dispatch, completely replacing the dynamic dispatch portion
+多分派，完全替代动态分派部分
 of EIEIO. Since <code>cl-defstruct</code> does inheritance and cl-generic does
+EIEIO。因为=cl-defstruct=做继承，而cl-generic做继承
 dynamic dispatch, there's not really much left for EIEIO --- besides bad
+动态调度，留给EIEIO的就不多了——除了坏的
 ideas like multiple inheritance and method combination.
+比如多重继承和方法组合。
 </p>
 
 <p>
 Without either of these packages, the most direct way to build single
-dispatch on top of <code>cl-defstruct</code> would be to <a href="file:///blog/2014/10/21/">shove a function in one
-of the slots</a>. Then the “method” is just a wrapper that call this
+没有这些包中的任何一个，最直接的方式是构建single
+dispatch on top of <code>cl-defstruct</code> would be to [[/blog/2014/10/21/][shove a function in one
+分派在=cl-defstruct=将是<a href="file:///blog/2014/10/21/">file:///blog/2014/10/21/</a>[推一个功能在一个
+of the slots]]. Then the “method” is just a wrapper that call this
+槽]]。那么“方法”就是调用这个的包装器
 function.
+函数。
 </p>
 
 <pre class="example">
 ;; Base "class"
 
 (cl-defstruct greeter
- greeting)
+greeting)
 
 (defun greet (thing)
- (funcall (greeter-greeting thing) thing))
+(funcall (greeter-greeting thing) thing))
 
 ;; Cow "class"
 
 (cl-defstruct (cow (:include greeter)
- (:constructor cow--create)))
+(:constructor cow--create)))
 
 (defun cow-create ()
- (cow--create :greeting (lambda (_) "Moo!")))
+(cow--create :greeting (lambda (_) "Moo!")))
 
 ;; Bird "class"
 
 (cl-defstruct (bird (:include greeter)
- (:constructor bird--create)))
+(:constructor bird--create)))
 
 (defun bird-create ()
- (bird--create :greeting (lambda (_) "Chirp!")))
+(bird--create :greeting (lambda (_) "Chirp!")))
 
 ;; Usage:
 
@@ -379,9 +531,13 @@ function.
 
 <p>
 Since cl-generic is aware of the types created by <code>cl-defstruct</code>,
+因为cl-generic知道由=cl-defstruct=创建的类型，
 functions can specialize on them as if they were native types. It's a
+函数可以专门化它们，就像它们是本机类型一样。这是一个
 lot simpler to let cl-generic do all the hard work. The people reading
+让cl-generic来做所有的艰苦工作要简单得多。人们阅读
 your code will appreciate it, too:
+你的代码也会欣赏它:
 </p>
 
 <pre class="example">
@@ -392,12 +548,12 @@ your code will appreciate it, too:
 (cl-defstruct cow)
 
 (cl-defmethod greet ((_ cow))
- "Moo!")
+"Moo!")
 
 (cl-defstruct bird)
 
 (cl-defmethod greet ((_ bird))
- "Chirp!")
+"Chirp!")
 
 (greet (make-cow))
 ;; =&gt; "Moo!"
@@ -408,8 +564,11 @@ your code will appreciate it, too:
 
 <p>
 The majority of the time a simple <code>cl-defstruct</code> will fulfill your
+大多数情况下，一个简单的=cl-defstruct=将满足你的
 needs, keeping in mind the gotcha with the constructor and copier
+注意构造函数和复印机的问题
 names. Its use should feel almost as natural as defining functions.
+的名字。它的使用应该和定义函数一样自然。
 </p>
 </div>
 </div>
@@ -419,9 +578,9 @@ names. Its use should feel almost as natural as defining functions.
 <div>
         <div class="post-meta">
             <span title="post date" class="post-info">2018-03-22</span>
-            <span title="last modification date" class="post-info">2018-03-22</span>
+            <span title="last modification date" class="post-info">2019-12-21</span>
             <span title="tags" class="post-info">:<a href="../../../../../tags/raw">raw</a>:</span>
-            <span title="author" class="post-info"><a href="mailto:lujun9972 &lt;at&gt; T520">lujun9972</a></span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-4350ea14-e25e-47dc-9c37-c8f0484961a5">lujun9972</a></span>
         </div>
     <script src="../../../../../media/js/jquery-2.1.3.min.js"></script>
     <script src="../../../../../media/js/md5.min.js"></script>
@@ -441,10 +600,19 @@ names. Its use should feel almost as natural as defining functions.
             </script>
         </section>
     <script src="../../../../../media/js/main.js"></script>
+        <script>
+         var _hmt = _hmt || [];
+         (function() {
+             var hm = document.createElement("script");
+             hm.src = "https://hm.baidu.com/hm.js?7bac4fd0247f69c27887e0d4e3aee41e";
+             var s = document.getElementsByTagName("script")[0]; 
+             s.parentNode.insertBefore(hm, s);
+         })();
+        </script>
     <div class="footer">
-        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 26.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
         <p>
-            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:lujun9972 &lt;at&gt; T520">lujun9972</a>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-4350ea14-e25e-47dc-9c37-c8f0484961a5">lujun9972</a>
             &nbsp;&nbsp;-&nbsp;&nbsp;
             Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
             <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>

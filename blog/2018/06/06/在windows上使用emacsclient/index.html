@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>在Windows上使用Emacsclient - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="emacs-common" />
+  <!-- <link rel="stylesheet" href="../../../../../media/css/main.css" type="text/css"/>
+       <link rel="stylesheet" href="../../../../../media/css/comment.css" type="text/css"/> -->
+  <link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/kognise/water.css@latest/dist/dark.css'>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="../../../../../">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <ul class="trigger">
+        <li><a href="../../../../../years/">Years</a></li>
+        <li><a href="../../../../../authors/">Authors</a></li>
+        <li><a href="../../../../../tags/">Tags</a></li>
+        <li><a href="../../../../../about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="../../../../../rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="https://www.bing.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">在Windows上使用Emacsclient</h1>
+<div id="table-of-contents">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#setup-in-elisp">elisp配置</a>
+<ul>
+<li><a href="#use-tcp-sockets">使用 TCP sockets</a></li>
+<li><a href="#uniquify-the-server-authentication-directory">规范化服务器认证目录</a></li>
+<li><a href="#prevent-server-is-unsafe-errors">预防 ‘server is unsafe' 错误</a></li>
+</ul>
+</li>
+<li><a href="#windows-environment-variables">Windows环境变量</a></li>
+<li><a href="#start-the-server">启动服务器</a></li>
+<li><a href="#using-the-emacsclient">使用 emacsclient</a></li>
+</ul>
+</div>
+</div>
+<p>
+But for this to work on Windows, we need some more elisp and Windows environment variable configuration than just the below code,
+使用emacsclient替代emacs二进制文件是一种非常有用的技术，可以防止每次打开新文件时都从新开始加载emacs。
+这项技术在Windows上也很有用。但是要在Windows上使用该技术，仅仅使用下面的配置是不够的,我们需要更多的elisp配置并且配置一些Windows环境变量:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">require</span> '<span style="font-weight: bold; text-decoration: underline;">server</span>)
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Start a server if (server-running-p) does not return t (e.g. if it</span>
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">returns nil or :other)</span>
+(<span style="font-weight: bold;">or</span> (eq (server-running-p) t)
+    (server-start))
+</pre>
+</div>
+
+<div id="outline-container-org8e76e29" class="outline-2">
+<h2 id="setup-in-elisp"><a id="org8e76e29"></a>elisp配置</h2>
+<div class="outline-text-2" id="text-setup-in-elisp">
+</div>
+
+<div id="outline-container-org672d7a6" class="outline-3">
+<h3 id="use-tcp-sockets"><a id="org672d7a6"></a>使用 TCP sockets</h3>
+<div class="outline-text-3" id="text-use-tcp-sockets">
+<p>
+By default the value of <code>server-use-tcp</code> is <code>nil</code>. So for Windows, we need this,
+我不明白为什么是这样，但要在Windows上启动服务，你需要使用TCP套接字，而不是本地套接字。默认情况下 <code>server-use-tcp</code> 的值为 <code>nil</code> 。因此在Windows上，我们需要这样做，
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">when</span> (equal window-system 'w32)
+  (<span style="font-weight: bold;">setq</span> server-use-tcp t))
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org2620f67" class="outline-3">
+<h3 id="uniquify-the-server-authentication-directory"><a id="org2620f67"></a>规范化服务器认证目录</h3>
+<div class="outline-text-3" id="text-uniquify-the-server-authentication-directory">
+<p>
+当 <code>server-use-tcp</code> 值非nil时， <code>server-auth-dir</code> 用于存储服务器身份验证文件。对于我来说，在两台不同的机器上运行相同的emacs是很正常的(在罕见的情况下可能在同一台机器上运行不同版本的emacs)，通过Dropbox共享相同的 <code>~/.emacs.d/</code> 目录。所以我对 <code>server-auth-dir</code> 进行了规范。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp"><span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Below needs to be set before you require 'server</span>
+(<span style="font-weight: bold;">setq</span> server-auth-dir
+      (<span style="font-weight: bold;">let</span> ((dir (concat user-emacs-directory
+                         <span style="font-style: italic;">"server_"</span> (format <span style="font-style: italic;">"%s_%s"</span>
+                                           emacs-major-version
+                                           emacs-minor-version)
+                         <span style="font-style: italic;">"_"</span> (system-name) <span style="font-weight: bold; font-style: italic;">; </span><span style="font-weight: bold; font-style: italic;">Use the var `</span><span style="font-weight: bold; font-style: italic; text-decoration: underline;">system-name</span><span style="font-weight: bold; font-style: italic;">' directly</span>
+                                        <span style="font-weight: bold; font-style: italic;">; </span><span style="font-weight: bold; font-style: italic;">if using emacs older than 25.1.</span>
+                         <span style="font-style: italic;">"/"</span>)))
+        (make-directory dir <span style="font-weight: bold;">:parents</span>)
+        dir))
+</pre>
+</div>
+
+<p>
+因此，如果我正在运行emacs 25.1，并且我的Windows机器名是 <code>FOO</code> ，那么 <code>server-auth-dir</code> 的值将被设置为 <code>~/.emacs.d/server_25_1_FOO/</code> 。
+</p>
+</div>
+</div>
+
+<div id="outline-container-orge575a3a" class="outline-3">
+<h3 id="prevent-server-is-unsafe-errors"><a id="orge575a3a"></a>预防 ‘server is unsafe' 错误</h3>
+<div class="outline-text-3" id="text-prevent-server-is-unsafe-errors">
+<p>
+为了让服务器在Windows上启动，还需要使用下面的技巧。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">with-eval-after-load</span> 'server
+  (<span style="font-weight: bold;">when</span> (equal window-system 'w32)
+    <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Suppress error "directory ~/.emacs.d/server is unsafe". It is needed</span>
+    <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">needed for the server to start on Windows.</span>
+    (<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">server-ensure-safe-dir</span> (dir) <span style="font-style: italic;">"Noop"</span> t)))
+</pre>
+</div>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orge0bd7cf" class="outline-2">
+<h2 id="windows-environment-variables"><a id="orge0bd7cf"></a>Windows环境变量</h2>
+<div class="outline-text-2" id="text-windows-environment-variables">
+<p>
+You will need to set <code>EMACS_SERVER_FILE</code> and <code>HOME</code> environment variables in Windows. I came up with the below steps that work on Windows 7.
+您需要在Windows中设置 <code>EMACS_SERVER_FILE</code> 和 <code>HOME</code> 环境变量。下面步骤适用于Windows 7。
+</p>
+
+<ul class="org-ul">
+<li>点击开始&gt;控制面板。</li>
+<li>在搜索域中搜索environment。</li>
+<li>点击编辑用户的环境变量。</li>
+<li>点击用户变量下的新建…</li>
+<li>在变量名字段中输入 <code>EMACS_SERVER_FILE</code> ，并在变量值字段中输入适当的值，其值为 <code>server-auth-dir</code> 中设置的值加上 <code>server</code> 。</li>
+
+<li>我 <code>server-auth-dir</code> 的值为 <code>~/.emacs.d/server_25_1_FOO/</code>. 因此我设置变量值为 <code>C:\Users\KModi\Dropbox\home\.emacs.d\server_25_1_FOO\server</code>. 这里使用 <code>/</code> 代替 了 <code>\</code> 。</li>
+<li>我还在使用相同的步骤在Windows上将用户环境变量 <code>HOME</code> 设置为 <code>C:\Users\KModi\Dropbox\home</code>.</li>
+
+<li>点击确定保存环境变量。</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-org719ef7f" class="outline-2">
+<h2 id="start-the-server"><a id="org719ef7f"></a>启动服务器</h2>
+<div class="outline-text-2" id="text-start-the-server">
+<p>
+下面代码在启动emacs时启动服务器。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">require</span> '<span style="font-weight: bold; text-decoration: underline;">server</span>)
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Start a server if (server-running-p) does not return t (e.g. if it</span>
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">returns nil or :other)</span>
+(<span style="font-weight: bold;">or</span> (eq (server-running-p) t)
+    (server-start))
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orga530948" class="outline-2">
+<h2 id="using-the-emacsclient"><a id="orga530948"></a>使用 emacsclient</h2>
+<div class="outline-text-2" id="text-using-the-emacsclient">
+<ol class="org-ol">
+<li>在启动Window后， 第一次启动Emacs 使用 <code>runemacs.exe</code> 启动.</li>
+<li>之后使用 <code>emacsclientw.exe</code>.</li>
+</ol>
+
+<p>
+为了方便，我将 <code>runemacs.exe</code> 快捷方式添加到 所有程序&gt;启动 中。这样每次我启动Windows时，emacs都会自动启动。
+</p>
+
+<p>
+如果你经常需要使用emacsclient在emacs中打开文件，可以 按住Shift键+右键单击文件,-选择打开方式,-点击选择默认程序并选择 <code>emacsclientw.exe</code> 可执行文件。
+</p>
+
+<ul class="org-ul">
+<li>你可以在 <a href="https://github.com/kaushalmodi/.emacs.d/blob/6c7b77af6ea39fd6e016a873fad763a712547223/setup-files/setup-server.el">这里</a> 找到我的完整配置</li>
+<li>本方法在 <a href="https://ftp.gnu.org/gnu/emacs/windows/">官方Windows版Emacs</a> 和 <a href="https://github.com/zklhp/emacs-w64/releases">emacs-w64</a> 都通过测试,测试版本为Emacs 25.1</li>
+</ul>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2018-06-06</span>
+            <span title="last modification date" class="post-info">2019-12-28</span>
+            <span title="tags" class="post-info">:<a href="../../../../../tags/emacs-common">emacs-common</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-4350ea14-e25e-47dc-9c37-c8f0484961a5">lujun9972</a></span>
+        </div>
+    <script src="../../../../../media/js/jquery-2.1.3.min.js"></script>
+    <script src="../../../../../media/js/md5.min.js"></script>
+        <section>
+            <div id="gitalk-container"></div>
+            <script type="text/javascript">
+             var gitalk = new Gitalk({
+                 clientID: 'fdcb5d9da3f4acb4862c',
+                 clientSecret: 'dd0a16312a206782cb7669dcec5e96874ab48170',
+                 repo: 'lujun9972.github.com',
+                 owner: 'lujun9972',
+                 admin: ['lujun9972'],
+                 id: md5(location.pathname),      // Ensure uniqueness and length less than 50
+                 distractionFreeMode: false  // Facebook-like distraction free mode
+             })
+             gitalk.render('gitalk-container')
+            </script>
+        </section>
+    <script src="../../../../../media/js/main.js"></script>
+        <script>
+         var _hmt = _hmt || [];
+         (function() {
+             var hm = document.createElement("script");
+             hm.src = "https://hm.baidu.com/hm.js?7bac4fd0247f69c27887e0d4e3aee41e";
+             var s = document.getElementsByTagName("script")[0]; 
+             s.parentNode.insertBefore(hm, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-4350ea14-e25e-47dc-9c37-c8f0484961a5">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="../../../../../instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>

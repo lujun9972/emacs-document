@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Org-mode中的Capture mode 与 Date Trees - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="org-mode" />
+  <!-- <link rel="stylesheet" href="../../../../../media/css/main.css" type="text/css"/>
+       <link rel="stylesheet" href="../../../../../media/css/comment.css" type="text/css"/> -->
+  <link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/kognise/water.css@latest/dist/dark.css'>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="../../../../../">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <ul class="trigger">
+        <li><a href="../../../../../years/">Years</a></li>
+        <li><a href="../../../../../authors/">Authors</a></li>
+        <li><a href="../../../../../tags/">Tags</a></li>
+        <li><a href="../../../../../about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="../../../../../rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="https://www.bing.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">Org-mode中的Capture mode 与 Date Trees</h1>
+<div id="table-of-contents">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#sec-1_1">何为Capture?</a></li>
+<li><a href="#sec-1_2">Capture 模板</a></li>
+<li><a href="#sec-1_3">日期树格式</a></li>
+<li><a href="#sec-1_4">捕获内容到日期树中</a></li>
+<li><a href="#sec-1_5">捕获和日期树的实际用途</a>
+<ul>
+<li><a href="#org9019477">我的生产率系统</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+<p>
+org-mode一个重要的功能是能够捕获笔记和想法(使用 <b>capture</b> 模式)并存储在一个制定位置中。日期树是一种根据日期指定位置的方法
+</p>
+
+<div id="outline-container-orga904733" class="outline-2">
+<h2 id="sec-1_1"><a id="orga904733"></a>何为Capture?</h2>
+<div class="outline-text-2" id="text-sec-1_1">
+<p>
+Capture 是一种快速添加内容到org文件中的工具，它讲究最小化的干扰工作流. 
+它取代了 <b>remember</b> 模块但是操作上很类似. 使用 capture 的基本流程为:
+</p>
+
+<ol class="org-ol">
+<li>调用 capture. 我在 <code>.emacs</code> 文件中设置 org-capture 的快捷键为 F6:</li>
+</ol>
+<p>
+<code>(global-set-key (kbd "&lt;f6&gt;") 'org-capture)</code>
+</p>
+<ol class="org-ol">
+<li>一个带有模板列表的新窗口显示出来. 每个木板都有一个对应的快捷键，比如 <code>n</code> 表示 笔记(notes) <code>t</code> 表示 待办(Todo-list)事项.</li>
+<li>输入快捷键, 例如输入 <code>n</code> 表示记录笔记</li>
+<li>输入内容</li>
+<li>通过 <code>C-c C-c</code> 保存笔记</li>
+<li>继续工作。</li>
+</ol>
+
+<p>
+如果您想进到内容保存的位置，请输入 <code>C-u C-u F6</code>,这个命令非常有用。
+</p>
+</div>
+</div>
+
+<div id="outline-container-org413422a" class="outline-2">
+<h2 id="sec-1_2"><a id="org413422a"></a>Capture 模板</h2>
+<div class="outline-text-2" id="text-sec-1_2">
+<p>
+每个模板都在 <code>.emacs</code> 文件中通过定制org-mode选项进行设置.
+捕获元素组件说明在手册第9.1.3.1节有所说明，以下是概要:
+</p>
+
+<ul class="org-ul">
+<li>一个 <b>快捷键</b> (字母)</li>
+<li>一个针对该模板的 <b>描述</b></li>
+<li>一个条目的 <b>类型</b> 说明. 可以一个带标题的 org-mode <b>条目</b> (节点), 一个列表项, 一个复选框项(<b>checkitem</b>) , 一个表格行(<b>table-line</b>) 或 <b>纯</b> 文本.</li>
+<li>一个 <b>目标</b>, 指定捕获的目的地</li>
+<li>一个 <b>模板</b> - 一段文本，可以通过特殊转译符代表日期、提示输入字符串等</li>
+<li>而外的行为属性(我仍然对如何设置属性列表感到困惑)</li>
+</ul>
+
+<p>
+这是我办公室电脑上的Capture模板:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">'(org-capture-templates
+  (<span style="font-weight: bold;">quote</span> (
+          (<span style="font-style: italic;">"a"</span> <span style="font-style: italic;">"Appointment"</span> entry (file+headline
+                                    <span style="font-style: italic;">"c:/charles/My Dropbox/GTD/taskdiary.org"</span> <span style="font-style: italic;">"Calendar"</span>)
+           <span style="font-style: italic;">"* APPT %^{Description} %^g</span>
+<span style="font-style: italic;">  %?</span>
+<span style="font-style: italic;">  Added: %U"</span>)
+          (<span style="font-style: italic;">"n"</span> <span style="font-style: italic;">"Notes"</span> entry (file+datetree
+                              <span style="font-style: italic;">"c:/charles/My Dropbox/GTD/taskdiary.org"</span>)
+           <span style="font-style: italic;">"* %^{Description} %^g %?</span>
+<span style="font-style: italic;">  Added: %U"</span>)
+          (<span style="font-style: italic;">"t"</span> <span style="font-style: italic;">"Task Diary"</span> entry (file+datetree
+                                   <span style="font-style: italic;">"c:/charles/My Dropbox/GTD/taskdiary.org"</span>)
+           <span style="font-style: italic;">"* TODO %^{Description} %^g</span>
+<span style="font-style: italic;">%?</span>
+<span style="font-style: italic;">Added: %U"</span>)
+          (<span style="font-style: italic;">"j"</span> <span style="font-style: italic;">"Journal"</span> entry (file+datetree
+                                <span style="font-style: italic;">"c:/charles/My Dropbox/GTD/workjournal.org"</span>)
+           <span style="font-style: italic;">"** %^{Heading}"</span>)
+
+          (<span style="font-style: italic;">"l"</span> <span style="font-style: italic;">"Log Time"</span> entry (file+datetree
+                                 <span style="font-style: italic;">"c:/charles/My Dropbox/GTD/timelog.org"</span> )
+           <span style="font-style: italic;">"** %U - %^{Activity} :TIME:"</span>)
+          )))
+</pre>
+</div>
+
+
+<p>
+注意模板是如何扩展成多行的。如果你想要一些换行的文本，那么根据需要格式化模板即可。
+例如例子中的“Added:”文本就是从新行开始到。
+</p>
+
+<p>
+下面是按下 <code>F6</code> 后出现的 capture mode的截屏.可以根上面的描述做个对比。
+</p>
+
+
+<div class="figure">
+<p><img src="http://members.optusnet.com.au/~charles57/GTD/capture1.png" alt="capture1.png" />
+</p>
+</div>
+
+<p>
+关于这个配置的一些注意事项:
+</p>
+
+<ul class="org-ul">
+<li>我将文件存放在一个通过基于web的 <a href="https://www.dropbox.com">DropBox</a> 服务来同步办公室和家庭电脑的目录中。</li>
+<li><code>%^g</code> 表示提示输入标签</li>
+<li>所有捕获的内容都通过 <code>Added: %U</code> 加上时间戳。</li>
+<li>有些内容放在文件中特定的目录下，比如约会就方式 <b>标题</b> 目录下</li>
+<li>其他条目在日期树中归档。下一节中对此进行了解释。</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-orgf1ed5d4" class="outline-2">
+<h2 id="sec-1_3"><a id="orgf1ed5d4"></a>日期树格式</h2>
+<div class="outline-text-2" id="text-sec-1_3">
+<p>
+日期树是一组以日期基准捕获信息的标题。
+标题有三层，每一层都有特定的格式:
+</p>
+
+<ul class="org-ul">
+<li>第一级标题是 <b>年</b> (<code>YYYY</code>)</li>
+<li>第二级标题是 <b>月</b> (<code>YYYY-MM 月名</code>)</li>
+<li>第三级标题是 <b>日</b> (<code>YYYY-MM-DD 日名</code>)</li>
+</ul>
+
+<p>
+这是我的文件的一个截屏，展示了一个日期树。
+</p>
+
+
+<div class="figure">
+<p><img src="http://members.optusnet.com.au/~charles57/GTD/datetree1.png" alt="datetree1.png" />
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org4209cbf" class="outline-2">
+<h2 id="sec-1_4"><a id="org4209cbf"></a>捕获内容到日期树中</h2>
+<div class="outline-text-2" id="text-sec-1_4">
+<p>
+Capture使用模板定义(存储在您的 <code>.emacs</code> 启动文件中)来定义信息存储在哪个文件的哪个位置。
+其中一类位置是日期树: <code>(file+datetree "path/to/file")</code>.
+</p>
+
+<p>
+在日期树中创建新标题时，Capture在目标文件的开头查找匹配年份。如果如果没有找到，则创建第一级标题。月和日也是重复这一过程。间隔的月和日标题不会被创建来填补空白.
+</p>
+
+<p>
+你也可以不经过Capture，直接在对应的标题下添加内容. 
+这使我可以手工输入周几 (从agenda视图中读取，这可以帮助我识别一周的开始日期). 
+你还可以为这些标题添加标签
+</p>
+</div>
+</div>
+
+<div id="outline-container-org74b1e47" class="outline-2">
+<h2 id="sec-1_5"><a id="org74b1e47"></a>捕获和日期树的实际用途</h2>
+<div class="outline-text-2" id="text-sec-1_5">
+<p>
+我习惯在精装笔记本上记笔记。我在笔记上每一天开始划上一条线，写下日期和星期，然后记下这一天的笔记。
+Date tree和Capture允许我重现这个功能。
+</p>
+
+<p>
+我也习惯用日记来确定约会和最后期限。日程视图为我提供了这个功能，使我可以在org-mode文件中移动分支(标题)。
+</p>
+
+<p>
+日期树提供了类似在“日记”的日期页面的中写入内容的功能。我使用一个名为 <code>taskdiary.org</code> 的文件来存放我捕获的笔记，并将“to Do”列表项作为树的分支。
+</p>
+
+<p>
+<b>笔记</b> 模板提示输入标题，然后将光标放在标题下面以便输入或粘帖内容.
+</p>
+
+<p>
+<b>任务</b> 模板也提示输入标题作为类别标签，模板中中包含 TODO 关键字.
+</p>
+
+<p>
+在这两个模板中，我都添加了创建条目时的日期和时间，因为这提供了有用的跟踪信息，特别是当内容需要重新归档时。
+</p>
+
+<p>
+我本可以把笔记和代办任务分文件存放，但我希望笔记和任务共存于同一地方。
+有时我会把一个笔记转换成代办事项，当这两者在同一文件中时，这种转换就很容易了。
+</p>
+
+<p>
+<b>日志</b> 模板用于记录长期的信息，例如日记，读书笔记和我做过的事。
+我不会再移动日志文件中的内容，且日志文件仅存在于我家里的电脑上。
+</p>
+
+
+<p>
+我这周开始记录时间日志,它被用于追踪我一整天的工作内容. 每次我开始一个新任务或者中断一个任务，我都会记录一个简短的描述。
+下面是迄今为止我一天的工作安排:
+</p>
+
+
+<div class="figure">
+<p><img src="http://members.optusnet.com.au/~charles57/GTD/timelog.png" alt="timelog.png" />
+</p>
+</div>
+
+<p>
+<b>收据</b> 用来记录网上银行和电子商务网站上的付款细节的. 我发现将财务信息与其他日记内容区分开比较合适。
+</p>
+
+<p>
+该模板仅在我的家庭电脑上设置，因为我只在家里进行个人财务方面的工作。
+</p>
+</div>
+
+<div id="outline-container-org9019477" class="outline-3">
+<h3 id="org9019477">我的生产率系统</h3>
+<div class="outline-text-3" id="text-org9019477">
+<p>
+:CUSTOM_ID: sec-1_5_1
+</p>
+
+<p>
+下面截屏显示了部分任务日志
+</p>
+
+
+<div class="figure">
+<p><img src="http://members.optusnet.com.au/~charles57/GTD/datetree3.png" alt="datetree3.png" />
+</p>
+</div>
+
+<p>
+你可以看到2010-10-06(周三)有一个计算机相关的代办任务以及两个笔记事项。
+2010-10-19(周二)有两个代办事项和三个已完成的任务。
+</p>
+
+<p>
+此日期树正是我任务管理系统的基础。
+</p>
+
+<p>
+Items are added as follows:-
+增加项目的步骤如下:-
+</p>
+
+<ul class="org-ul">
+<li><b>代办</b> 事项通过 <b>t</b> 对应的捕获模板添加，并通过一个标签来表明其上下文环境。然后通过合适的命令添加预定日期和结束日期(快捷键分别为 <code>C-c s</code> 和 <code>C-c d</code>)。</li>
+<li><b>笔记</b> 通过 <b>n</b> 对应的捕获模板添加.</li>
+</ul>
+
+<p>
+我通过下面方法来决定下一步要做什么:
+</p>
+
+<ul class="org-ul">
+<li><b>Agenda 视图</b> - 查看设置了预定日期和结束日期的项目</li>
+<li><b>Tag</b> 视图 - 查看带有某标签的项目(标签标识了我的GTD上下文, 比如家庭、办公室、金融、阅读、DVD等)</li>
+<li><b>每周回顾</b> - 每周我都会快速扫一下这周添加的项目.</li>
+</ul>
+</div>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2018-09-19</span>
+            <span title="last modification date" class="post-info">2019-12-28</span>
+            <span title="tags" class="post-info">:<a href="../../../../../tags/org-mode">org-mode</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-4350ea14-e25e-47dc-9c37-c8f0484961a5">lujun9972</a></span>
+        </div>
+    <script src="../../../../../media/js/jquery-2.1.3.min.js"></script>
+    <script src="../../../../../media/js/md5.min.js"></script>
+        <section>
+            <div id="gitalk-container"></div>
+            <script type="text/javascript">
+             var gitalk = new Gitalk({
+                 clientID: 'fdcb5d9da3f4acb4862c',
+                 clientSecret: 'dd0a16312a206782cb7669dcec5e96874ab48170',
+                 repo: 'lujun9972.github.com',
+                 owner: 'lujun9972',
+                 admin: ['lujun9972'],
+                 id: md5(location.pathname),      // Ensure uniqueness and length less than 50
+                 distractionFreeMode: false  // Facebook-like distraction free mode
+             })
+             gitalk.render('gitalk-container')
+            </script>
+        </section>
+    <script src="../../../../../media/js/main.js"></script>
+        <script>
+         var _hmt = _hmt || [];
+         (function() {
+             var hm = document.createElement("script");
+             hm.src = "https://hm.baidu.com/hm.js?7bac4fd0247f69c27887e0d4e3aee41e";
+             var s = document.getElementsByTagName("script")[0]; 
+             s.parentNode.insertBefore(hm, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-4350ea14-e25e-47dc-9c37-c8f0484961a5">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="../../../../../instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>

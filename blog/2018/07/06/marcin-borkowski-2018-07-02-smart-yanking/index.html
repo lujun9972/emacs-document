@@ -19,14 +19,14 @@
 <div>
   <header class="masthead">
     <h1 class="masthead-title"><a href="../../../../../">EMACS-DOCUMENT</a></h1>
-    <p>=============&gt;集思广益</p>
+    <p>=============&gt;随便,谢谢</p>
     <nav class="site-nav">
       <ul class="trigger">
         <li><a href="../../../../../years/">Years</a></li>
         <li><a href="../../../../../authors/">Authors</a></li>
         <li><a href="../../../../../tags/">Tags</a></li>
         <li><a href="../../../../../about/">About</a></li>
-        <li><a href="https://github.com/lujun9972/emacs-document">Github</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
         <li><a href="../../../../../rss.xml">RSS</a></li>
       </ul>
     </nav>
@@ -42,11 +42,13 @@
 <h1 class="title">Marcin Borkowski: 2018-07-02 Smart yanking</h1>
 <p>
 Notice: this is a long, technical post about a useful piece of Emacs Lisp. What it does it allowing to yank text with a space at either end both before and after a space between words and have Emacs adjust things so that you don't end up with two spaces at one end of the yanked fragment and no space at the other one. If you just want the working code, you may get it from here: <a href="https://gist.github.com/mbork/9ee1bd8216424e07342e88739fe65547">https://gist.github.com/mbork/9ee1bd8216424e07342e88739fe65547</a>. If you want to know the gory details, read on.
+注意:这是一篇很长的关于Emacs Lisp有用部分的技术文章。它所做的是允许在单词之间的前后两端都有空格的文本，并让Emacs进行调整，这样您就不会在被拖拽的片段的一端有两个空格，而另一端没有空格。如果你只是想要工作代码，你可以从这里:<a href="https://gist.github.com/mbork/9ee1bd8216424e07342e88739fe65547">https://gist.github.com/mbork/9ee1bd8216424e07342e88739fe65547</a>。如果你想知道血淋淋的细节，请继续读下去。
 </p>
 
 <p>
 
 Edit: in the first version of this blog post, I made an embarrassing rookie mistake. Sorry for that. Given that this post is one of the most popular ones in recent months, it is both ironic and humbling...
+编辑:在这篇博客文章的第一个版本中，我犯了一个令人尴尬的新手错误。对不起。鉴于这篇文章是近几个月来最受欢迎的文章之一，它既讽刺又令人难堪……
 </p>
 
 <p>
@@ -55,14 +57,16 @@ Edit: in the first version of this blog post, I made an embarrassing rookie mist
 
 <p>
 Anyway, the mistake is now corrected. Expect another blog post where I explain what I did wrong (I think it's easy to fall for this!).
+不管怎样，这个错误现在已经改正了。期待我在另一篇博文中解释我做错了什么(我认为很容易上当!)
 </p>
 
 <p>
 I use Emacs fairly often to write text in a natural language. While I consider Emacs support for human languages to be very good, there are still a few rough edges. One of them is connected with cutting and pasting, or, as Emacs insists on calling these, killing and yanking.
+我经常使用Emacs以自然语言编写文本。虽然我认为Emacs对人类语言的支持非常好，但仍然存在一些不足之处。其中一个与剪切和粘贴有关，或者像Emacs坚持称的那样，与杀戮和猛拉有关。
 </p>
 
 <p>
-It's been a long time since I wrote anything in Word, but I vaguely recall that its pasting command is fairly smart with respect to spaces. For instance, consider the following text:<br />
+It's been a long time since I wrote anything in Word, but I vaguely recall that its pasting command is fairly smart with respect to spaces. For instance, consider the following text:\
 </p>
 
 <pre class="example">
@@ -70,7 +74,7 @@ The quick| brown fox jumps over the lazy dog.
 </pre>
 
 <p>
-(The vertical bar denotes the point.) Now imagine pressing <code>M-d</code> (<code>kill-word</code>):<br />
+(The vertical bar denotes the point.) Now imagine pressing <code>M-d</code> (<code>kill-word</code>):\
 </p>
 
 <pre class="example">
@@ -78,7 +82,7 @@ The quick| fox jumps over the lazy dog.
 </pre>
 
 <p>
-and moving to the “lazy” part:<br />
+and moving to the “lazy” part:\
 </p>
 
 <pre class="example">
@@ -87,10 +91,11 @@ The quick fox jumps over the |lazy dog.
 
 <p>
 Notice how we are now on the beginning of the word instead of at the end of the previous one. (This might have happened if we e.g. went to the end of line -- <code>C-e</code> -- and then back by two words -- <code>M-2 M-b</code>.)
+注意我们现在是在单词的开头，而不是前一个单词的结尾。(这种情况可能会发生，如果我们例如:went to the end of line—=C-e=—and then by two words—=M-2 M-b=。)
 </p>
 
 <p>
-If we now press <code>C-y</code>, we end up with this:<br />
+If we now press <code>C-y</code>, we end up with this:\
 </p>
 
 <pre class="example">
@@ -99,170 +104,212 @@ The quick fox jumps over the brown|lazy dog.
 
 <p>
 As you can see, we now have a double space before “brown” and no space after it.
+如您所见，我们现在在“brown”前面有一个双空格，在它后面没有空格。
 </p>
 
 <p>
 It is not difficult to code a function doing the right thing in this case. (The “right thing” could be e.g. moving the point back by a space before yanking.) The problem, however, is to know when we should do that.
+在这种情况下，编写正确的函数并不困难。(“正确的做法”可以是，在猛拉之前，将指针向后移动一个空格。)然而，问题是要知道我们什么时候应该这样做。
 </p>
 
 <p>
 First of all, it is definitely a bad idea in programming modes. (Possibly unless we are editing comments or strings, but let's forget about it for now.) On the other hand, Org-mode, LaTeX modes etc. are fine. This means that we probably should put our customizations in <code>text-mode-hook</code>.
+首先，在编程模式中这绝对是个坏主意。(可能除非我们在编辑注释或字符串，但现在先把它忘掉。)另一方面，组织模式、乳胶模式等也很好。这意味着我们可能应该将定制放在=text-mode-hook=中。
 </p>
 
 <p>
 Then, we should decide where in the Emacs system we should plug our functionality into. Redefining <code>yank</code> is probably a bad idea -- we do not want to do all the hard work that command does (it has more than a dozen lines!). We could define our own command, let's call it <code>smart-yank</code>, which would do its magic and then call <code>yank</code>, but there is no need to. Emacs has a special facility designed exactly to this kind of customizations, called <code>advice</code>. We can advise the <code>yank</code> command, which means that we provide some Elisp code to be run before or after <code>yank</code> (or even instead of it).
+然后，我们应该决定将我们的功能插入Emacs系统的哪个部分。重新定义=yank=可能是个坏主意——我们不想做命令所做的所有艰苦工作(它有十几行!)我们可以定义我们自己的命令，我们将它命名为=smart-yank=，它会执行它的魔法，然后调用=yank=，但是没有必要这样做。Emacs有一个专门针对这种定制设计的特殊工具，称为=advice=。我们可以建议使用=yank=命令，这意味着我们提供了一些Elisp代码，可以在=yank=之前或之后运行(甚至代替它)。
 </p>
 
 <p>
 One drawback of using advice is that it is global: there is no way to install advice only in a specific mode or buffer. In other words, <code>text-mode-hook</code> will be of no use for us. This is not a huge problem, though, since we can make our function check whether we are in a mode derived from <code>text-mode</code>, and do nothing if we are not in such a mode.
+使用通知的一个缺点是它是全局的:无法仅在特定模式或缓冲区中安装通知。换句话说，=text-mode-hook=对我们没有用处。不过，这并不是一个大问题，因为我们可以让函数检查是否处于派生自=text-mode=的模式，如果不处于这种模式，则什么也不做。
 </p>
 
 <p>
-Now let's think about what exactly our advice should do. This is not easy, especially that we should probably take into consideration the fact that we may have two spaces at the end of the sentence, and that instead of a space we may have a newline between words. My first idea is to check whether the last entry in the kill ring has a whitespace character at the left or right. My assumptions are as follow.<br />
+Now let's think about what exactly our advice should do. This is not easy, especially that we should probably take into consideration the fact that we may have two spaces at the end of the sentence, and that instead of a space we may have a newline between words. My first idea is to check whether the last entry in the kill ring has a whitespace character at the left or right. My assumptions are as follow.\
 </p>
 
 <ul class="org-ul">
 <li>If it has whitespace on both sides, nothing special should happen.</li>
-<li>If it has whitespace on e.g. left side, and there is whitespace to the left of the point, we should move point before any whitespace.</li>
-<li>Similarly if the last kill rinf entry has whitespace on the right side.<br />
-If the kill ring entry has no space on either side, it might be difficult to decide what to do. It might be the case that it is not a whole word but only a prefix (though this would be strange). I think I could try to make sure that in this case, space is inserted on whichever side had no space before, and just see what happens during daily usage.</li>
 </ul>
+<p>
+-如果两边都有空格，就不会发生什么特别的事情。
+</p>
+<ul class="org-ul">
+<li>If it has whitespace on e.g. left side, and there is whitespace to the left of the point, we should move point before any whitespace.</li>
+</ul>
+<p>
+-如果它有空白，例如左边，和有空白的点的左边，我们应该移动点之前的任何空白。
+</p>
+<ul class="org-ul">
+<li>Similarly if the last kill rinf entry has whitespace on the right side.\</li>
+</ul>
+<p>
+If the kill ring entry has no space on either side, it might be difficult to decide what to do. It might be the case that it is not a whole word but only a prefix (though this would be strange). I think I could try to make sure that in this case, space is inserted on whichever side had no space before, and just see what happens during daily usage.
+如果杀环入口两边都没有空间，可能很难决定该怎么做。它可能不是一个完整的单词，而是一个前缀(尽管这很奇怪)。我想我可以试着确保在这种情况下，插入空间的任何一方没有空间之前，只是看看发生了什么日常使用。
+</p>
 
 <p>
 All this is rather simplified, since we do not really care for newlines and filling, but let's do it one step at a time.
+所有这些都非常简单，因为我们并不真正关心换行和填充，但是让我们一次只做一步。
 </p>
 
 <pre class="example">
 (defun has-space-at-boundary-p (string)
- "Check whether STRING has any whitespace on the boundary.
+"Check whether STRING has any whitespace on the boundary.
 Return 'left, 'right, 'both or nil."
- (let ((result nil))
- (when (string-match-p "^[[:space:]]+" string)
- (setq result 'left))
- (when (string-match-p "[[:space:]]+$" string)
- (if (eq result 'left)
-     (setq result 'both)
-    (setq result 'right)))
- result))
+(let ((result nil))
+(when (string-match-p "^[[:space:]]+" string)
+(setq result 'left))
+(when (string-match-p "[[:space:]]+$" string)
+(if (eq result 'left)
+(setq result 'both)
+(setq result 'right)))
+result))
 </pre>
 
 <p>
 Notice how I used <code>string-match-p</code>, which does not modify match data (which is global state, so I don't like modifying it by my functions).
+注意我是如何使用=string-match-p=的，它不修改匹配数据(这是全局状态，所以我不喜欢通过函数修改它)。
 </p>
 
 <p>
-Let us now write the function checking whether we should do something special when yanking. The criteria are as follows:<br />
+Let us now write the function checking whether we should do something special when yanking. The criteria are as follows:\
 </p>
 
 <ul class="org-ul">
 <li>If there is no space around point or on both sides of the point, do nothing special.</li>
+</ul>
+<p>
+-如果点周围或点的两边没有空间，不要做任何特殊的事情。
+</p>
+<ul class="org-ul">
 <li>If there is space e.g. to the left of the point, and the yanked text has space on the left, move point left across all the space first.</li>
+</ul>
+<p>
+-如果有空格，例如在点的左边，并且被拉下的文本在左边有空格，则先将点左移到整个空格。
+</p>
+<ul class="org-ul">
 <li>If there is space to the right of the point, do the analogous thing.</li>
 </ul>
+<p>
+如果在点的右边有空间，做类似的事情。
+</p>
 
 <p>
-First, we want to be able to check whether there is any whitespace around the point.<br />
+First, we want to be able to check whether there is any whitespace around the point.\
 </p>
 
 <pre class="example">
 (defun is-there-space-around-point-p ()
- "Check whether there is whitespace around point.
+"Check whether there is whitespace around point.
 Return 'left, 'right, 'both or nil."
- (let ((result nil))
- (when (&lt; (save-excursion
-     (skip-chars-backward "[:space:]"))
-     0)
- (setq result 'left))
- (when (&gt; (save-excursion
-     (skip-chars-forward "[:space:]"))
-     0)
- (if (eq result 'left)
-     (setq result 'both)
-    (setq result 'right)))
- result))
+(let ((result nil))
+(when (&lt; (save-excursion
+(skip-chars-backward "[:space:]"))
+0)
+(setq result 'left))
+(when (&gt; (save-excursion
+(skip-chars-forward "[:space:]"))
+0)
+(if (eq result 'left)
+(setq result 'both)
+(setq result 'right)))
+result))
 </pre>
 
 <p>
 We can now write the function combining all we have done so far.
+我们现在可以写出这个函数了。
 </p>
 
 <pre class="example">
 (defun set-point-before-yanking (string)
- "Put point in the appropriate place before yanking STRING."
- (let ((space-in-yanked-string (has-space-at-boundary-p string))
-    (space-at-point (is-there-space-around-point-p)))
- (cond ((and (eq space-in-yanked-string 'left)
-        (eq space-at-point 'left))
-     (skip-chars-backward "[:space:]"))
-     ((and (eq space-in-yanked-string 'right)
-        (eq space-at-point 'right))
-     (skip-chars-forward "[:space:]")))))
+"Put point in the appropriate place before yanking STRING."
+(let ((space-in-yanked-string (has-space-at-boundary-p string))
+(space-at-point (is-there-space-around-point-p)))
+(cond ((and (eq space-in-yanked-string 'left)
+(eq space-at-point 'left))
+(skip-chars-backward "[:space:]"))
+((and (eq space-in-yanked-string 'right)
+(eq space-at-point 'right))
+(skip-chars-forward "[:space:]")))))
 </pre>
 
 <p>
 Now there is one problem. We cannot advice <code>yank</code>, since we do not know the yanked string before <code>yank</code> is actually evaluated. (We could of course look up the source code for <code>yank</code>, and see how it uses <code>current-kill</code> to get the right string. Copying and pasting code between a function and its advice, however, kind of defeats the purpose of advising it in the first place.) It turns out, however, that <code>yank</code> is a pretty complicated mechanism, which calls the <code>insert-for-yank</code> command. It allows for some deep magic, manipulating text before yanking (and indeed, this mechanism could be used to solve our initial problem!). We may than advice <code>insert-for-yank</code>, which gets exactly what we want (the string) as its sole argument.
+现在有一个问题。我们不能advice =yank=，因为在=yank=被实际求值之前，我们不知道被拉动的字符串。(当然，我们可以查找=yank=的源代码，看看它如何使用=current-kill=来获得正确的字符串。然而，在函数和它的建议之间复制和粘贴代码，从一开始就违背了建议它的目的。然而，=yank=是一个相当复杂的机制，它调用=insert-for-yank=命令。它允许在猛拉之前对文本进行一些深层次的处理(实际上，这种机制可以用来解决我们最初的问题!)我们可以使用than advice =insert-for-yank=，它获取我们想要的(字符串)作为惟一参数。
 </p>
 
 <p>
 One possible drawback of this approach is that <code>yank</code> calls <code>push-mark</code> before <code>insert-for-yank</code>, which may or may not be what we want. We could circumvent that, but I'm not sure whether it's worth the effort, and the code would be even more hacky than it is now.
+这种方法的一个可能的缺点是=yank= calls <code>push-mark</code> before =insert-for-yank=，这可能是我们想要的，也可能不是。我们可以绕过它，但我不确定这样做是否值得，代码将比现在更容易破解。
 </p>
 
 <p>
-So let's finally define and install our advice, remembering about checking whether the mode is a text one.<br />
+So let's finally define and install our advice, remembering about checking whether the mode is a text one.\
 </p>
 
 <pre class="example">
 (defun set-point-before-yanking-if-in-text-mode (string)
- "Invoke `set-point-before-yanking' in text modes."
- (when (derived-mode-p 'text-mode)
- (set-point-before-yanking string)))
+"Invoke `set-point-before-yanking' in text modes."
+(when (derived-mode-p 'text-mode)
+(set-point-before-yanking string)))
 
 (advice-add
- 'insert-for-yank
- :before
- #'set-point-before-yanking-if-in-text-mode)
+'insert-for-yank
+:before
+#'set-point-before-yanking-if-in-text-mode)
 </pre>
 
 <p>
 This solution has one drawback. It installs some magic working behind the scenes (such kind of magic is traditionally called “DWIM” -- or “do what I mean” in Emacs world), and does not give the user any convenient way of turning this magic off. I don't like it when computers try to be smarter than they are, so I'd prefer to be able to tell Emacs “just yank this as it is, without paying attention to any spaces whatsoever”. Now the question is: how to tell that to Emacs? A prefix argument (<code>C-u</code>) is the first idea, but a prefix argument to <code>yank</code> has a well established meaning and I don't want to give up that.
+这个解决方案有一个缺点。安装一些魔法在幕后工作(这样的魔法传统上被称为“DWIM”——或者Emacs世界上“做我的意思”),和不给用户任何方便关闭这个神奇的方式。我不喜欢它当电脑尝试比他们更聪明,所以我希望能够告诉Emacs“猛拉这个,没有注意到任何空间”。现在的问题是:如何告诉Emacs?前缀参数(<code>C-u</code>)是第一个想法，但是前缀参数to =yank=有一个确定的含义，我不想放弃它。
 </p>
 
 <p>
 Well, another natural choice is <code>C-u C-u</code>. We have one problem, though. The <code>insert-for-yank</code> function knows nothing about the prefix argument to <code>yank</code>.
+另一个自然的选择是=C-u C-u=。不过，我们有一个问题。函数=insert-for-yank=对前缀参数=yank=一无所知。
 </p>
 
 <p>
 We may overcome this problem in a few ways. The first that came to my mind was to advise <code>yank</code> instead. This is probably not a bad idea, although there is one problem with it: what about other yanking commands? There aren't many of them in stock Emacs, and I don't care for yanking rectangles a lot (although my advice will break it, since <code>yank-rectangle</code> calls <code>insert-for-yank</code> repeatedly for each line), but there are at least <code>yank-pop</code> and mouse yanking commands. Since I don't yank rectangles very often (although I happen to use <code>delete-rectangle</code> every now and again), I am willing to pay the price.
+我们可以用几种方法来克服这个问题。我首先想到的是advise <code>yank</code> instead。这可能不是一个坏主意，尽管它有一个问题:其他的猛拉命令呢?在股票Emacs中，这样的命令并不多，而且我也不太喜欢猛拉矩形(尽管我的建议会破坏它，因为=猛拉矩形=调用=插入-for-猛拉=每行重复执行)，但是至少有=猛拉-pop=和鼠标猛拉命令。因为我不经常使用矩形(尽管我偶尔会使用=delete-rectangle=)，所以我愿意为此付出代价。
 </p>
 
 <p>
 This leaves us with the problem of telling <code>insert-for-yank</code> about the prefix argument to the command that invoked it. Luckily for us, we don't have to do anything. There is already the <a href="http://mbork.pl/2017-07-09_current-prefix-arg">current-prefix-arg</a> variable, which is global state, so blah, blah, you shouldn't use it, but really, who cares.
+这给我们留下了一个问题:告诉=insert-for-yank=调用它的命令的前缀参数。幸运的是，我们不需要做任何事。已经有了<a href="http://mbork。pl/2017-07-09_current-prefix-arg">current-prefix-arg</a>变量，它是全局状态，所以，等等，你不应该使用它，但真的，谁在乎呢。
 </p>
 
 <p>
-So here again is our advice.<br />
+So here again is our advice.\
 </p>
 
 <pre class="example">
 (defun set-point-before-yanking (string)
- "Put point in the appropriate place before yanking STRING."
- (unless (equal current-prefix-arg '(16))
- (let ((space-in-yanked-string (has-space-at-boundary-p string))
-     (space-at-point (is-there-space-around-point-p)))
- (cond ((and (eq space-in-yanked-string 'left)
-         (eq space-at-point 'left))
-     (skip-chars-backward "[:space:]"))
-     ((and (eq space-in-yanked-string 'right)
-         (eq space-at-point 'right))
-     (skip-chars-forward "[:space:]"))))))
+"Put point in the appropriate place before yanking STRING."
+(unless (equal current-prefix-arg '(16))
+(let ((space-in-yanked-string (has-space-at-boundary-p string))
+(space-at-point (is-there-space-around-point-p)))
+(cond ((and (eq space-in-yanked-string 'left)
+(eq space-at-point 'left))
+(skip-chars-backward "[:space:]"))
+((and (eq space-in-yanked-string 'right)
+(eq space-at-point 'right))
+(skip-chars-forward "[:space:]"))))))
 </pre>
 
 <p>
 Now <code>C-u C-u C-y</code> inserts the last entry in the kill ring as is. This is still not ideal -- we cannot meaningfully pass <code>C-u C-u</code> to <code>yank-pop</code>, for instance -- but should work well enough. (Remember that in a pinch, you can always manually reinsert the spaces. This is not as bad as it sounds -- yanking puts the point and mark around the yanked stuff, although without activating the mark, so jumping to the other side of the yanked text is as simple as <code>C-u C-SPC</code> or <code>C-x C-x</code>.) Incidentally, this also fixes the problem with yanking rectangles -- if <code>yank-rectangle</code> behaves wrong (i.e., the yanked lines are not aligned because of our machinations), you can just undo it and say <code>C-u C-u C-x r y</code> -- it's cumbersome, but possible.
+现在=C-u C-u C-y=按原样插入终止环中的最后一项。这仍然不理想——例如，我们不能有意义地将=C-u C-u=传递给=yank-pop=，但是应该可以很好地工作。(记住，在紧急情况下，总是可以手动重新插入空格。这并没有听起来那么糟糕——虽然没有激活标记，但是在标记的周围加上点和标记，所以跳到标记的另一边就像=C-u C-SPC=或=C-x C-x=一样简单。)顺便说一句，这也修复了拉拽矩形的问题——如果=拉拽矩形=行为错误(即。你可以撤销它，然后说=C-u C-u C-x r y=——这很麻烦，但也是可能的。
 </p>
 
 <p>
 Interestingly, there exists a completely different approach to the whole problem. There is a <code>yank-handler</code> property which you can put on a string passed to <code>insert-for-yank</code>, and it specifies a function that is called instead of <code>insert</code> when yanking text. So, we might just leave the yanking as it is, and make <code>kill-region</code> put this property on the text, with a “modified insert”. This approach looks promising, but I envision one problem: it won't support yanking texts from outside Emacs. For now, I'm staying with the above.
+有趣的是，有一个完全不同的方法来解决整个问题。有一个=yank-handler=属性，您可以将其放在传递给=insert-for-yank=的字符串上，它指定了一个函数，在对文本进行猛拉时调用该函数而不是=insert=。因此，我们可能只需要保持拉拽的原样，并使用“修改后的插入”使=kill-region=将此属性放在文本上。这种方法看起来很有前途，但我认为有一个问题:它不支持从Emacs外部删除文本。就目前而言，我仍坚持上述观点。
 </p>
 
 </div>
@@ -270,9 +317,9 @@ Interestingly, there exists a completely different approach to the whole problem
 <div>
         <div class="post-meta">
             <span title="post date" class="post-info">2018-07-06</span>
-            <span title="last modification date" class="post-info">2018-07-06</span>
+            <span title="last modification date" class="post-info">2019-12-21</span>
             <span title="tags" class="post-info">:<a href="../../../../../tags/raw">raw</a>:</span>
-            <span title="author" class="post-info"><a href="mailto:lujun9972 &lt;at&gt; T520">lujun9972</a></span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-4350ea14-e25e-47dc-9c37-c8f0484961a5">lujun9972</a></span>
         </div>
     <script src="../../../../../media/js/jquery-2.1.3.min.js"></script>
     <script src="../../../../../media/js/md5.min.js"></script>
@@ -292,10 +339,19 @@ Interestingly, there exists a completely different approach to the whole problem
             </script>
         </section>
     <script src="../../../../../media/js/main.js"></script>
+        <script>
+         var _hmt = _hmt || [];
+         (function() {
+             var hm = document.createElement("script");
+             hm.src = "https://hm.baidu.com/hm.js?7bac4fd0247f69c27887e0d4e3aee41e";
+             var s = document.getElementsByTagName("script")[0]; 
+             s.parentNode.insertBefore(hm, s);
+         })();
+        </script>
     <div class="footer">
-        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 26.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
         <p>
-            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:lujun9972 &lt;at&gt; T520">lujun9972</a>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-4350ea14-e25e-47dc-9c37-c8f0484961a5">lujun9972</a>
             &nbsp;&nbsp;-&nbsp;&nbsp;
             Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
             <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>

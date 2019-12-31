@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Org-mode任务依赖的高级应用 - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="org-mode" />
+  <!-- <link rel="stylesheet" href="../../../../../media/css/main.css" type="text/css"/>
+       <link rel="stylesheet" href="../../../../../media/css/comment.css" type="text/css"/> -->
+  <link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/kognise/water.css@latest/dist/dark.css'>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="../../../../../">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <ul class="trigger">
+        <li><a href="../../../../../years/">Years</a></li>
+        <li><a href="../../../../../authors/">Authors</a></li>
+        <li><a href="../../../../../tags/">Tags</a></li>
+        <li><a href="../../../../../about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="../../../../../rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="https://www.bing.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">Org-mode任务依赖的高级应用</h1>
+<div id="table-of-contents">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#advanced-snippets-with-yasnippet-and-yankpad">使用yasnippet 和 yankpad 进行高级代码片段管理</a></li>
+<li><a href="#example-use-case-organizing-an-cabaret-evening-with-friends">应用示例: 与朋友组织一个歌舞晚会</a></li>
+<li><a href="#using-an-advanced-interactive-snippet">使用高级的交互式代码片段</a></li>
+<li><a href="#advanced-workflows">高级工作流</a></li>
+<li><a href="#room-for-improvements">改进空间</a>
+<ul>
+<li><a href="#improvement-id-picker">改进:ID选择器</a></li>
+<li><a href="#improvement-generating-ids-from-heading-and-date">改进:根据标题和日期生成id</a></li>
+<li><a href="#improvement-assistant-for-creating-workflow-elements">改进:创建工作流元素的助手</a></li>
+<li><a href="#improvement-trigger-in-combination-with-set-scheduled">改进: TRIGGER 与 SCHEDULED 设置整合</a></li>
+<li><a href="#improvement-canceled-tasks-do-cancel-their-dependencies-as-well">改进:取消任务的同时也会取消它们的依赖关系</a></li>
+</ul>
+</li>
+<li><a href="#conclusion">结论</a></li>
+<li><a href="#org-edna">org-edna</a></li>
+</ul>
+</div>
+</div>
+<p>
+2018-02-02更新:<a href="https://elpa.gnu.org/packages/org-edna.html">org-edna</a> 的链接
+</p>
+
+<p>
+本博客的目标受众是 <a href="https://karl-voit.at/tags/emacs">Emacs</a> <a href="http://orgmode.org">org-mode</a> 高级用户以及那些对如何使用这些工具完成非琐碎的待办事务管理感到好奇的人。
+</p>
+
+<p>
+我们通过第三方贡献的 package <code>org-depend.el</code> 来定义待办任务之间的依赖关系. 该package有一组很好的特性. 不过我的工作流只用到了其中的部分功能。
+因此，本文并对 <code>org-depend</code> 进行详细说明。但是给出使用和改进它的一些想法。
+</p>
+
+<div id="outline-container-org9f14a44" class="outline-2">
+<h2 id="advanced-snippets-with-yasnippet-and-yankpad"><a id="org9f14a44"></a>使用yasnippet 和 yankpad 进行高级代码片段管理</h2>
+<div class="outline-text-2" id="text-advanced-snippets-with-yasnippet-and-yankpad">
+<p>
+对于一次性工作流，我手动创建任务并定义依赖项。然而，当我不得不多次做某事时，我倾向于使用<a href="https://karl-voit.at/apps-I-am-using">snippet software</a>通过快捷键的方式插入标题和任务。我写了一个<a href="https://karl-voit.at/Textbausteine">关于文本片段工具的德语博客</a>。
+</p>
+
+<p>
+比如我使用 <code>ccn</code> <code>TAB</code> 来插入静态的信用卡号. 通过 <code>dd</code> <code>TAB</code> 静态地插入ISO格式的当前日期,比如 <code>2016-12-17</code>. 下面我还会描述一个复杂的工作流，需要用到一个代码片段工具，以此提供复杂的、交互式的代码片段。
+</p>
+
+<p>
+<a href="https://github.com/joaotavora/yasnippet">yasnippet</a> 支持从简单到高级的Emacs片段管理了应用. 有了 yasnippet, 你可以根据major-mode(比如org-mode)管理目录中不同文件中的代码片段。
+扩展代码片段是通过键入代码片段定义的缩写(例如 <code>dd</code> )，然后接着(通常是)按 <code>TAB</code> 键来完成的。
+</p>
+
+<p>
+多年来我一直使用 yasnippet,知道我发现了 <a href="https://github.com/Kungsgeten/yankpad">yankpad</a>,它是对 yasnippet 的一个封装。与yasnippet相比，yankpad通过Org-mode文件中的不同标题（而不是目录下的不同文件）来管理代码片段
+由于我的代码片段多是用于Org-mode中的，所以我很高兴地接受了yankpad，并将所有的org-mode代码片段都迁移到了它上面。这使得维护更加容易，因为我在编写代码片段时能应用完整的org-mode功能。
+</p>
+
+<p>
+有了这样一个强力的snippet系统，我只需要定义一次复杂的工作流，而无需在创建工作流实例时处理依赖定义。
+因此，对于我日常使用的工作流来说，将复杂性放到代码片段模板中，可以立即让我从中受益。
+</p>
+</div>
+</div>
+
+<div id="outline-container-org55cda5c" class="outline-2">
+<h2 id="example-use-case-organizing-an-cabaret-evening-with-friends"><a id="org55cda5c"></a>应用示例: 与朋友组织一个歌舞晚会</h2>
+<div class="outline-text-2" id="text-example-use-case-organizing-an-cabaret-evening-with-friends">
+<p>
+我喜欢和朋友一起去看歌舞表演。为了在不忘记重要事情的情况下尽量减少组织工作，我维护了一个简单的工作流程:
+</p>
+
+<ol class="org-ol">
+<li>活动基本信息:艺术家，日期，简短描述，…</li>
+<li>定票</li>
+<li>给我的朋友发封邮件，问问谁会参加</li>
+<li>记下每一个参加的人</li>
+<li>在活动开始前不久发一封提醒邮件，这样没人会忘记</li>
+<li>为活动之夜本身创建一个org-mode事件</li>
+</ol>
+</div>
+</div>
+
+<div id="outline-container-org7fcabda" class="outline-2">
+<h2 id="using-an-advanced-interactive-snippet"><a id="org7fcabda"></a>使用高级的交互式代码片段</h2>
+<div class="outline-text-2" id="text-using-an-advanced-interactive-snippet">
+<p>
+假设，我在报纸上无意中看到，我最喜欢的一位艺术家要来。
+</p>
+
+<p>
+我切换到用来存储这类事件的org-mode文件。我通过快捷键插入一个yankpad代码片段，然后选择有关歌舞剧的代码片段。
+Emacs会询问我活动的日期(使用日期选择器)、艺术家的名字、歌舞表演项目的名称、地点(从预先定义的场地列表中选择)、我将预订多少座位、第一封和第二封电子邮件的日期。
+</p>
+
+<p>
+我的yankpad代码片段如下所示。我还定义了一些简单的封装函数来询问和插入内容 <code>my-capture-prompt</code>, <code>my-capture-selection</code>, 以及 <code>my-capture-insert</code> ，这些函数可以在<a href="https://github.com/novoid/dot-emacs/blob/master/main.el">我的Emacs配置</a>中找到。
+</p>
+
+<pre class="example">
+\** Cabaret `(my-capture-prompt "date of event" 'my-event-date)`: `(my-capture-prompt "artist" 'my-artist)`
+:PROPERTIES:
+:ID: `(my-capture-insert 'my-event-date)`-cabaret
+:END:
+
+- Title: `(my-capture-prompt "title" 'my-title)`
+- `(my-capture-prompt "Num of seats" 'my-num-seats)` seats reserved:
+  - 2: My girlfriend and I
+  - 2:
+  - 2:
+  - 2:
+
+\*** WAITING Make reservation for `(my-capture-insert 'my-num-seats)` seats
+:PROPERTIES:
+:ID: `(my-capture-insert 'my-event-date)`-reservation
+:TRIGGER: `(my-capture-insert 'my-event-date)`-offer-seats(TODO) `(my-capture-insert 'my-event-date)`-reminder-email(TODO)
+:END:
+
+\*** Email: offer `(my-capture-insert 'my-num-seats)`-2 seats
+SCHEDULED: &lt;`(my-capture-prompt "date 1st email" 'my-email-date)`&gt;
+:PROPERTIES:
+:ID: `(my-capture-insert 'my-event-date)`-offer-seats
+:END:
+
+Email template:
+#+BEGIN_QUOTE
+Cabaret: `(my-capture-insert 'my-artist)` on `(my-capture-insert 'my-event-date)`
+
+Hi friends!
+
+Who:    `(my-capture-insert 'my-artist)`
+What:   "`(my-capture-insert 'my-title)`"
+When:   `(my-capture-insert 'my-event-date)` 19:15
+Where:  `(my-capture-selection '("Theatercafé" "Orpheum") 'my-location)`
+
+First come, first served. We've got `(my-capture-insert 'my-num-seats)` seats.
+
+Karl
+#+END_QUOTE
+
+\*** Send reminder email
+SCHEDULED: &lt;`(my-capture-prompt "date reminder" 'my-reminder-date)`&gt;
+:PROPERTIES:
+:BLOCKER: `(my-capture-insert 'my-event-date)`-offer-seats
+:ID: `(my-capture-insert 'my-event-date)`-reminder-email
+:END:
+
+\*** `(my-capture-insert 'my-artist)`: "`(my-capture-insert 'my-title)`" (`(my-capture-insert 'my-location)`)
+:PROPERTIES:
+:ID: `(my-capture-insert 'my-event-date)`-cabaret-event
+:END:
+
+&lt;`(my-capture-insert 'my-event-date)` 20:00-23:30&gt;
+</pre>
+
+<p>
+你可以看到，通过使用 <code>my-capture-promt</code> 和 <code>my-capture-insert</code> 函数，我们可以很容易重用事件日期等信息。
+</p>
+
+<p>
+应用该代码段并创建一个实例将得到如下结果:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-org"><span style="font-weight: bold; font-style: italic;">** Cabaret 2017-01-24: Thomas Maurer</span>
+<span style="font-weight: bold;">:PROPERTIES:</span>
+<span style="font-weight: bold;">:ID:</span> 2017-01-24-cabaret
+<span style="font-weight: bold;">:END:</span>
+
+- Title: Der Tolerator
+- 8 seats reserved:
+  - 2: My girlfriend and I
+  - 2:
+  - 2:
+  - 2:
+
+<span style="font-weight: bold;">*** WAITING Make reservation for 8 seats</span>
+<span style="font-weight: bold;">:PROPERTIES:</span>
+<span style="font-weight: bold;">:ID:</span> 2017-01-24-reservation
+<span style="font-weight: bold;">:TRIGGER:</span> 2017-01-24-offer-seats(TODO) 2017-01-24-reminder-email(TODO)
+<span style="font-weight: bold;">:END:</span>
+
+<span style="font-weight: bold;">*** Email: offer 8-2 seats</span>
+<span style="font-weight: bold;">SCHEDULED:</span> <span style="text-decoration: underline;">&lt;2017-01-05&gt;</span>
+<span style="font-weight: bold;">:PROPERTIES:</span>
+<span style="font-weight: bold;">:ID:</span> 2017-01-24-offer-seats
+<span style="font-weight: bold;">:END:</span>
+
+Email template:
+<span style="font-weight: bold; font-style: italic;">#+BEGIN_QUOTE</span>
+Cabaret: Thomas Maurer on 2017-01-24
+
+Hi friends!
+
+Who:    Thomas Maurer
+What:   "Der Tolerator"
+When:   2017-01-24 19:15
+Where:  Theatercaf&#233;
+
+First come, first served. We've got 8 seats.
+
+Karl
+<span style="font-weight: bold; font-style: italic;">#+END_QUOTE</span>
+
+<span style="font-weight: bold;">*** Send reminder email</span>
+<span style="font-weight: bold;">SCHEDULED:</span> <span style="text-decoration: underline;">&lt;2017-01-21&gt;</span>
+<span style="font-weight: bold;">:PROPERTIES:</span>
+<span style="font-weight: bold;">:BLOCKER:</span> 2017-01-24-offer-seats
+<span style="font-weight: bold;">:ID:</span> 2017-01-24-reminder-email
+<span style="font-weight: bold;">:END:</span>
+
+<span style="font-weight: bold;">*** Thomas Maurer: "Der Tolerator" (Theatercaf&#233;)</span>
+<span style="font-weight: bold;">:PROPERTIES:</span>
+<span style="font-weight: bold;">:ID:</span> 2017-01-24-cabaret-event
+<span style="font-weight: bold;">:END:</span>
+
+<span style="text-decoration: underline;">&lt;2017-01-24 20:00-23:30&gt;</span>
+</pre>
+</div>
+
+<p>
+注意，对于不同日期的多个歌舞剧事件，其id是惟一的，因为事件日期是id的一部分，并且所有依赖项都是预先定义好的。
+</p>
+
+<p>
+一旦订好票了并将其任务标记为done后，两个发送邮件的任务将通过 <code>:TRIGGER:</code> 变成“TODO”状态。
+</p>
+
+<p>
+更新于2017-11-23:状态关键字的传播<a href="http://lists.gnu.org/archive/html/emacs-orgmode/2017-11/msg00260.html">在某些情况下不能工作</a>。
+</p>
+
+<p>
+为了演示先决条件被阻塞的情况，我为提醒电子邮件任务添加了 <code>:BLOCKER:</code> 依赖，在这个特定的示例中，它有点多余. 
+标记了 <code>:BLOCKER:</code> 的标题与普通标题有一个细微的区别:只要阻塞ID没有标记为完成(或取消), <code>:BLOCKER:</code> 任务就不会出现在我的日程中。
+这个特性非常棒，因为只要不满足先决条件，我就看不到已定义和计划好的任务。因此，我总是在工作流程中定义 <code>:TRIGGER:</code> 和 <code>:BLOCKER:</code> 依赖项，以使我的日程不会被现在无法处理的代办任务搞得一团糟。
+</p>
+
+<p>
+定义一个复杂的代码片段需要时间和精力。不过只要您为工作流定义好了复杂的代码片段，就可以轻松地多次设置工作流实例，这是它的优势。
+</p>
+</div>
+</div>
+
+<div id="outline-container-org70bfc57" class="outline-2">
+<h2 id="advanced-workflows"><a id="org70bfc57"></a>高级工作流</h2>
+<div class="outline-text-2" id="text-advanced-workflows">
+<p>
+歌舞剧的例子比较简单，只是为了演示基本的思想。我使用的项目模板,eBay购物工作流，<a href="https://en.wikipedia.org/wiki/Scrum_%28software_development%29">Scrum</a>故事管理，甚至是整个学期的整个课程管理，包括考试准备和学生评分则要复杂的多，这些都是由几十个标题组成的。
+</p>
+
+<p>
+ <code>chain-find-next(KEYWORD[,OPTIONS])</code> helps you finding the "next" heading.
+除了在代码片段中使用的 <code>:TRIGGER:</code> 和 <code>:BLOCKER:</code> 依赖之外, <code>org-depend.el</code> 还提供了其他功能。
+通过 <code>chain-sibling(KEYWORD)</code>, 可以让当前标题被标记为完成时，下一个标题变成 <code>KEYWORD</code> 状态。
+还有 <code>chain-siblings-scheduled</code>, 它将在 SCHEDULED 日期切换下一个标题的状态。 下一个标题由 <code>chain-find-next(KEYWORD[，OPTIONS])</code> 来决定。
+</p>
+
+<p>
+虽然这些是很好的特性，但我不使用它们，因为我需要更精细的特性，下面将会讲到。
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgeb2dc44" class="outline-2">
+<h2 id="room-for-improvements"><a id="orgeb2dc44"></a>改进空间</h2>
+<div class="outline-text-2" id="text-room-for-improvements">
+<p>
+I wrote down some possible improvements that would ease my personal digital life.
+由于我是 <code>org-depend.el</code> 的高级用户,再加上 <a href="https://lists.gnu.org/archive/html/emacs-orgmode/2016-12/msg00236.html">Carsten 在训一些改进 =org-depend.el=的意见</a>,我写下了一些可能会改善我个人数字生活的改进意见。
+</p>
+
+<p>
+其中一些问题可能只需要几行Elisp代码就可以解决了。不幸的是，我自己Elisp的编码能力很差，因此无法随心随意地扩展Emacs。
+</p>
+</div>
+
+<div id="outline-container-org7e718de" class="outline-3">
+<h3 id="improvement-id-picker"><a id="org7e718de"></a>改进:ID选择器</h3>
+<div class="outline-text-3" id="text-improvement-id-picker">
+<p>
+首先，我希望在定义 <code>:TRIGGER:</code> 和 <code>:BLOCKER:</code> 依赖时能使用ID选择器。
+</p>
+
+<p>
+This should work like this: after setting up the task in headings and giving them IDs, I'd like to invoke a "I want to define a dependency"-command. It first asks me what property I want to set: <code>:TRIGGER:</code> or <code>:BLOCKER:</code>.
+它的工作方式应该是这样的:在标题中设置好任务并为其id之后，调用一个“我想定义一个依赖项”的命令,它首先会询问我要设置什么属性: <code>:TRIGGER:</code> 还是 <code>:BLOCKER:</code> 。
+</p>
+
+<p>
+然后选择在相同的子层次结构中找到的所有ID(或者更进一步，所有文件中找到的ID?)
+</p>
+
+<p>
+然后为 <code>:TRIGGER:</code> 依赖(如果适用)设置好 KEYWORD 后，相应的属性将添加到当前标题上。
+</p>
+
+<p>
+这将极大地改进创建依赖项定义的过程，并在第一时间防止输入错误。
+</p>
+</div>
+</div>
+
+<div id="outline-container-org942715f" class="outline-3">
+<h3 id="improvement-generating-ids-from-heading-and-date"><a id="org942715f"></a>改进:根据标题和日期生成id</h3>
+<div class="outline-text-3" id="text-improvement-generating-ids-from-heading-and-date">
+<p>
+到目前为止，我手动定义了 <code>:ID:</code> 属性。有些设置可以为新标题随机生成id。但我不喜欢随机ID，因为我想在看到ID时能有关于标题内容的提示
+</p>
+
+<p>
+Usually, my IDs start with the current ISO day to enforce uniqueness and look like this:
+通常，我的id以ISO日期开头以保证唯一性，如下所示:
+</p>
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-left" />
+
+<col  class="org-left" />
+</colgroup>
+<thead>
+<tr>
+<th scope="col" class="org-left">Title</th>
+<th scope="col" class="org-left">Manual ID</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="org-left">Update notebook</td>
+<td class="org-left">2016-12-18-update-notebook</td>
+</tr>
+
+<tr>
+<td class="org-left">Schedule a meeting with Bob</td>
+<td class="org-left">2016-12-18-schedule-meeting-bob</td>
+</tr>
+
+<tr>
+<td class="org-left">Add additional URLs to lecture notes</td>
+<td class="org-left">2016-12-18-add-URLs-to-lecture</td>
+</tr>
+</tbody>
+</table>
+
+<p>
+如果有一个命令能根据当前标题自动生成相应的ID属性，不是很好吗?我想这并不难做到:
+</p>
+
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-left" />
+
+<col  class="org-left" />
+</colgroup>
+<thead>
+<tr>
+<th scope="col" class="org-left">Title</th>
+<th scope="col" class="org-left">Auto-generated ID</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="org-left">Update notebook</td>
+<td class="org-left">2016-12-18-Update-notebook</td>
+</tr>
+
+<tr>
+<td class="org-left">Schedule a meeting with Bob</td>
+<td class="org-left">2016-12-18-Schedule-a-meeting-with-Bob</td>
+</tr>
+
+<tr>
+<td class="org-left">Add additional URLs to lecture notes</td>
+<td class="org-left">2016-12-18-Add-additional-URLs-to-lecture-notes</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+
+<div id="outline-container-orgee9b127" class="outline-3">
+<h3 id="improvement-assistant-for-creating-workflow-elements"><a id="orgee9b127"></a>改进:创建工作流元素的助手</h3>
+<div class="outline-text-3" id="text-improvement-assistant-for-creating-workflow-elements">
+<p>
+本建议来至于 Christophe Schockaert,他在 <a href="https://lists.gnu.org/archive/html/emacs-orgmode/2016-12/msg00251.html">mailinglist中写到</a>: 为什么没有有一个可以同时做多件事情的助手呢?
+</p>
+
+<blockquote>
+<p>
+[...]
+Besides that, I wonder if/how we could automate the following course of actions:
+</p>
+<ul class="org-ul">
+<li>let have point on an entry</li>
+<li>create a new "TODO-like" entry as a link to that entry</li>
+<li>assign an ID to both entries: lets say "ID-original" and "ID-duplicate"</li>
+<li>in the new entry: define a BLOCKER property set on "ID-original"</li>
+<li>in the original entry: define a TRIGGER property set as ID-duplicate(DONE)</li>
+</ul>
+<p>
+At first sight:
+</p>
+<ul class="org-ul">
+<li>the new entry could be created besides the original or in a file where it is ready to refile</li>
+<li>the TODO state in the new entry could be set with a default, I think it is so easy to switch afterwards with Org keystrokes</li>
+<li>the triggered state might better be a parameter (possibly a customized default as "TODO"): otherwise, it would be necessary to go inside the drawer to change it</li>
+</ul>
+<p>
+Currently, I am doing all this manually, quite often. [...]
+</p>
+</blockquote>
+
+<p>
+我从中复制了这些内容: 这是一组非常常见的操作，它们经常在一起完成。 但是，我个人希望除了这个助理之外，还有上面提到的功能。
+</p>
+</div>
+</div>
+
+<div id="outline-container-org816cf2d" class="outline-3">
+<h3 id="improvement-trigger-in-combination-with-set-scheduled"><a id="org816cf2d"></a>改进: TRIGGER 与 SCHEDULED 设置整合</h3>
+<div class="outline-text-3" id="text-improvement-trigger-in-combination-with-set-scheduled">
+<p>
+I love the <code>:TRIGGER:</code> property because I can mark headings as open tasks only if they can be done now. Only headings which are ready to be looked at do have the <code>TODO</code> keyword.
+我喜欢=:TRIGGER:=属性，因为我可以将标题标记为打开的任务，除非它们现在就可以完成。只有可以查看的标题才有=TODO=关键字。
+</p>
+
+<p>
+One limitation of <code>org-depend.el</code> is that I am only to move forward scheduled dates to siblings and I am not able to define a different scheduled date.
+=org-depend的一个限制。el=是我只能将计划日期向前移动到兄弟姐妹，我不能定义一个不同的计划日期。
+</p>
+
+<p>
+Assume following syntax:
+假设如下语法:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-org"><span style="font-weight: bold; font-style: italic;">** </span><span style="font-weight: bold;">TODO</span><span style="font-weight: bold; font-style: italic;"> Asking the client about the project</span>
+<span style="font-weight: bold;"> :PROPERTIES:</span>
+ <span style="font-weight: bold;">:TRIGGER:</span> 2016-12-18-send-offer(TODO,2016-12-23)
+<span style="font-weight: bold;"> :END:</span>
+
+<span style="font-weight: bold; font-style: italic;">** Send offer to client</span>
+<span style="font-weight: bold;"> :PROPERTIES:</span>
+ <span style="font-weight: bold;">:ID:</span> 2016-12-18-send-offer
+<span style="font-weight: bold;"> :END:    </span>
+</pre>
+</div>
+
+<p>
+我扩展了trigger属性的选项，以便让keyword参数支持ISO日期。
+</p>
+
+<p>
+我希望在完成第一个任务时，ID为 <code>2016-12-18-send-offer</code> 的标题不仅关键字变为 <code>TODO</code> ,而且也被安排在2016-12-23那一天。
+</p>
+
+<p>
+请注意，  send-offer 标题不需要与 ask-client 标题在同一个子层次中. Therefore, sibling-operations 并不能完成所有的功能.
+</p>
+
+<p>
+除此之外，我希望能够定义相对的日程日期，如<a href="http://orgmode.org/manual/date_002ftime%20-prompt.html#%20the%20-date_002ftime-prompt">日期提示手册中那样</a>:
+</p>
+
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-left" />
+
+<col  class="org-left" />
+</colgroup>
+<tbody>
+<tr>
+<td class="org-left">2016-12-18-send-offer(TODO,.)</td>
+<td class="org-left">the day when marking the asking-task as done</td>
+</tr>
+
+<tr>
+<td class="org-left">2016-12-18-send-offer(TODO,+3d)</td>
+<td class="org-left">3 days after the scheduled date of the asking-task</td>
+</tr>
+
+<tr>
+<td class="org-left">2016-12-18-send-offer(TODO,.+3d)</td>
+<td class="org-left">3 days from the day when marking the asking-task as done</td>
+</tr>
+
+<tr>
+<td class="org-left">2016-12-18-send-offer(TODO,mon)</td>
+<td class="org-left">nearest Monday from the day when marking the asking-task as done</td>
+</tr>
+
+<tr>
+<td class="org-left">2016-12-18-send-offer(TODO,+2tue)</td>
+<td class="org-left">second Tuesday from the day when marking the asking-task as done</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+
+<div id="outline-container-orgba735ec" class="outline-3">
+<h3 id="improvement-canceled-tasks-do-cancel-their-dependencies-as-well"><a id="orgba735ec"></a>改进:取消任务的同时也会取消它们的依赖关系</h3>
+<div class="outline-text-3" id="text-improvement-canceled-tasks-do-cancel-their-dependencies-as-well">
+<p>
+如果有一个通用设置(或属性?)让我处理取消的任务和完成的任务不是很好吗?
+</p>
+
+<p>
+想象一下上面的例子。当我取消了ask-client任务时，send an offer真的有意义吗?许多人会向我一样也想取消所有后续的工作流任务。
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgbbd8958" class="outline-2">
+<h2 id="conclusion"><a id="orgbbd8958"></a>结论</h2>
+<div class="outline-text-2" id="text-conclusion">
+<p>
+虽然大多数人不需要高级工作流管理，比如任务之间的依赖关系，但我确实喜欢这个org-mode特性。
+这也是我为什么开始使用org-mode的原因。我喜欢让日程表只显示“现在”可以完成的任务和已经完成的任务。
+</p>
+
+<p>
+因此，即使您感受不到使用代码片段/模板系统来定义工作流的急迫之处，您依然可能会喜欢这篇文章。也许您也会开始定义简单的工作流。
+</p>
+
+<p>
+I'd love to read your comments on snippets, workflows, dependencies and such: write me an email or commend via Disqus (see below).
+欢迎对代码片段、工作流程、依赖关系等内容做出评论:给我发电子邮件或通过Disqus都行(见下面)。
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgcfbb108" class="outline-2">
+<h2 id="org-edna"><a id="orgcfbb108"></a>org-edna</h2>
+<div class="outline-text-2" id="text-org-edna">
+<p>
+有人建议我用 <a href="https://elpa.gnu.org/packages/org-edna.html">org-edna</a> 代替 org-depend.它给我的第一印象是跟 org-depend 很像但又有所不同。它更复杂，并且允许对依赖项进行更高级的定义。我对org-edna很有兴趣，我将在以后写一些关于它的内容。
+</p>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2018-03-02</span>
+            <span title="last modification date" class="post-info">2019-12-25</span>
+            <span title="tags" class="post-info">:<a href="../../../../../tags/org-mode">org-mode</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-4350ea14-e25e-47dc-9c37-c8f0484961a5">lujun9972</a></span>
+        </div>
+    <script src="../../../../../media/js/jquery-2.1.3.min.js"></script>
+    <script src="../../../../../media/js/md5.min.js"></script>
+        <section>
+            <div id="gitalk-container"></div>
+            <script type="text/javascript">
+             var gitalk = new Gitalk({
+                 clientID: 'fdcb5d9da3f4acb4862c',
+                 clientSecret: 'dd0a16312a206782cb7669dcec5e96874ab48170',
+                 repo: 'lujun9972.github.com',
+                 owner: 'lujun9972',
+                 admin: ['lujun9972'],
+                 id: md5(location.pathname),      // Ensure uniqueness and length less than 50
+                 distractionFreeMode: false  // Facebook-like distraction free mode
+             })
+             gitalk.render('gitalk-container')
+            </script>
+        </section>
+    <script src="../../../../../media/js/main.js"></script>
+        <script>
+         var _hmt = _hmt || [];
+         (function() {
+             var hm = document.createElement("script");
+             hm.src = "https://hm.baidu.com/hm.js?7bac4fd0247f69c27887e0d4e3aee41e";
+             var s = document.getElementsByTagName("script")[0]; 
+             s.parentNode.insertBefore(hm, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-4350ea14-e25e-47dc-9c37-c8f0484961a5">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="../../../../../instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>

@@ -19,14 +19,14 @@
 <div>
   <header class="masthead">
     <h1 class="masthead-title"><a href="../../../../../">EMACS-DOCUMENT</a></h1>
-    <p>=============&gt;集思广益</p>
+    <p>=============&gt;随便,谢谢</p>
     <nav class="site-nav">
       <ul class="trigger">
         <li><a href="../../../../../years/">Years</a></li>
         <li><a href="../../../../../authors/">Authors</a></li>
         <li><a href="../../../../../tags/">Tags</a></li>
         <li><a href="../../../../../about/">About</a></li>
-        <li><a href="https://github.com/lujun9972/emacs-document">Github</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
         <li><a href="../../../../../rss.xml">RSS</a></li>
       </ul>
     </nav>
@@ -44,55 +44,65 @@
 <h2>&#30446;&#24405;</h2>
 <div id="text-table-of-contents">
 <ul>
-<li><a href="#orgbfbd218">1 Add a way to run the tests</a></li>
-<li><a href="#orgdfe0934">2 Tangle the file</a></li>
-<li><a href="#orgb25bec8">3 Run the tests</a></li>
-<li><a href="#org731e7c9">4 The noweb doctest block</a></li>
+<li><a href="#orge683dcb">1 Add a way to run the tests</a></li>
+<li><a href="#org80cf979">1添加运行测试的方法</a></li>
+<li><a href="#orgff05787">2 Tangle the file</a></li>
+<li><a href="#orgd187fa1">2把文件打结</a></li>
+<li><a href="#orgbe4fdaf">3 Run the tests</a></li>
+<li><a href="#org45e8b58">3运行测试</a></li>
+<li><a href="#orge971e48">4 The noweb doctest block</a></li>
+<li><a href="#org2b9db73">4 noweb doctest块</a></li>
 </ul>
 </div>
 </div>
 <p>
 On the org-mode mailing list we had a nice discussion about using noweb and org-mode in literate programming. The results of that discussion were blogged about <a href="http://kdr2.com/tech/emacs/1805-approach-org-ref-code-to-text.html">here</a>. I thought of a different application of this for making <a href="https://pymotw.com/3/doctest/">doctests</a> in Python functions. I have to confess I have never liked these because I have always thought they were a pain to write since you basically have to put code and results into a docstring. The ideas developed in the discussion above led me to think of a new way to write these that seems totally reasonable.
+在组织模式邮件列表中，我们对在文字编程中使用noweb和组织模式进行了很好的讨论。那次讨论的结果被写进了博客<a href="http://kdr2.com/tech/emacs/1805-approach-org-refcodetotext.html">这里</a>。我想到了一个不同的应用程序来在Python函数中生成<a href="https://pymotw.com/3/doctest/">doctests</a>。我必须承认，我从来都不喜欢这些，因为我一直认为它们是一个痛苦的编写，因为你基本上必须把代码和结果到一个文档字符串。以上讨论中提出的观点让我想到了一种新的写法，这种写法似乎完全合理。
 </p>
 
 <p>
 The idea is just to put noweb placeholders in the function docstring for the doctests. The placeholders will be expanded when you tangle the file, and they will get their contents from other src-blocks where you have written and run examples to test them.
+其思想就是将noweb占位符放在doctest的函数docstring中。当您将文件纠结在一起时，占位符将被展开，它们将从您编写并运行示例以测试它们的其他src块中获取内容。
 </p>
 
 <p>
 I will illustrate the idea using org-mode and the ob-ipython I have in scimax. The defaults of my ob-ipython setup are not useful for this example because it puts the execution count and mime types of output in the output. These are not observed in a REPL, and so we turn this off by setting these variables.
+我将使用组织模式和我在scimax中拥有的ob-ipython来说明这个想法。我的ob-ipython设置的缺省值在本例中并不有用，因为它将输出的执行计数和mime类型放在输出中。这些在REPL中没有观察到，所以我们通过设置这些变量来关闭这个选项。
 </p>
 
 <pre class="example">
 (setq ob-ipython-suppress-execution-count t
- ob-ipython-show-mime-types nil)
+ob-ipython-show-mime-types nil)
 </pre>
 
 <p>
 Now, we make an example function that takes a single argument and returns one divided by that argument. This block is runnable, and the function is then defined in the jupyter kernel. The docstring contains several noweb references to doctest blocks we define later. For now, they don't do anything. See The noweb doctest block section for the block that is used to expand these. This block also has a tangle header which indicates the file to tangle the results to. When I run this block, it is sent to a Jupyter kernel and saved in memory for use in subsequent blocks.
+现在，我们创建一个示例函数，它接受单个参数并返回一个除以该参数的值。这个块是可运行的，然后在木星内核中定义这个函数。文档字符串包含几个noweb引用，这些引用指向我们稍后定义的doctest块。现在，他们什么都不做。请参阅noweb doctest块一节，了解用于展开这些测试的块。此块还有一个tangle头文件，指示要将结果纠结到哪个文件。当我运行这个块时，它被发送到一个Jupyter内核并保存在内存中，以供后续块使用。
 </p>
 
 <p>
 Here is the block with no noweb expansion. Note that this is easier to read in the original org source than it is to read in the published blog format.
+这是一个没有web扩展的块。请注意，这在原始的org源代码中比在已发布的博客格式中更容易阅读。
 </p>
 
 <pre class="example">
 def func(a):
-  """A function to divide one by a.
+"""A function to divide one by a.
 
-  &lt;&lt;doctest("doctest-1")&gt;&gt;
+&lt;&lt;doctest("doctest-1")&gt;&gt;
 
-  &lt;&lt;doctest("doctest-2")&gt;&gt;
+&lt;&lt;doctest("doctest-2")&gt;&gt;
 
-  &lt;&lt;doctest("doctest-3")&gt;&gt;
+&lt;&lt;doctest("doctest-3")&gt;&gt;
 
-  Returns: 1 / a.
-  """
-  return 1 / a
+Returns: 1 / a.
+"""
+return 1 / a
 </pre>
 
 <p>
 Now, we can write a series of named blocks that define various tests we might want to use as doctests. You can run these blocks here, and verify they are correct. Later, when we tangle the document, these will be incorporated into the tangled file in the docstring we defined above.
+现在，我们可以编写一系列命名的块，这些块定义我们可能希望用作doctest的各种测试。您可以在这里运行这些块，并验证它们是正确的。稍后，当我们纠结文档时，这些将被合并到我们在上面定义的docstring中的纠结文件中。
 </p>
 
 <pre class="example">
@@ -105,6 +115,7 @@ True
 
 <p>
 This next test will raise an Exception, and we just run it to make sure it does.
+下一个测试将引发一个异常，我们只是运行它以确保它确实如此。
 </p>
 
 <pre class="example">
@@ -118,8 +129,8 @@ ZeroDivisionErrorTraceback (most recent call last)
 ----&gt; 1 func(0)
 
 &lt;ipython-input-21-136dd7a84026&gt; in func(a)
- 14 Returns: 1 / a.
- 15 """
+14 Returns: 1 / a.
+15 """
 ---&gt; 16 return 1 / a
 
 ZeroDivisionError: division by zero
@@ -127,11 +138,12 @@ ZeroDivisionError: division by zero
 
 <p>
 This is just a doctest with indentation to show how it is used.
+这只是一个带有缩进的doctest，演示如何使用它。
 </p>
 
 <pre class="example">
 for i in range(1, 4):
-  print(func(i))
+print(func(i))
 </pre>
 
 <pre class="example">
@@ -143,32 +155,42 @@ for i in range(1, 4):
 
 <p>
 That concludes the examples I want incorporated into the doctests. Each one of these blocks has a name, which is used as an argument to the noweb references in the function docstring.
+以上就是我希望合并到doctest中的示例。每个块都有一个名称，该名称用作函数docstring中noweb引用的参数。
 </p>
 
-<div id="outline-container-orgbfbd218" class="outline-2">
-<h2 id="orgbfbd218">1 Add a way to run the tests</h2>
-<div class="outline-text-2" id="text-orgbfbd218">
+<div id="outline-container-orge683dcb" class="outline-2">
+<h2 id="orge683dcb">1 Add a way to run the tests</h2>
+</div>
+<div id="outline-container-org80cf979" class="outline-2">
+<h2 id="org80cf979">1添加运行测试的方法</h2>
+<div class="outline-text-2" id="text-org80cf979">
 <p>
 This is a common idiom to enable easy running of the doctests. This will get tangled out to the file.
+这是一种常见的习惯用法，可以轻松运行doctest。这将和文件纠缠在一起。
 </p>
 
 <pre class="example">
 if __name__ == "__main__":
-  import doctest
-  doctest.testmod()
+import doctest
+doctest.testmod()
 </pre>
 </div>
 </div>
 
-<div id="outline-container-orgdfe0934" class="outline-2">
-<h2 id="orgdfe0934">2 Tangle the file</h2>
-<div class="outline-text-2" id="text-orgdfe0934">
+<div id="outline-container-orgff05787" class="outline-2">
+<h2 id="orgff05787">2 Tangle the file</h2>
+</div>
+<div id="outline-container-orgd187fa1" class="outline-2">
+<h2 id="orgd187fa1">2把文件打结</h2>
+<div class="outline-text-2" id="text-orgd187fa1">
 <p>
 So far, the Python code we have written only exists in the org-file, and in memory. Tangling is the extraction of the code into a code file.
+到目前为止，我们编写的Python代码只存在于org文件和内存中。纠缠是将代码提取到代码文件中。
 </p>
 
 <p>
 We run this command, which extracts the code blocks marked for tangling, and expands the noweb references in them.
+我们运行这个命令，它提取标记为混乱的代码块，并展开其中的noweb引用。
 </p>
 
 <pre class="example">
@@ -177,50 +199,57 @@ We run this command, which extracts the code blocks marked for tangling, and exp
 
 <p>
 test.py
+test.py
 </p>
 
 <p>
 Here is what we get:
+这是我们得到的:
 </p>
 
 <pre class="example">
 def func(a):
- """A function to divide one by a.
+"""A function to divide one by a.
 
- &gt;&gt;&gt; func(5) == 0.2
- True
+&gt;&gt;&gt; func(5) == 0.2
+True
 
- &gt;&gt;&gt; func(0)
- Traceback (most recent call last):
- ZeroDivisionError: division by zero
+&gt;&gt;&gt; func(0)
+Traceback (most recent call last):
+ZeroDivisionError: division by zero
 
- &gt;&gt;&gt; for i in range(1, 4):
- ... print(func(i))
- 1.0
- 0.5
- 0.3333333333333333
+&gt;&gt;&gt; for i in range(1, 4):
+... print(func(i))
+1.0
+0.5
+0.3333333333333333
 
 
- Returns: 1 / a.
- """
- return 1 / a
+Returns: 1 / a.
+"""
+return 1 / a
 
 if __name__ == "__main__":
- import doctest
- doctest.testmod()
+import doctest
+doctest.testmod()
 </pre>
 
 <p>
 That looks like a reasonable python file. You can see the doctest blocks have been inserted into the docstring, as desired. The proof of course is that we can run these doctests, and use the python module. We show that next.
+这看起来像是一个合理的python文件。可以看到doctest块已经按需要插入到文档字符串中。当然，我们可以运行这些doctest并使用python模块，这就是证明。我们接下来展示。
 </p>
 </div>
 </div>
 
-<div id="outline-container-orgb25bec8" class="outline-2">
-<h2 id="orgb25bec8">3 Run the tests</h2>
-<div class="outline-text-2" id="text-orgb25bec8">
+<div id="outline-container-orgbe4fdaf" class="outline-2">
+<h2 id="orgbe4fdaf">3 Run the tests</h2>
+</div>
+<div id="outline-container-org45e8b58" class="outline-2">
+<h2 id="org45e8b58">3运行测试</h2>
+<div class="outline-text-2" id="text-org45e8b58">
 <p>
 Now, we can check if the tests pass in a fresh run (i.e. not using the version stored in the jupyter kernel.) The standard way to run the doctests is like this:
+现在，我们可以检查测试是否在新运行时通过(即不使用存储在jupyter内核中的版本)。运行doctest的标准方法如下:
 </p>
 
 <pre class="example">
@@ -229,6 +258,7 @@ python test.py -v
 
 <p>
 Well, that's it! It worked fine. Now we have a python file we can import and reuse, with some doctests that show how it works. For example, here it is in a small Python script.
+嗯,就是这样!它工作得很好。现在我们有了一个可以导入和重用的python文件，以及一些演示它如何工作的doctest。例如，下面是一个小型Python脚本。
 </p>
 
 <pre class="example">
@@ -242,57 +272,65 @@ print(func(3))
 
 <p>
 There are surely some caveats to keep in mind here. This was just a simple proof of concept idea that isn't tested beyond this example. I don't know how many complexities would arise from more complex doctests. But, it seems like a good idea to continue pursuing if you like using doctests, and like using org-mode and interactive/literate programming techniques.
+这里当然有一些需要注意的地方。这只是一个简单的概念概念的证明，没有测试超出这个例子。我不知道更复杂的文档测试会产生多少复杂性。但是，如果您喜欢使用doctest，喜欢使用组织模式和交互式/文字编程技术，那么继续研究似乎是一个好主意。
 </p>
 
 <p>
 It is definitely an interesting way to use noweb to build up better code files in my opinion.
+在我看来，使用noweb来构建更好的代码文件绝对是一种有趣的方式。
 </p>
 </div>
 </div>
 
-<div id="outline-container-org731e7c9" class="outline-2">
-<h2 id="org731e7c9">4 The noweb doctest block</h2>
-<div class="outline-text-2" id="text-org731e7c9">
+<div id="outline-container-orge971e48" class="outline-2">
+<h2 id="orge971e48">4 The noweb doctest block</h2>
+</div>
+<div id="outline-container-org2b9db73" class="outline-2">
+<h2 id="org2b9db73">4 noweb doctest块</h2>
+<div class="outline-text-2" id="text-org2b9db73">
 <p>
 These blocks are used in the noweb expansions. Each block takes a variable which is the name of a block. This block grabs the body of the named src block and formats it as if it was in a REPL.
+这些块用于noweb扩展。每个块都有一个变量，它是块的名称。这个块获取已命名的src块的主体，并将其格式化为REPL格式。
 </p>
 
 <p>
 We also grab the results of the named block and format it for the doctest. We use a heuristic to detect Tracebacks and modify the output to be consistent with it. In that case we assume the relevant Traceback is on the last line.
+我们还获取命名块的结果并将其格式化为doctest。我们使用一种启发式方法来检测回溯并修改输出使之与之一致。在这种情况下，我们假设相关的回溯在最后一行。
 </p>
 
 <p>
 Admittedly, this does some fragile feeling things, like trimming whitespace here and there to remove blank lines, and quoting quotes (which was not actually used in this example), and removing the ": " pieces of ob-ipython results. Probably other ways of running the src-blocks would not be that suitable for this.
+诚然，这确实做了一些让人感觉很脆弱的事情，比如在这里和那里删除空白行，引用引号(在本例中并没有实际使用)，以及删除ob-ipython结果的“:”部分。可能运行src块的其他方法并不适合这种情况。
 </p>
 
 <pre class="example">
 (org-babel-goto-named-src-block name)
 (let* ((src (s-trim-right (org-element-property :value (org-element-context))))
- (src-lines (split-string src "\n"))
- body result)
- (setq body
- (s-trim-right
- (s-concat "&gt;&gt;&gt; " (car src-lines) "\n"
- (s-join "\n" (mapcar (lambda (s)
- (concat "... " s))
- (cdr src-lines))))))
- ;; now the results
- (org-babel-goto-named-result name)
- (let ((result (org-element-context)))
- (setq result
- (thread-last
- (buffer-substring (org-element-property :contents-begin result)
- (org-element-property :contents-end result))
- (s-trim)
- ;; remove ": " from beginning of lines
- (replace-regexp-in-string "^: *" "")
- ;; quote quotes
- (replace-regexp-in-string "\\\"" "\\\\\"")))
- (when (string-match "Traceback" result)
- (setq result (format
- "Traceback (most recent call last):\n%s"
- (car (last (split-string result "\n"))))))
- (concat body "\n" result)))
+(src-lines (split-string src "n"))
+body result)
+(setq body
+(s-trim-right
+(s-concat "&gt;&gt;&gt; " (car src-lines) "n"
+(s-join "n" (mapcar (lambda (s)
+(concat "... " s))
+(cdr src-lines))))))
+;; now the results
+(org-babel-goto-named-result name)
+(let ((result (org-element-context)))
+(setq result
+(thread-last
+(buffer-substring (org-element-property :contents-begin result)
+(org-element-property :contents-end result))
+(s-trim)
+;; remove ": " from beginning of lines
+(replace-regexp-in-string "^: *" "")
+;; quote quotes
+(replace-regexp-in-string "\"" "\\"")))
+(when (string-match "Traceback" result)
+(setq result (format
+"Traceback (most recent call last):n%s"
+(car (last (split-string result "n"))))))
+(concat body "n" result)))
 </pre>
 </div>
 </div>
@@ -302,9 +340,9 @@ Admittedly, this does some fragile feeling things, like trimming whitespace here
 <div>
         <div class="post-meta">
             <span title="post date" class="post-info">2018-05-18</span>
-            <span title="last modification date" class="post-info">2019-04-26</span>
+            <span title="last modification date" class="post-info">2019-12-21</span>
             <span title="tags" class="post-info">:<a href="../../../../../tags/raw">raw</a>:</span>
-            <span title="author" class="post-info"><a href="mailto:lujun9972 &lt;at&gt; T520">lujun9972</a></span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-4350ea14-e25e-47dc-9c37-c8f0484961a5">lujun9972</a></span>
         </div>
     <script src="../../../../../media/js/jquery-2.1.3.min.js"></script>
     <script src="../../../../../media/js/md5.min.js"></script>
@@ -324,10 +362,19 @@ Admittedly, this does some fragile feeling things, like trimming whitespace here
             </script>
         </section>
     <script src="../../../../../media/js/main.js"></script>
+        <script>
+         var _hmt = _hmt || [];
+         (function() {
+             var hm = document.createElement("script");
+             hm.src = "https://hm.baidu.com/hm.js?7bac4fd0247f69c27887e0d4e3aee41e";
+             var s = document.getElementsByTagName("script")[0]; 
+             s.parentNode.insertBefore(hm, s);
+         })();
+        </script>
     <div class="footer">
-        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 26.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
         <p>
-            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:lujun9972 &lt;at&gt; T520">lujun9972</a>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-4350ea14-e25e-47dc-9c37-c8f0484961a5">lujun9972</a>
             &nbsp;&nbsp;-&nbsp;&nbsp;
             Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
             <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>

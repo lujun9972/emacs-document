@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>emacs-lisp中的f-strings - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="raw" />
+  <!-- <link rel="stylesheet" href="../../../../../media/css/main.css" type="text/css"/>
+       <link rel="stylesheet" href="../../../../../media/css/comment.css" type="text/css"/> -->
+  <link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/kognise/water.css@latest/dist/dark.css'>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="../../../../../">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <ul class="trigger">
+        <li><a href="../../../../../years/">Years</a></li>
+        <li><a href="../../../../../authors/">Authors</a></li>
+        <li><a href="../../../../../tags/">Tags</a></li>
+        <li><a href="../../../../../about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="../../../../../rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="https://www.bing.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">emacs-lisp中的f-strings</h1>
+<p>
+我非常喜欢Python 3中的f-string。它们允许您将变量名和表达式放在一个字符串模板中，然后展开该模板来创建新的字符串。下面是一个简单的例子:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-python"><span style="font-weight: bold; font-style: italic;">username</span> = <span style="font-style: italic;">'John Kitchin'</span>
+<span style="font-weight: bold; font-style: italic;">somevar</span> = 5**0.5
+<span style="font-weight: bold;">print</span>(f<span style="font-style: italic;">'{username:30s}{somevar:1.2f}'</span>)
+</pre>
+</div>
+
+<pre class="example">
+John Kitchin 2.24
+
+</pre>
+
+<p>
+相比之下，emacs-lisp中的字符串格式化就没那么有趣和简单了。初始状态下我们有:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">let</span> ((username <span style="font-style: italic;">"John Kitchin"</span>)
+      (somevar (sqrt 5)))
+  (format <span style="font-style: italic;">"%-30s%1.2f"</span> username somevar))
+</pre>
+</div>
+<pre class="example">
+John Kitchin 2.24
+</pre>
+
+<p>
+That is still three lines of code, but it is ugly and hard to read like the old python code:
+都是三行代码，但它很难看，像旧的python代码一样难以阅读:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-python"><span style="font-weight: bold;">print</span>(<span style="font-style: italic;">'%-30s%1.2f'</span> % (username, somevar))
+</pre>
+</div>
+
+<pre class="example">
+John Kitchin 2.24
+
+</pre>
+
+<p>
+我的经验表明，字符串越大，这个值就越难看出来，而f-string则更容易阅读。
+</p>
+
+<p>
+如果您不想要这些格式化字段，那么神奇的<a href="https://github.com/magnars/s.el">'s</a>库为emacs-lisp提供了一些帮助。您可以像这样引用词法环境中的变量。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">let</span> ((username <span style="font-style: italic;">"John Kitchin"</span>)
+      (somevar (sqrt 5)))
+  (<span style="font-weight: bold;">s-lex-format</span> <span style="font-style: italic;">"${username}${somevar}"</span>))
+</pre>
+</div>
+
+<pre class="example">
+John Kitchin2.23606797749979
+</pre>
+
+<p>
+今天，我决定做点什么，于是写了这个宏。它是 <code>s-lex-format</code> 的变体，引入了一个稍微新一点的语法。你现在可以添加一个可选的格式字段，该字段与变量名之间用空格分隔。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defmacro</span> <span style="font-weight: bold;">f-string</span> (fmt)
+  <span style="font-style: italic;">"Like `</span><span style="font-weight: bold; font-style: italic; text-decoration: underline;">s-format</span><span style="font-style: italic;">' but with format fields in it.</span>
+<span style="font-style: italic;">FMT is a string to be expanded against the current lexical</span>
+<span style="font-style: italic;">environment. It is like what is used in `</span><span style="font-weight: bold; font-style: italic; text-decoration: underline;">s-lex-format</span><span style="font-style: italic;">', but has</span>
+<span style="font-style: italic;">an expanded syntax to allow format-strings. For example:</span>
+<span style="font-style: italic;">${user-full-name 20s} will be expanded to the current value of</span>
+<span style="font-style: italic;">the variable `</span><span style="font-weight: bold; font-style: italic; text-decoration: underline;">user-full-name</span><span style="font-style: italic;">' in a field 20 characters wide.</span>
+<span style="font-style: italic;">(let ((f (sqrt 5))) (f-string "</span>${f 1.2f}<span style="font-style: italic;">"))</span>
+<span style="font-style: italic;">will render as: 2.24</span>
+<span style="font-style: italic;">This function is inspired by the f-strings in Python 3.6, which I</span>
+<span style="font-style: italic;">enjoy using a lot.</span>
+<span style="font-style: italic;">"</span>
+  (<span style="font-weight: bold;">let*</span> ((matches (s-match-strings-all<span style="font-style: italic;">"${</span><span style="font-weight: bold; font-style: italic;">\</span><span style="font-style: italic;">(?3:</span><span style="font-weight: bold; font-style: italic;">\</span><span style="font-style: italic;">(?1:[</span><span style="font-style: italic;">^</span><span style="font-style: italic;">} ]+</span><span style="font-weight: bold; font-style: italic;">\</span><span style="font-style: italic;">) *</span><span style="font-weight: bold; font-style: italic;">\</span><span style="font-style: italic;">(?2:[</span><span style="font-style: italic;">^</span><span style="font-style: italic;">}]*</span><span style="font-weight: bold; font-style: italic;">\</span><span style="font-style: italic;">)</span><span style="font-weight: bold; font-style: italic;">\</span><span style="font-style: italic;">)}"</span> fmt))
+         (agetter (<span style="font-weight: bold;">loop</span> for (m0 m1 m2 m3) in matches
+                        collect `(,m3 . ,(format (format <span style="font-style: italic;">"%%%s"</span> (<span style="font-weight: bold;">if</span> (string= m2 <span style="font-style: italic;">""</span>)
+                                                                    (<span style="font-weight: bold;">if</span> s-lex-value-as-lisp <span style="font-style: italic;">"S"</span> <span style="font-style: italic;">"s"</span>)
+                                                                  m2))
+                                                 (symbol-value (intern m1)))))))
+
+    `(s-format ,fmt 'aget ',agetter)))
+</pre>
+</div>
+
+<pre class="example">
+f-string
+</pre>
+
+<p>
+这就是它的用法。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">let</span> ((username <span style="font-style: italic;">"John Kitchin"</span>)
+      (somevar (sqrt 5)))
+  (f-string <span style="font-style: italic;">"${username -30s}${somevar 1.2f}"</span>))
+</pre>
+</div>
+
+<pre class="example">
+John Kitchin 2.24
+</pre>
+
+<p>
+它仍然缺乏python中f-string的一些功能，例如，在python中，待展开的模板参数将被求值。上面解决方案相比就显得太简单了，因为它只使用了一个正则表达式，并且仅限于词法环境中的变量值。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-python"><span style="font-weight: bold;">print</span>(f<span style="font-style: italic;">'{5**0.5:1.3f}'</span>)
+</pre>
+</div>
+
+<pre class="example">
+2.236
+
+</pre>
+
+<p>
+尽管如此，这个简单的解决方案与我大多数时候的做法是一致的，所以我仍然认为它是一个改进!
+</p>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2018-05-15</span>
+            <span title="last modification date" class="post-info">2019-12-21</span>
+            <span title="tags" class="post-info">:<a href="../../../../../tags/raw">raw</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-4350ea14-e25e-47dc-9c37-c8f0484961a5">lujun9972</a></span>
+        </div>
+    <script src="../../../../../media/js/jquery-2.1.3.min.js"></script>
+    <script src="../../../../../media/js/md5.min.js"></script>
+        <section>
+            <div id="gitalk-container"></div>
+            <script type="text/javascript">
+             var gitalk = new Gitalk({
+                 clientID: 'fdcb5d9da3f4acb4862c',
+                 clientSecret: 'dd0a16312a206782cb7669dcec5e96874ab48170',
+                 repo: 'lujun9972.github.com',
+                 owner: 'lujun9972',
+                 admin: ['lujun9972'],
+                 id: md5(location.pathname),      // Ensure uniqueness and length less than 50
+                 distractionFreeMode: false  // Facebook-like distraction free mode
+             })
+             gitalk.render('gitalk-container')
+            </script>
+        </section>
+    <script src="../../../../../media/js/main.js"></script>
+        <script>
+         var _hmt = _hmt || [];
+         (function() {
+             var hm = document.createElement("script");
+             hm.src = "https://hm.baidu.com/hm.js?7bac4fd0247f69c27887e0d4e3aee41e";
+             var s = document.getElementsByTagName("script")[0]; 
+             s.parentNode.insertBefore(hm, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-4350ea14-e25e-47dc-9c37-c8f0484961a5">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="../../../../../instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>

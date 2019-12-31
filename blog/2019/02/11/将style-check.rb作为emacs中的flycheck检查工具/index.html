@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>将style-check.rb作为Emacs中的flycheck检查工具 - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="emacs-common" />
+  <!-- <link rel="stylesheet" href="../../../../../media/css/main.css" type="text/css"/>
+       <link rel="stylesheet" href="../../../../../media/css/comment.css" type="text/css"/> -->
+  <link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/kognise/water.css@latest/dist/dark.css'>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="../../../../../">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <ul class="trigger">
+        <li><a href="../../../../../years/">Years</a></li>
+        <li><a href="../../../../../authors/">Authors</a></li>
+        <li><a href="../../../../../tags/">Tags</a></li>
+        <li><a href="../../../../../about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="../../../../../rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="https://www.bing.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">将style-check.rb作为Emacs中的flycheck检查工具</h1>
+<div id="table-of-contents">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#example-screenshot">案例截图</a></li>
+<li><a href="#style-check.rb-installation">安装style-check.rb</a></li>
+<li><a href="#flycheck-integration">flycheck集成</a></li>
+<li><a href="#chaining-other-latex-checkers">与其他latex检查器整合</a></li>
+</ul>
+</div>
+</div>
+<p>
+这篇文章向你展示了如何在Emacs文本编辑器中集成 <a href="https://www.cs.umd.edu/~nspring/software/style-check-readme.html">style-check.rb</a> 和 <a href="https://www.flycheck.org">flycheck</a>。
+</p>
+
+<p>
+style-check.rb可以检查:
+</p>
+
+<ul class="org-ul">
+<li>语法</li>
+<li>正确的大小写</li>
+<li>短语 例如. “few in number” → “few”</li>
+<li>拼写错误</li>
+<li>忽略 latex 命令</li>
+<li>Latex 源码检查 例如. 标签应该在句号之前(而不是之后)</li>
+</ul>
+
+<div id="outline-container-org51364c9" class="outline-2">
+<h2 id="example-screenshot"><a id="org51364c9"></a>案例截图</h2>
+<div class="outline-text-2" id="text-example-screenshot">
+<p>
+When the style-check.rb flychecker checker is functional, an example Flycheck Errors buffer is:
+当style-check.rb工作时，会有一个类似下面的Flycheck错误缓冲区:
+</p>
+
+
+<div class="figure">
+<p><img src="https://www.macs.hw.ac.uk/~rs46/images/site/style-check-flycheck.jpg" alt="style-check-flycheck.jpg" />
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgf1f6672" class="outline-2">
+<h2 id="style-check.rb-installation"><a id="orgf1f6672"></a>安装style-check.rb</h2>
+<div class="outline-text-2" id="text-style-check.rb-installation">
+<p>
+从 <a href="https://www.cs.umd.edu/~nspring/software/style-check-readme.html">https://www.cs.umd.edu/~nspring/software/style-check-readme.html</a> 下载.
+</p>
+
+<p>
+为了测试 <code>style-check.rb</code>, 我们先创建一个 <code>test.tex</code> 文件包含下面内容:
+</p>
+
+<pre class="example">
+documentclass{article}
+begin{document}
+section{Heading}
+The way in which.
+end{document}
+</pre>
+
+<p>
+然后测试 <code>style-check.rb</code> (路径要正确):
+</p>
+
+<pre class="example">
+/path/to/style-check.rb test.tex
+</pre>
+
+<p>
+它应该输出:
+</p>
+
+<pre class="example">
+test.tex:4:1: The way in which. (The way in which)
+</pre>
+</div>
+</div>
+
+<div id="outline-container-orga68a8f1" class="outline-2">
+<h2 id="flycheck-integration"><a id="orga68a8f1"></a>flycheck集成</h2>
+<div class="outline-text-2" id="text-flycheck-integration">
+<p>
+在你的 <code>~/.emacs</code>, <code>~/.emacs.el</code>, 或 <code>~/.emacs.d/init.el</code> (或其他) 文件中填入下面内容.
+</p>
+
+<p>
+<code>style-check.rb</code> 的路径需要修改为真实路径.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">require</span> '<span style="font-weight: bold; text-decoration: underline;">flycheck</span>)
+(flycheck-define-checker style-check
+  <span style="font-style: italic;">"A linter for style-check.rb"</span>
+  <span style="font-weight: bold;">:command</span> (<span style="font-style: italic;">"/path/to/style-check.rb"</span>
+            source-inplace)
+  <span style="font-weight: bold;">:error-patterns</span>
+  ((warning line-start (file-name) <span style="font-style: italic;">":"</span> line <span style="font-style: italic;">":"</span> column <span style="font-style: italic;">": "</span>
+            (message (one-or-more not-newline)
+                     (zero-or-more <span style="font-style: italic;">"n"</span> (any <span style="font-style: italic;">" "</span>) (one-or-more not-newline)))
+            line-end))
+  <span style="font-weight: bold;">:modes</span> latex-mode
+  )
+(add-to-list 'flycheck-checkers 'style-check)
+</pre>
+</div>
+
+<p>
+启用latex-mode的flycheck:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(add-hook 'latex-mode-hook 'flycheck-mode)
+</pre>
+</div>
+
+<p>
+当你打开 <code>.tex</code> 文件时， <code>style-check.rb</code> 会被调用来针对 latex 内容进行检查. 且每次保存变更时都会执行一次 <code>style-check.rb</code>.
+</p>
+
+<p>
+按下 <code>C-c ! l</code> 就会在一个 Flycheck 错误buffer显示 <code>file.txt</code> 的 文本分析(textlint) 警告
+</p>
+
+<p>
+<b>调试</b> 若flycheck错误buffer中没有显示任何警告, 按下 <code>C-c ! C-c</code> 可以对 <code>style-check.rb</code> 进行调试。 它会在新 buffer 中运行 <code>style-check.rb</code> 并显示其原始输出.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgef8527c" class="outline-2">
+<h2 id="chaining-other-latex-checkers"><a id="orgef8527c"></a>与其他latex检查器整合</h2>
+<div class="outline-text-2" id="text-chaining-other-latex-checkers">
+<p>
+Flycheck可以在单个文件上执行多个检查器。例如你可以将 <a href="./2018-12-25-textlint-flycheck.html">textlint flycheck check</a> 和 <code>style-check.rb</code> 检查起连用起来。
+你需要在Emacs配置文件(例如 <code>~/.init.el</code>)中定义文本检查工具然后将之加入 <code>style-check.rb</code> 中的检查器配置
+</p>
+
+<pre class="example">
+:next-checkers ((warning . textlint))
+</pre>
+
+<p>
+Flycheck现在将列出来自两个检查器的警告。
+</p>
+
+<p>
+多个检查器链接在一起的一个潜在缺点是来自不同检查器会对相同错误产生多个警告，例如拼写、措辞和大小写之类的错误。
+</p>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2019-02-11</span>
+            <span title="last modification date" class="post-info">2019-12-25</span>
+            <span title="tags" class="post-info">:<a href="../../../../../tags/emacs-common">emacs-common</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-4350ea14-e25e-47dc-9c37-c8f0484961a5">lujun9972</a></span>
+        </div>
+    <script src="../../../../../media/js/jquery-2.1.3.min.js"></script>
+    <script src="../../../../../media/js/md5.min.js"></script>
+        <section>
+            <div id="gitalk-container"></div>
+            <script type="text/javascript">
+             var gitalk = new Gitalk({
+                 clientID: 'fdcb5d9da3f4acb4862c',
+                 clientSecret: 'dd0a16312a206782cb7669dcec5e96874ab48170',
+                 repo: 'lujun9972.github.com',
+                 owner: 'lujun9972',
+                 admin: ['lujun9972'],
+                 id: md5(location.pathname),      // Ensure uniqueness and length less than 50
+                 distractionFreeMode: false  // Facebook-like distraction free mode
+             })
+             gitalk.render('gitalk-container')
+            </script>
+        </section>
+    <script src="../../../../../media/js/main.js"></script>
+        <script>
+         var _hmt = _hmt || [];
+         (function() {
+             var hm = document.createElement("script");
+             hm.src = "https://hm.baidu.com/hm.js?7bac4fd0247f69c27887e0d4e3aee41e";
+             var s = document.getElementsByTagName("script")[0]; 
+             s.parentNode.insertBefore(hm, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-4350ea14-e25e-47dc-9c37-c8f0484961a5">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="../../../../../instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>

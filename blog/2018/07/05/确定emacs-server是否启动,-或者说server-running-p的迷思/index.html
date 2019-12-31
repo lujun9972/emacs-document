@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>确定Emacs server是否启动, 或者说server-running-p的迷思 - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="elisp-common" />
+  <!-- <link rel="stylesheet" href="../../../../../media/css/main.css" type="text/css"/>
+       <link rel="stylesheet" href="../../../../../media/css/comment.css" type="text/css"/> -->
+  <link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/kognise/water.css@latest/dist/dark.css'>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="../../../../../">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <ul class="trigger">
+        <li><a href="../../../../../years/">Years</a></li>
+        <li><a href="../../../../../authors/">Authors</a></li>
+        <li><a href="../../../../../tags/">Tags</a></li>
+        <li><a href="../../../../../about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="../../../../../rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="https://www.bing.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">确定Emacs server是否启动, 或者说server-running-p的迷思</h1>
+<p>
+一个小问题:如何确定当前Emacs实例是否启动了服务器？
+</p>
+
+<p>
+快速搜索一下，我们可以得到三种方法: <code>server-mode=， =(daemonp)</code> 和 <code>(server-running-p)</code>. 
+这太多了，但是其中一个肯定是正确答案对吗? 然而, 并不是. 因为这个小问题的真正答案是：你无能为力。
+</p>
+
+<ul class="org-ul">
+<li>且仅当服务器使用 <code>server-mode</code> 函数启动时 <code>server-mode</code> 的值才为 <code>t=。但是我们还有其他方法可以启动服务器，比如 =M-x server-start</code> 或 <code>emacs --daemon</code> 。</li>
+<li>且仅当Emacs在守护进程模式下启动时, <code>(daemonp)</code> 才会返回 <code>t</code>.</li>
+</ul>
+
+<p>
+那么 <code>(server-run-p)</code> 呢?它看起来可能很不错，但是也有坑.
+</p>
+
+<p>
+它初看起来很不错:执行 <code>M-x server-start</code> 后， <code>(server-running-p)</code> 会返回 <code>t</code>! 
+那么我们是不是就可以选它了呢? 还不行!
+让我们启动一个新的Emacs实例，在不启动服务器的情况下执行 <code>(server-run-p)</code> 会发现依然返回 <code>t</code>!
+</p>
+
+<p>
+怎么回事？事实上 <code>(server-running-p)</code> 有点名不符实. 以下是其完整的源代码:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">server-running-p</span> (<span style="font-weight: bold; text-decoration: underline;">&amp;optional</span> name)
+  <span style="font-style: italic;">"Test whether server NAME is running.</span>
+
+<span style="font-style: italic;">Return values:</span>
+<span style="font-style: italic;">nil the server is definitely not running.</span>
+<span style="font-style: italic;">t the server seems to be running.</span>
+<span style="font-style: italic;">something else we cannot determine whether it's running without using</span>
+<span style="font-style: italic;">commands which may have to wait for a long time."</span>
+  (<span style="font-weight: bold;">unless</span> name (<span style="font-weight: bold;">setq</span> name server-name))
+  (<span style="font-weight: bold;">condition-case</span> nil
+      (<span style="font-weight: bold;">if</span> server-use-tcp
+          (<span style="font-weight: bold;">with-temp-buffer</span>
+            (insert-file-contents-literally (expand-file-name name server-auth-dir))
+            (<span style="font-weight: bold;">or</span> (<span style="font-weight: bold;">and</span> (looking-at <span style="font-style: italic;">"127</span><span style="font-weight: bold; font-style: italic;">\</span><span style="font-style: italic;">.0</span><span style="font-weight: bold; font-style: italic;">\</span><span style="font-style: italic;">.0</span><span style="font-weight: bold; font-style: italic;">\</span><span style="font-style: italic;">.1:[0-9]+ </span><span style="font-weight: bold; font-style: italic;">\</span><span style="font-style: italic;">([0-9]+</span><span style="font-weight: bold; font-style: italic;">\</span><span style="font-style: italic;">)"</span>)
+                     (assq 'comm
+                           (process-attributes
+                            (string-to-number (match-string 1))))
+                     t)
+                <span style="font-weight: bold;">:other</span>))
+        (delete-process
+         (make-network-process
+          <span style="font-weight: bold;">:name</span> <span style="font-style: italic;">"server-client-test"</span> <span style="font-weight: bold;">:family</span> 'local <span style="font-weight: bold;">:server</span> nil <span style="font-weight: bold;">:noquery</span> t
+          <span style="font-weight: bold;">:service</span> (expand-file-name name server-socket-dir)))
+        t)
+    (file-error nil)))
+</pre>
+</div>
+
+<p>
+doc-string中描述了恐怖的细节。函数中的 <code>-p</code> 后缀说明这是一个谓词，即布尔函数。
+但在 <code>server-running-p</code>, 返回 非 <code>nil</code> 值并不一定就是响亮而明确的 “是!”, 它的意思其实是“嗯，也许吧，谁知道呢?”
+这是第三种可能，因为Emacs并不是黑白分明的。
+</p>
+
+<p>
+但是这个函数做什么呢?它试图确定一个名叫 <code>NAME</code> 的服务器是否正在运行,方法是假设该服务器的配置与正在运行的实例完全一致。
+它可能最终会查看当前服务器的套接字文件，或者尝试启动一个TCP连接(这个开销非常昂贵)。
+你可能会在构建mode line时调用 <code>server-running-p</code> 函数: 但是它会让你立刻冻结Emacs运行而且还无法恢复. 
+它的使用场景目前还不太清楚. 它无法确定正在运行的实例是否启用了服务器 --- 但是它会使用该服务器的配置去搜索潜在的完全不同的其他服务器.
+</p>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2018-07-05</span>
+            <span title="last modification date" class="post-info">2019-12-23</span>
+            <span title="tags" class="post-info">:<a href="../../../../../tags/elisp-common">elisp-common</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-4350ea14-e25e-47dc-9c37-c8f0484961a5">lujun9972</a></span>
+        </div>
+    <script src="../../../../../media/js/jquery-2.1.3.min.js"></script>
+    <script src="../../../../../media/js/md5.min.js"></script>
+        <section>
+            <div id="gitalk-container"></div>
+            <script type="text/javascript">
+             var gitalk = new Gitalk({
+                 clientID: 'fdcb5d9da3f4acb4862c',
+                 clientSecret: 'dd0a16312a206782cb7669dcec5e96874ab48170',
+                 repo: 'lujun9972.github.com',
+                 owner: 'lujun9972',
+                 admin: ['lujun9972'],
+                 id: md5(location.pathname),      // Ensure uniqueness and length less than 50
+                 distractionFreeMode: false  // Facebook-like distraction free mode
+             })
+             gitalk.render('gitalk-container')
+            </script>
+        </section>
+    <script src="../../../../../media/js/main.js"></script>
+        <script>
+         var _hmt = _hmt || [];
+         (function() {
+             var hm = document.createElement("script");
+             hm.src = "https://hm.baidu.com/hm.js?7bac4fd0247f69c27887e0d4e3aee41e";
+             var s = document.getElementsByTagName("script")[0]; 
+             s.parentNode.insertBefore(hm, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-4350ea14-e25e-47dc-9c37-c8f0484961a5">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="../../../../../instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>

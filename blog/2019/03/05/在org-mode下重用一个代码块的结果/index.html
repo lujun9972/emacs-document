@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>在org-mode下重用一个代码块的结果 - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="org-mode" />
+  <!-- <link rel="stylesheet" href="../../../../../media/css/main.css" type="text/css"/>
+       <link rel="stylesheet" href="../../../../../media/css/comment.css" type="text/css"/> -->
+  <link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/kognise/water.css@latest/dist/dark.css'>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="../../../../../">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <ul class="trigger">
+        <li><a href="../../../../../years/">Years</a></li>
+        <li><a href="../../../../../authors/">Authors</a></li>
+        <li><a href="../../../../../tags/">Tags</a></li>
+        <li><a href="../../../../../about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="../../../../../rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="https://www.bing.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">在org-mode下重用一个代码块的结果</h1>
+<div id="table-of-contents">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#orgb32b954"><span class="done DONE">DONE</span> 在org-mode下重用一个代码块的结果</a>
+<ul>
+<li><a href="#org0e23def">:var</a></li>
+<li><a href="#orgacd9ed5">:cache</a></li>
+<li><a href="#orgc5a9f81">:wrap</a></li>
+<li><a href="#org92b923c">:file</a></li>
+<li><a href="#org84834fe">"remote" data</a></li>
+<li><a href="#org312ce56">手动保存文件中的数据</a></li>
+<li><a href="#orgc61e4c7">数据附录</a></li>
+<li><a href="#orgf40ada4">警告</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-orgb32b954" class="outline-2">
+<h2 id="orgb32b954"><span class="done DONE">DONE</span> 在org-mode下重用一个代码块的结果</h2>
+<div class="outline-text-2" id="text-orgb32b954">
+<p>
+
+</p>
+<p>
+:categories: emacs,elisp,orgmode
+:date:     2019/02/12 09:20:58
+:updated:  2019/02/25 14:17:16
+:org-url:  <a href="http://kitchingroup.cheme.cmu.edu/org/2019/02/12/Using-results-from-one-code-block-in-another-org-mode.org">http://kitchingroup.cheme.cmu.edu/org/2019/02/12/Using-results-from-one-code-block-in-another-org-mode.org</a>
+:permalink: <a href="http://kitchingroup.cheme.cmu.edu/blog/2019/02/12/Using-results-from-one-code-block-in-another-org-mode/index.html">http://kitchingroup.cheme.cmu.edu/blog/2019/02/12/Using-results-from-one-code-block-in-another-org-mode/index.html</a>
+</p>
+
+<p>
+This runs in a <i>session</i> where you can keep variables in memory between blocks, and use them in subsequent blocks.
+org模式中一个非常棒的特性是，您可以使用许多选项在代码块之间传递数据。
+在这篇文章中，我们将介绍其中一些选项在emacs-lisp语言中的应用。
+它在 <i>会话</i> 中运行，通过会话你可以将变量保存在块之间的内存中，并在后续块中使用它们。
+</p>
+
+<p>
+这里我们为一个变量设置值。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">setq</span> some-variable 42)
+</pre>
+</div>
+
+<pre class="example">
+42
+
+</pre>
+
+<p>
+然后在另一个块中我们可以使用这个变量:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(+ some-variable 1)
+</pre>
+</div>
+
+<pre class="example">
+43
+
+</pre>
+
+<p>
+你可以在会话中使用 <code>some-variable</code> 。令人感到意外的是，emacs-lisp会话是全局性的，您甚至可以在另一个缓冲区中访问 <code>some-variable</code>!
+但是不要这样做。当您关闭emacs后，该变量将消失，只剩下上面的结果。
+</p>
+
+<p>
+还有一种方法可以使用块标头中的命名代码块和变量将信息从一个块传递到另一个块。这允许您按名称在块之间传递数据，稍后您将会看到你甚至可以从其他文件中通过名称访问结果。
+</p>
+</div>
+
+<div id="outline-container-org0e23def" class="outline-3">
+<h3 id="org0e23def">:var</h3>
+<div class="outline-text-3" id="text-org0e23def">
+<p>
+首先，我们给代码块一个名字，像这样:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-org"><span style="font-weight: bold; font-style: italic;">#+name: block-1</span>
+<span style="font-weight: bold; font-style: italic;">#+BEGIN_SRC emacs-lisp</span>
+(current-time-string)
+<span style="font-weight: bold; font-style: italic;">#+END_SRC</span>
+</pre>
+</div>
+
+<p>
+当我们运行它时，结果中会有一个名字。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp" id="orgde45e08">(current-time-string)
+</pre>
+</div>
+
+<pre class="example">
+Tue Feb 12 08:19:23 2019
+
+</pre>
+
+<p>
+现在，我们可以通过 :var 标头将命名结果作为 <i>输入</i> 作用于一个新块。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-org"><span style="font-weight: bold; font-style: italic;">#+BEGIN_SRC emacs-lisp :var input=block-1</span>
+(format <span style="font-style: italic;">"We got %S in block-1"</span> input)
+<span style="font-weight: bold; font-style: italic;">#+END_SRC</span>
+</pre>
+</div>
+
+<p>
+当我们运行这个块时，emacs将运行block-1并将输出放入变量 <code>input</code> 中，该变量被用于代码块中。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(format <span style="font-style: italic;">"We got %S in block-1"</span> input)
+</pre>
+</div>
+
+<pre class="example">
+We got "Tue Feb 12 08:20:44 2019" in block-1
+
+</pre>
+
+<p>
+注意以下几点:
+</p>
+<ol class="org-ol">
+<li>每次运行它，block-1都会重新运行。</li>
+<li>此块中的结果与block-1中的结果不同</li>
+<li>运行第二个块时，block-1中的结果不会改变。</li>
+</ol>
+
+<p>
+您可能不想每次都重新运行block-1;比如这个计算可能非常昂贵，或者每次的计算结果都一样。那么可以使用:cache标头来防止每次都重新计算。
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgacd9ed5" class="outline-3">
+<h3 id="orgacd9ed5">:cache</h3>
+<div class="outline-text-3" id="text-orgacd9ed5">
+<p>
+如果您指定了 <code>:cache yes</code>,那么org-mode <i>应该会</i> 存储一个带有结果的代码块散列，只要代码块没有改变，那么它就不会重新运行。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-org"><span style="font-weight: bold; font-style: italic;">#+name: block-2</span>
+<span style="font-weight: bold; font-style: italic;">#+BEGIN_SRC emacs-lisp :cache yes</span>
+(current-time-string)
+<span style="font-weight: bold; font-style: italic;">#+END_SRC</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp" id="orga45d3cc">(current-time-string)
+</pre>
+</div>
+
+<pre class="example">
+Tue Feb 12 08:06:22 2019
+
+</pre>
+
+<p>
+现在，我们使用block-2作为输入，我们可以看到其输出和block-2的输出是一样的。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(format <span style="font-style: italic;">"We got %S in block-2"</span> input)
+</pre>
+</div>
+
+<pre class="example">
+We got "Tue Feb 12 08:06:22 2019" in block-2
+
+</pre>
+
+<p>
+好吧，但是如果我的结果太大而不能放入buffer，或者太复杂而不能用文本来表达怎么办?你还有其他选择。
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgc5a9f81" class="outline-3">
+<h3 id="orgc5a9f81">:wrap</h3>
+<div class="outline-text-3" id="text-orgc5a9f81">
+<p>
+假设我们在某个块中生成了一些json，然后希望在另一个块中使用它。
+同时我们还希望看到json作为中间结果存储在buffer中。我们可以像这样将输出包装在json块中。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp" id="org63a7a08">(<span style="font-weight: bold;">require</span> '<span style="font-weight: bold; text-decoration: underline;">json</span>)
+(json-encode `((<span style="font-style: italic;">"date"</span> . ,(current-time-string))))
+</pre>
+</div>
+
+<div class="json">
+<p>
+{"date":"Tue Feb 12 08:30:20 2019"}
+</p>
+
+</div>
+
+<p>
+然后，我们可以很容易地将输出注入到一个新块中。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(format <span style="font-style: italic;">"We got %S in json"</span> input)
+</pre>
+</div>
+
+<pre class="example">
+We got "{"date":"Tue Feb 12 08:30:20 2019"}
+" in json
+
+</pre>
+
+<p>
+这对文本数据非常简单. 但对二进制数据就不太好了.
+</p>
+
+<p>
+值得注意的是，你甚至能在另一个org文件中引用这个结果:
+</p>
+
+<pre class="example">
+#+BEGIN_SRC emacs-lisp :var input=./2019-02-12.org:json
+input
+#+END_SRC
+
+#+RESULTS:
+: {"date":"Tue Feb 12 08:30:20 2019"}
+</pre>
+</div>
+</div>
+
+<div id="outline-container-org92b923c" class="outline-3">
+<h3 id="org92b923c">:file</h3>
+<div class="outline-text-3" id="text-org92b923c">
+<p>
+如果数据太大或者数据是二进制的，无法方便地存入org文件，也没问题，只需使用:file头将其存入外部文件即可。像这样:
+</p>
+
+<pre class="example">
+#+name: block-3
+#+BEGIN_SRC emacs-lisp :cache yes :file block-3
+(require 'json)
+(json-encode `(("date" . ,(current-time-string))))
+#+END_SRC
+
+#+RESULTS[a14d376653bd8c40a0961ca95f21d8837dddec66]: block-3
+[[file:block-3]]
+</pre>
+
+
+<p>
+注意，您必须提供一个文件名。如果你希望文件名有意义，可以发送给某人，这当然不错，但如果有一个自动命名方案也不错，例如基于代码块块的sha-1散列值就不错。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp" id="org0762f9b">(<span style="font-weight: bold;">require</span> '<span style="font-weight: bold; text-decoration: underline;">json</span>)
+(json-encode `((<span style="font-style: italic;">"date"</span> . ,(current-time-string))))
+</pre>
+</div>
+
+<p>
+<a href="block-3">block-3</a>
+</p>
+
+<p>
+现在您可以使用其他工具来查看文件。在这里，我们仍然通过简单的shell工具来查看。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">cat block-3
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-sh">{<span style="font-style: italic;">"date"</span>:<span style="font-style: italic;">"Tue Feb 12 08:46:55 2019"</span>}
+</pre>
+</div>
+
+
+<p>
+block-3的输出是一个文件名:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">input
+</pre>
+</div>
+
+<pre class="example">
+/Users/jkitchin/Box Sync/kitchingroup/jkitchin/journal/2019/02/12/block-3
+
+</pre>
+
+<p>
+因此，您可以在新块中从它那读取数据，然后对其进行一些新操作。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">with-temp-buffer</span>
+(insert-file-contents input)
+(format <span style="font-style: italic;">"We got %S in block-3"</span> (json-read-from-string (buffer-string))))
+</pre>
+</div>
+
+<pre class="example">
+We got ((date . "Tue Feb 12 08:46:55 2019")) in block-3
+
+</pre>
+</div>
+</div>
+
+<div id="outline-container-org84834fe" class="outline-3">
+<h3 id="org84834fe">"remote" data</h3>
+<div class="outline-text-3" id="text-org84834fe">
+<p>
+代码块不一定要按顺序排列。如果你愿意，你可以把一些代码块放在附录里，然后在正文的代码块中使用使用它们。
+这样，您可以在正文中存放简短的代码块，这样可读性更好，而在其他地方存放更长、更复杂的块，这样就不会使文档混乱。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">with-temp-buffer</span>
+(insert-file-contents input)
+(format <span style="font-style: italic;">"We got %S in the appendix data"</span> (json-read-from-string (buffer-string))))
+</pre>
+</div>
+
+<pre class="example">
+We got "{"date":"Tue Feb 12 09:11:12 2019"}" in the appendix data
+
+</pre>
+</div>
+</div>
+
+<div id="outline-container-org312ce56" class="outline-3">
+<h3 id="org312ce56">手动保存文件中的数据</h3>
+<div class="outline-text-3" id="text-org312ce56">
+<p>
+注意你也可以手动保存数据到文件中，例如:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp" id="org0a44bf9">(<span style="font-weight: bold;">require</span> '<span style="font-weight: bold; text-decoration: underline;">json</span>)
+(<span style="font-weight: bold;">let</span> ((f <span style="font-style: italic;">"block-4.json"</span>))
+(<span style="font-weight: bold;">with-temp-file</span> f
+(prin1
+(json-encode `((<span style="font-style: italic;">"date"</span> . ,(current-time-string))))
+(current-buffer)))
+f)
+</pre>
+</div>
+
+<pre class="example">
+block-4.json
+
+</pre>
+
+<p>
+我们将文件名作为块返回的最后一个变量，这样我们就不必在下一个块中手动输入它。你知道，尽量不要重复…
+</p>
+
+<p>
+This just shows we did write out to our file:
+这只是为了证明我们确实写入了内容到文件中:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh">cat block-4.json
+</pre>
+</div>
+
+<pre class="example">
+:"Tue Feb 12 08:50:00 2019"}
+
+</pre>
+
+<p>
+我们使用block-4中的文件名作为输入变量读取文件。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">with-temp-buffer</span>
+(insert-file-contents input)
+(format <span style="font-style: italic;">"We got %S in block-4"</span> (json-read-from-string (buffer-string))))
+</pre>
+</div>
+
+<pre class="example">
+We got "{"date":"Tue Feb 12 08:51:25 2019"}" in block-4
+
+</pre>
+</div>
+</div>
+
+<div id="outline-container-orgc61e4c7" class="outline-3">
+<h3 id="orgc61e4c7"><a id="ID-0452775B-D200-4B9B-BC09-C6935D9183A4"></a>数据附录</h3>
+<div class="outline-text-3" id="text-orgc61e4c7">
+<div class="org-src-container">
+<pre class="src src-emacs-lisp" id="org126a806">(<span style="font-weight: bold;">require</span> '<span style="font-weight: bold; text-decoration: underline;">json</span>)
+(<span style="font-weight: bold;">let</span> ((f <span style="font-style: italic;">"appendix.json"</span>))
+(<span style="font-weight: bold;">with-temp-file</span> f
+(prin1
+(json-encode `((<span style="font-style: italic;">"date"</span> . ,(current-time-string))))
+(current-buffer)))
+f)
+</pre>
+</div>
+
+<pre class="example">
+appendix.json
+
+</pre>
+</div>
+</div>
+
+
+<div id="outline-container-orgf40ada4" class="outline-3">
+<h3 id="orgf40ada4">警告</h3>
+<div class="outline-text-3" id="text-orgf40ada4">
+<p>
+这样使用org-mode几乎总是在存储内容和存储位置方面找到正确的权衡。
+并非所有中间数据/计算都需要储存起来;如果它们真的很便宜，你可以通过重新运行代码块获取结果。
+如果它们非常小，也就是说，只需要几行内容就能狗读回来，那么可以将它们存储在文档中。如果它们非常大，可以将它们存储在外部文件中。
+</p>
+
+<p>
+在org文件中包含所有内容的美妙之处在于您只有单个文件，易于传输。
+但是，当文件变得太大时，就不那么实用了，例如，如果试图将数千行xml数据都放入buffer中，emacs可能会变慢。
+然后，你必须做出一些决定，保存什么，保存在哪里，以什么形式保存。
+</p>
+
+<p>
+对于只需要单个计算会话的短期项目来说，将所有内容都放在内存中可能没有问题。
+但对于较长期的项目来说，如果一个项目足够长期，您需要会关闭所有buffer，甚至可能在此期间会重新启动emacs，这是您必须做出一些决策，每个块中保存什么内容，才能让你在下一次会话中继续工作。
+同样的，您必须决定保存什么、在何处保存以及以什么形式保存。
+</p>
+
+<p>
+一旦您开始在org文件之外保存数据，它的可移植性就会降低，或者说移动文件会变得更加棘手，因为您需要移动所有的数据文件来保持它的完整性。
+之前，我曾探讨过org-archive的概念，这个概念使你可以获得org文件中链接的所有文件列表，但到目前为止，这只是一些概念的小证明而已(proof of concept ideas)。
+</p>
+
+<p>
+不同的语言在org模式下是不相同的。例如，有些并不支持会话，而且有些可能无法像这里例子中那样工作。
+改版的scimax iPython行为就与上面的示例不同。这可能是我无意中引入的bug造成的，以后我将尝试使它像上面emacs-lisp那样工作。
+</p>
+
+<p>
+总的来说，org-mode是我见过的在文档中传递和重用数据的最灵活、最强大的系统之一。
+它并不完美的，而且在这样一个强大的系统中，有许多未经探索或很少用到的场景可能存在危险。不过总体来说它看起来还是很有前景的。
+</p>
+</div>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2019-03-05</span>
+            <span title="last modification date" class="post-info">2019-12-31</span>
+            <span title="tags" class="post-info">:<a href="../../../../../tags/org-mode">org-mode</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-4350ea14-e25e-47dc-9c37-c8f0484961a5">lujun9972</a></span>
+        </div>
+    <script src="../../../../../media/js/jquery-2.1.3.min.js"></script>
+    <script src="../../../../../media/js/md5.min.js"></script>
+        <section>
+            <div id="gitalk-container"></div>
+            <script type="text/javascript">
+             var gitalk = new Gitalk({
+                 clientID: 'fdcb5d9da3f4acb4862c',
+                 clientSecret: 'dd0a16312a206782cb7669dcec5e96874ab48170',
+                 repo: 'lujun9972.github.com',
+                 owner: 'lujun9972',
+                 admin: ['lujun9972'],
+                 id: md5(location.pathname),      // Ensure uniqueness and length less than 50
+                 distractionFreeMode: false  // Facebook-like distraction free mode
+             })
+             gitalk.render('gitalk-container')
+            </script>
+        </section>
+    <script src="../../../../../media/js/main.js"></script>
+        <script>
+         var _hmt = _hmt || [];
+         (function() {
+             var hm = document.createElement("script");
+             hm.src = "https://hm.baidu.com/hm.js?7bac4fd0247f69c27887e0d4e3aee41e";
+             var s = document.getElementsByTagName("script")[0]; 
+             s.parentNode.insertBefore(hm, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-4350ea14-e25e-47dc-9c37-c8f0484961a5">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="../../../../../instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>
