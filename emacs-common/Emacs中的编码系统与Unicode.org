@@ -1,0 +1,78 @@
+#+TITLE: Emacs中的编码系统与Unicode
+#+URL: https://www.masteringemacs.org/article/working-coding-systems-unicode-emacs
+#+AUTHOR: lujun9972
+#+TAGS: emacs-common
+#+DATE: [2019年 06月 14日 星期五 18:27:58 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+* Emacs中的编码系统与Unicode
+:PROPERTIES:
+:CUSTOM_ID: working-with-coding-systems-and-unicode-in-emacs
+:CLASS: text-center
+:END:
+
+[[https://www.masteringemacs.org/static/img/fleuron2.gif]]
+
+在Emacs中处理unicode是我每天的任务。不幸的是，我不可能只使用 =UTF-8= 或 =iso-8859-1= 这两种编码;
+我的工作大量涉及许多特定领域的编码系统，因此我需要一个灵活的编辑器，它具有合理的默认设置，可以覆盖我最常用的用例。
+毫无疑问，Emacs完全有能力胜任这一角色。
+
+Emacs提供了功能用于更改各种事物的编码系统，比如进程、buffer和文件。
+你还可以强制Emacs使用特定的编码系统来调用命令，稍后我将对此进行介绍。
+
+(对我来说)最重要的改变是强制Emacs默认使用 =UTF-8=. 
+它实际上是一个标准实践，至少在西方是这样，因为它在网络上占主导地位;且能与ASCII进行一对一的映射;还足够灵活，可以表示任何unicode字符，这使其成为世界通用的兼容格式。
+不过这写都是老生常谈了。最大的问题是如何让Emacs在文件中没有明确说明它是UTF-8的情况下将其视为UTF-8。
+
+我使用以下代码片段强制将UTF-8作为所有文件、comint进程和缓冲区的默认编码系统。您可以使用自己喜欢的编码系统替换下面的 =utf-8=.
+
+#+BEGIN_SRC lisp
+(prefer-coding-system 'utf-8)
+(set-default-coding-systems 'utf-8)
+(set-terminal-coding-system 'utf-8)
+(set-keyboard-coding-system 'utf-8)
+;; backwards compatibility as default-buffer-file-coding-system
+;; is deprecated in 23.2.
+(if (boundp 'buffer-file-coding-system)
+(setq-default buffer-file-coding-system 'utf-8)
+(setq default-buffer-file-coding-system 'utf-8))
+
+;; Treat clipboard input as UTF-8 string first; compound text next, etc.
+(setq x-select-request-type '(UTF8_STRING COMPOUND_TEXT TEXT STRING))
+#+END_SRC
+
+一旦求值，Emacs将使用UTF-8来处理新文件、缓冲区、进程等内容。但若文件顶部有一个像这样的文件本地变量 =-*- coding: euc-tw -*-= ,那么Emacs将 *仍然* 使用不同的编码系统。(见Emacs手册中的 =48.2.4文件中的局部变量= )
+
+好的，那么Emacs默认所有东西都是UTF-8编码的了。但实际上并不是所有的东西都是UTF-8的呀;
+你要如何处理不是UTF-8的情况呢?你如何打破这个众所周知的规则?
+Emacs已经有了这个问题的解决方案。命令 =M-x universal-coding-system-argument=, 快捷键位 =C-x RET c=,可以接受将您希望使用的编码，以及要执行的命令作为参数。
+这使得使用其他编码打开文件、打开shell或运行Emacs命令成为可能。真的超级有用。如果您必须处理用奇怪的编码格式编码的内容，那么这个命令是必需的。
+
+使用 =universal coding sytem argument= 的一个问题是，它只会设置Emacs配置，而不会设置shell或系统的设置。
+这是一个问题，因为像Python这样的工具使用环境变量 =PYTHONIOENCODING= 来设置Python解释器的编码系统。
+
+我编写了下面的代码，它覆盖了 =universal-codingsystem-argument= 函数，使之也能临时地为命令的用户自定义环境变量设置编码格式。
+
+#+BEGIN_SRC lisp
+  (defvar universal-coding-system-env-list '("PYTHONIOENCODING")
+    "List of environment variables \[universal-coding-system-argument] should set")
+
+  (defadvice universal-coding-system-argument (around provide-env-handler activate)
+    "Augments \[universal-coding-system-argument] so it also sets environment variables
+
+  Naively sets all environment variables specified in
+  `universal-coding-system-env-list' to the literal string
+  representation of the argument `coding-system'.
+
+  No guarantees are made that the environment variables set by this advice support
+  the same coding systems as Emacs."
+    (let ((process-environment (copy-alist process-environment)))
+      (dolist (extra-env universal-coding-system-env-list)
+        (setenv extra-env (symbol-name (ad-get-arg 0))))
+      ad-do-it))
+#+END_SRC
+
+将代码插入emacs初始化文件并对执行之，现在emacs还将设置在 =universal-codingsystem-env-list= 中列出的环境变量了。
+有一点很重要，需要记住，那就是Python和Emacs并不共享一一对应的编码格式。
+可能会出现这样的情况，一个系统中存在的编码，另一个系统中不存在，或者拼写或标点符号不同;
+这些名称的映射就留给读者作为练习吧。
