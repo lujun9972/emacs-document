@@ -1,0 +1,119 @@
+#+TITLE: Emacs中的对比与合并
+#+URL: http://www.skybert.net/emacs/diffing-and-merging-in-emacs/
+#+AUTHOR: lujun9972
+#+TAGS: emacs-common
+#+DATE: [2018年 04月 19日 星期四 11:36:20 CST]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+* 对比Emacs中打开的不同的文件
+:PROPERTIES:
+:CUSTOM_ID: diffing-files-youve-got-open-in-your-emacs
+:END:
+
+#+BEGIN_EXAMPLE
+M-x ediff-buffers
+#+END_EXAMPLE
+
+* 对比文件的不同修订版本
+:PROPERTIES:
+:CUSTOM_ID: diffing-revisions-of-a-file
+:END:
+
+C-x v = (=vc-diff=)
+
+您还可以通过 =M-x ediff-revision= 调用 =ediff= 查看变更
+
+* 在ediff会话中
+:PROPERTIES:
+:CUSTOM_ID: inside-an-ediff-session
+:END:
+
+进入ediff会话后，将焦点放在 =ediff= 导航中进行操作.像这样:
+
+- n/p -下一个不同之处/前一个不同之处
+- a - 应用版本a的内容
+- b - 应用版本b的内容
+- r -还原，撤销A/B块的应用。
+- q - 退出 ediff 会话
+
+* 使用合并冲突标记解决文件中的合并冲突
+:PROPERTIES:
+:CUSTOM_ID: resolving-merge-conflicts-in-files-with-merge-conflict-markers
+:END:
+
+Emacs自带一个合并冲突的易用接口, 叫做 =smerge= (即"simple merge"之意).
+
+当出现合并冲突, Emacs将自动突出显示那些版本控制系统写入源文件中的差异标记。
+它将识别哪些部分是“他们的”，哪些是“我的”——以及“祖先”是什么样子的(如果你设置了三路合并)。
+
+[[http://www.skybert.net/graphics/2017/2017-01-04-emacs-3-way-diff-git-merge.png]]
+
+要选择下面的版本，我只要把光标放在上面，然后运行 =M-x smerge-keep-current=.
+
+* 告诉Git进行三路对比，而不是双路合并对比
+:PROPERTIES:
+:CUSTOM_ID: telling-git-to-give-us-3-way-diff-instead-of-two-way
+:END:
+
+默认情况下,git 在发生合并冲突时使用双路对比 ("我们"文件版本以及"他们"的版本). 
+然而当解决合并冲突时, 通常还需要查看合并文件两个版本的最新公共祖先.
+
+三路对比特别有用, 你可以通过在 =~/.gitconfig= 中添加下面内容来全局性地为所有项目设置成三路对比:
+
+#+BEGIN_EXAMPLE
+[merge]
+conflictstyle = diff3
+#+END_EXAMPLE
+
+* *)
+:PROPERTIES:
+:CUSTOM_ID: section
+:END:
+
+在版本Emacs版本25.1上通过测试
+
+* P4 的特定设置
+:PROPERTIES:
+:CUSTOM_ID: p4-specific-setup
+:END:
+
+在 =.p4enviro= 中写入:
+
+#+BEGIN_EXAMPLE
+P4MERGE=/home/torstein/bin/p4-emacs-merge
+#+END_EXAMPLE
+
+在 =.emacs= 中写入:
+
+#+BEGIN_EXAMPLE
+(server-start)
+#+END_EXAMPLE
+
+在 =/home/torstein/bin/emerge= 中写入 (Gentoo用户，注意完整的路径;-)
+
+#+BEGIN_EXAMPLE
+ancestor=$1
+theirs=$2
+yours=$3
+merge_result=$4
+
+emacsclient -e "(ediff-merge-files-with-ancestor "${yours}" "${theirs}" "${ancestor}" () "${merge_result}")"
+emacsclient "${merge_result}"
+#+END_EXAMPLE
+
+p4-emacs-merge的完整源代码可以在这里找到:
+https://github.com/skybert/my-little-friends/blob/master/bash/vcs/p4-emacs-merge
+
+** P4 specifc post-merge notes
+:PROPERTIES:
+:CUSTOM_ID: p4-specifc-post-merge-notes
+:END:
+
+在 =ediff= 会话中完成操作并返回到 p4/shell提示符后，选择 =ae= (接受编辑)
+下面是一个合并冲突, 显示了两个版本的内容 (p4 "你的内容" 作为 A 而 p4 "他们的内容" 作为 B):
+
+[[http://www.skybert.net/graphics/2016/2016-03-10-ediff-merge-before.png]]
+
+这次我希望使用他们的版本, 因此我按下 b 键. Emacs 就会使用B块的内容替换冲突部分了:
+
+[[http://www.skybert.net/graphics/2016/2016-03-10-ediff-merge-after.png]]
