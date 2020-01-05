@@ -1,0 +1,115 @@
+#+TITLE: org-babel文学分析简介
+#+URL: http://ul.io/nb/2018/04/30/literate-analytics-with-org-babel/
+#+AUTHOR: lujun9972
+#+TAGS: org-mode
+#+DATE: [2018年 06月 05日 星期二 14:13:05 CST]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+作为分析和数据基础设施团队的一名工程师，我花了相当多的时间在临时性地探索和执行分散在SQL数据库,Hive和Spark集群，blob存储中的数据上。
+这些调查工作很繁琐——一个实例就可能涉及多个ETL步骤、评估是否需要清理数据，以及在REPL和用于生产的程序之间移动代码。
+
+一旦得出了最初的结论，我需要回顾并为后面的人记录我的处理过程，准确地记录在这过程中发生的事情。
+这是一个发现错误和疏漏的方法，所以为什么不一边执行一边记录呢?
+
+我需要做的是:
+
+1. 记录每个命令
+2. 记录它做了什么，为什么有必要做
+3. 边执行边检查结果
+
+=org-mode= 和 =org-babel= 为这类多语言、多模式的任务提供了一个令人惊奇的环境。文章和代码可以自由地混合在一个[[https://en.wikipedia.org/wiki/Literate_programming][文学编程]]风格中，处理过程中使用的任何引用都可以被声明，而且最终的产品可以导出为人或机器可读的格式。
+如果你想看一份分析的最终结果，[[https://gist.github.com/nickbarnwell/917c8d8bbde173ef5ad94e40ba5fa01f][这里有一个例子]]是我最近为[[http://www.teawithstrangers.com/][与陌生人喝茶]]创建的，报告了最近几个月的增长情况，这份报告体现了这些能力。
+
+* 开始
+:PROPERTIES:
+:CUSTOM_ID: getting-started
+:END:
+
+由于我通常在类似sql的数据存储中开始我的探索，所以我就以此为例。
+=emacs= 自带了 =sql-mode= 和 =ob-sql=,所以你所要做的就是允许在 =org-babel= 环境中执行SQL的 =代码= 块; 为此，需要在 =init.el= 中添加以下内容:
+
+#+begin_src emacs-lisp
+  (add-to-list 'org-babel-load-languages '(sql . t))
+  ;;If you also want to disable confirmation for SQL blocks:
+  (setq org-confirm-babel-evaluate
+        (lambda (lang body)
+          (not (string= lang "sql"))))
+  ;;or disable it for all blocks
+  (setq org-confirm-babel-evaluate nil)
+#+end_src
+
+#+BEGIN_QUOTE
+注意:如果你想了解更多关于如何 =babel= 的评价，其 =info= 页面非常完整;可以调用 =(info "(org) Evaluating code blocks")= 查看。
+#+END_QUOTE
+
+=src= blocks accept a variety of arguments that control the behaviour of their output and export.
+现在已经配置好了 =org-babel=,该创建一个新 =org= buffer并添加一些属性来配置SQL环境了。
+=src= 块接受各种参数来控制其输出和导出行为。
+
+- =#+PROPERTY: header-args:sql :session literate-analytics :engine postgresql=
+
+- 这一行将两个默认参数添加到任何 =sql= =src= block中，这两个参数是: =:session= 和 =:engine=.前者 [[https://orgmode.org/worg/org-contrib/babel/intro.html#org98c324c][为我们的SQL块启用了会话执行]]，后者告诉 =sql-mode= 我们工作的后端是 =postgresql=; 这相当于在 =sql-mode= buffer中使用了 =sql-set-product=.
+
+- =#+PROPERTY: header-args:sql+ :exports results :database tws_dev=
+
+- =sql= 后面的 =+= 表示允许附加参数到现有参数，而不是覆盖它们. =:exports results= 表示 =src= 块的输出将被包含在 =org-export= 后端的输出中。最后， =:database= 是传递给SQL客户机的连接字符串。
+
+现在，通过键入 =<s TAB sql= 在 =sql-mode= 中添加一个 =src= 块(译者注，这个里放写的有问题，是在org-mode中添加一个SQL的src块)。
+这个块内的内容将被语法高亮显示，就像它们在自己的缓冲区中一样，在光标放在块中内容上后，通过输如 =C-c '=,你可以在一个有恰当mode的buffer中编辑块内容。
+
+你的bffer现在应该是这样的:
+
+
+#+BEGIN_EXAMPLE
+#+PROPERTY: header-args:sql :session literate-analytics :engine postgresql
+#+PROPERTY: header-args:sql+ :exports results :database tws_dev
+
+#+BEGIN_SRC sql
+SELECT COUNT(*) FROM users;
+#+END_SRC
+#+END_EXAMPLE
+
+现在，将您的o港币啊放在 =src= 块中，并通过 =C-c C-c= 调用 =org-babel-execute-src-block=.如果配置正确，应该会在下面插入 =RESULT= 块:
+
+#+BEGIN_EXAMPLE
+#+RESULTS:
+| count |
+|-------|
+| 5 |
+#+END_EXAMPLE
+
+结果将自动强制转换为 =org= 表格，如果您希望处理一些表格，或者使用 =elisp= 执行一些过滤操作，或者希望稍后通过 =org-export= 导出执行结果，这个特性非常有用。
+
+* 通过TRAMP使用远程资源
+:PROPERTIES:
+:CUSTOM_ID: using-remote-resources-via-tramp
+:END:
+
+由于你很少会遇到只与本地资源交互的情况，因此能够在其他机器上运行命令非常有用。
+例如，我们经常通过 =ssh= 登陆Hadoop集群的头节点中来重命名、移动或查找HDFS中的文件。幸运的是, =babel= 与[[https://www.gnu.org/software/tramp/][TRAMP]] 结合非常紧密。
+
+ =src= 块的 =:dir= 属性接受一个TRAMP引用;然后就可以在远程机器上执行block了，像这样:
+
+#+BEGIN_EXAMPLE
+#+BEGIN_SRC sh :dir /ssh:spark: :results output list
+hdfs dfs -ls $hdfsPath/ServiceInterface
+#+END_SRC
+
+#+RESULTS:
+: - Found 5 items
+: - drwxrwxrwx+ - ... 0 2018-04-25 17:06 $hdfsPath/ServiceInterface/Delinked
+: - drwxrwxrwx+ - ... 0 2018-04-25 16:43 $hdfsPath/ServiceInterface/PartialValidated
+: - drwxrwxrwx+ - ... 0 2018-04-23 19:58 $hdfsPath/ServiceInterface/PreValidated
+: - drwxrwxrwx+ - ... 0 2018-04-25 21:24 $hdfsPath/ServiceInterface/Unvalidated
+#+END_EXAMPLE
+
+如果要在同一台远程机器上执行多个命令，可以使用 =:session= 头参数来保持连接处于打开状态。参见[[https://orgmode.org/manual/session.html][session的info页面]]了解详情。
+
+* 进一步阅读
+:PROPERTIES:
+:CUSTOM_ID: further-reading
+:END:
+
+我只介绍了 =org-babel= 的一小部分功能，但希望它能给您一些启发。
+要进一步阅读，我建议观看[[https://www.youtube.com/watch?]v=dljNabciEGg][Howard Abram在Emacs会议上的Literate DevOps with emacs]] 并细读 =babel= 的 =info= 手册。
