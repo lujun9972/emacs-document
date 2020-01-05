@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>org-babel文学分析简介 - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="org-mode" />
+  <!-- <link rel="stylesheet" href="../../../../../media/css/main.css" type="text/css"/>
+       <link rel="stylesheet" href="../../../../../media/css/comment.css" type="text/css"/> -->
+  <link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/kognise/water.css@latest/dist/dark.css'>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="../../../../../">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <ul class="trigger">
+        <li><a href="../../../../../years/">Years</a></li>
+        <li><a href="../../../../../authors/">Authors</a></li>
+        <li><a href="../../../../../tags/">Tags</a></li>
+        <li><a href="../../../../../about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="../../../../../rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="https://www.bing.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">org-babel文学分析简介</h1>
+<div id="table-of-contents">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#getting-started">开始</a></li>
+<li><a href="#using-remote-resources-via-tramp">通过TRAMP使用远程资源</a></li>
+<li><a href="#further-reading">进一步阅读</a></li>
+</ul>
+</div>
+</div>
+<p>
+作为分析和数据基础设施团队的一名工程师，我花了相当多的时间在临时性地探索和执行分散在SQL数据库,Hive和Spark集群，blob存储中的数据上。
+这些调查工作很繁琐——一个实例就可能涉及多个ETL步骤、评估是否需要清理数据，以及在REPL和用于生产的程序之间移动代码。
+</p>
+
+<p>
+一旦得出了最初的结论，我需要回顾并为后面的人记录我的处理过程，准确地记录在这过程中发生的事情。
+这是一个发现错误和疏漏的方法，所以为什么不一边执行一边记录呢?
+</p>
+
+<p>
+我需要做的是:
+</p>
+
+<ol class="org-ol">
+<li>记录每个命令</li>
+<li>记录它做了什么，为什么有必要做</li>
+<li>边执行边检查结果</li>
+</ol>
+
+<p>
+<code>org-mode</code> 和 <code>org-babel</code> 为这类多语言、多模式的任务提供了一个令人惊奇的环境。文章和代码可以自由地混合在一个<a href="https://en.wikipedia.org/wiki/Literate_programming">文学编程</a>风格中，处理过程中使用的任何引用都可以被声明，而且最终的产品可以导出为人或机器可读的格式。
+如果你想看一份分析的最终结果，<a href="https://gist.github.com/nickbarnwell/917c8d8bbde173ef5ad94e40ba5fa01f">这里有一个例子</a>是我最近为<a href="http://www.teawithstrangers.com/">与陌生人喝茶</a>创建的，报告了最近几个月的增长情况，这份报告体现了这些能力。
+</p>
+
+<div id="outline-container-orgc0e919f" class="outline-2">
+<h2 id="getting-started"><a id="orgc0e919f"></a>开始</h2>
+<div class="outline-text-2" id="text-getting-started">
+<p>
+由于我通常在类似sql的数据存储中开始我的探索，所以我就以此为例。
+<code>emacs</code> 自带了 <code>sql-mode</code> 和 <code>ob-sql</code>,所以你所要做的就是允许在 <code>org-babel</code> 环境中执行SQL的 <code>代码</code> 块; 为此，需要在 <code>init.el</code> 中添加以下内容:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(add-to-list 'org-babel-load-languages '(sql . t))
+<span style="font-weight: bold; font-style: italic;">;;</span><span style="font-weight: bold; font-style: italic;">If you also want to disable confirmation for SQL blocks:</span>
+(<span style="font-weight: bold;">setq</span> org-confirm-babel-evaluate
+      (<span style="font-weight: bold;">lambda</span> (lang body)
+        (not (string= lang <span style="font-style: italic;">"sql"</span>))))
+<span style="font-weight: bold; font-style: italic;">;;</span><span style="font-weight: bold; font-style: italic;">or disable it for all blocks</span>
+(<span style="font-weight: bold;">setq</span> org-confirm-babel-evaluate nil)
+</pre>
+</div>
+
+<blockquote>
+<p>
+注意:如果你想了解更多关于如何 <code>babel</code> 的评价，其 <code>info</code> 页面非常完整;可以调用 <code>(info "(org) Evaluating code blocks")</code> 查看。
+</p>
+</blockquote>
+
+<p>
+<code>src</code> blocks accept a variety of arguments that control the behaviour of their output and export.
+现在已经配置好了 <code>org-babel</code>,该创建一个新 <code>org</code> buffer并添加一些属性来配置SQL环境了。
+<code>src</code> 块接受各种参数来控制其输出和导出行为。
+</p>
+
+<ul class="org-ul">
+<li><code>#+PROPERTY: header-args:sql :session literate-analytics :engine postgresql</code></li>
+
+<li>这一行将两个默认参数添加到任何 <code>sql</code> <code>src</code> block中，这两个参数是: <code>:session</code> 和 <code>:engine</code>.前者 <a href="https://orgmode.org/worg/org-contrib/babel/intro.html#org98c324c">为我们的SQL块启用了会话执行</a>，后者告诉 <code>sql-mode</code> 我们工作的后端是 <code>postgresql</code>; 这相当于在 <code>sql-mode</code> buffer中使用了 <code>sql-set-product</code>.</li>
+
+<li><code>#+PROPERTY: header-args:sql+ :exports results :database tws_dev</code></li>
+
+<li><code>sql</code> 后面的 <code>+</code> 表示允许附加参数到现有参数，而不是覆盖它们. <code>:exports results</code> 表示 <code>src</code> 块的输出将被包含在 <code>org-export</code> 后端的输出中。最后， <code>:database</code> 是传递给SQL客户机的连接字符串。</li>
+</ul>
+
+<p>
+现在，通过键入 <code>&lt;s TAB sql</code> 在 <code>sql-mode</code> 中添加一个 <code>src</code> 块(译者注，这个里放写的有问题，是在org-mode中添加一个SQL的src块)。
+这个块内的内容将被语法高亮显示，就像它们在自己的缓冲区中一样，在光标放在块中内容上后，通过输如 <code>C-c '</code>,你可以在一个有恰当mode的buffer中编辑块内容。
+</p>
+
+<p>
+你的bffer现在应该是这样的:
+</p>
+
+
+<pre class="example">
+#+PROPERTY: header-args:sql :session literate-analytics :engine postgresql
+#+PROPERTY: header-args:sql+ :exports results :database tws_dev
+
+#+BEGIN_SRC sql
+SELECT COUNT(*) FROM users;
+#+END_SRC
+</pre>
+
+<p>
+现在，将您的o港币啊放在 <code>src</code> 块中，并通过 <code>C-c C-c</code> 调用 <code>org-babel-execute-src-block</code>.如果配置正确，应该会在下面插入 <code>RESULT</code> 块:
+</p>
+
+<pre class="example">
+#+RESULTS:
+| count |
+|-------|
+| 5 |
+</pre>
+
+<p>
+结果将自动强制转换为 <code>org</code> 表格，如果您希望处理一些表格，或者使用 <code>elisp</code> 执行一些过滤操作，或者希望稍后通过 <code>org-export</code> 导出执行结果，这个特性非常有用。
+</p>
+</div>
+</div>
+
+<div id="outline-container-org9f98c77" class="outline-2">
+<h2 id="using-remote-resources-via-tramp"><a id="org9f98c77"></a>通过TRAMP使用远程资源</h2>
+<div class="outline-text-2" id="text-using-remote-resources-via-tramp">
+<p>
+由于你很少会遇到只与本地资源交互的情况，因此能够在其他机器上运行命令非常有用。
+例如，我们经常通过 <code>ssh</code> 登陆Hadoop集群的头节点中来重命名、移动或查找HDFS中的文件。幸运的是, <code>babel</code> 与<a href="https://www.gnu.org/software/tramp/">TRAMP</a> 结合非常紧密。
+</p>
+
+<p>
+<code>src</code> 块的 <code>:dir</code> 属性接受一个TRAMP引用;然后就可以在远程机器上执行block了，像这样:
+</p>
+
+<pre class="example">
+#+BEGIN_SRC sh :dir /ssh:spark: :results output list
+hdfs dfs -ls $hdfsPath/ServiceInterface
+#+END_SRC
+
+#+RESULTS:
+: - Found 5 items
+: - drwxrwxrwx+ - ... 0 2018-04-25 17:06 $hdfsPath/ServiceInterface/Delinked
+: - drwxrwxrwx+ - ... 0 2018-04-25 16:43 $hdfsPath/ServiceInterface/PartialValidated
+: - drwxrwxrwx+ - ... 0 2018-04-23 19:58 $hdfsPath/ServiceInterface/PreValidated
+: - drwxrwxrwx+ - ... 0 2018-04-25 21:24 $hdfsPath/ServiceInterface/Unvalidated
+</pre>
+
+<p>
+如果要在同一台远程机器上执行多个命令，可以使用 <code>:session</code> 头参数来保持连接处于打开状态。参见<a href="https://orgmode.org/manual/session.html">session的info页面</a>了解详情。
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgfdf77a9" class="outline-2">
+<h2 id="further-reading"><a id="orgfdf77a9"></a>进一步阅读</h2>
+<div class="outline-text-2" id="text-further-reading">
+<p>
+我只介绍了 <code>org-babel</code> 的一小部分功能，但希望它能给您一些启发。
+要进一步阅读，我建议观看[[<a href="https://www.youtube.com/watch">https://www.youtube.com/watch</a>?]v=dljNabciEGg][Howard Abram在Emacs会议上的Literate DevOps with emacs]] 并细读 <code>babel</code> 的 <code>info</code> 手册。
+</p>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2018-06-05</span>
+            <span title="last modification date" class="post-info">2020-01-05</span>
+            <span title="tags" class="post-info">:<a href="../../../../../tags/org-mode">org-mode</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-d3dff1eb-ae42-4475-b876-26b97e59dcfc">lujun9972</a></span>
+        </div>
+    <script src="../../../../../media/js/jquery-2.1.3.min.js"></script>
+    <script src="../../../../../media/js/md5.min.js"></script>
+        <section>
+            <div id="gitalk-container"></div>
+            <script type="text/javascript">
+             var gitalk = new Gitalk({
+                 clientID: 'fdcb5d9da3f4acb4862c',
+                 clientSecret: 'dd0a16312a206782cb7669dcec5e96874ab48170',
+                 repo: 'lujun9972.github.com',
+                 owner: 'lujun9972',
+                 admin: ['lujun9972'],
+                 id: md5(location.pathname),      // Ensure uniqueness and length less than 50
+                 distractionFreeMode: false  // Facebook-like distraction free mode
+             })
+             gitalk.render('gitalk-container')
+            </script>
+        </section>
+    <script src="../../../../../media/js/main.js"></script>
+        <script>
+         var _hmt = _hmt || [];
+         (function() {
+             var hm = document.createElement("script");
+             hm.src = "https://hm.baidu.com/hm.js?7bac4fd0247f69c27887e0d4e3aee41e";
+             var s = document.getElementsByTagName("script")[0]; 
+             s.parentNode.insertBefore(hm, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-d3dff1eb-ae42-4475-b876-26b97e59dcfc">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="../../../../../instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>
