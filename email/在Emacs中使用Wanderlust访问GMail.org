@@ -1,0 +1,142 @@
+#+TITLE: 在Emacs中使用Wanderlust访问GMail
+#+URL: https://box.matto.nl/emacsgmail.html
+#+AUTHOR: lujun9972
+#+TAGS: email
+#+DATE: [2018年 06月 22日 星期五 15:04:22 CST]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+* Emacs与Wanderlust IMAP邮件客户端
+:PROPERTIES:
+:CUSTOM_ID: emacs-with-wanderlust-imap-mailclient
+:END:
+
+你有多个访问邮件的工作站,也许是因为你同时使用工作站和笔记本电脑,或者因为你想在不同的地方访问电子邮件。
+总之不管是什么原因，如果你想从一台以上的计算机访问邮箱的话，[[http://nl.wikipedia.org/wiki/Internet_Message_Access_Protocol][IMAP]]是一种很好的组织邮件方法。您还可以使用一个[[http://www.intermedia.net][托管的exchange]]服务来进行额外操作。
+
+[[http://crc.nd.edu/software/xemacs.shtml][IMAP]]协议允许您访问邮箱，打开电子邮件进行阅读，而无需从邮件服务器删除邮件。所以下次你登录时，你的电子邮件还在那里。(除非你想删除邮件)。
+
+大多数pop3的邮件服务器都支持IMAP。
+
+要通过 [[http://en.wikipedia.org/wiki/Emacs][Emacs]] 访问IMAP邮件服务器，您需要在Emacs中安装额外的软件包。Wanderlust就是为Emacs添加IMAP功能的一个经过验证的解决方案。
+
+* Wanderlust 与 GMail 指南
+:PROPERTIES:
+:CUSTOM_ID: wanderlust-and-gmail-howto
+:END:
+
+It is very easy to configure Wanderlust to access your
+配置Wanderlust来访问 [[http://www.gmail.com][GMail]] 账户非常简单.
+
+以下是具体的步骤:
+
+1. 安装 wanderlust
+2. 创建 ~/.folders
+3. 将wanderlust 配置内容添加到 ~/.emacs 中
+4. 启动emacs，启动wanderlust，然后享受世界上最有效的GMail客户端
+
+** 安装 wanderlust
+:PROPERTIES:
+:CUSTOM_ID: get-wanderlust
+:END:
+
+#+begin_src shell
+  apt-get install wl
+#+end_src
+
+如果你不是使用Debian，你可以在这里找到[[http://www.gohome.org/wl/][Wanderlust]]
+
+** 创建 ~/.folders
+:PROPERTIES:
+:CUSTOM_ID: create-.folders
+:END:
+
+如果你没有Debian，你可以在这里找到[[http://www.gohome.org/wl/][Wanderlust]]
+
+往 ~/.folders 中至少加入下面内容:
+
+#+BEGIN_EXAMPLE
+%inbox "inbox"
++trash "Trash"
++draft "Drafts"
+#+END_EXAMPLE
+
+** 将wanderlust配置附加到~/.emacs中
+:PROPERTIES:
+属性:
+:CUSTOM_ID: append-the-wanderlust-configuration-to-.emacs
+:CUSTOM_ID append-the-wanderlust-configuration-to . emacs
+:END:
+结束:
+
+把这个写进你的~/.emacs:
+
+#+begin_src emacs-lisp
+  ;; wanderlust
+  (autoload 'wl "wl" "Wanderlust" t)
+  (autoload 'wl-other-frame "wl" "Wanderlust on new frame." t)
+  (autoload 'wl-draft "wl-draft" "Write draft with Wanderlust." t)
+
+  ;; IMAP
+  (setq elmo-imap4-default-server "imap.gmail.com")
+  (setq elmo-imap4-default-user "<accountname>@gmail.com")
+  (setq elmo-imap4-default-authenticate-type 'clear)
+  (setq elmo-imap4-default-port '993)
+  (setq elmo-imap4-default-stream-type 'ssl)
+
+  (setq elmo-imap4-use-modified-utf7 t)
+
+  ;; SMTP
+  (setq wl-smtp-connection-type 'starttls)
+  (setq wl-smtp-posting-port 587)
+  (setq wl-smtp-authenticate-type "plain")
+  (setq wl-smtp-posting-user "mattofransen")
+  (setq wl-smtp-posting-server "smtp.gmail.com")
+  (setq wl-local-domain "gmail.com")
+
+  (setq wl-default-folder "%inbox")
+  (setq wl-default-spec "%")
+  (setq wl-draft-folder "%[Gmail]/Drafts") ; Gmail IMAP
+  (setq wl-trash-folder "%[Gmail]/Trash")
+
+  (setq wl-folder-check-async t)
+
+  (setq elmo-imap4-use-modified-utf7 t)
+
+  (autoload 'wl-user-agent-compose "wl-draft" nil t)
+  (if (boundp 'mail-user-agent)
+  (setq mail-user-agent 'wl-user-agent))
+  (if (fboundp 'define-mail-user-agent)
+  (define-mail-user-agent
+  'wl-user-agent
+  'wl-user-agent-compose
+  'wl-draft-send
+  'wl-draft-kill
+  'mail-send-hook))
+#+end_src
+
+** 启动emacs和wanderlust，然后享受世界上最有效的GMail客户端
+:PROPERTIES:
+:CUSTOM_ID: start-emacs-start-wanderlust-and-enjoy-the-most-effecient-and-effective-gmail-client-in-the-world
+:END:
+
+启动emacs并执行
+
+#+BEGIN_EXAMPLE
+M-x wl
+#+END_EXAMPLE
+
+按提示输入gmail密码。然后就可以访问gmail收件箱了。
+
+如果你想打开除收件箱之外的其他邮箱，你需要把它们也添加到~/.folders中(我还没有测试过)。
+
+您还可以通过gmail帐户发送电子邮件。在“Wanderlust”中创建新邮件并发送它。系统会再次提示您输入密码，然后发送邮件。
+
+* 加密你的讯息
+:PROPERTIES:
+:CUSTOM_ID: encrypt-your-messages
+:END:
+
+将所有的电子邮件都加密是个好习惯。请参见 [[http://box.matto.nl/wanderlustgpg.html][GPG and Emacs with Wanderlust]]。通过这种方式，你还可以在Gmail中使用[[http://gnupg.org][GnuPG]](有时称为openpgp)。
+
+发件快乐!
