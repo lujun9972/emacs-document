@@ -1,0 +1,148 @@
+#+TITLE: 使用泛型函数简化导出org-mode链接的扩展方法
+#+URL: http://kitchingroup.cheme.cmu.edu/blog/2018/05/09/Making-it-easier-to-extend-the-export-of-org-mode-links-with-generic-functions/
+#+AUTHOR: lujun9972
+#+TAGS: elisp-common
+#+DATE: [2018年 06月 11日 星期一 12:42:26 CST]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+我超级喜欢org-mode链接。
+最近，我需要修改一些链接的导出方式，比如为不同的后端定义新的导出，或者对特定后端进行微调。
+根据链接的设置方式，这项工作可能会很困难。
+下面是我习惯使用的一个典型设置，其中后端不同的选项在单个函数的条件语句中处理。
+我将使用一个链接来说明这里的问题。
+这些链接只是标记的语法糖，它们本身不做做任何其他的事情。
+我们从一个例子开始，在这个例子中，该链接为不同的后端（如html或latex）将文本转换为斜体文本。
+
+#+begin_src emacs-lisp
+  (defun italic-link-export (path desc backend)
+    (cond
+     ((eq 'html backend)
+      (format "<em>%s</em>" path))
+     ((eq 'latex backend)
+      (format "\textit{%s}" path))
+     ;; fall-through case for everything else
+     (t
+      path)))
+
+  (org-link-set-parameters "italic" :export 'italic-link-export)
+#+end_src
+
+:export
+italic-link-export
+
+#+begin_src emacs-lisp
+  (org-export-string-as "italic:text" 'html t)
+#+end_src
+
+#+BEGIN_EXAMPLE
+<p>
+<em>text</em></p>
+#+END_EXAMPLE
+
+#+begin_src emacs-lisp
+  (org-export-string-as "italic:text" 'latex t)
+#+end_src
+
+#+BEGIN_EXAMPLE
+textit{text}
+#+END_EXAMPLE
+
+下面是默认情况。
+
+#+begin_src emacs-lisp
+  (require 'ox-md)
+  (org-export-string-as "italic:text" 'md t)
+#+end_src
+
+#+BEGIN_EXAMPLE
+
+# Table of Contents
+
+
+
+text
+
+#+END_EXAMPLE
+
+我在这里想指出，作为一个用户，扩展这个函数并不容易。你要么直接修改italic-link-export 函数，要么给它提供advise，要么给它打上猴子补丁。这些都不是太好。
+
+我还可以以另一种方式来定义 italic-link-export，其方式是使用后端参数来从列表或散列表中检索要使用的函数，但是在这之后你必须通过两个步骤来修改其行为:定义一个后端特定的函数 /并且/ 在查找变量中注册它。
+当然，也可以通过派生符号来查找一个函数，例如使用fboundp，然后使用funcall来执行它。像这样的:
+
+#+begin_src emacs-lisp
+  ;; a user definable function for exporting to latex
+  (defun italic-link-export-latex (path desc backend)
+    (format "\textit{%s}" path))
+
+  ;; generic export function that looks up functions or defaults to
+  (defun italic-link-exporter (path desc backend)
+    "Run `italic-link-export-BACKEND' if it exists, or return path."
+    (let ((func (intern-soft (format "italic-link-export-%s" backend))))
+      (if (fboundp func)
+          (funcall func path desc backend)
+        path)))
+#+end_src
+
+这不太直接，但您只需要定义新函数来添加新的导出后端，或替换单个后端导出。这个方案还不错，但还有改进的空间。
+
+I will switch to bold markup for this.
+在该[[https://github.com/jkitchin/org-ref/issues/492#issuecom387806180][评论]]中，我发现了一个新的解决问题的方法，使用elisp中的泛型函数!
+其思想是定义一个处理一般导出情况的通用函数，然后根据导出函数的签名为每个特定后端定义额外的函数。
+我这里将其改为粗体标记。
+
+#+begin_src emacs-lisp
+  (cl-defgeneric bold-link-export (path desc backend)
+    "Generic function to export a bold link."
+    path)
+
+  ;; this one runs when the backend is equal to html
+  (cl-defmethod bold-link-export ((path t) (desc t) (backend (eql html)))
+    (format "<b>%s</b>" path))
+
+  ;; this one runs when the backend is equal to latex
+  (cl-defmethod bold-link-export ((path t) (desc t) (backend (eql latex)))
+    (format "\textit{%s}" path))
+
+  (org-link-set-parameters "bold" :export 'bold-link-export)
+#+end_src
+
+:export
+bold-link-export
+
+它是这样用的:
+
+#+begin_src emacs-lisp
+  (org-export-string-as "some bold:text" 'html t)
+#+end_src
+
+#+BEGIN_EXAMPLE
+<p>
+some <b>text</b></p>
+#+END_EXAMPLE
+
+#+begin_src emacs-lisp
+  (org-export-string-as "some bold:text" 'latex t)
+#+end_src
+
+这里使用了通用函数。
+
+#+begin_src emacs-lisp
+  (require 'ox-md)
+  (org-export-string-as "some bold:text" 'md t)
+#+end_src
+
+#+BEGIN_EXAMPLE
+
+# Table of Contents
+
+
+
+some text
+
+#+END_EXAMPLE
+
+定义泛型函数的语法与常规函数非常相似。但具体的方法略有不同，因为它们必须提供触发每个方法的特定“签名”。
+这里我们只区分后台参数的类型。这些后端处理函数都是单独的真是太好了。在我看来，添加新功能很简单，替换起来也不太麻烦。
+
+泛型函数有许多其他潜在的应用，可以替换使用大量条件来控制流的函数，并在最后提供一个跳转选项。您可以在这里了解更多关于它们的信息:[[https://www.gnu.org/software/emacs/manual/html_node/elisp/Generic-Functions.html]]。它们能提供的信息比我在这里所描述的要多得多
