@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>使用泛型函数简化导出org-mode链接的扩展方法 - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="elisp-common" />
+  <!-- <link rel="stylesheet" href="../../../../../media/css/main.css" type="text/css"/>
+       <link rel="stylesheet" href="../../../../../media/css/comment.css" type="text/css"/> -->
+  <link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/kognise/water.css@latest/dist/dark.css'>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="../../../../../">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <ul class="trigger">
+        <li><a href="../../../../../years/">Years</a></li>
+        <li><a href="../../../../../authors/">Authors</a></li>
+        <li><a href="../../../../../tags/">Tags</a></li>
+        <li><a href="../../../../../about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="../../../../../rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="https://www.bing.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">使用泛型函数简化导出org-mode链接的扩展方法</h1>
+<p>
+我超级喜欢org-mode链接。
+最近，我需要修改一些链接的导出方式，比如为不同的后端定义新的导出，或者对特定后端进行微调。
+根据链接的设置方式，这项工作可能会很困难。
+下面是我习惯使用的一个典型设置，其中后端不同的选项在单个函数的条件语句中处理。
+我将使用一个链接来说明这里的问题。
+这些链接只是标记的语法糖，它们本身不做做任何其他的事情。
+我们从一个例子开始，在这个例子中，该链接为不同的后端（如html或latex）将文本转换为斜体文本。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">italic-link-export</span> (path desc backend)
+  (<span style="font-weight: bold;">cond</span>
+   ((eq 'html backend)
+    (format <span style="font-style: italic;">"&lt;em&gt;%s&lt;/em&gt;"</span> path))
+   ((eq 'latex backend)
+    (format <span style="font-style: italic;">"\textit{%s}"</span> path))
+   <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">fall-through case for everything else</span>
+   (t
+    path)))
+
+(org-link-set-parameters <span style="font-style: italic;">"italic"</span> <span style="font-weight: bold;">:export</span> 'italic-link-export)
+</pre>
+</div>
+
+<p>
+:export
+italic-link-export
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(org-export-string-as <span style="font-style: italic;">"italic:text"</span> 'html t)
+</pre>
+</div>
+
+<pre class="example">
+&lt;p&gt;
+&lt;em&gt;text&lt;/em&gt;&lt;/p&gt;
+</pre>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(org-export-string-as <span style="font-style: italic;">"italic:text"</span> 'latex t)
+</pre>
+</div>
+
+<pre class="example">
+textit{text}
+</pre>
+
+<p>
+下面是默认情况。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">require</span> '<span style="font-weight: bold; text-decoration: underline;">ox-md</span>)
+(org-export-string-as <span style="font-style: italic;">"italic:text"</span> 'md t)
+</pre>
+</div>
+
+<pre class="example">
+
+# Table of Contents
+
+
+
+text
+
+</pre>
+
+<p>
+我在这里想指出，作为一个用户，扩展这个函数并不容易。你要么直接修改italic-link-export 函数，要么给它提供advise，要么给它打上猴子补丁。这些都不是太好。
+</p>
+
+<p>
+我还可以以另一种方式来定义 italic-link-export，其方式是使用后端参数来从列表或散列表中检索要使用的函数，但是在这之后你必须通过两个步骤来修改其行为:定义一个后端特定的函数 <i>并且</i> 在查找变量中注册它。
+当然，也可以通过派生符号来查找一个函数，例如使用fboundp，然后使用funcall来执行它。像这样的:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp"><span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">a user definable function for exporting to latex</span>
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">italic-link-export-latex</span> (path desc backend)
+  (format <span style="font-style: italic;">"\textit{%s}"</span> path))
+
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">generic export function that looks up functions or defaults to</span>
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">italic-link-exporter</span> (path desc backend)
+  <span style="font-style: italic;">"Run `</span><span style="font-weight: bold; font-style: italic; text-decoration: underline;">italic-link-export-BACKEND</span><span style="font-style: italic;">' if it exists, or return path."</span>
+  (<span style="font-weight: bold;">let</span> ((func (intern-soft (format <span style="font-style: italic;">"italic-link-export-%s"</span> backend))))
+    (<span style="font-weight: bold;">if</span> (fboundp func)
+        (funcall func path desc backend)
+      path)))
+</pre>
+</div>
+
+<p>
+这不太直接，但您只需要定义新函数来添加新的导出后端，或替换单个后端导出。这个方案还不错，但还有改进的空间。
+</p>
+
+<p>
+I will switch to bold markup for this.
+在该<a href="https://github.com/jkitchin/org-ref/issues/492#issuecom387806180">评论</a>中，我发现了一个新的解决问题的方法，使用elisp中的泛型函数!
+其思想是定义一个处理一般导出情况的通用函数，然后根据导出函数的签名为每个特定后端定义额外的函数。
+我这里将其改为粗体标记。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">cl-defgeneric</span> <span style="font-weight: bold;">bold-link-export</span> (path desc backend)
+  <span style="font-style: italic;">"Generic function to export a bold link."</span>
+  path)
+
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">this one runs when the backend is equal to html</span>
+(<span style="font-weight: bold;">cl-defmethod</span> <span style="font-weight: bold;">bold-link-export</span> ((path t) (desc t) (backend (eql html)))
+  (format <span style="font-style: italic;">"&lt;b&gt;%s&lt;/b&gt;"</span> path))
+
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">this one runs when the backend is equal to latex</span>
+(<span style="font-weight: bold;">cl-defmethod</span> <span style="font-weight: bold;">bold-link-export</span> ((path t) (desc t) (backend (eql latex)))
+  (format <span style="font-style: italic;">"\textit{%s}"</span> path))
+
+(org-link-set-parameters <span style="font-style: italic;">"bold"</span> <span style="font-weight: bold;">:export</span> 'bold-link-export)
+</pre>
+</div>
+
+<p>
+:export
+bold-link-export
+</p>
+
+<p>
+它是这样用的:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(org-export-string-as <span style="font-style: italic;">"some bold:text"</span> 'html t)
+</pre>
+</div>
+
+<pre class="example">
+&lt;p&gt;
+some &lt;b&gt;text&lt;/b&gt;&lt;/p&gt;
+</pre>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(org-export-string-as <span style="font-style: italic;">"some bold:text"</span> 'latex t)
+</pre>
+</div>
+
+<p>
+这里使用了通用函数。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">require</span> '<span style="font-weight: bold; text-decoration: underline;">ox-md</span>)
+(org-export-string-as <span style="font-style: italic;">"some bold:text"</span> 'md t)
+</pre>
+</div>
+
+<pre class="example">
+
+# Table of Contents
+
+
+
+some text
+
+</pre>
+
+<p>
+定义泛型函数的语法与常规函数非常相似。但具体的方法略有不同，因为它们必须提供触发每个方法的特定“签名”。
+这里我们只区分后台参数的类型。这些后端处理函数都是单独的真是太好了。在我看来，添加新功能很简单，替换起来也不太麻烦。
+</p>
+
+<p>
+泛型函数有许多其他潜在的应用，可以替换使用大量条件来控制流的函数，并在最后提供一个跳转选项。您可以在这里了解更多关于它们的信息:<a href="https://www.gnu.org/software/emacs/manual/html_node/elisp/Generic-Functions.html">https://www.gnu.org/software/emacs/manual/html_node/elisp/Generic-Functions.html</a>。它们能提供的信息比我在这里所描述的要多得多
+</p>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2018-06-11</span>
+            <span title="last modification date" class="post-info">2020-01-09</span>
+            <span title="tags" class="post-info">:<a href="../../../../../tags/elisp-common">elisp-common</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-5c28ebd1-4afe-41d5-b82f-b5f0e67bdb9f">lujun9972</a></span>
+        </div>
+    <script src="../../../../../media/js/jquery-2.1.3.min.js"></script>
+    <script src="../../../../../media/js/md5.min.js"></script>
+        <section>
+            <div id="gitalk-container"></div>
+            <script type="text/javascript">
+             var gitalk = new Gitalk({
+                 clientID: 'fdcb5d9da3f4acb4862c',
+                 clientSecret: 'dd0a16312a206782cb7669dcec5e96874ab48170',
+                 repo: 'lujun9972.github.com',
+                 owner: 'lujun9972',
+                 admin: ['lujun9972'],
+                 id: md5(location.pathname),      // Ensure uniqueness and length less than 50
+                 distractionFreeMode: false  // Facebook-like distraction free mode
+             })
+             gitalk.render('gitalk-container')
+            </script>
+        </section>
+    <script src="../../../../../media/js/main.js"></script>
+        <script>
+         var _hmt = _hmt || [];
+         (function() {
+             var hm = document.createElement("script");
+             hm.src = "https://hm.baidu.com/hm.js?7bac4fd0247f69c27887e0d4e3aee41e";
+             var s = document.getElementsByTagName("script")[0]; 
+             s.parentNode.insertBefore(hm, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-5c28ebd1-4afe-41d5-b82f-b5f0e67bdb9f">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="../../../../../instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>
