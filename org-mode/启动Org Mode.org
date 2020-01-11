@@ -1,0 +1,90 @@
+#+TITLE: 启动Org Mode
+#+URL: https://lepisma.github.io/2017/10/28/ricing-org-mode/
+#+AUTHOR: lujun9972
+#+TAGS: org-mode
+#+DATE: [2018年 10月 22日 星期一 11:45:55 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+这是一个简短的帖子发表在我在 =/r/unixporn= 中的 [[https://www.reddit.com/r/unixporn/comments/73vwpa/stumpwm_light_colors_with_purple_accent/dnvqwt8/?context=1][一片帖子中]],在该帖子中我说明了如何配置Org mode使之看起来像是文字处理器一样。
+其目的是重启一个我之前发起的一个[[https://www.reddit.com/r/unixporn/comments/6lj3h3/stumpwmkde_emacs_org_mode_writing_setup/][比赛]]。下面展示的是它实际的样子。
+
+
+[[https://lepisma.github.io/2017/10/28/ricing-org-mode/demo.png]]
+
+该外观的灵感来自于  [[https://edwardtufte.github.io/et-book][Edward Tufte]] 在他书中所使用的风格。
+在github上可以免费复制其CSS样式，项目名为[[https://edwardtufte.github.io/tuft-css/][tuft-css]]。
+除了适当的间距和页边距之外，我还很喜欢Tufte的字体 [[https://edwardtufte.github.io/et-book][ET Book]]。 这款字体是一种旧式的衬线字体，它的斜体十分漂亮。
+
+[[https://lepisma.github.io/2017/10/28/ricing-org-mode/et-book.png]]
+图2: Et Book 字体
+
+首先，我们需要一个好看的浅色配色方案，使Org模式除了字体外的其他的face看起来都很不错。
+我选择了[[https://github.com/nashamri/spacemacs-theme][spacemacs-light]]，主要是因为我使用spacemacs，而且就本文所涉及的face数量而言，它也相当完备的。
+此外，它还有一个良好的灰白色背景(=#fbf8ef=)。这里涉及三个基本步骤:
+
+- 设置face和主题
+- 填充物
+- 其他Org-mode的可视化和可用性调整
+
+* 1 Faces
+
+I have set the =variable-pitch= font to be =EtBembo= (along with title and stuff) and enable =variable-pitch-mode= when in an org buffer.
+我们将为org mode主体设置使用Et Book(名为=EtBembo=)字体。你可以在[[https://github.com/edwardtufte/et-book][此处]]获取该字体。
+如果您用的是spacemacs，最简单的方法是使用spacemacs中的 =theming= layer来设置face。
+我的face配置在[[https://github.com/lepisma/rogue/blob/75ab1c3422b409f41daa4c003b931e869eed0914/config.el#L205][这里]]。对于每个face来说，属性的第二个值是light主题(spacemacs-light)所使用的值。
+我已经将 =variable-pitch= 字体设置为 =EtBembo= (标题和内容都是如此设置的)，并在org buffer中启用 =variable-pitch-mode=.
+
+请注意，与其他face设置不同， =Org-indent= 的 =(:inherit (org-hide fixed-pitch))= 有一个重要的作用，就是将Org标题下的文本以非monospace字体对齐，所以不要忘了设置它。
+
+* 2 内容填充物
+
+有几个地方可以让你获得一些喘息的空间。
+
+- /行间距/
+
+每个缓冲区的行间距可以使用变量 =line-spacing= 来设置。可以使用小数，比如0.1。
+
+- /顶部留白/
+
+与 =mode-line= 类似，Emacs的每个窗口也有 =header-line= 。将其格式设置为空字符串 =(setq header-line-format " ")= 会给你一个用空白填充的顶部空间。你还可以通过改变header-line face的高度来改变其间距。
+
+- /侧面留白/
+
+可以通过设置边距宽度来添加边距。您还需要重置buffer以使更改可见。下面是一个这样的函数:
+
+#+begin_src emacs-lisp
+  (lambda () (progn
+               (setq left-margin-width 2)
+               (setq right-margin-width 2)
+               (set-window-buffer nil (current-buffer))))
+#+end_src
+
+如果您需要填充整个frame，以便所有内容(包括mode-line)都能进入填充视图，您可以设置 =internal-border-width= 变量。
+
+I don't use it much since my current settings reproduce pretty much what I need from it. Nevertheless, [[https://github.com/lepisma/rogue/blob/75ab1c3422b409f41daa4c003b931e869eed0914/packages.el#L264-L287][here is some config]] for writeroom.
+你也可以试试 [[https://github.com/joostkremers/writeroom-mode][writeroom-mode]]，它使写入buffer更干净，并且有许多与填充相关的设置。 一个巧妙的特性是它会使缓冲区文本居中并隐藏mode line。
+我不经常使用它，因为我当前的设置从中拷贝了我所需要的东西。
+不过，[[https://github.com/lepisma/rogue/blob/75ab1c3422b409f41daa4c003b931e869eed0914/packages.el#L264-L287][这里有一些writeroom的相关配置]]。
+
+* 3 其他调整
+
+不管你的mode line上显示了什么信息，如果你的目标是没有干扰，那么它很可能需要被关闭。 Spacemacs提供了一个minor mode =hidden-mode-line-mode= 来隐藏mode line，可以将其添加到org hook上。其他一些次要的设置如下:
+
+#+begin_src emacs-lisp
+  (setq org-startup-indented t
+        org-bullets-bullet-list '(" ")
+        org-ellipsis "  "
+        org-pretty-entities t
+        org-hide-emphasis-markers t
+
+        org-agenda-block-separator ""
+        org-fontify-whole-heading-line t
+        org-fontify-done-headline t
+        org-fontify-quote-and-verse-blocks t)
+#+end_src
+
+还可以尝试在 org-mode 中禁用 =hl-line-mode=,因为变化的行高度会使这些高光看起来很糟糕。
+安装[[https://github.com/Fuco1/org-pretty-table][org-pretty-table-mode]] 让表格边框变得漂亮。其他东西，比如latex (=org-latex-toggle-fragment=)和图片预览(=org-image-toggle-inline=)都是org自带的。
+
+[[https://github.com/lepisma/rogue/tree/75ab1c3422b409f41daa4c003b931e869eed0914][这里]] 是我的Emacs配置中本文相关的快照。
