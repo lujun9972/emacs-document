@@ -1,0 +1,106 @@
+#+TITLE: 使用org-radiobutton从列表中选择单个选项
+#+URL:
+#+AUTHOR: lujun9972
+#+TAGS: org-mode
+#+DATE: [2018-03-11 Sun 15:50]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+* DONE 使用org-radiobutton从列表中选择单个选项                       :ignore:
+CLOSED: [2018-03-11 Sun 15:50]
+:PROPERTIES:
+:BLOG_FILENAME: 2018-03-11-Use-org-radiobutton-to-select-an-option-from-a-list
+:PUBDATE:  [2018-03-11 Sun 15:50]
+:END:
+:LOGBOOK:
+- State "DONE"       from              [2018-03-11 Sun 15:50]
+CLOCK: [2018-03-11 Sun 15:20]--[2018-03-11 Sun 15:50] =>  0:30
+:END:
+
+#+BEGIN_SRC elisp :exports none
+(use-package org-radiobutton)
+#+END_SRC
+
+自从我偶然看到了[[http://howardism.org/Technical/Emacs/literate-devops.html][文学式DevOps]]这篇文章之后，我就入迷了并且在每次事故发生时都会写下“org笔记本“,用于记录所有修复问题的代码和步骤,以防将来可能发生(protip: 它总是会/重复发生/)。
+
+最近我们遇到了一些关于webhook请求行为怪异的问题，因此我创建了一个小记录本来查询mongo数据库(我们在这个记录本中存储了所有的请求和一些用来处理请求结果的函数(从elisp到jq再到ruby)。
+如你所知，使用 =org-mode= 和babel在不同语言代码块之间处理数据是非常简单的。
+
+因此，想象这样一个块(借助[[https://github.com/krisajenkins/ob-mongo][ob-mongo]]):
+
+#+BEGIN_SRC org
+,#+NAME: query
+,#+BEGIN_SRC mongo :db logs :host localhost :port 27017
+db.webhookLogs.find({endpoint: "AddCustomer"}).sort({_id: -1}).limit(1)
+,#+END_SRC
+#+END_SRC
+
+它返回了对 =AddCustomer= 端点的最新请求结果。然后，这个块的结果通过管道传输到其他代码块中来处理请求，您可以想象这是什么样子的。
+
+通常我在本地运行整个应用程序栈，但我们也有独立的预生产和生产环境。因此，我在自己的本地栈上运行了这个记录本之后，我想在预生产环境中也尝试一下。
+
+我使用[[https://github.com/rejeep/prodigy.el][prodigy]]来管理我的ssh隧道，因此我需要做的就是将端口更改为指向预生产环境并重新运行这个记录本。
+问题是我有多个查询块，所以我必须去更改每个块中的 =:port= 参数。
+
+我创建了一个块来解决这个问题，它作为端口的来源，在标题行中被动态地引用:
+
+#+BEGIN_SRC org
+,#+NAME: port
+,#+BEGIN_SRC elisp
+27017
+,#+END_SRC
+
+,#+NAME: query
+,#+BEGIN_SRC mongo :db logs :host localhost :port (org-babel-ref-resolve "port")
+db.webhookLogs.find({endpoint: "AddCustomer"}).sort({_id: -1}).limit(1)
+,#+END_SRC
+#+END_SRC
+
+因为我们可以在标题中调用elisp，所以我利用了 =org-babel-ref-resolve=,并给它源块的名称，babel会自动用块的值替换它。
+
+这解决了在一个地方更改常量的问题，但是当我使用更多的环境时，我往往会忘记端口有哪些。所以我在block上面创建了一个列表来提醒我可用的值:
+
+#+BEGIN_SRC org
+Use one of the following ports to operate on the given environment:
+
+- localhost :: 27017
+- staging :: 27004
+- production :: 27005
+
+,#+NAME: port
+,#+BEGIN_SRC elisp
+27017
+,#+END_SRC
+
+,#+NAME: query
+,#+BEGIN_SRC mongo :db logs :host localhost :port (org-babel-ref-resolve "port")
+db.webhookLogs.find({endpoint: "AddCustomer"}).sort({_id: -1}).limit(1)
+,#+END_SRC
+#+END_SRC
+
+我们可以使用org模式的列表描述语法 =foo::= 为每个项目附加一个标签，并将数字保留为“值”。
+
+这看起来很像是一个选择列表。所以我的想法是这样的:让它成为一个复选框列表，然后通过选中该选项来选择该选项。
+问题是，当切换输入时，需要取消当前输入的切换，然后切换所需的选项。
+理想情况下，切换其中一个复选框将取消另一个复选框的选中，这样始终只有一个选项被选中:换句话说，我想要一个单选按钮列表。
+
+在快速谷歌之后，我发现(通过[[http://irreal.org/blog/?p=4644][Irreal]])[[http://kitchingroup.cheme.cmu.edu/blog/2015/10/05/A-checkbox-list-in-org-mode-with-one-value/][John Kitchin]]已经解决了这个问题。我把他的代码整理了一下，用“现代”的org-mode(这篇文章已经有三年的历史了)把它包装成[[https://github.com/Fuco1/org-radiobutton][org-radiobutton]]。
+
+现在我有一个很好用的菜单，只要在想要的选项上按下 =C-c c=,可以选择运行记录本的环境了。org-mode太酷了!
+
+#+BEGIN_SRC org
+  Check one of the following ports to operate on the given environment:
+
+  ,#+attr_org: :radio
+  ,#+NAME: port
+  - [ ] localhost :: 27017
+  - [X] staging :: 27004
+  - [ ] production :: 27005
+
+  ,#+NAME: query
+  ,#+BEGIN_SRC mongo :db logs :host localhost :port (org-radiobutton-value "port")
+  db.webhookLogs.find({endpoint: "AddCustomer"}).sort({_id: -1}).limit(1)
+  ,#+END_SRC
+#+END_SRC
+
+我将会检查所有的记录本，把所有丑陋的选项hack换成现在这个配置，真令人愉悦啊!:D
