@@ -1,0 +1,137 @@
+#+TITLE: TIP: 让ERC使用起来很有趣
+#+URL: https://www.reddit.com/r/emacs/comments/8ml6na/tip_how_to_make_erc_fun_to_use/
+#+AUTHOR: lujun9972
+#+TAGS: emacs-common
+#+DATE: [2018年 06月 20日 星期三 13:08:42 CST]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+又一个星期，又一个技巧。本周，我将根据几个人的建议，向您介绍我使用 =erc= 的方法。我为这篇相对较长的文章提前道歉，我只是想写得完整一些，这样任何人都能看懂这篇文章。
+首先，如果你不知道到IRC是什么，那么我告诉你，简单的说，它允许你通过不同的渠道与他人实时沟通。
+IRC是我快速获取简单问题答案的最好途径，也是我向比我更有能力的人学习的最好途径。
+例如，当我学习一门新语言的时候，我喜欢做的是加入他们的IRC频道，在每天结束的时候浏览日志，试着理解他们提出的问题和答案。起初，它令人困惑，但渐渐地我熟悉了所用的词汇。
+
+在继续下面的内容之前，我的 =erc= 看起来像这样的:
+
+[[https://preview.redd.it/0rk9stel5h011.png]]
+
+如果你仍然有兴趣知道更多，那么让我们继续!
+
+你需要问自己一个问题:如何使用IRC来节省你的时间而不是浪费时间，因为我们很快就会把时间花在不同的频道上，就像Reddit一样。
+就我而言，理想的配置是让ERC易于阅读，只将注意力放在需要阅读的内容上，当有人回答了我的问题时，通知我。
+
+无需详细介绍，以下是我使用的配置的起始部分:
+
+#+begin_src emacs-lisp
+  (use-package erc
+    :custom
+    (erc-autojoin-channels-alist '(("freenode.net" "#archlinux" "#bash" "#bitcoin"
+                                    "#emacs" "#gentoo" "#i3" "#latex" "#org-mode" "#python")))
+    (erc-autojoin-timing 'ident)
+    (erc-fill-function 'erc-fill-static)
+    (erc-fill-static-center 22)
+    (erc-hide-list '("JOIN" "PART" "QUIT"))
+    (erc-lurker-hide-list '("JOIN" "PART" "QUIT"))
+    (erc-lurker-threshold-time 43200)
+    (erc-prompt-for-nickserv-password nil)
+    (erc-server-reconnect-attempts 5)
+    (erc-server-reconnect-timeout 3)
+    (erc-track-exclude-types '("JOIN" "MODE" "NICK" "PART" "QUIT"
+                               "324" "329" "332" "333" "353" "477"))
+    :config
+    (add-to-list 'erc-modules 'notifications)
+    (add-to-list 'erc-modules 'spelling)
+    (erc-services-mode 1)
+    (erc-update-modules))
+#+end_src
+
+大体上，它为显示提供了一个很不错的边栏，允许使用 =authinfo.gpg= 文件中的密码进行连接，用户加入或离开通道时不要告诉我，启用事件通知和实时拼写检查。
+
+此外，对于像我这样想把密码存储在一个GPG文件中的人，你需要指定一个文件优先级列表，告诉 =erc= 从哪里开始寻找你的密码:
+
+#+begin_src emacs-lisp
+  (setq auth-sources '("~/Sync/shared/.authinfo.gpg"
+                       "~/.authinfo.gpg"
+                       "~/.authinfo"
+                       "~/.netrc"))
+#+end_src
+
+and of course, don't forget to add this line in your =.authinfo.gpg= file, where <nickname> and <password> match your real information:
+当然，不要忘记在 =.authinfo.gpg= 文件中添加下面这一行，其中<nickname>和<password>使用您的真实信息:
+
+#+BEGIN_EXAMPLE
+machine irc.freenode.net login <nickname> password <password>
+#+END_EXAMPLE
+
+*注意:* 将 =auth-sources= 替换为最适合您的那个。
+
+如果您在看，下面我将列出一些我使用的函数，这些函数允许您补完上面的配置。
+
+-- 为了避免打开多个 =erc= 实例，我使用了一个函数来确保只有一个连接实例存在:
+
+#+begin_src emacs-lisp
+  (defun my/erc-start-or-switch ()
+    "Connects to ERC, or switch to last active buffer."
+    (interactive)
+    (if (get-buffer "irc.freenode.net:6667")
+        (erc-track-switch-buffer 1)
+      (when (y-or-n-p "Start ERC? ")
+        (erc :server "irc.freenode.net" :port 6667 :nick "rememberYou"))))
+#+end_src
+
+-- 我喜欢的另一件事是，当我收到私人消息时，或者当我的昵称被某个频道所引用时，能自动收到通知，以便让我快速响应。该通知的标题为笔名,内容为信息:
+
+#+begin_src emacs-lisp
+  (defun my/erc-notify (nickname message)
+    "Displays a notification message for ERC."
+    (let* ((channel (buffer-name))
+           (nick (erc-hl-nicks-trim-irc-nick nickname))
+           (title (if (string-match-p (concat "^" nickname) channel)
+                      nick
+                    (concat nick " (" channel ")")))
+           (msg (s-trim (s-collapse-whitespace message))))
+      (alert (concat nick ": " msg) :title title)))
+#+end_src
+
+-- 令我烦恼的一件事是，我想知道频道上有多少人，这样我就能知道我是否能快速得到回答。这是通过以下代码完成的:
+
+#+begin_src emacs-lisp
+  (defun my/erc-count-users ()
+    "Displays the number of users connected on the current channel."
+    (interactive)
+    (if (get-buffer "irc.freenode.net:6667")
+        (let ((channel (erc-default-target)))
+          (if (and channel (erc-channel-p channel))
+              (message "%d users are online on %s"
+                       (hash-table-count erc-channel-users)
+                       channel)
+            (user-error "The current buffer is not a channel")))
+      (user-error "You must first start ERC")))
+#+end_src
+
+-- 有时我想复制和粘贴渠道中的某个资源，而让自己免于被短时间内重复消息所打扰。为了避免这些问题，这个函数能够拯救你:
+
+#+begin_src emacs-lisp
+  (defun my/erc-preprocess (string)
+    "Avoids channel flooding."
+    (setq str
+          (string-trim
+           (replace-regexp-in-string "n+" " " str))))
+#+end_src
+
+-- 另外介绍两个我喜欢用的package。第一个是 =erc-hl-nicks=,它允许我将颜色与假名联系起来。 我发现它很方便，它会给我回答之人一个第一印象。最后，第二个包是 =erc-image=,它在通道上自动将图像链接显示图像。这使我可以无需点击链接就能查看图像:
+
+#+begin_src emacs-lisp
+  (use-package erc-hl-nicks
+    :after erc)
+
+  (use-package erc-image
+    :after erc)
+#+end_src
+
+#+RESULTS:
+
+为了不让这篇文章变得太长，你可以在[[https://github.com/beryou/.emacs.d][GitHub]]上找到我的完整配置。
+
+您可以通过分享一些配置内容，以及使用的各种包来补充这篇文章。
+
+IRC上再见!祝你有一个美好的夜晚或美好的一天，Emacs的朋友!
