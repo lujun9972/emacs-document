@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Org-mode Workflow Part 4: Automatic Web Publishing - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="raw" />
+  <!-- <link rel="stylesheet" href="../../../../../media/css/main.css" type="text/css"/>
+       <link rel="stylesheet" href="../../../../../media/css/comment.css" type="text/css"/> -->
+  <link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/kognise/water.css@latest/dist/dark.css'>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="../../../../../">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <ul class="trigger">
+        <li><a href="../../../../../years/">Years</a></li>
+        <li><a href="../../../../../authors/">Authors</a></li>
+        <li><a href="../../../../../tags/">Tags</a></li>
+        <li><a href="../../../../../about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="../../../../../rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="https://www.bing.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">Org-mode Workflow Part 4: Automatic Web Publishing</h1>
+<div id="table-of-contents">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#using-ox-hugo">Using Ox-hugo</a></li>
+<li><a href="#org-ref">Org-ref</a></li>
+<li><a href="#netlify">Netlify</a></li>
+<li><a href="#summary">Summary</a></li>
+</ul>
+</div>
+</div>
+<p>
+Org-mode Workflow Part 4: Automatic Web Publishing
+</p>
+
+<p>
+Some were curious about how I was automatically publishing my
+Org files, so I thought I'd try to give some insight into the process.
+You can find the Github repo <a href="https://github.com/jethrokuan/braindump/">here</a>.
+</p>
+
+<p>
+I prefer my tools to be as simple as possible, but I'm also somewhat
+lazy, so I tend to use whatever was easiest. Previously, I'd be using
+Org's in-built HTML export, but it was missing a bunch of niceties
+that weren't that trivial to implement, like RSS and sitemaps. This
+was also <a href="https://www.reddit.com/r/emacs/comments/6qahdz/what_are_you_currently_developing_in_emacs_lisp/dkvxgvs?utm_source=share&amp;utm_medium=web2x">around the time when Kaushal Modi's ox-hugo package was
+starting to take shape</a> (See a pattern here? Lot's of the things I use
+is just a matter of timing), so I went with <code>ox-hugo</code>.
+</p>
+
+<div id="outline-container-org21f1d03" class="outline-2">
+<h2 id="using-ox-hugo"><a id="org21f1d03"></a>Using Ox-hugo</h2>
+<div class="outline-text-2" id="text-using-ox-hugo">
+<p>
+<code>ox-hugo</code> exports your Org files into Markdown files, depending on how
+you configure it. I use the one-post-per-file configuration, so every
+Org file within my folder gets exported to a separate Markdown file,
+and will have its own webpage. For example, <a href="https://github.com/jethrokuan/braindump/blob/master/org/actor_critic.org">org/actor_critic.org</a>
+generates <a href="https://github.com/jethrokuan/braindump/blob/master/content/posts/actor_critic.md">contents/posts/actor_critic.md</a>. <a href="https://gohugo.io/">Hugo</a> will then take these
+Markdown files and generate the appropriate HTML, just like any other
+Hugo site.
+</p>
+
+<p>
+The one-post-per-file configuration works great with the Zettelkasten
+method, where notes are meant to be short. It's also the configuration
+where linking between files actually works (it generates relative web
+links).
+</p>
+</div>
+</div>
+
+<div id="outline-container-org3ee0fbf" class="outline-2">
+<h2 id="org-ref"><a id="org3ee0fbf"></a>Org-ref</h2>
+<div class="outline-text-2" id="text-org-ref">
+<p>
+<a href="https://github.com/jkitchin/org-ref">Org-ref</a> is a package that helps with bibliography management. I'd
+noticed that <code>org-ref</code> citations were being exported in a curious
+format that didn't look nice in Hugo, and had found that this was the
+default markdown export style from <code>org-ref</code>. There wasn't an easy way
+to change this style either, so I overrode all the related functions
+and packaged those into <a href="https://github.com/jethrokuan/org-ref-ox-hugo/">jethrokuan/org-ref-ox-hugo</a>. Here's my
+configuration for that.
+</p>
+
+<pre class="example">
+(use-package org-ref-ox-hugo
+ :straight (:host github :repo "jethrokuan/org-ref-ox-hugo" :branch "custom/overrides")
+ :after org org-ref ox-hugo
+ :config
+ (add-to-list 'org-ref-formatted-citation-formats
+ '("md"
+ ("article" . "${author}, *${title}*, ${journal}, *${volume}(${number})*, ${pages} (${year}). ${doi}")
+ ("inproceedings" . "${author}, *${title}*, In ${editor}, ${booktitle} (pp. ${pages}) (${year}). ${address}: ${publisher}.")
+ ("book" . "${author}, *${title}* (${year}), ${address}: ${publisher}.")
+ ("phdthesis" . "${author}, *${title}* (Doctoral dissertation) (${year}). ${school}, ${address}.")
+ ("inbook" . "${author}, *${title}*, In ${editor} (Eds.), ${booktitle} (pp. ${pages}) (${year}). ${address}: ${publisher}.")
+ ("incollection" . "${author}, *${title}*, In ${editor} (Eds.), ${booktitle} (pp. ${pages}) (${year}). ${address}: ${publisher}.")
+ ("proceedings" . "${editor} (Eds.), _${booktitle}_ (${year}). ${address}: ${publisher}.")
+ ("unpublished" . "${author}, *${title}* (${year}). Unpublished manuscript.")
+ ("misc" . "${author} (${year}). *${title}*. Retrieved from [${howpublished}](${howpublished}). ${note}.")
+ (nil . "${author}, *${title}* (${year})."))))
+</pre>
+</div>
+</div>
+
+<div id="outline-container-org1ddf411" class="outline-2">
+<h2 id="netlify"><a id="org1ddf411"></a>Netlify</h2>
+<div class="outline-text-2" id="text-netlify">
+<p>
+Setting up automatic publishing is trivial with <a href="https://www.netlify.com/">Netlify</a>, which has
+first-class support for Hugo websites. Just create an account, and use
+the default Hugo build settings, which looks something like this:
+</p>
+
+
+<div class="figure">
+<p><img src="https://d33wubrfki0l68.cloudfront.net/200eac90c91bf0d9fdaf88ef1d26a62efaed9159/b430f/ox-hugo/screenshot2019-12-20_17-37-17_.png" alt="screenshot2019-12-20_17-37-17_.png" />
+</p>
+</div>
+
+<p>
+Figure 1: Netlify Build settings
+</p>
+
+<p>
+Now each push to <code>master</code> branch will trigger a build and publish in
+Netlify.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgec2bec9" class="outline-2">
+<h2 id="summary"><a id="orgec2bec9"></a>Summary</h2>
+<div class="outline-text-2" id="text-summary">
+<p>
+In sum, I used <code>ox-hugo</code> for making Hugo more Org-compatible,
+<code>org-ref</code> and some hacks (<code>org-ref-ox-hugo</code>) to make citations look
+nice, and Netlify to publish the website. This blog is also similarly
+powered by Netlify.
+</p>
+
+<p>
+Hope that helps!
+</p>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2020-01-14</span>
+            <span title="last modification date" class="post-info">2020-01-14</span>
+            <span title="tags" class="post-info">:<a href="../../../../../tags/raw">raw</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-71a5b8c9-73ee-4dfe-a28b-6fe08fe13d2e">lujun9972</a></span>
+        </div>
+    <script src="../../../../../media/js/jquery-2.1.3.min.js"></script>
+    <script src="../../../../../media/js/md5.min.js"></script>
+        <section>
+            <div id="gitalk-container"></div>
+            <script type="text/javascript">
+             var gitalk = new Gitalk({
+                 clientID: 'fdcb5d9da3f4acb4862c',
+                 clientSecret: 'dd0a16312a206782cb7669dcec5e96874ab48170',
+                 repo: 'lujun9972.github.com',
+                 owner: 'lujun9972',
+                 admin: ['lujun9972'],
+                 id: md5(location.pathname),      // Ensure uniqueness and length less than 50
+                 distractionFreeMode: false  // Facebook-like distraction free mode
+             })
+             gitalk.render('gitalk-container')
+            </script>
+        </section>
+    <script src="../../../../../media/js/main.js"></script>
+        <script>
+         var _hmt = _hmt || [];
+         (function() {
+             var hm = document.createElement("script");
+             hm.src = "https://hm.baidu.com/hm.js?7bac4fd0247f69c27887e0d4e3aee41e";
+             var s = document.getElementsByTagName("script")[0]; 
+             s.parentNode.insertBefore(hm, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-71a5b8c9-73ee-4dfe-a28b-6fe08fe13d2e">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="../../../../../instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>
