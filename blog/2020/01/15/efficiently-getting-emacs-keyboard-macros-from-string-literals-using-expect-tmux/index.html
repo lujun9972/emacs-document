@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Efficiently getting emacs keyboard macros from string literals using expect/tmux - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="raw" />
+  <!-- <link rel="stylesheet" href="../../../../../media/css/main.css" type="text/css"/>
+       <link rel="stylesheet" href="../../../../../media/css/comment.css" type="text/css"/> -->
+  <link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/kognise/water.css@latest/dist/dark.css'>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="../../../../../">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <ul class="trigger">
+        <li><a href="../../../../../years/">Years</a></li>
+        <li><a href="../../../../../authors/">Authors</a></li>
+        <li><a href="../../../../../tags/">Tags</a></li>
+        <li><a href="../../../../../about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="../../../../../rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="https://www.bing.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">Efficiently getting emacs keyboard macros from string literals using expect/tmux</h1>
+<div id="table-of-contents">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#demonstration">Demonstration</a></li>
+<li><a href="#extra-stuff">Extra stuff</a>
+<ul>
+<li><a href="#expect-code-generation-script">expect code generation script</a></li>
+<li><a href="#the-more-terse-version">The more terse version</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+<dl class="org-dl">
+<dt><code>{´◕ ◡ ◕｀}</code></dt><dd>This requires both expect and tmux to be installed. They are only used in the background. You can use this function with GUI emacs fine. No other dependencies are required for this elisp function to work. The <code>bash/tcl/expect</code> script is embedded in elisp.</dd>
+<dt>Update</dt><dd>The builtin <code>edmacro-format-keys</code> gives me the functionality I want without the rigmarole.</dd>
+</dl>
+
+<p>
+<code>make-kbd-from-string</code> is a function that takes a string literal and gives you a keyboard macro.
+</p>
+
+<p>
+I don't know if it's possible to do this in emacs lisp. What I ended up doing was making an expect script that spawns a vanilla emacs and runs <code>kmacro-start-macro</code>.
+</p>
+
+<p>
+<code>tcl/expect</code> then enters the literal string in and emacs saves the recorded macro to a temporary file which emacs retrieves.
+</p>
+
+<p>
+All of this happens inside a temporary tmux window in the background. That was needed because the <code>shell-command</code> function would usually hang if asked to run a program that requires a <code>tty</code>.
+</p>
+
+<pre class="example">
+(defun e/chomp (str)
+ "Chomp leading and tailing whitespace from STR."
+ (while (string-match "\\`\n+\\|^\\s-+\\|\\s-+$\\|\n+\\'"
+ str)
+ (setq str (replace-match "" t t str)))
+ str)
+
+(defun make-kbd-from-string (s)
+ (let ((quoted-string (let ((print-escape-newlines t))
+ (prin1-to-string s)))
+ (tf (make-temp-file "emacskbm" nil ".exp")))
+
+ (ignore-errors (with-temp-buffer
+ (insert (concat
+ "outfile=/tmp/emacskbm.txt\n"
+ "rm -f \"$outfile\"\n"
+ "\n"
+ "cat &gt; /tmp/emacskbm.exp &lt;&lt;HEREDOC\n"
+ "if { \\$argc &gt;= 1 } {\n"
+ " set literal [lindex \\$argv 0]\n"
+ "}\n"
+ "\n"
+ "spawn sh\n"
+ "send -- \"emacs -Q -nw\"\n"
+ "send -- \\015\n"
+ "expect -exact \"scratch\"\n"
+ "send -- \\030\n"
+ "send -- \"(\"\n"
+ "send -- \"\\$literal\"\n"
+ "send -- \\030\n"
+ "send -- \")\"\n"
+ "send -- \\033:\n"
+ "send -- \"(with-temp-buffer (insert (replace-regexp-in-string \\\"^Last macro: \\\" \\\"\\\" (kmacro-view-macro))) (write-file \\\"$outfile\\\"))\"\n"
+ "send -- \\015\n"
+ "send -- \\033:\n"
+ "send -- \"(kill-emacs)\"\n"
+ "send -- \\015\n"
+ "send -- \\004\n"
+ "interact\n"
+ "HEREDOC\n"
+ "\n"
+ "{\n"
+ "expect -f /tmp/emacskbm.exp \"$@\"\n"
+ "} &amp;&gt;/dev/null\n"
+ "tmux wait-for -S emacskbm\n"))
+ (write-file tf)))
+
+ (shell-command (concat "tmux neww -d bash " tf " " quoted-string "; tmux wait-for emacskbm"))
+ (e/chomp (with-temp-buffer
+ (insert-file-contents "/tmp/emacskbm.txt")
+ (buffer-string)))))
+</pre>
+
+<p>
+How to use this function:
+</p>
+
+<pre class="example">
+(make-kbd-from-string "/msg yo hi")
+</pre>
+
+<p>
+An example of output
+</p>
+
+<pre class="example">
+/msg SPC yo SPC hi
+</pre>
+
+<p>
+On second thoughts, I suppose this could've all been done through <code>term-mode</code> if you had a <code>term-mode</code> inside of a <code>term-mode</code> in which case it could all be done in emacs-lisp. Do I want to find out? I'm not sure.
+</p>
+
+<p>
+What is the whole point of this function you may ask? The issue is you can't <code>(insert "some text")</code> inside of <code>term</code>. You must use a keyboard macro.
+</p>
+
+<pre class="example">
+(defun irssi-search-channels (pattern)
+ (interactive (list (read-string "pattern:")))
+ (execute-kbd-macro
+ (kbd "M-7"))
+ (execute-kbd-macro
+ (kbd "C-a C-k"))
+ (execute-kbd-macro
+ (kbd
+ (make-kbd-from-string (concat "/msg alis LIST 0_sync_master.sh 1_add_new_article_manual.sh 1_add_new_article_newspaper.sh 2_start_translating.sh 3_continue_the_work.sh 4_finish.sh 5_pause.sh auto_translate.sh base.sh parse_url_by_manual.sh parse_url_by_newspaper.py parse_url_by_newspaper.sh project.cfg reformat.sh texput.log urls_checker.sh youdao.sh -topic " pattern))))
+ (execute-kbd-macro
+ (kbd "C-m"))
+ (execute-kbd-macro
+ (kbd
+ (make-kbd-from-string "/query alis")))
+ (execute-kbd-macro
+ (kbd "C-m")))
+
+(define-key irssi-term-mode-map (kbd "M-/") #'irssi-search-channels)
+</pre>
+
+<div id="outline-container-org93e1e26" class="outline-2">
+<h2 id="demonstration"><a id="org93e1e26"></a>Demonstration</h2>
+<div class="outline-text-2" id="text-demonstration">
+<p>
+[[<a href="https://asciinema.org/a/MbMM1aWV2zCpoEOPsWTGhtQN3">https://asciinema.org/a/MbMM1aWV2zCpoEOPsWTGhtQN3</a>][<object type="image/svg+xml" data="https://asciinema.org/a/MbMM1aWV2zCpoEOPsWTGhtQN3.svg" class="org-svg">
+Sorry, your browser does not support SVG.</object>]]
+</p>
+</div>
+</div>
+
+<div id="outline-container-orge8c5f89" class="outline-2">
+<h2 id="extra-stuff"><a id="orge8c5f89"></a>Extra stuff</h2>
+<div class="outline-text-2" id="text-extra-stuff">
+</div>
+
+<div id="outline-container-org16274a0" class="outline-3">
+<h3 id="expect-code-generation-script"><a id="org16274a0"></a>expect code generation script</h3>
+<div class="outline-text-3" id="text-expect-code-generation-script">
+<pre class="example">
+#!/bin/bash
+export TTY
+
+( hs "$(basename "$0")" "$@" "#" "&lt;==" "$(ps -o comm= $PPID)" 0&lt;/dev/null ) &amp;&gt;/dev/null
+
+s="$1"
+
+fp=/tmp/emacskbm.txt
+
+{
+unbuffer x \
+ -sh "emacs -Q -nw" \
+ -e scratch \
+ -c x \
+ -s "(" \
+ -s "$1" \
+ -c x \
+ -s ")" \
+ -m : -s "(with-temp-buffer (insert (replace-regexp-in-string \"^Last macro: \" \"\" (kmacro-view-macro))) (write-file \"$fp\"))" -c m \
+ -m : -s "(kill-emacs)" -c m \
+ -i
+} &amp;&gt;/dev/null
+
+cat "$fp"
+</pre>
+</div>
+</div>
+
+<div id="outline-container-orga3fd034" class="outline-3">
+<h3 id="the-more-terse-version"><a id="orga3fd034"></a>The more terse version</h3>
+<div class="outline-text-3" id="text-the-more-terse-version">
+<p>
+It's operational slowness is made up for by its caching.
+</p>
+
+<pre class="example">
+(defun type-keys (s)
+ "Type out the string"
+ (interactive (list (read-string "string:")))
+ (ekm (make-kbd-from-string s)))
+(defalias 'ekl 'type-keys)
+
+(defun make-kbd-from-string (s)
+ (let ((quoted-string (let ((print-escape-newlines t))
+ (prin1-to-string s))))
+ (chomp (eval `(ci (sh (concat "ci emacs-string2kbm " (q ,s)) nil t))))))
+
+(defun irssi-search-channels (pattern)
+ (interactive (list (read-string "pattern:")))
+ ;; The 7th window is probably a freenode window
+ (ekm "M-7")
+ (ekm "C-a C-k")
+ ;; (insert "/msg alis LIST 0_sync_master.sh 1_add_new_article_manual.sh 1_add_new_article_newspaper.sh 2_start_translating.sh 3_continue_the_work.sh 4_finish.sh 5_pause.sh auto_translate.sh base.sh parse_url_by_manual.sh parse_url_by_newspaper.py parse_url_by_newspaper.sh project.cfg reformat.sh texput.log urls_checker.sh youdao.sh -topic github")
+ (ekm (make-kbd-from-string (concat "/msg alis LIST 0_sync_master.sh 1_add_new_article_manual.sh 1_add_new_article_newspaper.sh 2_start_translating.sh 3_continue_the_work.sh 4_finish.sh 5_pause.sh auto_translate.sh base.sh parse_url_by_manual.sh parse_url_by_newspaper.py parse_url_by_newspaper.sh project.cfg reformat.sh texput.log urls_checker.sh youdao.sh -topic " pattern)))
+ (ekm "C-m")
+ (ekm (make-kbd-from-string "/query alis"))
+ (ekm "C-m"))
+</pre>
+</div>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2020-01-15</span>
+            <span title="last modification date" class="post-info">2020-01-15</span>
+            <span title="tags" class="post-info">:<a href="../../../../../tags/raw">raw</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-568e6c0b-72bb-447c-bbc1-e813a8bde583">lujun9972</a></span>
+        </div>
+    <script src="../../../../../media/js/jquery-2.1.3.min.js"></script>
+    <script src="../../../../../media/js/md5.min.js"></script>
+        <section>
+            <div id="gitalk-container"></div>
+            <script type="text/javascript">
+             var gitalk = new Gitalk({
+                 clientID: 'fdcb5d9da3f4acb4862c',
+                 clientSecret: 'dd0a16312a206782cb7669dcec5e96874ab48170',
+                 repo: 'lujun9972.github.com',
+                 owner: 'lujun9972',
+                 admin: ['lujun9972'],
+                 id: md5(location.pathname),      // Ensure uniqueness and length less than 50
+                 distractionFreeMode: false  // Facebook-like distraction free mode
+             })
+             gitalk.render('gitalk-container')
+            </script>
+        </section>
+    <script src="../../../../../media/js/main.js"></script>
+        <script>
+         var _hmt = _hmt || [];
+         (function() {
+             var hm = document.createElement("script");
+             hm.src = "https://hm.baidu.com/hm.js?7bac4fd0247f69c27887e0d4e3aee41e";
+             var s = document.getElementsByTagName("script")[0]; 
+             s.parentNode.insertBefore(hm, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-568e6c0b-72bb-447c-bbc1-e813a8bde583">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="../../../../../instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>

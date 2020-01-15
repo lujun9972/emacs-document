@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Setting up Emacs Python LSP with PyEnv and stuff - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="raw" />
+  <!-- <link rel="stylesheet" href="../../../../../media/css/main.css" type="text/css"/>
+       <link rel="stylesheet" href="../../../../../media/css/comment.css" type="text/css"/> -->
+  <link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/kognise/water.css@latest/dist/dark.css'>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="../../../../../">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <ul class="trigger">
+        <li><a href="../../../../../years/">Years</a></li>
+        <li><a href="../../../../../authors/">Authors</a></li>
+        <li><a href="../../../../../tags/">Tags</a></li>
+        <li><a href="../../../../../about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="../../../../../rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="https://www.bing.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">Setting up Emacs Python LSP with PyEnv and stuff</h1>
+<div id="table-of-contents">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#setting-up-the-environment">Setting up the Environment</a>
+<ul>
+<li><a href="#setting-up-pyenv">Setting up <code>pyenv</code>:</a></li>
+<li><a href="#installing-direnv">Installing <code>direnv</code></a></li>
+</ul>
+</li>
+<li><a href="#setting-up-the-project">Setting up the Project</a></li>
+<li><a href="#setting-up-emacs">Setting up Emacs</a></li>
+</ul>
+</div>
+</div>
+<p>
+There are many documents describing how to set up Python language servers for autocompletion in Emacs. The ones I read however were all missing the following features:
+</p>
+
+<ul class="org-ul">
+<li>Switching between multiple Python versions</li>
+<li>Handling Python virtual environments
+I have a pretty simple workflow that I am now happy with, so I figured I would share it with all of you!</li>
+</ul>
+
+<div id="outline-container-org76a5594" class="outline-2">
+<h2 id="setting-up-the-environment"><a id="org76a5594"></a>Setting up the Environment</h2>
+<div class="outline-text-2" id="text-setting-up-the-environment">
+<p>
+The tools I'm using:
+</p>
+
+<ul class="org-ul">
+<li><code>pyenv</code>: manage multiple python versions</li>
+<li><code>direnv</code>: handle project specific enviornment configuration</li>
+<li><code>venv</code>: switching between Python virtual environments</li>
+</ul>
+</div>
+
+<div id="outline-container-orge12dfd8" class="outline-3">
+<h3 id="setting-up-pyenv"><a id="orge12dfd8"></a>Setting up <code>pyenv</code>:</h3>
+<div class="outline-text-3" id="text-setting-up-pyenv">
+<p>
+There is an official <a href="https://github.com/pyenv/pyenv-installer">autoinstaller</a>. I sort of hate the idea because of the security risks but it's not like I am going to be checking the install script anyways:
+</p>
+
+<pre class="example">
+curl https://pyenv.run | bash
+</pre>
+
+<p>
+For those of you who are more security conscious, follow the other <a href="https://github.com/pyenv/pyenv">installation instructions</a>.
+</p>
+
+<p>
+Now, I'm using <code>zsh</code> as my shell. Let's set up the <code>pyenv</code> configuration in the <code>~/.zshenv</code>:
+</p>
+
+<pre class="example">
+export PATH="$HOME/.pyenv/bin:$PATH"
+eval "$(pyenv init -)"
+eval "$(pyenv virtualenv-init -)"
+</pre>
+
+<p>
+Note that I'm doing this in <code>~/.zshenv</code> instead of <code>~/.zshrc</code> because <code>~/.zshrc</code> is for interactive shells. <code>~/.zprofile</code> will work as well. You can read about the different roles of <code>zsh</code> startup files in this <a href="https://unix.stackexchange.com/questions/71253/what-should-shouldnt-go-in-zshenv-zshrc-zlogin-zprofile-zlogout">great stackoverflow post</a>.
+</p>
+
+<p>
+Now, if we open a new terminal and type <code>whereis pyenv</code> you should get something similar to what I get below:
+</p>
+
+<pre class="example">
+kota@kota-ThinkPad-P1&gt; whereis pyenv ~
+pyenv: /home/kota/.pyenv/bin/pyenv
+</pre>
+
+<p>
+:)
+</p>
+</div>
+</div>
+
+<div id="outline-container-org8215c83" class="outline-3">
+<h3 id="installing-direnv"><a id="org8215c83"></a>Installing <code>direnv</code></h3>
+<div class="outline-text-3" id="text-installing-direnv">
+<p>
+Wel, <code>direnv</code> is also easy to install as it is prepackaged for <a href="https://direnv.net/docs/installation.html">many Linux distributions</a>.
+On Ubuntu:
+</p>
+
+<pre class="example">
+sudo apt install direnv
+</pre>
+
+<p>
+Then, we want to <a href="https://direnv.net/docs/hook.html">install the hooks into your shell</a>. In my case, this is <code>zsh</code>, so in my <code>.zshrc</code>:
+</p>
+
+<pre class="example">
+eval "$(direnv hook zsh)"
+</pre>
+
+<p>
+Let's also add the <code>pyenv</code> and <code>venv</code> configuration to <code>~/.config/direnv/direnvrc</code> (stolen from the <a href="https://github.com/direnv/direnv/wiki/Python">direnv documentation</a>):
+</p>
+
+<pre class="example">
+use_pyenv() {
+ unset PYENV_VERSION
+ # Because each python version is prepended to the PATH, add them in reverse order
+ for ((j = $#; j &gt;= 1; j--)); do
+ local python_version=${!j}
+ local pyenv_python=$(pyenv root)/versions/${python_version}/bin/python
+ if [[ ! -x "$pyenv_python" ]]; then
+ log_error "Error: $pyenv_python can't be executed."
+ return 1
+ fi
+
+ unset PYTHONHOME
+ local ve=$($pyenv_python -c "import pkgutil; print('venv' if pkgutil.find_loader('venv') else ('virtualenv' if pkgutil.find_loader('virtualenv') else ''))")
+
+ case $ve in
+ "venv")
+ VIRTUAL_ENV=$(direnv_layout_dir)/python-$python_version
+ export VIRTUAL_ENV
+ if [[ ! -d $VIRTUAL_ENV ]]; then
+ $pyenv_python -m venv "$VIRTUAL_ENV"
+ fi
+ PATH_add "$VIRTUAL_ENV"/bin
+ ;;
+ "virtualenv")
+ layout_python "$pyenv_python"
+ ;;
+ *)
+ log_error "Error: neither venv nor virtualenv are available to ${pyenv_python}."
+ return 1
+ ;;
+ esac
+
+ # e.g. Given "use pyenv 3.6.9 2.7.16", PYENV_VERSION becomes "3.6.9:2.7.16"
+ [[ -z "$PYENV_VERSION" ]] &amp;&amp; PYENV_VERSION=$python_version || PYENV_VERSION="${python_version}:$PYENV_VERSION"
+ done
+
+ export PYENV_VERSION
+}
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org4dc93b7" class="outline-2">
+<h2 id="setting-up-the-project"><a id="org4dc93b7"></a>Setting up the Project</h2>
+<div class="outline-text-2" id="text-setting-up-the-project">
+<p>
+I created a very simple project structured as follows:
+</p>
+
+<pre class="example">
+├── .envrc
+├── foo
+│ ├── app.py
+│ ├── __init__.py
+│ └── __main__.py
+└── setup.py
+</pre>
+
+<p>
+All this application does is find the length of vector <code>(1, 2, 3)</code>:
+</p>
+
+<pre class="example">
+import numpy as np
+
+def run():
+ arr = np.array([1, 2, 3])
+ print(np.linalg.norm(arr))
+</pre>
+
+<p>
+The key thing here is it uses an external dependency.
+</p>
+
+<p>
+Let's also take a look at the <code>setup.py</code>:
+</p>
+
+<pre class="example">
+from setuptools import setup, find_packages
+from foo import __version__
+setup(
+ name="foo",
+ version=__version__,
+ packages=find_packages(exclude=["tests"]),
+ author="Kota Weaver",
+ install_requires=[
+ 'numpy'
+ ],
+ extras_require={
+ 'dev': [
+ 'python-language-server[all]'
+ ],
+ 'test': [
+ 'pytest', 'pyflakes'
+ ]
+ }
+)
+</pre>
+
+<p>
+Note that I have the Python LSP server listed in the <code>dev</code> dependencies.
+</p>
+
+<p>
+Now let's also set up the Python development enviornment! First my <code>.envrc</code>:
+</p>
+
+<pre class="example">
+export SIMENV_PYTHON=3.8.1
+
+use pyenv $SIMENV_PYTHON
+</pre>
+
+<p>
+Now, if we go into the project directory, and do a <code>direnv allow</code>, we should be able to install the correct version of Python using:
+</p>
+
+<pre class="example">
+pyenv install $SIMENV_PYTHON
+</pre>
+
+<p>
+(NOTE: you may need to install some of the following dependencies: <code>libffi-dev libssl-dev libreadline-dev libsqlite3-dev libbz2-dev</code>)
+</p>
+
+<p>
+Then, leave the directory and enter again, and install the dependencies using:
+</p>
+
+<pre class="example">
+pip install -e .['dev','test']
+</pre>
+
+<p>
+(depending on your shell you may need to escape the <code>[</code> and <code>]</code> with <code>\</code>)
+</p>
+
+<p>
+Make sure the <code>which python</code> shows the correct location!
+This allows us to run the program using:
+</p>
+
+<pre class="example">
+kota@kota-ThinkPad-P1&gt; python -m foo ~/foo
+3.7416573867739413
+</pre>
+
+<p>
+Yay!
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgdbbb003" class="outline-2">
+<h2 id="setting-up-emacs"><a id="orgdbbb003"></a>Setting up Emacs</h2>
+<div class="outline-text-2" id="text-setting-up-emacs">
+<p>
+Now we get into the meat of it all... Let's configure our Emacs to do smart things with this!
+</p>
+
+<p>
+I'm using <code>use-package</code>, which I bootstrap if it is not installed. I have this set to be a very simple <code>~/.emacs.d/init.el</code> so you can take what you want:
+</p>
+
+<pre class="example">
+(setq package-archives '(("gnu" . "https://elpa.gnu.org/packages/")
+ ("marmalade" . "https://marmalade-repo.org/packages/")
+ ("melpa" . "https://melpa.org/packages/")))
+(package-initialize)
+
+(when (not (package-installed-p 'use-package)) (package-refresh-contents) (package-install 'use-package))
+(require 'use-package)
+
+; direnv mode allows automatic loading of direnv variables
+(use-package direnv
+ :ensure t
+ :config
+ (direnv-mode))
+
+; setup Emacs path from our ~/.zshenv
+(use-package exec-path-from-shell
+ :ensure t
+ :config
+ (when (memq window-system '(mac ns x))
+ (exec-path-from-shell-initialize)))
+
+                    ; we also should make sure we have flycheck installed
+(use-package flycheck
+ :ensure t)
+
+; Let's set up company! perhaps not necessary but this is what i like to use
+(use-package company
+ :ensure t
+ :config
+ (setq company-idle-delay 0)
+ (setq company-minimum-prefix-length 1))
+
+; install lsp mode
+(use-package lsp-mode
+ :ensure t
+ :hook (python-mode . lsp-deferred)
+ :commands (lsp lsp-deferred))
+
+; let's add the lsp company backend
+(use-package company-lsp
+ :ensure t
+ :config
+ (push 'company-lsp company-backends))
+
+; also installs lsp as a dependency
+(use-package lsp-ui
+ :ensure t
+ :hook (lsp-mode . lsp-ui-mode))
+</pre>
+
+<p>
+And the necessary screenshot from my machine (this is my normal setup, rather than the one above, but the same functionality should be there):
+</p>
+
+
+<div class="figure">
+<p><img src="file:///img/emacs-python-lsp/emacs-screenshot.png" alt="emacs-screenshot.png" />
+</p>
+</div>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2020-01-15</span>
+            <span title="last modification date" class="post-info">2020-01-15</span>
+            <span title="tags" class="post-info">:<a href="../../../../../tags/raw">raw</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-568e6c0b-72bb-447c-bbc1-e813a8bde583">lujun9972</a></span>
+        </div>
+    <script src="../../../../../media/js/jquery-2.1.3.min.js"></script>
+    <script src="../../../../../media/js/md5.min.js"></script>
+        <section>
+            <div id="gitalk-container"></div>
+            <script type="text/javascript">
+             var gitalk = new Gitalk({
+                 clientID: 'fdcb5d9da3f4acb4862c',
+                 clientSecret: 'dd0a16312a206782cb7669dcec5e96874ab48170',
+                 repo: 'lujun9972.github.com',
+                 owner: 'lujun9972',
+                 admin: ['lujun9972'],
+                 id: md5(location.pathname),      // Ensure uniqueness and length less than 50
+                 distractionFreeMode: false  // Facebook-like distraction free mode
+             })
+             gitalk.render('gitalk-container')
+            </script>
+        </section>
+    <script src="../../../../../media/js/main.js"></script>
+        <script>
+         var _hmt = _hmt || [];
+         (function() {
+             var hm = document.createElement("script");
+             hm.src = "https://hm.baidu.com/hm.js?7bac4fd0247f69c27887e0d4e3aee41e";
+             var s = document.getElementsByTagName("script")[0]; 
+             s.parentNode.insertBefore(hm, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-568e6c0b-72bb-447c-bbc1-e813a8bde583">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="../../../../../instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>
