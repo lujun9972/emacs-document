@@ -1,0 +1,73 @@
+#+TITLE: Copy formatted org-mode text from Emacs to other applications
+#+URL: http://kitchingroup.cheme.cmu.edu/blog/2016/06/16/Copy-formatted-org-mode-text-from-Emacs-to-other-applications/
+#+AUTHOR: lujun9972
+#+TAGS: raw
+#+DATE: [2020年 01月 15日 星期三 19:24:38 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+I do a lot of writing in org-mode and I thought it would be great if I could copy text from an org-file and paste it /with formatting/ into other applications, e.g. Word, Gmail, etc.... Curiosity got the better of me and I wondered how this is done in other applications. It works by creating a [[https://www.safaribooksonline.com/library/view/rtf-pocket-guide/9781449302047/ch01.html][Rich Text Format]] version of what you want to copy and then putting that on the clipboard. It isn't quite enough to just copy it, it needs to go in the clipboard as an RTF datatype. On Mac OSX I used [[http://osxdaily.com/2007/03/05/manipulating-the-clipboard-from-the-command-line/][pbcopy]] to make that happen.
+
+Check out this video of this post in action: [[https://www.youtube.com/watch?v=irkmQnggVpE]]
+
+One simple strategy to do this from org-mode is to generate HTML by export, and then convert it to RTF with a utility, e.g. textutil. For example like this.
+
+#+BEGIN_EXAMPLE
+  (defun formatted-copy ()
+   "Export region to HTML, and copy it to the clipboard."
+   (interactive)
+   (save-window-excursion
+   (let* ((buf (org-export-to-buffer 'html "*Formatted Copy*" nil nil t t))
+   (html (with-current-buffer buf (buffer-string))))
+   (with-current-buffer buf
+   (shell-command-on-region
+   (point-min)
+   (point-max)
+   "textutil -stdin -format html -convert rtf -stdout | pbcopy"))
+   (kill-buffer buf))))
+
+  (global-set-key (kbd "H-w") 'formatted-copy)
+#+END_EXAMPLE
+
+This works well for everything but equations and images. Citations leave a bit to be desired, but improving this is still a challenge.
+
+Let us try this on some text. Some *bold*, /italic/, underline, struck and =verbatim= text to copy. Here are some example Formulas: H2O ionizes to form H+. We simply must have an equation: \(e^{i\pi} + 1 = 0\) . We should also have a citation [[#kitchin-2015-examp][kitchin-2015-examp]] and multiple citations [[#kitchin-2016-autom-data][kitchin-2016-autom-data]],[[#kitchin-2015-data-surfac-scien][kitchin-2015-data-surfac-scien]] .
+
+A code block:
+
+#+BEGIN_EXAMPLE
+  import pycse.orgmode as org
+  import numpy as np
+  import matplotlib.pyplot as plt
+
+  x = np.linspace(0, 60, 500)
+  plt.figure(figsize=(4, 2))
+  plt.plot(np.exp(-0.1 0_sync_master.sh 1_add_new_article_manual.sh 1_add_new_article_newspaper.sh 2_start_translating.sh 3_continue_the_work.sh 4_finish.sh 5_pause.sh auto_translate.sh base.sh parse_url_by_manual.sh parse_url_by_newspaper.py parse_url_by_newspaper.sh project.cfg reformat.sh texput.log urls_checker.sh youdao.sh x) 0_sync_master.sh 1_add_new_article_manual.sh 1_add_new_article_newspaper.sh 2_start_translating.sh 3_continue_the_work.sh 4_finish.sh 5_pause.sh auto_translate.sh base.sh parse_url_by_manual.sh parse_url_by_newspaper.py parse_url_by_newspaper.sh project.cfg reformat.sh texput.log urls_checker.sh youdao.sh np.cos(x),
+       np.exp(-0.1 0_sync_master.sh 1_add_new_article_manual.sh 1_add_new_article_newspaper.sh 2_start_translating.sh 3_continue_the_work.sh 4_finish.sh 5_pause.sh auto_translate.sh base.sh parse_url_by_manual.sh parse_url_by_newspaper.py parse_url_by_newspaper.sh project.cfg reformat.sh texput.log urls_checker.sh youdao.sh x) 0_sync_master.sh 1_add_new_article_manual.sh 1_add_new_article_newspaper.sh 2_start_translating.sh 3_continue_the_work.sh 4_finish.sh 5_pause.sh auto_translate.sh base.sh parse_url_by_manual.sh parse_url_by_newspaper.py parse_url_by_newspaper.sh project.cfg reformat.sh texput.log urls_checker.sh youdao.sh np.sin(x))
+  org.figure(plt.savefig('spiral.png'),
+        caption='A spiral.',
+        attributes=[['org', ':width 100']])
+  print('')
+  org.table([['H1', 'H2'], None, [1, 2], [2, 4]],
+        caption='A simple table')
+  print('')
+  org.result(6 0_sync_master.sh 1_add_new_article_manual.sh 1_add_new_article_newspaper.sh 2_start_translating.sh 3_continue_the_work.sh 4_finish.sh 5_pause.sh auto_translate.sh base.sh parse_url_by_manual.sh parse_url_by_newspaper.py parse_url_by_newspaper.sh project.cfg reformat.sh texput.log urls_checker.sh youdao.sh 7)
+#+END_EXAMPLE
+
+[[http://kitchingroup.cheme.cmu.edu/media/2016-06-16-Copy-formatted-org-mode-text-from-Emacs-to-other-applications/spiral.png]]
+
+Figure 1: A spiral.
+
+Table 1:
+
+A simple table
+| H1 | H2 |
+|----+----|
+|  1 |  2 |
+|  2 |  4 |
+
+#+BEGIN_EXAMPLE
+  42
+#+END_EXAMPLE
+
+In summary, this simple approach to generating RTF from exported HTML works really well for the simplest markups. To improve on getting figures in, getting cross-references, captions, proper references, etc... will require a more sophisticated export approach, and probably one that exports RTF directly. That is a big challenge for another day!
+
