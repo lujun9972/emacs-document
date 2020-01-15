@@ -1,0 +1,172 @@
+#+TITLE: Multiple GMail Accounts in Gnus
+#+URL: http://www.cataclysmicmutation.com/2010/11/multiple-gmail-accounts-in-gnus/
+#+AUTHOR: lujun9972
+#+TAGS: raw
+#+DATE: [2020年 01月 15日 星期三 19:02:36 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+I have both my home and work email accounts through Gmail (work being hosted through our own domain). I wanted to configure Gnus to access both imap accounts with the following requirements:
+
+- Visually differentiate between mailboxes in the different accounts (Gnus wants to call all your Gmail account inboxes “INBOX”)
+- Have outgoing mail routed through the correct account, with an appropriate signature, from address, other headers, etc.
+- Have expiry work the way I want -- basically, in “normal” mailboxes (not special Gmail folders), I want to be able to expire messages and have them moved immediately into the Gmail “All Mail” folder for archival.
+- Get the desired behavior for each mailbox (INBOX always visible, show read messages, etc.)
+
+There are a number of hurdles you have to climb over to get this working acceptably, and I never found one source that had a complete working solution that met my needs, so I decided to publish my setup in the hopes that it might prove useful for someone. In short, here are the problems we need to solve:
+
+- All your google accounts will have the same server name, breaking authinfo logins
+- Get Gnus to understand how to set behaviors per-mailbox
+- Make outgoing mail route through the correct account's SMTP server
+- Figure out a way to identify mailboxes by name in the Group buffer
+
+*** Getting authinfo to work with multiple Gmail accounts
+    :PROPERTIES:
+    :CUSTOM_ID: getting-authinfo-to-work-with-multiple-gmail-accounts
+    :END:
+
+Ordinarily, you'd configure your select methods in Gnus something like the following:
+
+‘Account setup in .gnus'
+
+#+BEGIN_EXAMPLE
+  (setq gnus-secondary-select-methods
+   '((nnimap "home"
+   (nnimap-address "imap.gmail.com")
+   (nnimap-server-port 993)
+   (nnimap-stream ssl)
+   (nnimap-authinfo-file "~/.authinfo"))
+   (nnimap "work"
+   (nnimap-address "imap.gmail.com")
+   (nnimap-server-port 993)
+   (nnimap-stream ssl)
+   (nnimap-authinfo-file "~/.authinfo"))))
+#+END_EXAMPLE
+
+You'd then put your credentials into your .authinfo file like so:
+
+#+BEGIN_EXAMPLE
+  machine imap.gmail.com login mylogin password mypassword port imaps
+  machine imap.gmail.com login mylogin2 password mypassword2 port imaps
+#+END_EXAMPLE
+
+The problem is that in our case, both accounts have a server name of “imap.gmail.com”, and thus authinfo can't figure out which credentials to send to which account. If you're using a new enough Gnus version, this problem can be solved by replacing “imap.gmail.com” in .authinfo with the account name “home” or “work” from .gnus. Alternately, you can define aliases for imap.gmail.com in your localhosts file and configure each account to access a different alias, allowing you to have different server names in .authinfo. I went with the simpler version.
+
+#+BEGIN_EXAMPLE
+  machine home login mylogin password mypassword port imaps
+  machine work login mylogin2 password mypassword2 port imaps
+#+END_EXAMPLE
+
+*** Setting up Multiple SMTP Servers
+    :PROPERTIES:
+    :CUSTOM_ID: setting-up-multiple-smtp-servers
+    :END:
+
+Gnus by default has no mechanism for switching SMTP servers on outgoing messages. There are a few options, but the simplest is probably to install [[http://msmtp.sourceforge.net/][msmtp]]. This is a simple little program that accepts a command line parameter that tells it which server to use, and then connects to that server to send your mail. Once you've installed and configured that (my configuration is shown below), we'll still need to customize Gnus to pass the right flags to msmtp depending on where we send the message from.
+
+#+BEGIN_EXAMPLE
+  defaults
+  tls on
+  auto_from on
+  logfile ~/.msmtp.log
+
+  account home
+  host smtp.gmail.com
+  tls on
+  tls_certcheck off
+  auth on
+  from myusername@gmail.com
+  user myusername@gmail.com
+  password myhomepassword
+  port 587
+
+  account work
+  host smtp.gmail.com
+  tls on
+  tls_certcheck off
+  auth on
+  from me@myworkdomain.com
+  user me@myworkdomain.com
+  password myworkpassword
+  port 587
+#+END_EXAMPLE
+
+*** Setting behaviors per Mailbox
+    :PROPERTIES:
+    :CUSTOM_ID: setting-behaviors-per-mailbox
+    :END:
+
+Most of what I need can be accomplished through Gnus' notion of group parameters. You can theoretically customize parameters through the Customize buffer, but I abhor that awful abomination and would prefer to do it through Lisp. Fortunately, you can set most group parameters via the gnus-parameters variable. This variable is a list of alists, each of which contains a regular expression matching a group name followed by a set of parameters for that group. Below is my gnus-parameters.
+
+‘Account customization in .gnus'
+
+#+BEGIN_EXAMPLE
+  (setq gnus-parameters
+   '(("nnimap work:INBOX"
+   (display . all)
+   (posting-style
+   (name "Deon Garrett")
+   (address "me@myworkaddress.com")
+   (organization "My Employer")
+   (signature-file "~/.signature-work"))
+   (expiry-target . delete)
+   ("nnimap work:[Gmail]/.*"
+   (display . all)
+   (posting-style
+   (name "Deon Garrett")
+   (address "me@myworkaddress.com")
+   (organization "My Employer")
+   (signature-file "~/.signature-work"))
+   (expiry-wait . never))
+   ("nnimap home:(INBOX|lists..*)"
+   (display . all)
+   (posting-style
+   (name "Deon Garrett")
+   (address "me@myhomeaddress.com")
+   (signature-file "~/.signature-home"))
+   (expiry-target . delete)
+   ("nnimap home:[Gmail]/.*"
+   (display . all)
+   (posting-style
+   (name "Deon Garrett")
+   (address "me@myhomeaddress.com")
+   (signature-file "~/.signature-home"))
+   (expiry-wait . never))))
+#+END_EXAMPLE
+
+There's a lot going on here, but basically, I have two accounts “home” and “work”, and for each account, I have one set of parameters for normal mailboxes, and another set for those “special” gmail mailboxes that I want to treat slightly differently (mainly with respect to expiry). Note the regular expressions for the group names: “nnimap XXXX:YYYY” where XXXX is the account name (“home” or “work”) and YYYY must match only the mailboxes I want. So the first block matches only the INBOX on my work account. It sets the headers I want on outgoing mail, tells Gnus to always show all messages when I enter the group, sends the correct switch to the msmtp program to select my work account (Edit: msmtp supports automatically choosing an account based on the From header. See my updated example .msmtprc file),and sets up expiry to immediate move expired messages to the “[GMail]/All Mail” folder. *Correction: I've since changed the expiry to delete the message instead of moving it to All Mail, as Gmail always keeps a copy in All Mail anyway. I have left the “expiry . never” for the Gmail groups to prevent deletion of messages from inside the Google special groups. **The second block is still the work account, but now matches only mailboxes named like “[GMail]/”, that is, all the special Gmail boxes. The only different setting here is that I tell Gnus to never expire a message from a special folder. The remaining two blocks of settings configure my home account in a similar fashion. There are a few global settings we need to set as well. We need to tell Gnus to use msmtp as our sendmail replacement. I also want all my subscribed groups to be always visible, and the “visible” group parameter won't work from gnus-parameters, so per the documentation, we need to set that in an alternate fashion. You should also set up a default set of outgoing headers so that if you send mail from outside any group, you'll still have some useful default. Below is the elisp to set up msmtp and make the groups visible. I'll leave it to you to set most of those other variables, as they're standard Gnus settings that you probably already know.
+
+‘SMTP setup in .gnus'
+
+#+BEGIN_EXAMPLE
+   (setq message-send-mail-function 'message-send-mail-with-sendmail)
+   (setq sendmail-program "/usr/local/bin/msmtp")
+   (setq gnus-permanently-visible-groups ".*")
+#+END_EXAMPLE
+
+*** Fixing the Naming Problem
+    :PROPERTIES:
+    :CUSTOM_ID: fixing-the-naming-problem
+    :END:
+
+There's one last really annoying issue -- if you open gnus with this configuration and subscribe to INBOX from both accounts, you'll see the groups buffer with the following:
+
+#+BEGIN_EXAMPLE
+  0: INBOX
+  0: INBOX
+#+END_EXAMPLE
+
+Clearly we'd like to have a visual way of differentiating the two accounts. I tried setting the “comment” field in the group parameters and modifying gnus-group-line-format, but it had no effect. I believe the gnus-parameters variable isn't consulted until you enter a group, which must happen after the group buffer is displayed, so that makes some sense. After experimenting with several complete failures, I hit upon the idea to use Gnus' “topics” to give me at least a reasonable solution. Briefly, the idea of topics is that you can organize your group buffer by topic rather than by group, giving you a hierarchical display of, for example, all your “comp.lang.*” newsgroups under a tree instead of just in a flat list. From the group buffer, press “t”. This puts you into the topic minor mode. You can consult the info page for Topic Parameters for all the details, but the short version is that you can create new topics with “T n”, rename topics with “T r”, move groups from one topic to another with “T m”, etc. I created topics named “Home”, “Work”, and “News” (for a couple of NNTP groups), and moved each group or mailbox into the appropriate topic. Put the following into your .gnus to activate topic mode each time you start Gnus to persist your changes.
+
+‘turning on topic-mode'
+
+#+BEGIN_EXAMPLE
+  1
+#+END_EXAMPLE
+
+#+BEGIN_EXAMPLE
+   (add-hook 'gnus-group-mode-hook 'gnus-topic-mode)
+#+END_EXAMPLE
+
+The result is shown in the screenshot below. It's not perfect, but it's certainly at least reasonable.
+
+[[http://www.cataclysmicmutation.com/images/2010/11/gnustopics.png]]
