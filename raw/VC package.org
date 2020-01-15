@@ -1,0 +1,246 @@
+#+TITLE: VC package
+#+URL: http://alexott.net/en/writings/emacs-vcs/EmacsVC.html
+#+AUTHOR: lujun9972
+#+TAGS: raw
+#+DATE: [2020年 01月 15日 星期三 14:40:17 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+The VC package provides to user ability to work with different version control systems
+(VCS) via unified user interfaces. Now it supports following VCS (via VCS-specific
+modules): rcs, CVS, MetaCVS, Subversion, GNU Arch, sccs, Darcs, SourceSafe, ClearCase, Git
+and Mercurial (some of them available only in GNU Emacs 22.0, development repository of
+GNU Emacs or at author's sites).
+
+** <<sec1>> Basic concepts and approaches
+   :PROPERTIES:
+   :CUSTOM_ID: basic-concepts-and-approaches
+   :END:
+
+Design of VC package took many things from the design of rcs version control system. So
+many concepts tightly coupled with concepts of this VCS.
+
+When file is under control of VCS, then we say that it "registered" in VCS. For each file
+exists "main" file, that contain data and history of changes. For each "main" file could
+exists "work" file, that could be modified. In some VCS you need to block work file
+before add any change. In other VCS you can add changes to your copy of work file, and
+than explicitly commit changes to repository. For systems, that require explicit locking
+of files, to add a change to a file, you need to switch file from read-only state to
+read-write state. And usually, in such systems, only one user can make changes into
+locked files, and other users should wait until that user finish modification of files and
+remove block on file(s).
+
+When you work with VC some information about its state is displayed in status line.
+Information is represented in following form: at first is short name of VCS, used for
+current file, next is displayed symbol, describing file's state, and then file's version
+number is displayed. If state symbol is equal to =-=, then file is not blocked or changed.
+If file is blocked or modified, then symbol is changed to =:=. If file is blocked by other
+user, then status field will displayed as =:user:=.
+
+** <<sec2>> Work with package
+   :PROPERTIES:
+   :CUSTOM_ID: work-with-package
+   :END:
+
+*** <<sec3>> Basic work sequence
+    :PROPERTIES:
+    :CUSTOM_ID: basic-work-sequence
+    :END:
+
+The main function of VC package is =vc-next-action= (=C-x v v=), that performs next logical
+command of version control system. Depending on used VCS, order of commands in this
+sequence could differ. For systems, that require blocking of file (rcs, sccs, and CVS
+with corresponding setup), order of executions is following:
+
+- if file is not registered in VCS, then register it;
+- if file is registered, but not blocked, then fetch latest version from repository and
+  block it;
+- if file was blocked by current user, but not changed, then it fetches new version and
+  updates buffer;
+- if file was changed, then display a new buffer to enter comment about change, and
+  commit changes;
+- if file was blocked by other user, then VC tries to block it.
+
+For systems, that doesn't support explicit blocking, order of execution is slightly different:
+
+- if file is not registered in VCS, then register it, but doesn't commit it;
+- if file already was added, but not committed, then commit it;
+- if file was changed, then display a new buffer to enter comment about change, and
+  commit changes;
+- if file was changed in repository, then ask user, and perform merging of changes in
+  your copy of work file.
+
+User can pass prefix argument to =vc-next-action= function. Passing of this argument allow
+user to change behaviour of function --- for example, user can set version number for new
+file, or for file, that will fetched from repository, or change version control system (if
+file was registered in different VCS).
+
+Entering of commit message is performed in special buffer with name =*VC-Log*=. User can
+enter message, and commit changes by pressing =C-c C-c=. If you doesn't want to commit
+changes, just leave this buffer without pressing =C-c C-c=. And if you want use same commit
+message for several files, then you can use =M-n=, =M-p=, =M-s= and =M-r= key bindings, that allow
+you to navigate in messages history.
+
+*** <<sec4>> Work with changes
+    :PROPERTIES:
+    :CUSTOM_ID: work-with-changes
+    :END:
+
+User can use VC to view changes, that he did during work with files. To get list of
+changes between work copy and latest committed version, user can use =vc-diff= function
+(=C-x v ==). If user runs this function with prefix argument, then he can
+obtain list of changes between any two versions. The =vc-version-other-window= function (=C-x v ~=) allows to get from repository any version of file, and show it in separate buffer.
+In some VCS you can obtain annotated versions of files, and VC also support this feature
+with =vc-annotate= function, that bound to =C-x v g=. With annotated version you can see who
+make concrete changes, in which version they was made, etc.
+
+User can cancel with =vc-revert-buffer= function (=C-x v u=), that remove changes and return
+current file to actual version from repository. After execution of =vc-revert-buffer= file
+is not blocked, so you need to block it to make new changes.
+
+*** <<sec5>> Work with files
+    :PROPERTIES:
+    :CUSTOM_ID: work-with-files
+    :END:
+
+Registration of file in repository is performed with =vc-register= function (=C-x v i=).
+Selection of version control systems depends on several parameters. If in the directory
+there are files, already registered in some VCSs, then file will registered in this
+system. If in directory there are files, registered in several VCSs, then file will
+registered in system, that is first in the list =vc-handled-backends=. And if there are no
+registered files in directory, then VC take first name from =vc-handled-backends= list. For
+example, you can register file in CVS only if you explicitly specify name of VCS. By
+default, new file gets version number equal 1.1. You can set another version number if
+you supply prefix argument to =vc-register= function. If =vc-initial-comment= variable has
+non-=nil= value, then this function also ask user for comment, that will used as description
+of this file.
+
+The VC package also supports renaming of registered files. To do this you can use
+=vc-rename-file= function, that renames you working file, and also "main" file. This
+function also update all snapshots, so they will point to the correct file name. But you
+couldn't use this function for blocked files.
+
+User can also get information about current file by using =vc-print-log= function, that
+bound to =C-x v l=. This command shows history of changes together with text of comments
+for each of change.
+
+*** <<sec6>> Use VC together with Dired
+    :PROPERTIES:
+    :CUSTOM_ID: use-vc-together-with-dired
+    :END:
+
+Functions, that was described before, was designed to work with separate files. But for
+big projects it's often need to work with sets of files --- see which files was modified,
+display list of changes for whole project, etc. To allow user to do this, VC package
+implements special mode ---
+=vc-dired-mode=. To create a buffer, that work in this mode,
+user could use =vc-directory= function (=C-x v d=). The buffer, created by this command, has
+almost no differs from usual Dired's buffer. In this buffer user can see recursive list
+of files, registered in VCS.
+
+During work with Dired's buffer we can display data in short or full mode. In short
+display mode, in buffer are displayed only modified or not updated files. In full display
+mode, in buffer are displayed all files registered in VCS. User can switch between short
+and full display modes with =v t= key binding. In buffer also displayed information about
+user, who had blocked file (for systems, that support this feature) or file status (for
+all other systems). In the buffer with =vc-dired-mode= work all Dired's functions and keys,
+except =v= key, that is used as prefix key for all VC functions. For user available all VC
+functions, as described in other section, but they doesn't use =C-x= prefix, and could be
+applied for file sets.
+
+*** <<sec7>> <<branches>>Work with branches
+    :PROPERTIES:
+    :CUSTOM_ID: work-with-branches
+    :END:
+
+Like other packages, that allows to work with VCS, the VC package also supports work with
+different branches of one project. Package supports creation of branches, switching
+between them, and also merging of changes between different branches. To switch to other
+branch you just need to supply prefix argument to the =vc-next-action= function. User may
+use branch version instead of concrete version of file. Next operations will performed on
+selected branch. Creation of new branch is performed similar way --- when you commit data
+with =vc-next-action=, you just need to supply prefix argument and version number. If you
+supply non-existing branch number, then it will created. After creation of the branch,
+all work will performed in it, and user will need to explicitly switch to other branch, if
+he need this.
+
+To merge changes from another branch you can use =vc-merge= function, that bound to =C-x v m=.
+This command will ask you about branch from which you want merge changes, and apply them
+to your current brunch. If you doesn't specify branch version, then changes will taken
+from repository, from your current branch, if somebody commit them during your work. If
+during merge arise some conflicts, then package will notify you, and mark them in the
+file, or run Ediff to resolve them. You can also use =vc-resolve-conflicts= function to
+resolve existing conflicts. This function run new Ediff session, where you can see all
+conflicts, and accept or cancel proposed solutions.
+
+*** <<sec8>> Work with remote repositories
+    :PROPERTIES:
+    :CUSTOM_ID: work-with-remote-repositories
+    :END:
+
+Some of VCS supports "central repository" concept, that is used to keep "main" versions of
+file, together with history of changes. Repository could be local, or located on remote
+server. VC automatically detects cases, when repository is located on remote server, and
+does some things, that allow to effectively work with data, especially if connection to
+server is very slow or unstable. When user make a first change in file, the local copy of
+original file is created. This allow to execute functions for getting reverting changes
+without establishing network connection. File with original version has name
+=FILE.~VERSION.~=. When you commit changes to repository, local copy of original file will
+deleted. User can also manually create reserve copy of file using =vc-version-other-window=
+function. Difference between these two copies is that automatic copy has additional =.=
+char before =~=. Many VC functions can use both copies of file if their exists.
+
+*** <<sec9>> Work with snapshots
+    :PROPERTIES:
+    :CUSTOM_ID: work-with-snapshots
+    :END:
+
+Snapshot is named set of files with concrete versions, that could be used as separate
+object. Some VCSs support this concept internally, so VC just use existing functionality.
+For all other systems, VC implements this functionality, so snapshots will visible only if
+VC package is used. To work with snapshots VC package provides two functions. The
+=vc-create-snapshot= function (=C-x v s=) create a new snapshot using versions of files
+existing in current directory (and all sub-directories). The =vc-retrieve-snapshot=
+function (=C-x v r=) allows user to retrieve snapshot with given name. Many VC's functions
+allow user to use snapshot's names as argument, instead of using version numbers. This is
+especially useful when you look list of changes between two releases of program.
+
+*** <<sec10>> Other functions
+    :PROPERTIES:
+    :CUSTOM_ID: other-functions
+    :END:
+
+Usually for files, registered in some VCS history of changes is kept for each file
+separately. But in GNU projects, usually change logs are kept for whole project or on per
+directory basis. To allow to work with such change logs, VC package implements
+=vc-update-change-log= function (=C-x v a=), that updates common change log with change logs
+for all modified files. When this command gets a prefix argument, then it can update
+common change log with entries from concrete files.
+
+You can also insert special headers into your files. These headers depends on concrete
+VCS, and in some VCSs could be used for auxiliary goals. To insert such header, you can
+use =vc-insert-headers= function (=C-x v h=). VC automatically selects header, suitable for
+current VCS. All headers are kept in =vc-BACKEND-header= variables, so you can modify them
+to allow insertion of your own headers.
+
+** <<sec11>> Customization
+   :PROPERTIES:
+   :CUSTOM_ID: customization
+   :END:
+
+User can customize behaviour of VC package using standard Emacs's customization routines.
+He just need to execute =M-x customize-group vc= to do this. Some of options, applicable
+for all supported VCSs, but some are applicable only to concrete backends. Full
+description of customization variables you can find in VC's manual.
+
+** <<sec12>> Additional information
+   :PROPERTIES:
+   :CUSTOM_ID: additional-information
+   :END:
+
+Detailed description of VC package is provided as part of Emacs's documentation. Besides
+this, you can find more information about VC package at [[http://www.emacswiki.org/cgi-bin/wiki/CategoryVersionControl][Emacs WiKi]].
+
+Some of modules, that provides integration of VC with concrete VCS are not included into
+GNU Emacs or XEmacs distributions. You can find them on the author's sites:
+
+Last change: 05.03.2013 16:54
