@@ -1,0 +1,77 @@
+#+TITLE: 从Emacs拷贝格式化的org-mode内容到其他应用程序中
+#+URL: http://kitchingroup.cheme.cmu.edu/blog/2016/06/16/Copy-formatted-org-mode-text-from-Emacs-to-other-applications/
+#+AUTHOR: lujun9972
+#+TAGS: org-mode
+#+DATE: [2020年 01月 15日 星期三 19:24:38 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+我用org-mode写了很多东西，我想如果可以从org文件中复制文本，然后带格式地粘贴到其他应用程序中(例如Word、Gmail等)那就太好了。
+好奇心战胜了我,我也想知道其他应用程序是如何做到这一点的。
+它的工作原理是创建一个[[https://www.safaribooksonline.com/library/view/rtfpocguide/9781449302047/ch01.html][富文本格式]]版本的内容，然后把它放在剪贴板上。
+然而仅仅复制它是不够的，它需要以RTF数据类型的身份进入剪贴板。在Mac OSX上，我使用[[http://osxdaily.com/2007/03/05/- the-clipboard-from-the-command-line/][pbcopy]]实现了这一点。
+
+看看这篇文章的实战视频:[[https://www.youtube.com/watch?v=irkmQnggVpE]]
+
+在org-mode中实现这一点的一个简单策略是通过导出生成HTML，然后使用工具(如textutil)将其转换为RTF。比如这样。
+
+#+begin_src emacs-lisp
+  (defun formatted-copy ()
+    "Export region to HTML, and copy it to the clipboard."
+    (interactive)
+    (save-window-excursion
+      (let* ((buf (org-export-to-buffer 'html "*Formatted Copy*" nil nil t t))
+             (html (with-current-buffer buf (buffer-string))))
+        (with-current-buffer buf
+          (shell-command-on-region
+           (point-min)
+           (point-max)
+           "textutil -stdin -format html -convert rtf -stdout | pbcopy"))
+        (kill-buffer buf))))
+
+  (global-set-key (kbd "H-w") 'formatted-copy)
+#+end_src
+
+这种方法除了方程和图像，其他的都没问题。引用也还有待改进，如何改进是一个挑战。
+
+让我们在一些文本上试试这种方法。文本包括一些 *粗体*, /斜体/,下划线,打钩和 =原样= 文本复制。
+还包括一些公式的例子:H_{2}O电离形成H^{+}。我们还得有一个等式:(e^{iπ} + 1 = 0)。
+我们还应该有单个引用 [[http://kitchingroup.cheme.cmu.edu/blog/2016/06/16/Copy-formatted-org-mode-text-from-Emacs-to-other-applications/#kitchin-2015-examp][kitchin-2015-examp]] 和多个引用 [[http://kitchingroup.cheme.cmu.edu/blog/2016/06/16/Copy-formatted-org-mode-text-from-Emacs-to-other-applications/#kitchin-2016-autom-data][kitchen-2016-autom-data]],[[http://kitchingroup.cheme.cmu.edu/blog/2016/06/16/Copy-formatted-org-mode-text-from-Emacs-to-other-applications/#kitchin-2015-data-surfac-scien][kitchen-2015-data-surfac-scien]] 的情况.
+
+再加上一个代码块:
+
+#+begin_src python
+  import pycse.orgmode as org
+  import numpy as np
+  import matplotlib.pyplot as plt
+
+  x = np.linspace(0, 60, 500)
+  plt.figure(figsize=(4, 2))
+  plt.plot(np.exp(-0.1 0_sync_master.sh 1_add_new_article_manual.sh 1_add_new_article_newspaper.sh 2_start_translating.sh 3_continue_the_work.sh 4_finish.sh 5_pause.sh auto_translate.sh base.sh parse_url_by_manual.sh parse_url_by_newspaper.py parse_url_by_newspaper.sh project.cfg reformat.sh texput.log urls_checker.sh youdao.sh x) 0_sync_master.sh 1_add_new_article_manual.sh 1_add_new_article_newspaper.sh 2_start_translating.sh 3_continue_the_work.sh 4_finish.sh 5_pause.sh auto_translate.sh base.sh parse_url_by_manual.sh parse_url_by_newspaper.py parse_url_by_newspaper.sh project.cfg reformat.sh texput.log urls_checker.sh youdao.sh np.cos(x),
+  np.exp(-0.1 0_sync_master.sh 1_add_new_article_manual.sh 1_add_new_article_newspaper.sh 2_start_translating.sh 3_continue_the_work.sh 4_finish.sh 5_pause.sh auto_translate.sh base.sh parse_url_by_manual.sh parse_url_by_newspaper.py parse_url_by_newspaper.sh project.cfg reformat.sh texput.log urls_checker.sh youdao.sh x) 0_sync_master.sh 1_add_new_article_manual.sh 1_add_new_article_newspaper.sh 2_start_translating.sh 3_continue_the_work.sh 4_finish.sh 5_pause.sh auto_translate.sh base.sh parse_url_by_manual.sh parse_url_by_newspaper.py parse_url_by_newspaper.sh project.cfg reformat.sh texput.log urls_checker.sh youdao.sh np.sin(x))
+  org.figure(plt.savefig('spiral.png'),
+  caption='A spiral.',
+  attributes=[['org', ':width 100']])
+  print('')
+  org.table([['H1', 'H2'], None, [1, 2], [2, 4]],
+  caption='A simple table')
+  print('')
+  org.result(6 0_sync_master.sh 1_add_new_article_manual.sh 1_add_new_article_newspaper.sh 2_start_translating.sh 3_continue_the_work.sh 4_finish.sh 5_pause.sh auto_translate.sh base.sh parse_url_by_manual.sh parse_url_by_newspaper.py parse_url_by_newspaper.sh project.cfg reformat.sh texput.log urls_checker.sh youdao.sh 7)
+#+end_src
+
+[[http://kitchingroup.cheme.cmu.edu/media/2016-06-16-Copy-formatted-org-mode-text-from-Emacs-to-other-applications/spiral.png]]
+图1:一个螺旋。
+
+一个表:
+
+一个简单的表
+| H1 | H2 |
+|----+----|
+|  1 |  2 |
+|  2 |  4 |
+
+#+BEGIN_EXAMPLE
+42
+#+END_EXAMPLE
+
+总之，这种从导出的HTML生成RTF的简单方法非常适合这些简单标记的应用场景。在获取图表、获取交叉引用、标题、适当引用等方面的改进则需要更复杂的导出方法，而且可能需要直接导出成RTF格式。又是一个巨大的挑战!
