@@ -1,0 +1,116 @@
+#+TITLE: 使用Emacs frame实现Peek definition
+#+URL: http://tuhdo.github.io/emacs-frame-peek.html
+#+AUTHOR: lujun9972
+#+TAGS: emacs-common
+#+DATE: [2018-02-05 一 15:28]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+
+在许多IDE中，都有peek definition这个功能，它在不离开当前buffer的情况下，在弹出框中打开定义(函数、类、符号等)。
+大多数情况下，跳到一个定义，然后跳回来就足够了，所以为什么要离开当前buffer去重新加载一个全新的buffer，然后再回去重新加载原buffer呢?这让人分心。
+
+peek definition的一个例子如下所示:
+[[http://tuhdo.github.io/static/peek-definition-vs.png][peek-definition-vs.png]]
+(来源:微软)。
+
+我在Emacs中找过替代方案，但显然，所有涉及弹出框的解决方案都很慢而且缺乏必要的功能。
+弹出框显示文本的空间有限，而且没有字体锁定(font locking)。
+你甚至不能搜索，或者即使可以搜索，也及其困难和缓慢。
+
+最近，在一次跳转代码定义的过程中，我遗漏了跳转链起始的原buffer的踪迹，例如我从file1.c开始，然后跳转到file2.c, file3.h, file4.c，如此继续，直到我忘记我是从file1.c开始的(file1.c可能很长，很难记住它的名称)。
+这让我想在另一个独立的frame/buffer中执行整个代码跳跃过程，而不要打乱我的当前buffer。
+我尝试改进流程如下:
+
++ 使用不同的buffer:最初，我创建另一个buffer，并从那里开始。然而，通常情况下，这个另一个buffer也是一个有用的buffer。
++ 使用不同的workspace:我使用[[https://github.com/wasamasa/eyebrowse][eyebrowse]]，这个包可以创建一个全新的工作空间，并将之前的窗口配置保存为另一个工作空间。事实上，你可以轻松地在不同的窗口配置之间切换。这个解决方案很快就变得很麻烦，因为我必须记住哪个工作空间用于浏览代码，更不用说为我还因为其他目的创建了5个其他工作空间。这很快成为管理工作空间的负担。
+
+就在这时，我突然想起了frame。没错，Emacs frame!它非常适合这个用例。
+我可以在这个frame中做任何我想做的事，当完成时，只需用 =C-x 5 0= 关闭它即可。通过使用frame，我的工作空间(使用eyebrowse)的数量保持在一个可管理的数量内。
+
+再等等，如果Emacs frame足够小，那它不是和弹出框一样么?而且还保留了buffer的每个特性(语法高亮、代码跳跃等).更何况，制作一个frame比其他弹出式解决方案要轻量级得多。
+
+现在，在Emacs中实现peek definition就是简单地自动化这些步骤:
+
+1 找到光标所在符号起始位置的绝对位置，以像素为单位。
+2 创建一个新的不可见框架，其中包含当前buffer。
+3 将新frame定位在符号开始的正下方。
+4 跳转到光标所在的符号定义处。
+5 让frame可见。
+
+下面是一个peek definition的弹出框:
+
+[[http://tuhdo.github.io/static/peek-definition-emacs.gif][peek-definition-emacs.gif]]
+
+在本例中，我使用 =rtag-find-symbol-at-point= 函数进行跳转。但是你可以用任何一个函数来查找定义，只要它会跳转到对应buffer就行。
+最后，代码如下:
+
+#+begin_src elisp
+  (defun rtags-peek-definition ()
+  "Peek at definition at point using rtags."
+  (interactive)
+  (let ((func (lambda ()
+  (rtags-find-symbol-at-point)
+  (rtags-location-stack-forward))))
+  (rtags-start-process-unless-running)
+  (make-peek-frame func)))
+
+  (defun make-peek-frame (find-definition-function &rest args)
+  "Make a new frame for peeking definition"
+  (when (or (not (rtags-called-interactively-p)) (rtags-sandbox-id-matches))
+  (let (summary
+  doc-frame
+  x y
+  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  ;; 1. Find the absolute position of the current beginning of the symbol at point, ;;
+  ;; in pixels.                                                                     ;;
+  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  (abs-pixel-pos (save-excursion
+  (beginning-of-thing 'symbol)
+  (window-absolute-pixel-position))))
+  (setq x (car abs-pixel-pos))
+  ;; (setq y (cdr abs-pixel-pos))
+  (setq y (+ (cdr abs-pixel-pos) (frame-char-height)))
+
+  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  ;; 2. Create a new invisible frame, with the current buffer in it. ;;
+  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  (setq doc-frame (make-frame '((minibuffer . nil)
+  (name . "*RTags Peek*")
+  (width . 80)
+  (visibility . nil)
+  (height . 15))))
+
+  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  ;; 3. Position the new frame right under the beginning of the symbol at point. ;;
+  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  (set-frame-position doc-frame x y)
+
+  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  ;; 4. Jump to the symbol at point. ;;
+  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  (with-selected-frame doc-frame
+  (apply find-definition-function args)
+  (read-only-mode)
+  (when semantic-stickyfunc-mode (semantic-stickyfunc-mode -1))
+  (recenter-top-bottom 0))
+
+  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  ;; 5. Make frame visible again ;;
+  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  (make-frame-visible doc-frame))))
+
+#+end_src
+#+begin_example
+#+end_example
+
+然后，将新命令绑定到一个快捷键，并尝试一下:
+
+#+BEGIN_SRC emacs-lisp
+(global-set-key (kbd "C-c p") 'rtags-peek-definition)
+#+END_SRC
+
+要关闭peek帧，只需使用 =C-x 5 0= (运行删除frame命令)。你可以将之绑定到l另一个快捷键让关闭frame更容易，例如f12键。
+
+我使用Emacs越多，就越开始意识到frame是多么有用。特别是在Emacs 26之后，有一个选项可以让从OS任务栏中删除框架，让你不能使用 Alt+Tab 切换到Emacs中创建的任何子框架中去。
+有了这个特性，您可以创建许多Emacs frame，而不会造成Alt+tab混乱。也许是时候拥抱frame了。
