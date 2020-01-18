@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Drowning in Email; mu4e to the Rescue. - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="raw" />
+  <!-- <link rel="stylesheet" href="../../../../../media/css/main.css" type="text/css"/>
+       <link rel="stylesheet" href="../../../../../media/css/comment.css" type="text/css"/> -->
+  <link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/kognise/water.css@latest/dist/dark.css'>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="../../../../../">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <ul class="trigger">
+        <li><a href="../../../../../years/">Years</a></li>
+        <li><a href="../../../../../authors/">Authors</a></li>
+        <li><a href="../../../../../tags/">Tags</a></li>
+        <li><a href="../../../../../about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="../../../../../rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="https://www.bing.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">Drowning in Email; mu4e to the Rescue.</h1>
+<div id="table-of-contents">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#what-is-mu4e">What is mu4e?</a>
+<ul>
+<li><a href="#configure-mbsync">Configure mbsync</a></li>
+<li><a href="#configure-mu4e">Configure mu4e</a></li>
+</ul>
+</li>
+<li><a href="#check-out-the-mu4e-shortcuts">Check out the mu4e shortcuts:</a></li>
+<li><a href="#choosing-offline-imap-client-mbsync-vs-offlineimap">Choosing Offline IMAP client: mbsync vs offlineimap</a></li>
+</ul>
+</div>
+</div>
+
+<div class="figure">
+<p><img src="https://www.macs.hw.ac.uk/~rs46/images/site/phd-comic-emails.gif" alt="phd-comic-emails.gif" />
+</p>
+</div>
+
+<div id="outline-container-orga3c0ffc" class="outline-2">
+<h2 id="what-is-mu4e"><a id="orga3c0ffc"></a>What is mu4e?</h2>
+<div class="outline-text-2" id="text-what-is-mu4e">
+<p>
+<a href="http://www.djcbsoftware.nl/code/mu/mu4e.html">mu4e</a> is an emacs-based email client. It is fully search-based, with a UI optimised for speed with quick key stroked for common actions. Emails can be composed with rich-text using org-mode. Email addresses auto-completion is supported. Actions are asynchronous, so heavy actions never block emacs.
+</p>
+
+<p>
+The basic idea is this: you configure an offline IMAP client to synchronise your remote email server with your local computer. Two possibilities for an IMAP synchroniser are mbsync and offlineimap. This post describes a setup using mbsync.
+</p>
+</div>
+
+<div id="outline-container-org57f8ebe" class="outline-3">
+<h3 id="configure-mbsync"><a id="org57f8ebe"></a>Configure mbsync</h3>
+<div class="outline-text-3" id="text-configure-mbsync">
+<ol class="org-ol">
+<li>Install SSL development files, required by mbsync for SSL authentication. With RPM based package managers, <code>sudo yum install openssl-devel</code> or if using <code>dnf</code> (e.g. with Fedora 22+), then run <code>sudo dnf install openssl-devel</code>. With debian machines, <code>sudo apt-get install libssl-dev</code>.</li>
+
+<li>Install mbsync, either from a <a href="http://sourceforge.net/projects/isync/files/isync/">release tarball</a> or from <a href="http://sourceforge.net/p/isync/isync/ci/master/tree/">git</a>.</li>
+
+<li>Create a temporary file <code>.mbsyncpass</code> and store your plain text password in there. Next, <code>gpg2 --output .mbsyncpass.gpg --symmetric .mbsyncpass</code>. Move <code>mysyncpass.gpg</code> in <code>~/.emacs.d</code> and remove the <code>.mbsyncpass</code> file.</li>
+
+<li>Create a temporary file <code>~/.authinfo</code> and store the following plain text in there, replacing host, username, password &amp; port information for your settings:</li>
+</ol>
+
+<p>
+<code>machine mail.example.com login myusername port 587 password mypassword</code>
+</p>
+
+<ol class="org-ol">
+<li>Generate the encrypted file with <code>gpg2 --output ~/.authinfo.gpg --symmetric ~/.authinfo</code>. Remove the <code>~/.authinfo</code> file.</li>
+
+<li>Create a <code>.mbsyncrc</code> file. I have it in my <code>~/.emacs.d/</code> directory so that it is version controlled to use easily across my machines. Check on the work server the exact directory names you wish to syncronise (e.g. is it "Sent" or "Sent Items"?). Choose the location for your local mail directory. I chose <code>~/email/mysyncmail</code>. Add the following to the <code>.mbsyncrc</code> file:</li>
+</ol>
+
+<pre class="example">
+IMAPAccount uni
+Host mail.example.com
+User me@example.com
+PassCmd "gpg2 -q --for-your-eyes-only --no-tty -d ~/.emacs.d/.mbsyncpass.gpg"
+Port 993
+SSLType IMAPS
+AuthMechs Login
+CertificateFile /etc/ssl/certs/ca-bundle.crt
+
+IMAPStore uni-remote
+Account uni
+
+MaildirStore uni-local
+Path ~/email/mbsyncmail/
+Inbox ~/email/mbsyncmail/INBOX
+
+Channel uni
+Master :uni-remote:
+Slave :uni-local:
+Patterns "Sent Items" "INBOX" "Deleted Items"
+Create Slave
+Sync All
+Expunge Both
+SyncState *
+</pre>
+
+<ol class="org-ol">
+<li>Run the <code>mbsync</code> command, to synchronise your IMAP inbox: <code>mbsync -c ~/.emacs.d/.mbsyncrc work</code></li>
+</ol>
+</div>
+</div>
+
+<div id="outline-container-org4fe58f2" class="outline-3">
+<h3 id="configure-mu4e"><a id="org4fe58f2"></a>Configure mu4e</h3>
+<div class="outline-text-3" id="text-configure-mu4e">
+<ol class="org-ol">
+<li>Install mu4e, either using a package manager, from a tarball, or from git. <a href="http://www.djcbsoftware.nl/code/mu/mu4e/Installation.html">Details here</a>.</li>
+
+<li>Now set up your mu4e configuration. Check out the mu4e documentation on the variables. Make sure the following is stored in an <code>.el</code> file that is loaded by emacs, e.g. by the <code>~.emacs</code> file.</li>
+</ol>
+
+<pre class="example">
+(add-to-list 'load-path "~/place/to/your/mu4e")
+(require 'smtpmail)
+
+; smtp
+(setq message-send-mail-function 'smtpmail-send-it
+ smtpmail-starttls-credentials
+ '(("mail.example.com" 587 nil nil))
+ smtpmail-default-smtp-server "mail.example.com"
+ smtpmail-smtp-server "mail.example.com"
+ smtpmail-smtp-service 587
+ smtpmail-debug-info t)
+
+(require 'mu4e)
+
+(setq mu4e-maildir (expand-file-name "~/email/mbsyncmail"))
+
+(setq mu4e-drafts-folder "/Drafts")
+(setq mu4e-sent-folder "/Sent Items")
+(setq mu4e-trash-folder "/Trash")
+(setq message-signature-file "~/.emacs.d/.signature") ; put your signature in this file
+
+; get mail
+(setq mu4e-get-mail-command "mbsync -c ~/.emacs.d/.mbsyncrc work"
+ mu4e-html2text-command "w3m -T text/html"
+ mu4e-update-interval 120
+ mu4e-headers-auto-update t
+ mu4e-compose-signature-auto-include nil)
+
+(setq mu4e-maildir-shortcuts
+ '( ("/INBOX" . ?i)
+ ("/Sent Items" . ?s)
+ ("/Trash" . ?t)
+ ("/Drafts" . ?d)))
+
+;; show images
+(setq mu4e-show-images t)
+
+;; use imagemagick, if available
+(when (fboundp 'imagemagick-register-types)
+ (imagemagick-register-types))
+
+;; general emacs mail settings; used when composing e-mail
+;; the non-mu4e-* stuff is inherited from emacs/message-mode
+(setq mu4e-reply-to-address "me@example.com"
+ user-mail-address "me@example.com"
+ user-full-name "Rob Stewart")
+
+;; don't save message to Sent Messages, IMAP takes care of this
+; (setq mu4e-sent-messages-behavior 'delete)
+
+;; spell check
+(add-hook 'mu4e-compose-mode-hook
+ (defun my-do-compose-stuff ()
+ "My settings for message composition."
+ (set-fill-column 72)
+ (flyspell-mode)))
+</pre>
+
+<ol class="org-ol">
+<li>Then, you must index that directory with <code>mu</code>:</li>
+</ol>
+
+<p>
+<code>mu index --maildir=~/email/mbsyncmail/</code>
+</p>
+
+<ol class="org-ol">
+<li>Now it's time to try out mu4e. Open up emacs and type <code>M-x mu4e</code>.</li>
+</ol>
+
+
+<div class="figure">
+<p><img src="../images/site/mu4e-demo.png" alt="mu4e-demo.png" />
+</p>
+</div>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org0d801e5" class="outline-2">
+<h2 id="check-out-the-mu4e-shortcuts"><a id="org0d801e5"></a>Check out the mu4e shortcuts:</h2>
+<div class="outline-text-2" id="text-check-out-the-mu4e-shortcuts">
+<ul class="org-ul">
+<li><code>n/p</code> go to next, previous message</li>
+<li><code>RET</code> open the message at point in the message view</li>
+<li><code>s</code> search</li>
+<li><code>j</code> jump to maildir e.g. <code>ji</code> jumps to inbox</li>
+<li><code>O</code> change sort order</li>
+<li><code>P</code> toggle threading</li>
+<li><code>d</code> mark message for moving to trash folder</li>
+<li><code>m</code> mark message for moving to another maildir folder</li>
+<li><code>?,!</code> mark message as unread/read</li>
+<li><code>R,F,C</code> reply/forward/compose</li>
+</ul>
+
+<p>
+The complete list of mu4e key bindings is listed <a href="http://www.djcbsoftware.nl/code/mu/mu4e/Keybindings.html">here</a>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgd2cdc93" class="outline-2">
+<h2 id="choosing-offline-imap-client-mbsync-vs-offlineimap"><a id="orgd2cdc93"></a>Choosing Offline IMAP client: mbsync vs offlineimap</h2>
+<div class="outline-text-2" id="text-choosing-offline-imap-client-mbsync-vs-offlineimap">
+<p>
+The more popular approach is <a href="http://en.wikipedia.org/wiki/OfflineIMAP">offlineimap</a>, and I tried this for a week. I later tried <a href="http://isync.sourceforge.net/mbsync.html">mbsync</a>, and this is working much better for me. People have opted for offlineimap because of its ability to a invoke python file to prompt a user for a password, thus avoiding plain text passwords being stored locally. Fortunately, this has now <a href="http://sourceforge.net/mailarchive/message.php?msg_id=31795745">been implemented</a> in mbsync, which is what the <code>PassCmd</code> entry in <code>.mbsyncrc</code> is for.
+</p>
+
+<blockquote>
+<p>
+<b>Zawinski's Law</b> “Every program attempts to expand until it can read mail. Those programs which cannot so expand are replaced by ones which can." Law of Software Envelopment, Jamie Zawinski.
+</p>
+</blockquote>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2020-01-15</span>
+            <span title="last modification date" class="post-info">2020-01-15</span>
+            <span title="tags" class="post-info">:<a href="../../../../../tags/raw">raw</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-bcec46e0-e8c4-4bd6-8a1c-ab619f3d8b40">lujun9972</a></span>
+        </div>
+    <script src="../../../../../media/js/jquery-2.1.3.min.js"></script>
+    <script src="../../../../../media/js/md5.min.js"></script>
+        <section>
+            <div id="gitalk-container"></div>
+            <script type="text/javascript">
+             var gitalk = new Gitalk({
+                 clientID: 'fdcb5d9da3f4acb4862c',
+                 clientSecret: 'dd0a16312a206782cb7669dcec5e96874ab48170',
+                 repo: 'lujun9972.github.com',
+                 owner: 'lujun9972',
+                 admin: ['lujun9972'],
+                 id: md5(location.pathname),      // Ensure uniqueness and length less than 50
+                 distractionFreeMode: false  // Facebook-like distraction free mode
+             })
+             gitalk.render('gitalk-container')
+            </script>
+        </section>
+    <script src="../../../../../media/js/main.js"></script>
+        <script>
+         var _hmt = _hmt || [];
+         (function() {
+             var hm = document.createElement("script");
+             hm.src = "https://hm.baidu.com/hm.js?7bac4fd0247f69c27887e0d4e3aee41e";
+             var s = document.getElementsByTagName("script")[0]; 
+             s.parentNode.insertBefore(hm, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-bcec46e0-e8c4-4bd6-8a1c-ab619f3d8b40">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="../../../../../instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>

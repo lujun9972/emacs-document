@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>在Emacs中进行有效的拼写检查 - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="emacs-common" />
+  <!-- <link rel="stylesheet" href="../../../../../media/css/main.css" type="text/css"/>
+       <link rel="stylesheet" href="../../../../../media/css/comment.css" type="text/css"/> -->
+  <link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/kognise/water.css@latest/dist/dark.css'>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="../../../../../">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <ul class="trigger">
+        <li><a href="../../../../../years/">Years</a></li>
+        <li><a href="../../../../../authors/">Authors</a></li>
+        <li><a href="../../../../../tags/">Tags</a></li>
+        <li><a href="../../../../../about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="../../../../../rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="https://www.bing.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">在Emacs中进行有效的拼写检查</h1>
+<div id="table-of-contents">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#orgcdbb511">HTML中的拼写检查</a></li>
+<li><a href="#orgc2b2a26">不要将doubleon(双词)显示为错误</a></li>
+<li><a href="#orgd56bfcd">驼峰字符串的拼写检查</a></li>
+<li><a href="#org5d48ab6">总结</a></li>
+<li><a href="#orgde2da67">Javascript和ReactJS设置(可选)</a></li>
+</ul>
+</div>
+</div>
+<p>
+我用web模式下的<a href="http://www.emacswiki.org/emacs/FlySpell">Flyspell</a>作为示例。其他major-mode也一样。
+</p>
+
+<p>
+首先，请将下面的代码插入到 <code>.emacs</code> 中，为所有的编程语言打开 <code>flyspell</code>.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(add-hook 'prog-mode-hook 'flyspell-prog-mode)
+</pre>
+</div>
+
+<p>
+下面是一个<a href="http://blog.binchen.org/posts/what-what%20-the-best-spell-check-set-up-in-emacs.html">短教程</a>:
+</p>
+
+<ul class="org-ul">
+<li>如何设置flyspell</li>
+<li>hunspell和aspell的区别</li>
+<li>如何设置hunspell</li>
+</ul>
+
+<div id="outline-container-org9f819f2" class="outline-2">
+<h2 id="orgcdbb511"><a id="org9f819f2"></a>HTML中的拼写检查</h2>
+<div class="outline-text-2" id="text-orgcdbb511">
+<p>
+拼写检查的范围包括:
+</p>
+
+<ul class="org-ul">
+<li>html标签之间的文本，如 <code>&lt;label&gt;Please input email&lt;/label&gt;</code></li>
+<li>html输入控件的值，如 <code>&lt;input type</code>"text" Value <code>"Please input your name"&gt;</code></li>
+<li>CSS类名,如 <code>&lt;div class</code>"btn btn-default" /&gt;=</li>
+</ul>
+
+<p>
+我的配置如下:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp"><span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">{{ flyspell setup for web-mode</span>
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">web-mode-flyspell-verify</span> ()
+  (<span style="font-weight: bold;">let*</span> ((f (get-text-property (- (point) 1) 'face))
+         rlt)
+    (<span style="font-weight: bold;">cond</span>
+     <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Check the words with these font faces, possibly.</span>
+     <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">this *blacklist* will be tweaked in next condition</span>
+     ((not (memq f '(web-mode-html-attr-value-face
+                     web-mode-html-tag-face
+                     web-mode-html-attr-name-face
+                     web-mode-constant-face
+                     web-mode-doctype-face
+                     web-mode-keyword-face
+                     web-mode-comment-face <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">focus on get html label right</span>
+                     web-mode-function-name-face
+                     web-mode-variable-name-face
+                     web-mode-css-property-name-face
+                     web-mode-css-selector-face
+                     web-mode-css-color-face
+                     web-mode-type-face
+                     web-mode-block-control-face)))
+      (<span style="font-weight: bold;">setq</span> rlt t))
+     <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">check attribute value under certain conditions</span>
+     ((memq f '(web-mode-html-attr-value-face))
+      (<span style="font-weight: bold;">save-excursion</span>
+        (search-backward-regexp <span style="font-style: italic;">"=['\"]"</span> (line-beginning-position) t)
+        (backward-char)
+        (<span style="font-weight: bold;">setq</span> rlt (string-match <span style="font-style: italic;">"^</span><span style="font-weight: bold; font-style: italic;">\\</span><span style="font-weight: bold; font-style: italic;">(</span><span style="font-style: italic;">value</span><span style="font-weight: bold; font-style: italic;">\\</span><span style="font-weight: bold; font-style: italic;">|</span><span style="font-style: italic;">class</span><span style="font-weight: bold; font-style: italic;">\\</span><span style="font-weight: bold; font-style: italic;">|</span><span style="font-style: italic;">ng[A-Za-z0-9-]*</span><span style="font-weight: bold; font-style: italic;">\\</span><span style="font-weight: bold; font-style: italic;">)</span><span style="font-style: italic;">$"</span>
+                                (thing-at-point 'symbol)))))
+     <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">finalize the blacklist</span>
+     (t
+      (<span style="font-weight: bold;">setq</span> rlt nil)))
+    rlt))
+(put 'web-mode 'flyspell-mode-predicate 'web-mode-flyspell-verify)
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">}}</span>
+</pre>
+</div>
+
+<p>
+我使用<a href="http://webmode.org/">web-mode</a>来编辑HTML文件。但该技术也适用于其他模式(如php模式、html模式等).
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgbc2805b" class="outline-2">
+<h2 id="orgc2b2a26"><a id="orgbc2805b"></a>不要将doubleon(双词)显示为错误</h2>
+<div class="outline-text-2" id="text-orgc2b2a26">
+<p>
+Modern CSS frameworks like <a href="http://getbootstrap.com/">Bootstrap</a> make doublon unavoidable. For example, CSS class name <code>btn btn-default</code> contains double word <code>btn</code>.
+在<a href="http://getbootstrap.com/">Bootstrap</a>这样的现代CSS框架中，使得doublon不可避免。例如，CSS类名 <code>btn btn-default</code> 就包含双单词=btn=。
+</p>
+
+<p>
+因此,我们不能在HTML中将doublon显示为错误，
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defvar</span> <span style="font-weight: bold; font-style: italic;">flyspell-check-doublon</span> t
+  <span style="font-style: italic;">"Check doublon (double word) when calling `</span><span style="font-weight: bold; font-style: italic; text-decoration: underline;">flyspell-highlight-incorrect-region</span><span style="font-style: italic;">'."</span>)
+(make-variable-buffer-local 'flyspell-check-doublon)
+
+(<span style="font-weight: bold;">defadvice</span> <span style="font-weight: bold;">flyspell-highlight-incorrect-region</span> (around flyspell-highlight-incorrect-region-hack activate)
+  (<span style="font-weight: bold;">if</span> (<span style="font-weight: bold;">or</span> flyspell-check-doublon (not (eq 'doublon (ad-get-arg 2))))
+      ad-do-it))
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">web-mode-hook-setup</span> ()
+  (flyspell-mode 1)
+  (<span style="font-weight: bold;">setq</span> flyspell-check-doublon nil))
+
+(add-hook 'web-mode-hook 'web-mode-hook-setup)
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orga2b0c4c" class="outline-2">
+<h2 id="orgd56bfcd"><a id="orga2b0c4c"></a>驼峰字符串的拼写检查</h2>
+<div class="outline-text-2" id="text-orgd56bfcd">
+<p>
+当且仅当使用<a href="http://aspell.net/">aspell</a>时，我们才可以检查驼峰格式的字符串/变量/函数。
+</p>
+
+<p>
+将下面的代码插入 <code>.emacs</code> 中，
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp"><span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">if (aspell installed) { use aspell}</span>
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">else if (hunspell installed) { use hunspell }</span>
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">whatever spell checker I use, I always use English dictionary</span>
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">I prefer use aspell because:</span>
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">1. aspell is older</span>
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">2. looks Kevin Atkinson still get some road map for aspell:</span>
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">@see http://lists.gnu.org/archive/html/aspell-announce/2011-09/msg00000.html</span>
+(<span style="font-weight: bold;">setq</span> ispell-program-name <span style="font-style: italic;">"aspell"</span>
+      <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">force the English dictionary, support Camel Case spelling check (tested with aspell 0.6)</span>
+      ispell-extra-args '(<span style="font-style: italic;">"--sug-mode=ultra"</span> <span style="font-style: italic;">"--lang=en_US"</span> <span style="font-style: italic;">"--run-together"</span>)
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orge7adef1" class="outline-2">
+<h2 id="org5d48ab6"><a id="orge7adef1"></a>总结</h2>
+<div class="outline-text-2" id="text-org5d48ab6">
+<p>
+<a href="http://www.emacswiki.org/emacs/FlySpell">EmacsWiki</a> 建议使用 <code>(flyspell-prog-mode)</code> 只检查注释中的错字。
+</p>
+
+<p>
+但正如我再次所展现的，Emacs给了您充分的自由来设计一个“不同的”解决方案。
+</p>
+
+<p>
+屏幕截图如下(拼写错误有下划线):
+</p>
+
+
+<div class="figure">
+<p><img src="http://blog.binchen.org/wp-content/spell-check-html-in-emacs.png" alt="spell-check-html-in-emacs.png" />
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org33d5d90" class="outline-2">
+<h2 id="orgde2da67"><a id="org33d5d90"></a>Javascript和ReactJS设置(可选)</h2>
+<div class="outline-text-2" id="text-orgde2da67">
+<p>
+如果你完全理解了我前面的部分，那么你无需阅读这部分。
+</p>
+
+<p>
+将下面的代码插入 <code>.emacs</code> 中，
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">js-flyspell-verify</span> ()
+  (<span style="font-weight: bold;">let*</span> ((f (get-text-property (- (point) 1) 'face)))
+    <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">*whitelist*</span>
+    <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">only words with following font face will be checked</span>
+    (memq f '(js2-function-call
+              js2-function-param
+              js2-object-property
+              font-lock-variable-name-face
+              font-lock-string-face
+              font-lock-function-name-face))))
+(put 'js2-mode 'flyspell-mode-predicate 'js-flyspell-verify)
+(put 'rjsx-mode 'flyspell-mode-predicate 'js-flyspell-verify)
+</pre>
+</div>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2020-01-15</span>
+            <span title="last modification date" class="post-info">2020-01-18</span>
+            <span title="tags" class="post-info">:<a href="../../../../../tags/emacs-common">emacs-common</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-bcec46e0-e8c4-4bd6-8a1c-ab619f3d8b40">lujun9972</a></span>
+        </div>
+    <script src="../../../../../media/js/jquery-2.1.3.min.js"></script>
+    <script src="../../../../../media/js/md5.min.js"></script>
+        <section>
+            <div id="gitalk-container"></div>
+            <script type="text/javascript">
+             var gitalk = new Gitalk({
+                 clientID: 'fdcb5d9da3f4acb4862c',
+                 clientSecret: 'dd0a16312a206782cb7669dcec5e96874ab48170',
+                 repo: 'lujun9972.github.com',
+                 owner: 'lujun9972',
+                 admin: ['lujun9972'],
+                 id: md5(location.pathname),      // Ensure uniqueness and length less than 50
+                 distractionFreeMode: false  // Facebook-like distraction free mode
+             })
+             gitalk.render('gitalk-container')
+            </script>
+        </section>
+    <script src="../../../../../media/js/main.js"></script>
+        <script>
+         var _hmt = _hmt || [];
+         (function() {
+             var hm = document.createElement("script");
+             hm.src = "https://hm.baidu.com/hm.js?7bac4fd0247f69c27887e0d4e3aee41e";
+             var s = document.getElementsByTagName("script")[0]; 
+             s.parentNode.insertBefore(hm, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-bcec46e0-e8c4-4bd6-8a1c-ab619f3d8b40">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="../../../../../instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>

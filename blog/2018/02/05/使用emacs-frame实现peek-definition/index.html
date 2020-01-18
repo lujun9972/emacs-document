@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>使用Emacs frame实现Peek definition - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="emacs-common" />
+  <!-- <link rel="stylesheet" href="../../../../../media/css/main.css" type="text/css"/>
+       <link rel="stylesheet" href="../../../../../media/css/comment.css" type="text/css"/> -->
+  <link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/kognise/water.css@latest/dist/dark.css'>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="../../../../../">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <ul class="trigger">
+        <li><a href="../../../../../years/">Years</a></li>
+        <li><a href="../../../../../authors/">Authors</a></li>
+        <li><a href="../../../../../tags/">Tags</a></li>
+        <li><a href="../../../../../about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="../../../../../rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="https://www.bing.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">使用Emacs frame实现Peek definition</h1>
+<p>
+在许多IDE中，都有peek definition这个功能，它在不离开当前buffer的情况下，在弹出框中打开定义(函数、类、符号等)。
+大多数情况下，跳到一个定义，然后跳回来就足够了，所以为什么要离开当前buffer去重新加载一个全新的buffer，然后再回去重新加载原buffer呢?这让人分心。
+</p>
+
+<p>
+peek definition的一个例子如下所示:
+<a href="http://tuhdo.github.io/static/peek-definition-vs.png">peek-definition-vs.png</a>
+(来源:微软)。
+</p>
+
+<p>
+我在Emacs中找过替代方案，但显然，所有涉及弹出框的解决方案都很慢而且缺乏必要的功能。
+弹出框显示文本的空间有限，而且没有字体锁定(font locking)。
+你甚至不能搜索，或者即使可以搜索，也及其困难和缓慢。
+</p>
+
+<p>
+最近，在一次跳转代码定义的过程中，我遗漏了跳转链起始的原buffer的踪迹，例如我从file1.c开始，然后跳转到file2.c, file3.h, file4.c，如此继续，直到我忘记我是从file1.c开始的(file1.c可能很长，很难记住它的名称)。
+这让我想在另一个独立的frame/buffer中执行整个代码跳跃过程，而不要打乱我的当前buffer。
+我尝试改进流程如下:
+</p>
+
+<ul class="org-ul">
+<li>使用不同的buffer:最初，我创建另一个buffer，并从那里开始。然而，通常情况下，这个另一个buffer也是一个有用的buffer。</li>
+<li>使用不同的workspace:我使用<a href="https://github.com/wasamasa/eyebrowse">eyebrowse</a>，这个包可以创建一个全新的工作空间，并将之前的窗口配置保存为另一个工作空间。事实上，你可以轻松地在不同的窗口配置之间切换。这个解决方案很快就变得很麻烦，因为我必须记住哪个工作空间用于浏览代码，更不用说为我还因为其他目的创建了5个其他工作空间。这很快成为管理工作空间的负担。</li>
+</ul>
+
+<p>
+就在这时，我突然想起了frame。没错，Emacs frame!它非常适合这个用例。
+我可以在这个frame中做任何我想做的事，当完成时，只需用 <code>C-x 5 0</code> 关闭它即可。通过使用frame，我的工作空间(使用eyebrowse)的数量保持在一个可管理的数量内。
+</p>
+
+<p>
+再等等，如果Emacs frame足够小，那它不是和弹出框一样么?而且还保留了buffer的每个特性(语法高亮、代码跳跃等).更何况，制作一个frame比其他弹出式解决方案要轻量级得多。
+</p>
+
+<p>
+现在，在Emacs中实现peek definition就是简单地自动化这些步骤:
+</p>
+
+<p>
+1 找到光标所在符号起始位置的绝对位置，以像素为单位。
+2 创建一个新的不可见框架，其中包含当前buffer。
+3 将新frame定位在符号开始的正下方。
+4 跳转到光标所在的符号定义处。
+5 让frame可见。
+</p>
+
+<p>
+下面是一个peek definition的弹出框:
+</p>
+
+<p>
+<a href="http://tuhdo.github.io/static/peek-definition-emacs.gif">peek-definition-emacs.gif</a>
+</p>
+
+<p>
+在本例中，我使用 <code>rtag-find-symbol-at-point</code> 函数进行跳转。但是你可以用任何一个函数来查找定义，只要它会跳转到对应buffer就行。
+最后，代码如下:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-elisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">rtags-peek-definition</span> ()
+<span style="font-style: italic;">"Peek at definition at point using rtags."</span>
+(<span style="font-weight: bold;">interactive</span>)
+(<span style="font-weight: bold;">let</span> ((func (<span style="font-weight: bold;">lambda</span> ()
+(rtags-find-symbol-at-point)
+(rtags-location-stack-forward))))
+(rtags-start-process-unless-running)
+(make-peek-frame func)))
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">make-peek-frame</span> (find-definition-function <span style="font-weight: bold; text-decoration: underline;">&amp;rest</span> args)
+<span style="font-style: italic;">"Make a new frame for peeking definition"</span>
+(<span style="font-weight: bold;">when</span> (<span style="font-weight: bold;">or</span> (not (rtags-called-interactively-p)) (rtags-sandbox-id-matches))
+(<span style="font-weight: bold;">let</span> (summary
+doc-frame
+x y
+<span style="font-weight: bold; font-style: italic;">;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;</span>
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">1. Find the absolute position of the current beginning of the symbol at point, ;;</span>
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">in pixels.                                                                     ;;</span>
+<span style="font-weight: bold; font-style: italic;">;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;</span>
+(abs-pixel-pos (<span style="font-weight: bold;">save-excursion</span>
+(beginning-of-thing 'symbol)
+(window-absolute-pixel-position))))
+(<span style="font-weight: bold;">setq</span> x (car abs-pixel-pos))
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">(setq y (cdr abs-pixel-pos))</span>
+(<span style="font-weight: bold;">setq</span> y (+ (cdr abs-pixel-pos) (frame-char-height)))
+
+<span style="font-weight: bold; font-style: italic;">;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;</span>
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">2. Create a new invisible frame, with the current buffer in it. ;;</span>
+<span style="font-weight: bold; font-style: italic;">;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;</span>
+(<span style="font-weight: bold;">setq</span> doc-frame (make-frame '((minibuffer . nil)
+(name . <span style="font-style: italic;">"*RTags Peek*"</span>)
+(width . 80)
+(visibility . nil)
+(height . 15))))
+
+<span style="font-weight: bold; font-style: italic;">;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;</span>
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">3. Position the new frame right under the beginning of the symbol at point. ;;</span>
+<span style="font-weight: bold; font-style: italic;">;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;</span>
+(set-frame-position doc-frame x y)
+
+<span style="font-weight: bold; font-style: italic;">;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;</span>
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">4. Jump to the symbol at point. ;;</span>
+<span style="font-weight: bold; font-style: italic;">;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;</span>
+(<span style="font-weight: bold;">with-selected-frame</span> doc-frame
+(apply find-definition-function args)
+(read-only-mode)
+(<span style="font-weight: bold;">when</span> semantic-stickyfunc-mode (semantic-stickyfunc-mode -1))
+(recenter-top-bottom 0))
+
+<span style="font-weight: bold; font-style: italic;">;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;</span>
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">5. Make frame visible again ;;</span>
+<span style="font-weight: bold; font-style: italic;">;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;</span>
+(make-frame-visible doc-frame))))
+
+</pre>
+</div>
+<pre class="example">
+
+</pre>
+
+<p>
+然后，将新命令绑定到一个快捷键，并尝试一下:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(global-set-key (kbd <span style="font-style: italic;">"C-c p"</span>) 'rtags-peek-definition)
+</pre>
+</div>
+
+<p>
+要关闭peek帧，只需使用 <code>C-x 5 0</code> (运行删除frame命令)。你可以将之绑定到l另一个快捷键让关闭frame更容易，例如f12键。
+</p>
+
+<p>
+我使用Emacs越多，就越开始意识到frame是多么有用。特别是在Emacs 26之后，有一个选项可以让从OS任务栏中删除框架，让你不能使用 Alt+Tab 切换到Emacs中创建的任何子框架中去。
+有了这个特性，您可以创建许多Emacs frame，而不会造成Alt+tab混乱。也许是时候拥抱frame了。
+</p>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2018-02-05</span>
+            <span title="last modification date" class="post-info">2020-01-16</span>
+            <span title="tags" class="post-info">:<a href="../../../../../tags/emacs-common">emacs-common</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-bcec46e0-e8c4-4bd6-8a1c-ab619f3d8b40">lujun9972</a></span>
+        </div>
+    <script src="../../../../../media/js/jquery-2.1.3.min.js"></script>
+    <script src="../../../../../media/js/md5.min.js"></script>
+        <section>
+            <div id="gitalk-container"></div>
+            <script type="text/javascript">
+             var gitalk = new Gitalk({
+                 clientID: 'fdcb5d9da3f4acb4862c',
+                 clientSecret: 'dd0a16312a206782cb7669dcec5e96874ab48170',
+                 repo: 'lujun9972.github.com',
+                 owner: 'lujun9972',
+                 admin: ['lujun9972'],
+                 id: md5(location.pathname),      // Ensure uniqueness and length less than 50
+                 distractionFreeMode: false  // Facebook-like distraction free mode
+             })
+             gitalk.render('gitalk-container')
+            </script>
+        </section>
+    <script src="../../../../../media/js/main.js"></script>
+        <script>
+         var _hmt = _hmt || [];
+         (function() {
+             var hm = document.createElement("script");
+             hm.src = "https://hm.baidu.com/hm.js?7bac4fd0247f69c27887e0d4e3aee41e";
+             var s = document.getElementsByTagName("script")[0]; 
+             s.parentNode.insertBefore(hm, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-bcec46e0-e8c4-4bd6-8a1c-ab619f3d8b40">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="../../../../../instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>

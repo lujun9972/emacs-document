@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>从Emacs拷贝格式化的org-mode内容到其他应用程序中 - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="org-mode" />
+  <!-- <link rel="stylesheet" href="../../../../../media/css/main.css" type="text/css"/>
+       <link rel="stylesheet" href="../../../../../media/css/comment.css" type="text/css"/> -->
+  <link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/kognise/water.css@latest/dist/dark.css'>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="../../../../../">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <ul class="trigger">
+        <li><a href="../../../../../years/">Years</a></li>
+        <li><a href="../../../../../authors/">Authors</a></li>
+        <li><a href="../../../../../tags/">Tags</a></li>
+        <li><a href="../../../../../about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="../../../../../rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="https://www.bing.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">从Emacs拷贝格式化的org-mode内容到其他应用程序中</h1>
+<p>
+我用org-mode写了很多东西，我想如果可以从org文件中复制文本，然后带格式地粘贴到其他应用程序中(例如Word、Gmail等)那就太好了。
+好奇心战胜了我,我也想知道其他应用程序是如何做到这一点的。
+它的工作原理是创建一个<a href="https://www.safaribooksonline.com/library/view/rtfpocguide/9781449302047/ch01.html">富文本格式</a>版本的内容，然后把它放在剪贴板上。
+然而仅仅复制它是不够的，它需要以RTF数据类型的身份进入剪贴板。在Mac OSX上，我使用<a href="http://osxdaily.com/2007/03/05/-%20the-clipboard-from-the-command-line/">pbcopy</a>实现了这一点。
+</p>
+
+<p>
+看看这篇文章的实战视频:<a href="https://www.youtube.com/watch?v=irkmQnggVpE">https://www.youtube.com/watch?v=irkmQnggVpE</a>
+</p>
+
+<p>
+在org-mode中实现这一点的一个简单策略是通过导出生成HTML，然后使用工具(如textutil)将其转换为RTF。比如这样。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">formatted-copy</span> ()
+  <span style="font-style: italic;">"Export region to HTML, and copy it to the clipboard."</span>
+  (<span style="font-weight: bold;">interactive</span>)
+  (<span style="font-weight: bold;">save-window-excursion</span>
+    (<span style="font-weight: bold;">let*</span> ((buf (org-export-to-buffer 'html <span style="font-style: italic;">"*Formatted Copy*"</span> nil nil t t))
+           (html (<span style="font-weight: bold;">with-current-buffer</span> buf (buffer-string))))
+      (<span style="font-weight: bold;">with-current-buffer</span> buf
+        (shell-command-on-region
+         (point-min)
+         (point-max)
+         <span style="font-style: italic;">"textutil -stdin -format html -convert rtf -stdout | pbcopy"</span>))
+      (kill-buffer buf))))
+
+(global-set-key (kbd <span style="font-style: italic;">"H-w"</span>) 'formatted-copy)
+</pre>
+</div>
+
+<p>
+这种方法除了方程和图像，其他的都没问题。引用也还有待改进，如何改进是一个挑战。
+</p>
+
+<p>
+让我们在一些文本上试试这种方法。文本包括一些 <b>粗体</b>, <i>斜体</i>,下划线,打钩和 <code>原样</code> 文本复制。
+还包括一些公式的例子:H_{2}O电离形成H^{+}。我们还得有一个等式:(e^{iπ} + 1 = 0)。
+我们还应该有单个引用 <a href="http://kitchingroup.cheme.cmu.edu/blog/2016/06/16/Copy-formatted-org-mode-text-from-Emacs-to-other-applications/#kitchin-2015-examp">kitchin-2015-examp</a> 和多个引用 <a href="http://kitchingroup.cheme.cmu.edu/blog/2016/06/16/Copy-formatted-org-mode-text-from-Emacs-to-other-applications/#kitchin-2016-autom-data">kitchen-2016-autom-data</a>,<a href="http://kitchingroup.cheme.cmu.edu/blog/2016/06/16/Copy-formatted-org-mode-text-from-Emacs-to-other-applications/#kitchin-2015-data-surfac-scien">kitchen-2015-data-surfac-scien</a> 的情况.
+</p>
+
+<p>
+再加上一个代码块:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-python"><span style="font-weight: bold;">import</span> pycse.orgmode <span style="font-weight: bold;">as</span> org
+<span style="font-weight: bold;">import</span> numpy <span style="font-weight: bold;">as</span> np
+<span style="font-weight: bold;">import</span> matplotlib.pyplot <span style="font-weight: bold;">as</span> plt
+
+<span style="font-weight: bold; font-style: italic;">x</span> = np.linspace(0, 60, 500)
+plt.figure(figsize=(4, 2))
+plt.plot(np.exp(-0.1 0_sync_master.sh 1_add_new_article_manual.sh 1_add_new_article_newspaper.sh 2_start_translating.sh 3_continue_the_work.sh 4_finish.sh 5_pause.sh auto_translate.sh base.sh parse_url_by_manual.sh parse_url_by_newspaper.py parse_url_by_newspaper.sh project.cfg reformat.sh texput.log urls_checker.sh youdao.sh x) 0_sync_master.sh 1_add_new_article_manual.sh 1_add_new_article_newspaper.sh 2_start_translating.sh 3_continue_the_work.sh 4_finish.sh 5_pause.sh auto_translate.sh base.sh parse_url_by_manual.sh parse_url_by_newspaper.py parse_url_by_newspaper.sh project.cfg reformat.sh texput.log urls_checker.sh youdao.sh np.cos(x),
+np.exp(-0.1 0_sync_master.sh 1_add_new_article_manual.sh 1_add_new_article_newspaper.sh 2_start_translating.sh 3_continue_the_work.sh 4_finish.sh 5_pause.sh auto_translate.sh base.sh parse_url_by_manual.sh parse_url_by_newspaper.py parse_url_by_newspaper.sh project.cfg reformat.sh texput.log urls_checker.sh youdao.sh x) 0_sync_master.sh 1_add_new_article_manual.sh 1_add_new_article_newspaper.sh 2_start_translating.sh 3_continue_the_work.sh 4_finish.sh 5_pause.sh auto_translate.sh base.sh parse_url_by_manual.sh parse_url_by_newspaper.py parse_url_by_newspaper.sh project.cfg reformat.sh texput.log urls_checker.sh youdao.sh np.sin(x))
+org.figure(plt.savefig(<span style="font-style: italic;">'spiral.png'</span>),
+caption=<span style="font-style: italic;">'A spiral.'</span>,
+attributes=[[<span style="font-style: italic;">'org'</span>, <span style="font-style: italic;">':width 100'</span>]])
+<span style="font-weight: bold;">print</span>(<span style="font-style: italic;">''</span>)
+org.table([[<span style="font-style: italic;">'H1'</span>, <span style="font-style: italic;">'H2'</span>], <span style="font-weight: bold; text-decoration: underline;">None</span>, [1, 2], [2, 4]],
+caption=<span style="font-style: italic;">'A simple table'</span>)
+<span style="font-weight: bold;">print</span>(<span style="font-style: italic;">''</span>)
+org.result(6 0_sync_master.sh 1_add_new_article_manual.sh 1_add_new_article_newspaper.sh 2_start_translating.sh 3_continue_the_work.sh 4_finish.sh 5_pause.sh auto_translate.sh base.sh parse_url_by_manual.sh parse_url_by_newspaper.py parse_url_by_newspaper.sh project.cfg reformat.sh texput.log urls_checker.sh youdao.sh 7)
+</pre>
+</div>
+
+<p>
+<img src="http://kitchingroup.cheme.cmu.edu/media/2016-06-16-Copy-formatted-org-mode-text-from-Emacs-to-other-applications/spiral.png" alt="spiral.png" />
+图1:一个螺旋。
+</p>
+
+<p>
+一个表:
+</p>
+
+<p>
+一个简单的表
+</p>
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-right" />
+
+<col  class="org-right" />
+</colgroup>
+<thead>
+<tr>
+<th scope="col" class="org-right">H1</th>
+<th scope="col" class="org-right">H2</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="org-right">1</td>
+<td class="org-right">2</td>
+</tr>
+
+<tr>
+<td class="org-right">2</td>
+<td class="org-right">4</td>
+</tr>
+</tbody>
+</table>
+
+<pre class="example">
+42
+</pre>
+
+<p>
+总之，这种从导出的HTML生成RTF的简单方法非常适合这些简单标记的应用场景。在获取图表、获取交叉引用、标题、适当引用等方面的改进则需要更复杂的导出方法，而且可能需要直接导出成RTF格式。又是一个巨大的挑战!
+</p>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2020-01-15</span>
+            <span title="last modification date" class="post-info">2020-01-16</span>
+            <span title="tags" class="post-info">:<a href="../../../../../tags/org-mode">org-mode</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-bcec46e0-e8c4-4bd6-8a1c-ab619f3d8b40">lujun9972</a></span>
+        </div>
+    <script src="../../../../../media/js/jquery-2.1.3.min.js"></script>
+    <script src="../../../../../media/js/md5.min.js"></script>
+        <section>
+            <div id="gitalk-container"></div>
+            <script type="text/javascript">
+             var gitalk = new Gitalk({
+                 clientID: 'fdcb5d9da3f4acb4862c',
+                 clientSecret: 'dd0a16312a206782cb7669dcec5e96874ab48170',
+                 repo: 'lujun9972.github.com',
+                 owner: 'lujun9972',
+                 admin: ['lujun9972'],
+                 id: md5(location.pathname),      // Ensure uniqueness and length less than 50
+                 distractionFreeMode: false  // Facebook-like distraction free mode
+             })
+             gitalk.render('gitalk-container')
+            </script>
+        </section>
+    <script src="../../../../../media/js/main.js"></script>
+        <script>
+         var _hmt = _hmt || [];
+         (function() {
+             var hm = document.createElement("script");
+             hm.src = "https://hm.baidu.com/hm.js?7bac4fd0247f69c27887e0d4e3aee41e";
+             var s = document.getElementsByTagName("script")[0]; 
+             s.parentNode.insertBefore(hm, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-bcec46e0-e8c4-4bd6-8a1c-ab619f3d8b40">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="../../../../../instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>
