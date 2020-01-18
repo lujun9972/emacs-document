@@ -1,0 +1,159 @@
+#+TITLE: 在Emacs中进行有效的拼写检查
+#+URL: http://blog.binchen.org/posts/effective-spell-check-in-emacs.html
+#+AUTHOR: lujun9972
+#+TAGS: emacs-common
+#+DATE: [2020年 01月 15日 星期三 14:44:49 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+我用web模式下的[[http://www.emacswiki.org/emacs/FlySpell][Flyspell]]作为示例。其他major-mode也一样。
+
+首先，请将下面的代码插入到 =.emacs= 中，为所有的编程语言打开 =flyspell=.
+
+#+begin_src emacs-lisp
+  (add-hook 'prog-mode-hook 'flyspell-prog-mode)
+#+end_src
+
+下面是一个[[http://blog.binchen.org/posts/what-what -the-best-spell-check-set-up-in-emacs.html][短教程]]:
+
+- 如何设置flyspell
+- hunspell和aspell的区别
+- 如何设置hunspell
+
+* HTML中的拼写检查
+:PROPERTIES:
+:CUSTOM_ID: orgcdbb511
+:END:
+
+拼写检查的范围包括:
+
+- html标签之间的文本，如 =<label>Please input email</label>=
+- html输入控件的值，如 =<input type="text" Value ="Please input your name">=
+- CSS类名,如 =<div class="btn btn-default" />=
+
+我的配置如下:
+
+#+begin_src emacs-lisp
+  ;; {{ flyspell setup for web-mode
+  (defun web-mode-flyspell-verify ()
+    (let* ((f (get-text-property (- (point) 1) 'face))
+           rlt)
+      (cond
+       ;; Check the words with these font faces, possibly.
+       ;; this *blacklist* will be tweaked in next condition
+       ((not (memq f '(web-mode-html-attr-value-face
+                       web-mode-html-tag-face
+                       web-mode-html-attr-name-face
+                       web-mode-constant-face
+                       web-mode-doctype-face
+                       web-mode-keyword-face
+                       web-mode-comment-face ;; focus on get html label right
+                       web-mode-function-name-face
+                       web-mode-variable-name-face
+                       web-mode-css-property-name-face
+                       web-mode-css-selector-face
+                       web-mode-css-color-face
+                       web-mode-type-face
+                       web-mode-block-control-face)))
+        (setq rlt t))
+       ;; check attribute value under certain conditions
+       ((memq f '(web-mode-html-attr-value-face))
+        (save-excursion
+          (search-backward-regexp "=['\"]" (line-beginning-position) t)
+          (backward-char)
+          (setq rlt (string-match "^\\(value\\|class\\|ng[A-Za-z0-9-]*\\)$"
+                                  (thing-at-point 'symbol)))))
+       ;; finalize the blacklist
+       (t
+        (setq rlt nil)))
+      rlt))
+  (put 'web-mode 'flyspell-mode-predicate 'web-mode-flyspell-verify)
+  ;; }}
+#+end_src
+
+我使用[[http://webmode.org/][web-mode]]来编辑HTML文件。但该技术也适用于其他模式(如php模式、html模式等).
+
+* 不要将doubleon(双词)显示为错误
+:PROPERTIES:
+:CUSTOM_ID: orgc2b2a26
+:END:
+
+Modern CSS frameworks like [[http://getbootstrap.com/][Bootstrap]] make doublon unavoidable. For example, CSS class name =btn btn-default= contains double word =btn=.
+在[[http://getbootstrap.com/][Bootstrap]]这样的现代CSS框架中，使得doublon不可避免。例如，CSS类名 =btn btn-default= 就包含双单词=btn=。
+
+因此,我们不能在HTML中将doublon显示为错误，
+
+#+begin_src emacs-lisp
+  (defvar flyspell-check-doublon t
+    "Check doublon (double word) when calling `flyspell-highlight-incorrect-region'.")
+  (make-variable-buffer-local 'flyspell-check-doublon)
+
+  (defadvice flyspell-highlight-incorrect-region (around flyspell-highlight-incorrect-region-hack activate)
+    (if (or flyspell-check-doublon (not (eq 'doublon (ad-get-arg 2))))
+        ad-do-it))
+
+  (defun web-mode-hook-setup ()
+    (flyspell-mode 1)
+    (setq flyspell-check-doublon nil))
+
+  (add-hook 'web-mode-hook 'web-mode-hook-setup)
+#+end_src
+
+* 驼峰字符串的拼写检查
+:PROPERTIES:
+:CUSTOM_ID: orgd56bfcd
+:END:
+
+当且仅当使用[[http://aspell.net/][aspell]]时，我们才可以检查驼峰格式的字符串/变量/函数。
+
+将下面的代码插入 =.emacs= 中，
+
+#+begin_src emacs-lisp
+  ;; if (aspell installed) { use aspell}
+  ;; else if (hunspell installed) { use hunspell }
+  ;; whatever spell checker I use, I always use English dictionary
+  ;; I prefer use aspell because:
+  ;; 1. aspell is older
+  ;; 2. looks Kevin Atkinson still get some road map for aspell:
+  ;; @see http://lists.gnu.org/archive/html/aspell-announce/2011-09/msg00000.html
+  (setq ispell-program-name "aspell"
+        ;; force the English dictionary, support Camel Case spelling check (tested with aspell 0.6)
+        ispell-extra-args '("--sug-mode=ultra" "--lang=en_US" "--run-together")
+#+end_src
+
+* 总结
+:PROPERTIES:
+:CUSTOM_ID: org5d48ab6
+:END:
+
+[[http://www.emacswiki.org/emacs/FlySpell][EmacsWiki]] 建议使用 =(flyspell-prog-mode)= 只检查注释中的错字。
+
+但正如我再次所展现的，Emacs给了您充分的自由来设计一个“不同的”解决方案。
+
+屏幕截图如下(拼写错误有下划线):
+
+[[http://blog.binchen.org/wp-content/spell-check-html-in-emacs.png]]
+
+* Javascript和ReactJS设置(可选)
+:PROPERTIES:
+:CUSTOM_ID: orgde2da67
+:END:
+
+如果你完全理解了我前面的部分，那么你无需阅读这部分。
+
+将下面的代码插入 =.emacs= 中，
+
+#+begin_src emacs-lisp
+  (defun js-flyspell-verify ()
+    (let* ((f (get-text-property (- (point) 1) 'face)))
+      ;; *whitelist*
+      ;; only words with following font face will be checked
+      (memq f '(js2-function-call
+                js2-function-param
+                js2-object-property
+                font-lock-variable-name-face
+                font-lock-string-face
+                font-lock-function-name-face))))
+  (put 'js2-mode 'flyspell-mode-predicate 'js-flyspell-verify)
+  (put 'rjsx-mode 'flyspell-mode-predicate 'js-flyspell-verify)
+#+end_src
