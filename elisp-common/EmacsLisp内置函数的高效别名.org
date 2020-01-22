@@ -1,0 +1,133 @@
+#+TITLE: EmacsLisp内置函数的高效别名
+#+URL: https://nullprogram.com/blog/2019/12/10/
+#+AUTHOR: lujun9972
+#+TAGS: elisp-common
+#+DATE: [2020年 01月 15日 星期三 19:09:47 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+假如你不喜欢 =car= 和 =cdr= 这两个传统上指代lisp cons cell一半部分的标识符。[[https://irreal.org/blog/?p=8500][这两个标识符很有迷惑性]]。
+一个cons实际上就是一个二元组，它的两个半部分本身没有任何特殊的含义，即使认为把他们分成了“头部”和“尾部”。
+不过，也许这对你来说确实很重要，所以无论如何你都想折腾一下它。那么最好的折腾方法是什么?
+
+* defalias
+:PROPERTIES:
+:CUSTOM_ID: defalias
+:END:
+
+Emacs Lisp有一个内置的函数, =defalias=,这个选择显而易见。
+
+#+begin_src emacs-lisp
+  (defalias 'car-alias #'car)
+#+end_src
+
+I've followed the definition with its disassembly (Emacs 26.3, [[/blog/2016/12/22/][lexical scope]]):
+内置的 =car= 函数对这门语言太过基础，[[https://nullprogram.com/blog/2014/01/04/][以至于它有自己的操作字节码]]。在代码中调用 =car= 时，字节编译器不会生成函数调用，而是使用一条指令。
+例如，下面这个 =add= 函数，它对两个参数的 =car= 进行求和。我使用了它的反汇编功能来生成定义(Emacs 26.3， [[https://nullprogram.com/blog/2016/12/22/][词汇作用域]]):
+
+#+begin_src emacs-lisp
+  (defun add (a b)
+    (+ (car a) (car b)))
+  ;; 0 stack-ref 1
+  ;; 1 car
+  ;; 2 stack-ref 1
+  ;; 3 car
+  ;; 4 plus
+  ;; 5 return
+#+end_src
+
+由于使用了专用的 =car= 操作码，所以没有任何函数调用，它生成了最优的6个字节码指令。
+
+=defalias= 的问题是,由于允许更改定义——或者[[https://nullprogram.com/blog/2013/01/22/][被 advised]]——这剥夺了字节编译器的优化机会。这是[[https://nullprogram.com/blog/2019/12/09/][它的不足之处]]。
+当字节码编译器看到 =car-alias= 时，它不得不发出一个函数调用:
+
+#+begin_src emacs-lisp
+  (defun add-alias (a b)
+    (+ (car-alias a) (car-alias b)))
+  ;; 0 constant car-alias
+  ;; 1 stack-ref 2
+  ;; 2 call 1
+  ;; 3 constant car-alias
+  ;; 4 stack-ref 2
+  ;; 5 call 1
+  ;; 6 plus
+  ;; 7 return
+#+end_src
+
+它有两个函数调用和八个字节码指令。这些函数调用比 =car= 指令要昂贵得多，这将在稍后的基准测试中展示。
+
+* defsubst
+:PROPERTIES:
+:CUSTOM_ID: defsubst
+:END:
+
+另一种方法是 =defsubst=,这是一个内联函数定义，它将内联一个实际的 =car=.
+与宏一样，=defsubst= 的语义也明确表示，重新定义可能不会影响以前的使用，因此不存在上面的不足之处了。
+不幸的是[[https://nullprogram.com/blog/2019/02/24/][Elisp的字节码编译器很笨]]，而且内联 =car-subst= 也做得很差。
+
+#+begin_src emacs-lisp
+  (defsubst car-subst (x)
+    (car x))
+
+  (defun add-subst (a b)
+    (+ (car-subst a) (car-subst b)))
+  ;; 0 stack-ref 1
+  ;; 1 dup
+  ;; 2 car
+  ;; 3 stack-set 1
+  ;; 5 stack-ref 1
+  ;; 6 dup
+  ;; 7 car
+  ;; 8 stack-set 1
+  ;; 10 plus
+  ;; 11 return
+#+end_src
+
+这里有0个函数调用和10个字节码指令。其中直接使用了 =car= 操作码，但是却多了5个不必要的指令。不过，这仍然比调用函数快。
+如果字节码编译器能稍微聪明一点，就可以将其编译为理想情况了，那么讨论就到此为止了。
+
+* cl-first
+:PROPERTIES:
+:CUSTOM_ID: cl-first
+:END:
+
+内置的 =cl-lib= 包有 =cl-first= 作为 =car= 的别名。这是一个Emacs Lisp高手写的，那么他们的表现如何呢?
+
+#+begin_src emacs-lisp
+  (require 'cl-lib)
+
+  (defun add-cl-first (a b)
+    (+ (cl-first a) (cl-first b)))
+  ;; 0 stack-ref 1
+  ;; 1 car
+  ;; 2 stack-ref 1
+  ;; 3 car
+  ;; 4 plus
+  ;; 5 return
+#+end_src
+
+它就像以前的 =car= 一样!这是怎么做到的?方法是通过使用字节编译器提示:
+
+#+begin_src emacs-lisp
+  (defalias 'cl-first 'car)
+  (put 'cl-first 'byte-optimizer 'byte-compile-inline-expand)
+#+end_src
+
+他们使用 =defalias=,但是同时也手动告诉字节编译器去内联其定义，就好象 =defsubst= 一样。
+事实上 =defsubst= 本身会扩展为一个设置了 =byte-compile-inline-expand= 的表达式，但是，正如上面所看到的，内联函数的开销被内联了，并没有消除。
+
+* 基准测试
+:PROPERTIES:
+:CUSTOM_ID: benchmark
+:END:
+
+那么替代方案的表现如何呢?([[https://gist.github.com/skeeto/36baa3b1493f53eab4e082b449448a96][基准来源]])
+
+#+begin_src emacs-lisp
+  add (0.594811299 0 0.0)
+  add-alias (1.232037132 0 0.0)
+  add-subst (0.700044324 0 0.0)
+  add-cl-first (0.58332882 0 0.0)
+#+end_src
+
+(列表的 =car= 操作所花费的运行时间).由于 =add= 和 =add-cl-first= 具有相同的字节码，我们不应该也没有看到明显的差异。 简单地使用 =defalias= 会使运行时间加倍，而使用 =defsubst= 则会慢15%左右。
