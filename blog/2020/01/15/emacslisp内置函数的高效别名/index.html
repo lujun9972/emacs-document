@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>EmacsLisp内置函数的高效别名 - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="elisp-common" />
+  <!-- <link rel="stylesheet" href="../../../../../media/css/main.css" type="text/css"/>
+       <link rel="stylesheet" href="../../../../../media/css/comment.css" type="text/css"/> -->
+  <link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/kognise/water.css@latest/dist/dark.css'>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="../../../../../">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <ul class="trigger">
+        <li><a href="../../../../../years/">Years</a></li>
+        <li><a href="../../../../../authors/">Authors</a></li>
+        <li><a href="../../../../../tags/">Tags</a></li>
+        <li><a href="../../../../../about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="../../../../../rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="https://www.bing.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">EmacsLisp内置函数的高效别名</h1>
+<div id="table-of-contents">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#defalias">defalias</a></li>
+<li><a href="#defsubst">defsubst</a></li>
+<li><a href="#cl-first">cl-first</a></li>
+<li><a href="#benchmark">基准测试</a></li>
+</ul>
+</div>
+</div>
+<p>
+假如你不喜欢 <code>car</code> 和 <code>cdr</code> 这两个传统上指代lisp cons cell一半部分的标识符。<a href="https://irreal.org/blog/?p=8500">这两个标识符很有迷惑性</a>。
+一个cons实际上就是一个二元组，它的两个半部分本身没有任何特殊的含义，即使认为把他们分成了“头部”和“尾部”。
+不过，也许这对你来说确实很重要，所以无论如何你都想折腾一下它。那么最好的折腾方法是什么?
+</p>
+
+<div id="outline-container-org7f11af1" class="outline-2">
+<h2 id="defalias"><a id="org7f11af1"></a>defalias</h2>
+<div class="outline-text-2" id="text-defalias">
+<p>
+Emacs Lisp有一个内置的函数, <code>defalias</code>,这个选择显而易见。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defalias</span> '<span style="font-weight: bold;">car-alias</span> #'car)
+</pre>
+</div>
+
+<p>
+I've followed the definition with its disassembly (Emacs 26.3, <a href="file:///blog/2016/12/22/">lexical scope</a>):
+内置的 <code>car</code> 函数对这门语言太过基础，<a href="https://nullprogram.com/blog/2014/01/04/">以至于它有自己的操作字节码</a>。在代码中调用 <code>car</code> 时，字节编译器不会生成函数调用，而是使用一条指令。
+例如，下面这个 <code>add</code> 函数，它对两个参数的 <code>car</code> 进行求和。我使用了它的反汇编功能来生成定义(Emacs 26.3， <a href="https://nullprogram.com/blog/2016/12/22/">词汇作用域</a>):
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">add</span> (a b)
+  (+ (car a) (car b)))
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">0 stack-ref 1</span>
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">1 car</span>
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">2 stack-ref 1</span>
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">3 car</span>
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">4 plus</span>
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">5 return</span>
+</pre>
+</div>
+
+<p>
+由于使用了专用的 <code>car</code> 操作码，所以没有任何函数调用，它生成了最优的6个字节码指令。
+</p>
+
+<p>
+<code>defalias</code> 的问题是,由于允许更改定义——或者<a href="https://nullprogram.com/blog/2013/01/22/">被 advised</a>——这剥夺了字节编译器的优化机会。这是<a href="https://nullprogram.com/blog/2019/12/09/">它的不足之处</a>。
+当字节码编译器看到 <code>car-alias</code> 时，它不得不发出一个函数调用:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">add-alias</span> (a b)
+  (+ (car-alias a) (car-alias b)))
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">0 constant car-alias</span>
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">1 stack-ref 2</span>
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">2 call 1</span>
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">3 constant car-alias</span>
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">4 stack-ref 2</span>
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">5 call 1</span>
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">6 plus</span>
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">7 return</span>
+</pre>
+</div>
+
+<p>
+它有两个函数调用和八个字节码指令。这些函数调用比 <code>car</code> 指令要昂贵得多，这将在稍后的基准测试中展示。
+</p>
+</div>
+</div>
+
+<div id="outline-container-org8f544d2" class="outline-2">
+<h2 id="defsubst"><a id="org8f544d2"></a>defsubst</h2>
+<div class="outline-text-2" id="text-defsubst">
+<p>
+另一种方法是 <code>defsubst</code>,这是一个内联函数定义，它将内联一个实际的 <code>car</code>.
+与宏一样，=defsubst= 的语义也明确表示，重新定义可能不会影响以前的使用，因此不存在上面的不足之处了。
+不幸的是<a href="https://nullprogram.com/blog/2019/02/24/">Elisp的字节码编译器很笨</a>，而且内联 <code>car-subst</code> 也做得很差。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defsubst</span> <span style="font-weight: bold;">car-subst</span> (x)
+  (car x))
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">add-subst</span> (a b)
+  (+ (car-subst a) (car-subst b)))
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">0 stack-ref 1</span>
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">1 dup</span>
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">2 car</span>
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">3 stack-set 1</span>
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">5 stack-ref 1</span>
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">6 dup</span>
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">7 car</span>
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">8 stack-set 1</span>
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">10 plus</span>
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">11 return</span>
+</pre>
+</div>
+
+<p>
+这里有0个函数调用和10个字节码指令。其中直接使用了 <code>car</code> 操作码，但是却多了5个不必要的指令。不过，这仍然比调用函数快。
+如果字节码编译器能稍微聪明一点，就可以将其编译为理想情况了，那么讨论就到此为止了。
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgc7fe294" class="outline-2">
+<h2 id="cl-first"><a id="orgc7fe294"></a>cl-first</h2>
+<div class="outline-text-2" id="text-cl-first">
+<p>
+内置的 <code>cl-lib</code> 包有 <code>cl-first</code> 作为 <code>car</code> 的别名。这是一个Emacs Lisp高手写的，那么他们的表现如何呢?
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">require</span> '<span style="font-weight: bold; text-decoration: underline;">cl-lib</span>)
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">add-cl-first</span> (a b)
+  (+ (cl-first a) (cl-first b)))
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">0 stack-ref 1</span>
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">1 car</span>
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">2 stack-ref 1</span>
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">3 car</span>
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">4 plus</span>
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">5 return</span>
+</pre>
+</div>
+
+<p>
+它就像以前的 <code>car</code> 一样!这是怎么做到的?方法是通过使用字节编译器提示:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defalias</span> '<span style="font-weight: bold;">cl-first</span> 'car)
+(put 'cl-first 'byte-optimizer 'byte-compile-inline-expand)
+</pre>
+</div>
+
+<p>
+他们使用 <code>defalias</code>,但是同时也手动告诉字节编译器去内联其定义，就好象 <code>defsubst</code> 一样。
+事实上 <code>defsubst</code> 本身会扩展为一个设置了 <code>byte-compile-inline-expand</code> 的表达式，但是，正如上面所看到的，内联函数的开销被内联了，并没有消除。
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgfda9c8e" class="outline-2">
+<h2 id="benchmark"><a id="orgfda9c8e"></a>基准测试</h2>
+<div class="outline-text-2" id="text-benchmark">
+<p>
+那么替代方案的表现如何呢?(<a href="https://gist.github.com/skeeto/36baa3b1493f53eab4e082b449448a96">基准来源</a>)
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">add (0.594811299 0 0.0)
+add-alias (1.232037132 0 0.0)
+add-subst (0.700044324 0 0.0)
+add-cl-first (0.58332882 0 0.0)
+</pre>
+</div>
+
+<p>
+(列表的 <code>car</code> 操作所花费的运行时间).由于 <code>add</code> 和 <code>add-cl-first</code> 具有相同的字节码，我们不应该也没有看到明显的差异。 简单地使用 <code>defalias</code> 会使运行时间加倍，而使用 <code>defsubst</code> 则会慢15%左右。
+</p>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2020-01-15</span>
+            <span title="last modification date" class="post-info">2020-01-22</span>
+            <span title="tags" class="post-info">:<a href="../../../../../tags/elisp-common">elisp-common</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-14d8e2b3-5546-4093-8f80-d57613ce77dd">lujun9972</a></span>
+        </div>
+    <script src="../../../../../media/js/jquery-2.1.3.min.js"></script>
+    <script src="../../../../../media/js/md5.min.js"></script>
+        <section>
+            <div id="gitalk-container"></div>
+            <script type="text/javascript">
+             var gitalk = new Gitalk({
+                 clientID: 'fdcb5d9da3f4acb4862c',
+                 clientSecret: 'dd0a16312a206782cb7669dcec5e96874ab48170',
+                 repo: 'lujun9972.github.com',
+                 owner: 'lujun9972',
+                 admin: ['lujun9972'],
+                 id: md5(location.pathname),      // Ensure uniqueness and length less than 50
+                 distractionFreeMode: false  // Facebook-like distraction free mode
+             })
+             gitalk.render('gitalk-container')
+            </script>
+        </section>
+    <script src="../../../../../media/js/main.js"></script>
+        <script>
+         var _hmt = _hmt || [];
+         (function() {
+             var hm = document.createElement("script");
+             hm.src = "https://hm.baidu.com/hm.js?7bac4fd0247f69c27887e0d4e3aee41e";
+             var s = document.getElementsByTagName("script")[0]; 
+             s.parentNode.insertBefore(hm, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-14d8e2b3-5546-4093-8f80-d57613ce77dd">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="../../../../../instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>
