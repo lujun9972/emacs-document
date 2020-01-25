@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>mu4e救你出Email的苦海 - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="email" />
+  <!-- <link rel="stylesheet" href="../../../../../media/css/main.css" type="text/css"/>
+       <link rel="stylesheet" href="../../../../../media/css/comment.css" type="text/css"/> -->
+  <link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/kognise/water.css@latest/dist/dark.css'>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="../../../../../">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <ul class="trigger">
+        <li><a href="../../../../../years/">Years</a></li>
+        <li><a href="../../../../../authors/">Authors</a></li>
+        <li><a href="../../../../../tags/">Tags</a></li>
+        <li><a href="../../../../../about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="../../../../../rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="https://www.bing.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">mu4e救你出Email的苦海</h1>
+<div id="table-of-contents">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#what-is-mu4e">mu4e是什么?</a>
+<ul>
+<li><a href="#configure-mbsync">配置mbsync</a></li>
+<li><a href="#configure-mu4e">配置mu4e</a></li>
+</ul>
+</li>
+<li><a href="#check-out-the-mu4e-shortcuts">查看mu4e快捷键:</a></li>
+<li><a href="#choosing-offline-imap-client-mbsync-vs-offlineimap">选择IMAP离线客户端：Mbsync 对比 offlineimap</a></li>
+</ul>
+</div>
+</div>
+
+<div class="figure">
+<p><img src="https://www.macs.hw.ac.uk/~rs46/images/site/phd-comic-emails.gif" alt="phd-comic-emails.gif" />
+</p>
+</div>
+
+<div id="outline-container-org8653f1d" class="outline-2">
+<h2 id="what-is-mu4e"><a id="org8653f1d"></a>mu4e是什么?</h2>
+<div class="outline-text-2" id="text-what-is-mu4e">
+<p>
+<a href="http://www.djcbsoftware.nl/code/mu/mu4e.html">mu4e</a>是一个基于emacs的电子邮件客户端。 它完全以搜索为基础，用户界面为速度进行了优化,对很多常用操作都分配了快捷键。电子邮件可以使用org-mode来与富文本进行整合。支持电子邮件地址自动不全。异步操作，因此繁重的操作不会阻塞emacs。
+</p>
+
+<p>
+其基本思路是这样的:配置一个离线IMAP客户机来使远程电子邮件服务器与本地计算机同步。mbsync和offlineimap是两个最常用的IMAP同步工具。这篇文章基于mbsync。
+</p>
+</div>
+
+<div id="outline-container-org95d8ba6" class="outline-3">
+<h3 id="configure-mbsync"><a id="org95d8ba6"></a>配置mbsync</h3>
+<div class="outline-text-3" id="text-configure-mbsync">
+<ol class="org-ol">
+<li>安装mbsyncSSL身份验证所需的SSL开发文件。对于基于RPM的包管理器，使用 <code>sudo yum install openssl-devel</code> 如果使用 <code>dnf</code> (例如Fedora 22+)，则运行 <code>sudo dnf install openssl-devel</code>. 对于debian机器, <code>sudo apt-get install libssl-dev</code>.</li>
+
+<li>安装mbsync，可以通过<a href="http://sourceforge.net/projects/isync/files/isync/">发布tarball</a>安装，也可以通过<a href="http://sourceforge.net/p/isync/isync/ci/master/tree/">git</a>安装。</li>
+
+<li>创建一个临时文件 <code>.mbsyncpass</code> ,并在其中存储纯文本密码。接下来运行 <code>gpg2 --output .mbsyncpass.gpg --symmetric .mbsyncpass</code>.= 移动 <code>mysyncpass.gpg</code> 到 <code>~/.emacs.d</code> 并删除 <code>.mbsyncpass</code> 文件。</li>
+
+<li><p>
+创建临时文件 <code>~/.authinfo</code> 并在其中存储以下纯文本，需要替换设置的主机、用户名、密码和端口信息:
+</p>
+
+<p>
+<code>machine mail.example.com login myusername port 587 password mypassword</code>
+</p></li>
+
+<li>使用命令 <code>gpg2 --output ~/.authinfo.gpg --symmetric ~/.authinfo</code> 生成加密文件. 删除 <code>~/.authinfo</code> 文件.</li>
+
+<li><p>
+创建一个 <code>.mbsyncrc</code> 文件。我把它放在 <code>~/.emacs.d</code> 目录中以纳入版本控制，这样我能轻松地跨机器使用它。在工作服务器上仔细检查您希望同步的目录名(例如，它是“已发送”还是“已发送项”?). 选择本地存放邮件的目录地址。我选择的是=~/email/mysyncmail=。将以下内容添加到 <code>.mbsyncrc</code> 文件中:
+</p>
+
+<pre class="example">
+IMAPAccount uni
+Host mail.example.com
+User me@example.com
+PassCmd "gpg2 -q --for-your-eyes-only --no-tty -d ~/.emacs.d/.mbsyncpass.gpg"
+Port 993
+SSLType IMAPS
+AuthMechs Login
+CertificateFile /etc/ssl/certs/ca-bundle.crt
+
+IMAPStore uni-remote
+Account uni
+
+MaildirStore uni-local
+Path ~/email/mbsyncmail/
+Inbox ~/email/mbsyncmail/INBOX
+
+Channel uni
+Master :uni-remote:
+Slave :uni-local:
+Patterns "Sent Items" "INBOX" "Deleted Items"
+Create Slave
+Sync All
+Expunge Both
+SyncState *
+</pre></li>
+
+<li>运行 <code>mbsync</code> 命令来同步IMAP收件箱:  <code>mbsync -c ~/.emacs.d/.mbsyncrc work</code></li>
+</ol>
+</div>
+</div>
+
+<div id="outline-container-org1a3393f" class="outline-3">
+<h3 id="configure-mu4e"><a id="org1a3393f"></a>配置mu4e</h3>
+<div class="outline-text-3" id="text-configure-mu4e">
+<ol class="org-ol">
+<li>安装mu4e,可以使用包管理器或者通过tarball或git安装。<a href="http://www.djcbsoftware.nl/code/mu/mu4e/Installation.html">这里查看安装细节</a>。</li>
+
+<li><p>
+然后配置mu4e。查看有关变量的mu4e文档。确保以下内容存储在emacs加载的 <code>.el</code> 文件中，例如 <code>~.emacs</code> 文件。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(add-to-list 'load-path <span style="font-style: italic;">"~/place/to/your/mu4e"</span>)
+(<span style="font-weight: bold;">require</span> '<span style="font-weight: bold; text-decoration: underline;">smtpmail</span>)
+
+                                        <span style="font-weight: bold; font-style: italic;">; </span><span style="font-weight: bold; font-style: italic;">smtp</span>
+(<span style="font-weight: bold;">setq</span> message-send-mail-function 'smtpmail-send-it
+      smtpmail-starttls-credentials
+      '((<span style="font-style: italic;">"mail.example.com"</span> 587 nil nil))
+      smtpmail-default-smtp-server <span style="font-style: italic;">"mail.example.com"</span>
+      smtpmail-smtp-server <span style="font-style: italic;">"mail.example.com"</span>
+      smtpmail-smtp-service 587
+      smtpmail-debug-info t)
+
+(<span style="font-weight: bold;">require</span> '<span style="font-weight: bold; text-decoration: underline;">mu4e</span>)
+
+(<span style="font-weight: bold;">setq</span> mu4e-maildir (expand-file-name <span style="font-style: italic;">"~/email/mbsyncmail"</span>))
+
+(<span style="font-weight: bold;">setq</span> mu4e-drafts-folder <span style="font-style: italic;">"/Drafts"</span>)
+(<span style="font-weight: bold;">setq</span> mu4e-sent-folder <span style="font-style: italic;">"/Sent Items"</span>)
+(<span style="font-weight: bold;">setq</span> mu4e-trash-folder <span style="font-style: italic;">"/Trash"</span>)
+(<span style="font-weight: bold;">setq</span> message-signature-file <span style="font-style: italic;">"~/.emacs.d/.signature"</span>) <span style="font-weight: bold; font-style: italic;">; </span><span style="font-weight: bold; font-style: italic;">put your signature in this file</span>
+
+                                        <span style="font-weight: bold; font-style: italic;">; </span><span style="font-weight: bold; font-style: italic;">get mail</span>
+(<span style="font-weight: bold;">setq</span> mu4e-get-mail-command <span style="font-style: italic;">"mbsync -c ~/.emacs.d/.mbsyncrc work"</span>
+      mu4e-html2text-command <span style="font-style: italic;">"w3m -T text/html"</span>
+      mu4e-update-interval 120
+      mu4e-headers-auto-update t
+      mu4e-compose-signature-auto-include nil)
+
+(<span style="font-weight: bold;">setq</span> mu4e-maildir-shortcuts
+      '( (<span style="font-style: italic;">"/INBOX"</span> . ?i)
+         (<span style="font-style: italic;">"/Sent Items"</span> . ?s)
+         (<span style="font-style: italic;">"/Trash"</span> . ?t)
+         (<span style="font-style: italic;">"/Drafts"</span> . ?d)))
+
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">show images</span>
+(<span style="font-weight: bold;">setq</span> mu4e-show-images t)
+
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">use imagemagick, if available</span>
+(<span style="font-weight: bold;">when</span> (fboundp 'imagemagick-register-types)
+  (imagemagick-register-types))
+
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">general emacs mail settings; used when composing e-mail</span>
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">the non-mu4e-* stuff is inherited from emacs/message-mode</span>
+(<span style="font-weight: bold;">setq</span> mu4e-reply-to-address <span style="font-style: italic;">"me@example.com"</span>
+      user-mail-address <span style="font-style: italic;">"me@example.com"</span>
+      user-full-name <span style="font-style: italic;">"Rob Stewart"</span>)
+
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">don't save message to Sent Messages, IMAP takes care of this</span>
+                                        <span style="font-weight: bold; font-style: italic;">; </span><span style="font-weight: bold; font-style: italic;">(setq mu4e-sent-messages-behavior 'delete)</span>
+
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">spell check</span>
+(add-hook 'mu4e-compose-mode-hook
+          (<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">my-do-compose-stuff</span> ()
+            <span style="font-style: italic;">"My settings for message composition."</span>
+            (set-fill-column 72)
+            (flyspell-mode)))
+</pre>
+</div></li>
+
+<li><p>
+然后，使用 <code>mu</code> 索引该目录，这一步必须做:
+</p>
+
+<p>
+<code>mu index --maildir=~/email/mbsyncmail/</code>
+</p></li>
+
+<li>现在是时候试试mu4e了。打开emacs, 输入 <code>M-x mu4e</code>.</li>
+</ol>
+
+
+<div class="figure">
+<p><img src="https://www.macs.hw.ac.uk/~rs46/images/site/mu4e-demo.png" alt="mu4e-demo.png" />
+</p>
+</div>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgf63de3a" class="outline-2">
+<h2 id="check-out-the-mu4e-shortcuts"><a id="orgf63de3a"></a>查看mu4e快捷键:</h2>
+<div class="outline-text-2" id="text-check-out-the-mu4e-shortcuts">
+<ul class="org-ul">
+<li><code>n/p</code> 转到下一个，前一个消息</li>
+<li><code>RET</code> 在message视图中打开消息</li>
+<li><code>s</code> 搜索</li>
+<li><code>j</code> 跳转到邮件目录，例如 <code>ji</code> 跳转到收件箱</li>
+<li><code>O</code> 改变排序顺序</li>
+<li><code>P</code> 切换threading</li>
+<li><code>d</code> 标记移动到垃圾文件夹的消息</li>
+<li><code>m</code> 标记消息，用于移动到另一个邮件目录文件夹</li>
+<li><code>?,!</code> 将消息标记为未读/已读</li>
+<li><code>R,F,C</code> 回复/转发/组合</li>
+</ul>
+
+<p>
+mu4e键绑定的完整列表列在<a href="http://www.djcbsoftware.nl/code/mu/mu4e/Keybindings.html">此处</a>。
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgeed2051" class="outline-2">
+<h2 id="choosing-offline-imap-client-mbsync-vs-offlineimap"><a id="orgeed2051"></a>选择IMAP离线客户端：Mbsync 对比 offlineimap</h2>
+<div class="outline-text-2" id="text-choosing-offline-imap-client-mbsync-vs-offlineimap">
+<p>
+<a href="http://en.wikipedia.org/wiki/OfflineIMAP">offlineimap</a>要更流行一些，我曾经试用了一周。 后来我尝试了<a href="http://isync.sourceforge.net/mbsync.html">mbsync</a>，对我来说它的效果更好。 人们选择offlineimap是因为它能够通过调用python文件提示用户输入密码，从而避免了纯文本密码存储在本地。
+幸运的是，mbsync现在<a href="http://sourceforge.net/mailarchive/message.php?msg_id=31795745">也实现了这个</a>，也就是 <code>.mbsyncrc</code> 中 <code>PassCmd</code> 项的作用
+</p>
+
+<blockquote>
+<p>
+<b>Zawinski's Law</b> “Every program attempts to expand until it can read mail. Those programs which cannot so expand are replaced by ones which can." Law of Software Envelopment, Jamie Zawinski.
+</p>
+</blockquote>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2020-01-15</span>
+            <span title="last modification date" class="post-info">2020-01-25</span>
+            <span title="tags" class="post-info">:<a href="../../../../../tags/email">email</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-e9b43c24-2a1e-4dc7-9f8a-1ae00e2ed213">lujun9972</a></span>
+        </div>
+    <script src="../../../../../media/js/jquery-2.1.3.min.js"></script>
+    <script src="../../../../../media/js/md5.min.js"></script>
+        <section>
+            <div id="gitalk-container"></div>
+            <script type="text/javascript">
+             var gitalk = new Gitalk({
+                 clientID: 'fdcb5d9da3f4acb4862c',
+                 clientSecret: 'dd0a16312a206782cb7669dcec5e96874ab48170',
+                 repo: 'lujun9972.github.com',
+                 owner: 'lujun9972',
+                 admin: ['lujun9972'],
+                 id: md5(location.pathname),      // Ensure uniqueness and length less than 50
+                 distractionFreeMode: false  // Facebook-like distraction free mode
+             })
+             gitalk.render('gitalk-container')
+            </script>
+        </section>
+    <script src="../../../../../media/js/main.js"></script>
+        <script>
+         var _hmt = _hmt || [];
+         (function() {
+             var hm = document.createElement("script");
+             hm.src = "https://hm.baidu.com/hm.js?7bac4fd0247f69c27887e0d4e3aee41e";
+             var s = document.getElementsByTagName("script")[0]; 
+             s.parentNode.insertBefore(hm, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-e9b43c24-2a1e-4dc7-9f8a-1ae00e2ed213">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="../../../../../instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>
