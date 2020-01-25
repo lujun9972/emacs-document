@@ -1,0 +1,174 @@
+#+TITLE: 使用expect/tmux有效地根据字符串文本生成emacs键盘宏
+#+URL: https://mullikine.github.io/posts/emacs-macros-from-string-literals-using-invisible-emacs/
+#+AUTHOR: lujun9972
+#+TAGS: emacs-common
+#+DATE: [2020年 01月 15日 星期三 14:16:45 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+- ={´◕◡◕'}=:: 需要预先安装好 expect 和 tmux。它们只在后台使用。该函数在GUI emacs中也能工作的很好。除此之外再不需要其他任何依赖项. =bash/tcl/expect= 脚本本身被嵌入elisp中。
+- 更新 :: 内置的 =edmacro-format-keys= 提供了我想要的功能，而无需这些繁琐的代码。
+
+=make-kbd-from-string= 是一个接受一个字符串并返回键盘宏的函数，它文字，并为您提供一个键盘宏。
+
+我不知道能否用emacs lisp来实现它。最后我完成的是一个expect脚本，这个脚本启动一个普通的emacs并运行 =kmacro-start-macro=.
+
+=tcl/expect= 然后原样输入字符串，emacs将记录的宏保存到一个临时文件中，供Emacs随后获取。
+
+所有这些都发生在后台的一个临时的tmux窗口中。之所以需要这样做，是因为 =shell-command= 函数在运行一个需要 =tty= 的程序时则通常会挂起。
+
+#+begin_src emacs-lisp
+  (defun e/chomp (str)
+    "Chomp leading and tailing whitespace from STR."
+    (while (string-match "\`n+\|^\s-+\|\s-+$\|n+\'"
+                         str)
+      (setq str (replace-match "" t t str)))
+    str)
+
+  (defun make-kbd-from-string (s)
+    (let ((quoted-string (let ((print-escape-newlines t))
+                           (prin1-to-string s)))
+          (tf (make-temp-file "emacskbm" nil ".exp")))
+
+      (ignore-errors (with-temp-buffer
+                       (insert (concat
+                                "outfile=/tmp/emacskbm.txtn"
+                                "rm -f "$outfile"n"
+                                "n"
+                                "cat > /tmp/emacskbm.exp <<HEREDOCn"
+                                "if { \$argc >= 1 } {n"
+                                " set literal [lindex \$argv 0]n"
+                                "}n"
+                                "n"
+                                "spawn shn"
+                                "send -- "emacs -Q -nw"n"
+                                "send -- \015n"
+                                "expect -exact "scratch"n"
+                                "send -- \030n"
+                                "send -- "("n"
+                                           "send -- "\$literal"n"
+                                           "send -- \030n"
+                                           "send -- ")"n"
+                                "send -- \033:n"
+                                "send -- "(with-temp-buffer (insert (replace-regexp-in-string \"^Last macro: \" \"\" (kmacro-view-macro))) (write-file \"$outfile\"))"n"
+                                "send -- \015n"
+                                "send -- \033:n"
+                                "send -- "(kill-emacs)"n"
+                                "send -- \015n"
+                                "send -- \004n"
+                                "interactn"
+                                "HEREDOCn"
+                                "n"
+                                "{n"
+                                "expect -f /tmp/emacskbm.exp "$@"n"
+                                "} &>/dev/nulln"
+                                "tmux wait-for -S emacskbmn"))
+                       (write-file tf)))
+
+      (shell-command (concat "tmux neww -d bash " tf " " quoted-string "; tmux wait-for emacskbm"))
+      (e/chomp (with-temp-buffer
+                 (insert-file-contents "/tmp/emacskbm.txt")
+                 (buffer-string)))))
+#+end_src
+
+使用这个函数的方法:
+
+#+begin_src emacs-lisp
+  (make-kbd-from-string "/msg yo hi")
+#+end_src
+
+输出如下:
+
+#+BEGIN_EXAMPLE
+/msg SPC yo SPC hi
+#+END_EXAMPLE
+
+重新考虑一下后，我绝该功能可以借助 =term-mode= 来完成，如果您能在 =term-mode= 内部嵌套另一个 =term-mode=,那么所有功能ijo都可以在emacs-lisp中完成。以后我可能会尝试一下吧，谁知道呢?
+
+你可能会问这个函数的意义是什么?它解决的问题是不能在 =term= 中插入 =(insert "some text")=,而必须使用键盘宏.
+
+#+begin_src emacs-lisp
+  (defun irssi-search-channels (pattern)
+    (interactive (list (read-string "pattern:")))
+    (execute-kbd-macro
+     (kbd "M-7"))
+    (execute-kbd-macro
+     (kbd "C-a C-k"))
+    (execute-kbd-macro
+     (kbd
+      (make-kbd-from-string (concat "/msg alis LIST 0_sync_master.sh 1_add_new_article_manual.sh 1_add_new_article_newspaper.sh 2_start_translating.sh 3_continue_the_work.sh 4_finish.sh 5_pause.sh auto_translate.sh base.sh parse_url_by_manual.sh parse_url_by_newspaper.py parse_url_by_newspaper.sh project.cfg reformat.sh texput.log urls_checker.sh youdao.sh -topic " pattern))))
+    (execute-kbd-macro
+     (kbd "C-m"))
+    (execute-kbd-macro
+     (kbd
+      (make-kbd-from-string "/query alis")))
+    (execute-kbd-macro
+     (kbd "C-m")))
+
+  (define-key irssi-term-mode-map (kbd "M-/") #'irssi-search-channels)
+#+end_src
+
+* 展示
+:PROPERTIES:
+:CUSTOM_ID: demonstration
+:END:
+
+[[https://asciinema.org/a/MbMM1aWV2zCpoEOPsWTGhtQN3][[[https://asciinema.org/a/MbMM1aWV2zCpoEOPsWTGhtQN3.svg]]]]
+
+* 其他说明
+:PROPERTIES:
+:CUSTOM_ID: extra-stuff
+:END:
+
+** expect 代码生成脚本
+:PROPERTIES:
+:CUSTOM_ID: expect-code-generation-script
+:END:
+
+#+begin_src shell
+  #!/bin/bash
+  export TTY
+
+  ( hs "$(basename "$0")" "$@" "#" "<==" "$(ps -o comm= $PPID)" 0</dev/null ) &>/dev/null
+
+  s="$1"
+
+  fp=/tmp/emacskbm.txt
+
+  {
+      unbuffer x    -sh "emacs -Q -nw"    -e scratch    -c x    -s "("    -s "$1"    -c x    -s ")"    -m : -s "(with-temp-buffer (insert (replace-regexp-in-string "^Last macro: " "" (kmacro-view-macro))) (write-file "$fp"))" -c m    -m : -s "(kill-emacs)" -c m    -i
+  } &>/dev/null
+
+  cat "$fp"
+#+end_src
+
+** COMMENT 简洁版
+:PROPERTIES:
+:CUSTOM_ID: the-more-terse-version
+:END:
+
+它运行缓慢，但可以通过缓存来弥补。
+
+#+begin_src emacs-lisp
+  (defun type-keys (s)
+    "Type out the string"
+    (interactive (list (read-string "string:")))
+    (ekm (make-kbd-from-string s)))
+  (defalias 'ekl 'type-keys)
+
+  (defun make-kbd-from-string (s)
+    (let ((quoted-string (let ((print-escape-newlines t))
+                           (prin1-to-string s))))
+      (chomp (eval `(ci (sh (concat "ci emacs-string2kbm " (q ,s)) nil t))))))
+
+  (defun irssi-search-channels (pattern)
+    (interactive (list (read-string "pattern:")))
+    ;; The 7th window is probably a freenode window
+    (ekm "M-7")
+    (ekm "C-a C-k")
+    ;; (insert "/msg alis LIST 0_sync_master.sh 1_add_new_article_manual.sh 1_add_new_article_newspaper.sh 2_start_translating.sh 3_continue_the_work.sh 4_finish.sh 5_pause.sh auto_translate.sh base.sh parse_url_by_manual.sh parse_url_by_newspaper.py parse_url_by_newspaper.sh project.cfg reformat.sh texput.log urls_checker.sh youdao.sh -topic github")
+    (ekm (make-kbd-from-string (concat "/msg alis LIST 0_sync_master.sh 1_add_new_article_manual.sh 1_add_new_article_newspaper.sh 2_start_translating.sh 3_continue_the_work.sh 4_finish.sh 5_pause.sh auto_translate.sh base.sh parse_url_by_manual.sh parse_url_by_newspaper.py parse_url_by_newspaper.sh project.cfg reformat.sh texput.log urls_checker.sh youdao.sh -topic " pattern)))
+    (ekm "C-m")
+    (ekm (make-kbd-from-string "/query alis"))
+    (ekm "C-m"))
+#+end_src
