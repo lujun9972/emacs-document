@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>使用PyEnv等配置Emacs Python LSP - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="emacs-common" />
+  <!-- <link rel="stylesheet" href="../../../../../media/css/main.css" type="text/css"/>
+       <link rel="stylesheet" href="../../../../../media/css/comment.css" type="text/css"/> -->
+  <link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/kognise/water.css@latest/dist/dark.css'>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="../../../../../">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <ul class="trigger">
+        <li><a href="../../../../../years/">Years</a></li>
+        <li><a href="../../../../../authors/">Authors</a></li>
+        <li><a href="../../../../../tags/">Tags</a></li>
+        <li><a href="../../../../../about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="../../../../../rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="https://www.bing.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">使用PyEnv等配置Emacs Python LSP</h1>
+<div id="table-of-contents">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#setting-up-the-environment">设置环境</a>
+<ul>
+<li><a href="#setting-up-pyenv">设置 <code>pyenv</code>:</a></li>
+</ul>
+</li>
+<li><a href="#setting-up-the-project">设置项目</a></li>
+<li><a href="#setting-up-emacs">设置Emacs</a></li>
+</ul>
+</div>
+</div>
+<p>
+有许多文档描述了如何在Emacs中设置用于自动不全的Python语言服务器。然而，就我所看到的这些文档都缺少以下内容:
+</p>
+
+<ul class="org-ul">
+<li>如何在多个Python版本之间进行切换</li>
+<li>如何处理Python虚拟环境</li>
+</ul>
+
+<p>
+我有一个简单但足够使用的工作流程，想与大家分享!
+</p>
+
+<div id="outline-container-org6fb5883" class="outline-2">
+<h2 id="setting-up-the-environment"><a id="org6fb5883"></a>设置环境</h2>
+<div class="outline-text-2" id="text-setting-up-the-environment">
+<p>
+用到的工具:
+</p>
+
+<ul class="org-ul">
+<li><code>pyenv</code>: 管理多个python版本</li>
+<li><code>direnv</code>: 处理项目相关的环境配置</li>
+<li><code>venv</code>: 在Python虚拟环境之间进行切换</li>
+</ul>
+</div>
+
+<div id="outline-container-org7628e22" class="outline-3">
+<h3 id="setting-up-pyenv"><a id="org7628e22"></a>设置 <code>pyenv</code>:</h3>
+<div class="outline-text-3" id="text-setting-up-pyenv">
+<p>
+官方提供了一个<a href="https://github.com/pyenv/pyenv-installer">自动安装脚本</a>。我不太喜欢使用它来安装，因为存在安全风险，但我也没有要检查这个安装脚本的意思:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">curl https://pyenv.run | bash
+</pre>
+</div>
+
+<p>
+对于那些关注安全的人，请遵循其他<a href="https://github.com/pyenv/pyenv">安装说明</a>。
+</p>
+
+<p>
+Now, I'm using <code>zsh</code> as my shell. Let's set up the <code>pyenv</code> configuration in the <code>~/.zshenv</code>:
+目前，我使用 <code>zsh</code> 作为日常使用shell. 让我们在 <code>~/.zshenv</code> 中设置 <code>pyenv</code> 配置:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell"><span style="font-weight: bold;">export</span> <span style="font-weight: bold; font-style: italic;">PATH</span>=<span style="font-style: italic;">"$HOME/.pyenv/bin:$PATH"</span>
+<span style="font-weight: bold;">eval</span> <span style="font-style: italic;">"$(</span><span style="font-weight: bold;">pyenv</span><span style="font-style: italic;"> init -)"</span>
+<span style="font-weight: bold;">eval</span> <span style="font-style: italic;">"$(</span><span style="font-weight: bold;">pyenv</span><span style="font-style: italic;"> virtualenv-init -)"</span>
+</pre>
+</div>
+
+<p>
+注意，我在 <code>~/.zshenv</code> 而不是在 <code>~/.zshrc</code> 中执行该操作。这是因为 <code>~/.zshrc</code> 仅被交互式shell加载。你也可以把这段内容放到 <code>~/.zprofile</code> 中。
+你可以在这个 <a href="https://unix.stackexchange.com/questions/71253/what-should-shouldnt-go-in-zshenv-zshrc-zlogin-zprofile-zlogout">很棒的stackoverflow帖子</a> 中了解到 <code>zsh</code> 各个启动文件的不同作用。
+</p>
+
+<p>
+现在，如果我们打开一个新的终端，输入 <code>whereis pyenv</code> 你应该得到类似下面的内容:
+</p>
+
+<pre class="example">
+kota@kota-ThinkPad-P1&gt; whereis pyenv ~
+pyenv: /home/kota/.pyenv/bin/pyenv
+</pre>
+
+<p>
+:)
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgc9c3ec0" class="outline-2">
+<h2 id="setting-up-the-project"><a id="orgc9c3ec0"></a>设置项目</h2>
+<div class="outline-text-2" id="text-setting-up-the-project">
+<p>
+我创建了一个非常简单的项目结构如下所示:
+</p>
+
+<pre class="example">
+├── .envrc
+├── foo
+│ ├── app.py
+│ ├── __init__.py
+│ └── __main__.py
+└── setup.py
+</pre>
+
+<p>
+这个应用程序要做的就是找出向量 <code>(1,2,3)</code> 的长度:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-python"><span style="font-weight: bold;">import</span> numpy <span style="font-weight: bold;">as</span> np
+
+<span style="font-weight: bold;">def</span> <span style="font-weight: bold;">run</span>():
+<span style="font-weight: bold; font-style: italic;">arr</span> = np.array([1, 2, 3])
+<span style="font-weight: bold;">print</span>(np.linalg.norm(arr))
+</pre>
+</div>
+
+<p>
+这里的关键是它使用了一个外部依赖项。
+</p>
+
+<p>
+让我们再来看看 <code>setup.py</code>:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-python"><span style="font-weight: bold;">from</span> setuptools <span style="font-weight: bold;">import</span> setup, find_packages
+<span style="font-weight: bold;">from</span> foo <span style="font-weight: bold;">import</span> __version__
+setup(
+    name=<span style="font-style: italic;">"foo"</span>,
+    version=__version__,
+    packages=find_packages(exclude=[<span style="font-style: italic;">"tests"</span>]),
+    author=<span style="font-style: italic;">"Kota Weaver"</span>,
+    install_requires=[
+        <span style="font-style: italic;">'numpy'</span>
+    ],
+    extras_require={
+        <span style="font-style: italic;">'dev'</span>: [
+            <span style="font-style: italic;">'python-language-server[all]'</span>
+        ],
+        <span style="font-style: italic;">'test'</span>: [
+            <span style="font-style: italic;">'pytest'</span>, <span style="font-style: italic;">'pyflakes'</span>
+        ]
+    }
+)
+</pre>
+</div>
+
+<p>
+注意，我在 <code>dev</code> 依赖中列出了Python LSP服务器。
+</p>
+
+<p>
+现在让我们建立Python开发环境!首先是我 <code>.envrc</code>:
+</p>
+
+<pre class="example">
+export SIMENV_PYTHON=3.8.1
+
+use pyenv $SIMENV_PYTHON
+</pre>
+
+<p>
+现在，如果我们进入项目目录，并执行 <code>direnv allow</code>,应该就能够通过下面命令安装正确的Python版本:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">pyenv install $<span style="font-weight: bold; font-style: italic;">SIMENV_PYTHON</span>
+</pre>
+</div>
+
+<p>
+(注意: 您可能需要安装以下依赖项: <code>libffi-dev libssl-dev libreadline-dev libsqlite3-dev libbz2-dev</code>)
+</p>
+
+<p>
+然后，离开并再次进入该目录，然后使用以下命令安装依赖项:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">pip install -e .[<span style="font-style: italic;">'dev'</span>,<span style="font-style: italic;">'test'</span>]
+</pre>
+</div>
+
+<p>
+(根据您的shell，您也许需要使用 <code>==</code> 来转义 <code>[</code> 和 <code>]</code>)
+</p>
+
+<p>
+确保 <code>which python</code> 显示的位置是正确的!
+这允许我们使用下面命令运行程序使用:
+</p>
+
+<pre class="example">
+kota@kota-ThinkPad-P1&gt; python -m foo ~/foo
+3.7416573867739413
+</pre>
+
+<p>
+耶!
+</p>
+</div>
+</div>
+
+<div id="outline-container-org06fc579" class="outline-2">
+<h2 id="setting-up-emacs"><a id="org06fc579"></a>设置Emacs</h2>
+<div class="outline-text-2" id="text-setting-up-emacs">
+<p>
+现在，我们进入最重要的部分……让我们配置Emacs来使用它做一些聪明的事情!
+</p>
+
+<p>
+我使用 <code>use-package</code>, 我设置成如果没有安装则自动进行安装。我将这个设置在一个非常简单的 <code>~/.emacs.d/init.el</code> 中，你可以随意引用:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">setq</span> package-archives '((<span style="font-style: italic;">"gnu"</span> . <span style="font-style: italic;">"https://elpa.gnu.org/packages/"</span>)
+(<span style="font-style: italic;">"marmalade"</span> . <span style="font-style: italic;">"https://marmalade-repo.org/packages/"</span>)
+(<span style="font-style: italic;">"melpa"</span> . <span style="font-style: italic;">"https://melpa.org/packages/"</span>)))
+(package-initialize)
+
+(<span style="font-weight: bold;">when</span> (not (package-installed-p 'use-package)) (package-refresh-contents) (package-install 'use-package))
+(<span style="font-weight: bold;">require</span> '<span style="font-weight: bold; text-decoration: underline;">use-package</span>)
+
+<span style="font-weight: bold; font-style: italic;">; </span><span style="font-weight: bold; font-style: italic;">direnv mode allows automatic loading of direnv variables</span>
+(use-package direnv
+<span style="font-weight: bold;">:ensure</span> t
+<span style="font-weight: bold;">:config</span>
+(direnv-mode))
+
+<span style="font-weight: bold; font-style: italic;">; </span><span style="font-weight: bold; font-style: italic;">setup Emacs path from our ~/.zshenv</span>
+(use-package exec-path-from-shell
+<span style="font-weight: bold;">:ensure</span> t
+<span style="font-weight: bold;">:config</span>
+(<span style="font-weight: bold;">when</span> (memq window-system '(mac ns x))
+(exec-path-from-shell-initialize)))
+
+<span style="font-weight: bold; font-style: italic;">; </span><span style="font-weight: bold; font-style: italic;">we also should make sure we have flycheck installed</span>
+(use-package flycheck
+<span style="font-weight: bold;">:ensure</span> t)
+
+<span style="font-weight: bold; font-style: italic;">; </span><span style="font-weight: bold; font-style: italic;">Let's set up company! perhaps not necessary but this is what i like to use</span>
+(use-package company
+<span style="font-weight: bold;">:ensure</span> t
+<span style="font-weight: bold;">:config</span>
+(<span style="font-weight: bold;">setq</span> company-idle-delay 0)
+(<span style="font-weight: bold;">setq</span> company-minimum-prefix-length 1))
+
+<span style="font-weight: bold; font-style: italic;">; </span><span style="font-weight: bold; font-style: italic;">install lsp mode</span>
+(use-package lsp-mode
+<span style="font-weight: bold;">:ensure</span> t
+<span style="font-weight: bold;">:hook</span> (python-mode . lsp-deferred)
+<span style="font-weight: bold;">:commands</span> (lsp lsp-deferred))
+
+<span style="font-weight: bold; font-style: italic;">; </span><span style="font-weight: bold; font-style: italic;">let's add the lsp company backend</span>
+(use-package company-lsp
+<span style="font-weight: bold;">:ensure</span> t
+<span style="font-weight: bold;">:config</span>
+(<span style="font-weight: bold;">push</span> 'company-lsp company-backends))
+
+<span style="font-weight: bold; font-style: italic;">; </span><span style="font-weight: bold; font-style: italic;">also installs lsp as a dependency</span>
+(use-package lsp-ui
+<span style="font-weight: bold;">:ensure</span> t
+<span style="font-weight: bold;">:hook</span> (lsp-mode . lsp-ui-mode))
+</pre>
+</div>
+
+<p>
+下面是我机器上的一些截图(这是我的正常设置的截图，而不是上面精简版的截图，但应该有相同的功能):
+</p>
+
+
+<div class="figure">
+<p><img src="http://www.kotaweaver.com/img/emacs-python-lsp/emacs-screenshot.png" alt="emacs-screenshot.png" />
+</p>
+</div>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2020-01-15</span>
+            <span title="last modification date" class="post-info">2020-01-25</span>
+            <span title="tags" class="post-info">:<a href="../../../../../tags/emacs-common">emacs-common</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-d6e98511-6944-459a-9e76-246f780825a7">lujun9972</a></span>
+        </div>
+    <script src="../../../../../media/js/jquery-2.1.3.min.js"></script>
+    <script src="../../../../../media/js/md5.min.js"></script>
+        <section>
+            <div id="gitalk-container"></div>
+            <script type="text/javascript">
+             var gitalk = new Gitalk({
+                 clientID: 'fdcb5d9da3f4acb4862c',
+                 clientSecret: 'dd0a16312a206782cb7669dcec5e96874ab48170',
+                 repo: 'lujun9972.github.com',
+                 owner: 'lujun9972',
+                 admin: ['lujun9972'],
+                 id: md5(location.pathname),      // Ensure uniqueness and length less than 50
+                 distractionFreeMode: false  // Facebook-like distraction free mode
+             })
+             gitalk.render('gitalk-container')
+            </script>
+        </section>
+    <script src="../../../../../media/js/main.js"></script>
+        <script>
+         var _hmt = _hmt || [];
+         (function() {
+             var hm = document.createElement("script");
+             hm.src = "https://hm.baidu.com/hm.js?7bac4fd0247f69c27887e0d4e3aee41e";
+             var s = document.getElementsByTagName("script")[0]; 
+             s.parentNode.insertBefore(hm, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-d6e98511-6944-459a-9e76-246f780825a7">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="../../../../../instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>
