@@ -13,9 +13,13 @@
 
 其思想就是将noweb占位符放在doctest的函数docstring中。当你tangle文件时，占位符被展开，它们从编写的其他代码块中获取内容并运行示例来进行测试。
 
+#+BEGIN_EXPORT html
+<iframe width="560" height="315" src="https://www.youtube.com/embed/u8CWbedVV9Y" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>
+#+END_EXPORT
+
 我将使用org-mode和我在scimax中的ob-ipython来说明这个想法。我ob-ipython设置的缺省值在本例中并没有用，因为它会将执行计数和输出的mime类型也放在输出中。这些在REPL中是没有的，所以我们通过设置下面变量来关闭这个功能。
 
-#+begin_src emacs-lisp
+#+begin_src emacs-lisp  :results silent
   (setq ob-ipython-suppress-execution-count t
         ob-ipython-show-mime-types nil)
 #+end_src
@@ -27,65 +31,90 @@
 
 下面是一个没有web扩展的块。请注意，原始的org源代码要已发布的博客更容易阅读。
 
-#+begin_src python
-  def func(a):
-      """A function to divide one by a.
+#+BEGIN_SRC ipython :noweb no
+def func(a):
+    """A function to divide one by a.
 
-  <<doctest("doctest-1")>>
+    <<doctest("doctest-1")>>
 
-  <<doctest("doctest-2")>>
+    <<doctest("doctest-2")>>
 
-  <<doctest("doctest-3")>>
+    <<doctest("doctest-3")>>
 
-  Returns: 1 / a.
-      """
-      return 1 / a
-#+end_src
+    Returns: 1 / a.
+    """
+    return 1 / a
+
+#+END_SRC
+
+# this is the block that is actually tangled.
+
+#+BEGIN_SRC ipython :noweb yes :tangle test.py :results silent :exports none
+def func(a):
+    """A function to divide one by a.
+
+    <<doctest("doctest-1")>>
+
+    <<doctest("doctest-2")>>
+
+    <<doctest("doctest-3")>>
+
+    Returns: 1 / a.
+    """
+    return 1 / a
+
+#+END_SRC
 
 现在，我们可以编写一系列命名的块，这些块定义了我们希望用作doctest的各种测试。你可以在这里运行这些块，并验证它们是正确的。
 稍后，当我们tangle文档时，这些结果将被合并到我们在上面定义的docstring中的tangle文件中。
 
-#+begin_src python
-  func(5) == 0.2
-#+end_src
+#+name: doctest-1
+#+BEGIN_SRC ipython
+func(5) == 0.2
+#+END_SRC
 
-#+BEGIN_EXAMPLE
-True
-#+END_EXAMPLE
+#+RESULTS: doctest-1
+:RESULTS:
+: True
+:END:
 
 下面这个测试将引发一个异常，我们只是运行它以确保它确实如此。
 
-#+begin_src python
-  func(0)
-#+end_src
+#+name: doctest-2
+#+BEGIN_SRC ipython
+func(0)
+#+END_SRC
 
-#+BEGIN_EXAMPLE
-
-ZeroDivisionErrorTraceback (most recent call last)
-<ipython-input-23-ba0cd5a88f0a> in <module>()
-----> 1 func(0)
-
-<ipython-input-21-136dd7a84026> in func(a)
-14 Returns: 1 / a.
-15 """
----> 16 return 1 / a
-
-ZeroDivisionError: division by zero
-#+END_EXAMPLE
+#+RESULTS: doctest-2
+:RESULTS:
+:
+: ZeroDivisionErrorTraceback (most recent call last)
+: <ipython-input-6-ba0cd5a88f0a> in <module>()
+: ----> 1 func(0)
+:
+: <ipython-input-1-eafd354a3163> in func(a)
+:      18     Returns: 1 / a.
+:      19     """
+: ---> 20     return 1 / a
+:
+: ZeroDivisionError: division by zero
+:END:
 
 下面是一个带有缩进的doctest，这里演示如何使用它。
 
-#+begin_src python
-  for i in range(1, 4):
-      print(func(i))
-#+end_src
+#+name: doctest-3
+#+BEGIN_SRC ipython
+for i in range(1, 4):
+    print(func(i))
+#+END_SRC
 
-#+BEGIN_EXAMPLE
-1.0
-0.5
-0.3333333333333333
-
-#+END_EXAMPLE
+#+RESULTS: doctest-3
+:RESULTS:
+: 1.0
+: 0.5
+: 0.3333333333333333
+:
+:END:
 
 以上就是我希望合并到doctest中的示例。每个块都有一个名称，该名称就是函数docstring中noweb引用的参数。
 
@@ -93,11 +122,11 @@ ZeroDivisionError: division by zero
 
 这是一种常见的习惯用法，可以轻松运行doctest。这将被tangle到文件中。
 
-#+begin_src python
-  if __name__ == "__main__":
-      import doctest
-      doctest.testmod()
-#+end_src
+#+BEGIN_SRC ipython :tangle test.py
+if __name__ == "__main__":
+    import doctest
+    doctest.testmod()
+#+END_SRC
 
 * 2 Tangle 该 file
 
@@ -109,7 +138,8 @@ ZeroDivisionError: division by zero
   (org-babel-tangle)
 #+end_src
 
-test.py
+#+RESULTS:
+| test.py |
 
 下面是结果:
 
@@ -146,11 +176,40 @@ test.py
 
 现在，我们可以检查是否能在全新运行时通过测试(即不使用存储在jupyter内核中的函数版本)。运行doctest的标准方法如下:
 
-#+begin_src shell
+#+begin_src shell :results scalar
   python test.py -v
 #+end_src
 
-For example, here it is in a small Python script.
+#+RESULTS:
+#+begin_example
+Trying:
+    func(5) == 0.2
+Expecting:
+    True
+ok
+Trying:
+    func(0)
+Expecting:
+    Traceback (most recent call last):
+    ZeroDivisionError: division by zero
+ok
+Trying:
+    for i in range(1, 4):
+        print(func(i))
+Expecting:
+    1.0
+    0.5
+    0.3333333333333333
+ok
+1 items had no tests:
+    __main__
+1 items passed all tests:
+   3 tests in __main__.func
+3 tests in 2 items.
+3 passed and 0 failed.
+Test passed.
+#+end_example
+
 嗯,就是这样!它工作正常。现在我们有了一个可以导入和重用的python文件，以及一些演示它如何工作的doctest。例如，下面是一个小型Python脚本。
 
 #+begin_src python
@@ -174,7 +233,8 @@ For example, here it is in a small Python script.
 
 诚然，这确实做了一些让人感觉很脆弱的事情，比如到处删除空白行，引用引号(在本例中并没有实际使用)，以及删除ob-ipython结果中的“:”部分。可能其他运行代码快方法并不适合这种情况。
 
-#+begin_src emacs-lisp
+#+name: doctest
+#+begin_src emacs-lisp :var name=""
   (org-babel-goto-named-src-block name)
   (let* ((src (s-trim-right (org-element-property :value (org-element-context))))
          (src-lines (split-string src "\n"))
