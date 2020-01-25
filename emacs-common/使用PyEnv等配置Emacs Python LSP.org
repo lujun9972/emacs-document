@@ -1,0 +1,273 @@
+#+TITLE: 使用PyEnv等配置Emacs Python LSP
+#+URL: http://www.kotaweaver.com/blog/emacs-python-lsp/
+#+AUTHOR: lujun9972
+#+TAGS: emacs-common
+#+DATE: [2020年 01月 15日 星期三 14:13:56 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+有许多文档描述了如何在Emacs中设置用于自动不全的Python语言服务器。然而，就我所看到的这些文档都缺少以下内容:
+
+- 如何在多个Python版本之间进行切换
+- 如何处理Python虚拟环境
+
+我有一个简单但足够使用的工作流程，想与大家分享!
+
+* 设置环境
+:PROPERTIES:
+:CUSTOM_ID: setting-up-the-environment
+:END:
+
+用到的工具:
+
+- =pyenv=: 管理多个python版本
+- =direnv=: 处理项目相关的环境配置
+- =venv=: 在Python虚拟环境之间进行切换
+
+** 设置 =pyenv=:
+:PROPERTIES:
+:CUSTOM_ID: setting-up-pyenv
+:END:
+
+官方提供了一个[[https://github.com/pyenv/pyenv-installer][自动安装脚本]]。我不太喜欢使用它来安装，因为存在安全风险，但我也没有要检查这个安装脚本的意思:
+
+#+begin_src shell
+  curl https://pyenv.run | bash
+#+end_src
+
+对于那些关注安全的人，请遵循其他[[https://github.com/pyenv/pyenv][安装说明]]。
+
+Now, I'm using =zsh= as my shell. Let's set up the =pyenv= configuration in the =~/.zshenv=:
+目前，我使用 =zsh= 作为日常使用shell. 让我们在 =~/.zshenv= 中设置 =pyenv= 配置:
+
+#+begin_src shell
+  export PATH="$HOME/.pyenv/bin:$PATH"
+  eval "$(pyenv init -)"
+  eval "$(pyenv virtualenv-init -)"
+#+end_src
+
+注意，我在 =~/.zshenv= 而不是在 =~/.zshrc= 中执行该操作。这是因为 =~/.zshrc= 仅被交互式shell加载。你也可以把这段内容放到 =~/.zprofile= 中。
+你可以在这个 [[https://unix.stackexchange.com/questions/71253/what-should-shouldnt-go-in-zshenv-zshrc-zlogin-zprofile-zlogout][很棒的stackoverflow帖子]] 中了解到 =zsh= 各个启动文件的不同作用。
+
+现在，如果我们打开一个新的终端，输入 =whereis pyenv= 你应该得到类似下面的内容:
+
+#+BEGIN_EXAMPLE
+kota@kota-ThinkPad-P1> whereis pyenv ~
+pyenv: /home/kota/.pyenv/bin/pyenv
+#+END_EXAMPLE
+
+:)
+
+** COMMENT 安装 =direnv=
+:PROPERTIES:
+:CUSTOM_ID: installing-direnv
+:END:
+
+嗯，=direnv= 也很容易安装，因为它是预先在[[https://direnv.net/docs/install.html][许多Linux发行版]]中做成了可安装的包了。
+在Ubuntu上:
+
+#+begin_src shell
+  sudo apt install direnv
+#+end_src
+
+Then, we want to [[https://direnv.net/docs/hook.html][install the hooks into your shell]]. In my case, this is =zsh=, so in my =.zshrc=:
+然后，我们[[https://direnv.net/docs/hook.html][将钩子安装到shell中]]。在本例中用的是 =zsh=,所以我在=.zshrc= 中加入:
+
+#+begin_src shell
+  eval "$(direnv hook zsh)"
+#+end_src
+
+我们还将 =pyenv= 和 =venv= 配置添加到 =~/.config/direnv/direnvrc= 中(抄自 [[https://github.com/direnv/direnv/wiki/Python][direnv的文档]]):
+
+#+begin_src shell
+  use_pyenv() {
+      unset PYENV_VERSION
+      # Because each python version is prepended to the PATH, add them in reverse order
+      for ((j = $#; j >= 1; j--)); do
+          local python_version=${!j}
+          local pyenv_python=$(pyenv root)/versions/${python_version}/bin/python
+          if [[ ! -x "$pyenv_python" ]]; then
+              log_error "Error: $pyenv_python can't be executed."
+              return 1
+          fi
+
+          unset PYTHONHOME
+          local ve=$($pyenv_python -c "import pkgutil; print('venv' if pkgutil.find_loader('venv') else ('virtualenv' if pkgutil.find_loader('virtualenv') else ''))")
+
+          case $ve in
+              "venv")
+                  VIRTUAL_ENV=$(direnv_layout_dir)/python-$python_version
+                  export VIRTUAL_ENV
+                  if [[ ! -d $VIRTUAL_ENV ]]; then
+                      $pyenv_python -m venv "$VIRTUAL_ENV"
+                  fi
+                  PATH_add "$VIRTUAL_ENV"/bin
+                  ;;
+              "virtualenv")
+                  layout_python "$pyenv_python"
+                  ;;
+              ,*)
+                  log_error "Error: neither venv nor virtualenv are available to ${pyenv_python}."
+                  return 1
+                  ;;
+          esac
+
+          # e.g. Given "use pyenv 3.6.9 2.7.16", PYENV_VERSION becomes "3.6.9:2.7.16"
+          [[ -z "$PYENV_VERSION" ]] && PYENV_VERSION=$python_version || PYENV_VERSION="${python_version}:$PYENV_VERSION"
+      done
+
+      export PYENV_VERSION
+  }
+#+end_src
+
+* 设置项目
+:PROPERTIES:
+:CUSTOM_ID: setting-up-the-project
+:END:
+
+我创建了一个非常简单的项目结构如下所示:
+
+#+BEGIN_EXAMPLE
+├── .envrc
+├── foo
+│ ├── app.py
+│ ├── __init__.py
+│ └── __main__.py
+└── setup.py
+#+END_EXAMPLE
+
+这个应用程序要做的就是找出向量 =(1,2,3)= 的长度:
+
+#+begin_src python
+  import numpy as np
+
+  def run():
+  arr = np.array([1, 2, 3])
+  print(np.linalg.norm(arr))
+#+end_src
+
+这里的关键是它使用了一个外部依赖项。
+
+让我们再来看看 =setup.py=:
+
+#+begin_src python
+  from setuptools import setup, find_packages
+  from foo import __version__
+  setup(
+      name="foo",
+      version=__version__,
+      packages=find_packages(exclude=["tests"]),
+      author="Kota Weaver",
+      install_requires=[
+          'numpy'
+      ],
+      extras_require={
+          'dev': [
+              'python-language-server[all]'
+          ],
+          'test': [
+              'pytest', 'pyflakes'
+          ]
+      }
+  )
+#+end_src
+
+注意，我在 =dev= 依赖中列出了Python LSP服务器。
+
+现在让我们建立Python开发环境!首先是我 =.envrc=:
+
+#+BEGIN_EXAMPLE
+export SIMENV_PYTHON=3.8.1
+
+use pyenv $SIMENV_PYTHON
+#+END_EXAMPLE
+
+现在，如果我们进入项目目录，并执行 =direnv allow=,应该就能够通过下面命令安装正确的Python版本:
+
+#+begin_src shell
+  pyenv install $SIMENV_PYTHON
+#+end_src
+
+(注意: 您可能需要安装以下依赖项: =libffi-dev libssl-dev libreadline-dev libsqlite3-dev libbz2-dev=)
+
+然后，离开并再次进入该目录，然后使用以下命令安装依赖项:
+
+#+begin_src shell
+  pip install -e .['dev','test']
+#+end_src
+
+(根据您的shell，您也许需要使用 ~==~ 来转义 =[= 和 =]=)
+
+确保 =which python= 显示的位置是正确的!
+这允许我们使用下面命令运行程序使用:
+
+#+BEGIN_EXAMPLE
+kota@kota-ThinkPad-P1> python -m foo ~/foo
+3.7416573867739413
+#+END_EXAMPLE
+
+耶!
+
+* 设置Emacs
+:PROPERTIES:
+:CUSTOM_ID: setting-up-emacs
+:END:
+
+现在，我们进入最重要的部分……让我们配置Emacs来使用它做一些聪明的事情!
+
+我使用 =use-package=, 我设置成如果没有安装则自动进行安装。我将这个设置在一个非常简单的 =~/.emacs.d/init.el= 中，你可以随意引用:
+
+#+begin_src emacs-lisp
+  (setq package-archives '(("gnu" . "https://elpa.gnu.org/packages/")
+  ("marmalade" . "https://marmalade-repo.org/packages/")
+  ("melpa" . "https://melpa.org/packages/")))
+  (package-initialize)
+
+  (when (not (package-installed-p 'use-package)) (package-refresh-contents) (package-install 'use-package))
+  (require 'use-package)
+
+  ; direnv mode allows automatic loading of direnv variables
+  (use-package direnv
+  :ensure t
+  :config
+  (direnv-mode))
+
+  ; setup Emacs path from our ~/.zshenv
+  (use-package exec-path-from-shell
+  :ensure t
+  :config
+  (when (memq window-system '(mac ns x))
+  (exec-path-from-shell-initialize)))
+
+  ; we also should make sure we have flycheck installed
+  (use-package flycheck
+  :ensure t)
+
+  ; Let's set up company! perhaps not necessary but this is what i like to use
+  (use-package company
+  :ensure t
+  :config
+  (setq company-idle-delay 0)
+  (setq company-minimum-prefix-length 1))
+
+  ; install lsp mode
+  (use-package lsp-mode
+  :ensure t
+  :hook (python-mode . lsp-deferred)
+  :commands (lsp lsp-deferred))
+
+  ; let's add the lsp company backend
+  (use-package company-lsp
+  :ensure t
+  :config
+  (push 'company-lsp company-backends))
+
+  ; also installs lsp as a dependency
+  (use-package lsp-ui
+  :ensure t
+  :hook (lsp-mode . lsp-ui-mode))
+#+end_src
+
+下面是我机器上的一些截图(这是我的正常设置的截图，而不是上面精简版的截图，但应该有相同的功能):
+
+[[http://www.kotaweaver.com/img/emacs-python-lsp/emacs-screenshot.png]]
