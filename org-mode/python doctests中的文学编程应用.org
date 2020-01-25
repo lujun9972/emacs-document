@@ -1,0 +1,205 @@
+#+TITLE: python doctests中的文学编程应用
+#+URL: http://kitchingroup.cheme.cmu.edu/blog/2018/05/17/Literate-programming-with-python-doctests/
+#+AUTHOR: lujun9972
+#+TAGS: org-mode
+#+DATE: [2018年 05月 18日 星期五 17:59:26 CST]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+在org-mode的邮件列表中，我们对在文学编程中如何使用noweb和org-mode进行了很好的讨论。那次讨论的结果被写进了博客[[http://kdr2.com/tech/emacs/1805-approach-org-refcodetotext.html][里]]。
+我想到了一个不同的文学编程应用程序来生成Python函数中的[[https://pymotw.com/3/doctest/][doctests]]。
+我必须承认，我从来都不喜欢写这些doctests，因为我一直认为它们编写起来非常痛苦，基本上你必须把代码和结果放到一个文档字符串。
+上面文学编程讨论中提出的观点让我想到了一种新的写法，这种写法看起来非常合理。
+
+其思想就是将noweb占位符放在doctest的函数docstring中。当你tangle文件时，占位符被展开，它们从编写的其他代码块中获取内容并运行示例来进行测试。
+
+我将使用org-mode和我在scimax中的ob-ipython来说明这个想法。我ob-ipython设置的缺省值在本例中并没有用，因为它会将执行计数和输出的mime类型也放在输出中。这些在REPL中是没有的，所以我们通过设置下面变量来关闭这个功能。
+
+#+begin_src emacs-lisp
+  (setq ob-ipython-suppress-execution-count t
+        ob-ipython-show-mime-types nil)
+#+end_src
+
+现在，我们创建一个示例函数，它接受单个参数并返回一除以该参数的值。
+这个块是可运行的，然后在jupyter kernel中定义该函数。
+该函数的文档字符串中包含几个noweb引用，这些引用指向我们稍后定义的doctest块。目前，他们还不起作用。这些doctest块在 =The noweb doctest block= 这一节中。
+此块还有一个tangle头，指明了要将结果tangle到哪个文件。当我运行这个块时，它被发送给Jupyter kernel并保存在内存中，以供后续块使用。
+
+下面是一个没有web扩展的块。请注意，原始的org源代码要已发布的博客更容易阅读。
+
+#+begin_src python
+  def func(a):
+      """A function to divide one by a.
+
+  <<doctest("doctest-1")>>
+
+  <<doctest("doctest-2")>>
+
+  <<doctest("doctest-3")>>
+
+  Returns: 1 / a.
+      """
+      return 1 / a
+#+end_src
+
+现在，我们可以编写一系列命名的块，这些块定义了我们希望用作doctest的各种测试。你可以在这里运行这些块，并验证它们是正确的。
+稍后，当我们tangle文档时，这些结果将被合并到我们在上面定义的docstring中的tangle文件中。
+
+#+begin_src python
+  func(5) == 0.2
+#+end_src
+
+#+BEGIN_EXAMPLE
+True
+#+END_EXAMPLE
+
+下面这个测试将引发一个异常，我们只是运行它以确保它确实如此。
+
+#+begin_src python
+  func(0)
+#+end_src
+
+#+BEGIN_EXAMPLE
+
+ZeroDivisionErrorTraceback (most recent call last)
+<ipython-input-23-ba0cd5a88f0a> in <module>()
+----> 1 func(0)
+
+<ipython-input-21-136dd7a84026> in func(a)
+14 Returns: 1 / a.
+15 """
+---> 16 return 1 / a
+
+ZeroDivisionError: division by zero
+#+END_EXAMPLE
+
+下面是一个带有缩进的doctest，这里演示如何使用它。
+
+#+begin_src python
+  for i in range(1, 4):
+      print(func(i))
+#+end_src
+
+#+BEGIN_EXAMPLE
+1.0
+0.5
+0.3333333333333333
+
+#+END_EXAMPLE
+
+以上就是我希望合并到doctest中的示例。每个块都有一个名称，该名称就是函数docstring中noweb引用的参数。
+
+* 1 添加运行测试的方法
+
+这是一种常见的习惯用法，可以轻松运行doctest。这将被tangle到文件中。
+
+#+begin_src python
+  if __name__ == "__main__":
+      import doctest
+      doctest.testmod()
+#+end_src
+
+* 2 Tangle 该 file
+
+到目前为止，我们编写的Python代码只存在于org文件和内存中。所谓Tangling就是将代码提取到代码文件中。
+
+我们运行下面这个命令，它会提取标记为tangling的代码块，并展开其中的noweb引用。
+
+#+begin_src emacs-lisp
+  (org-babel-tangle)
+#+end_src
+
+test.py
+
+下面是结果:
+
+#+begin_src python
+  def func(a):
+      """A function to divide one by a.
+    
+      >>> func(5) == 0.2
+      True
+    
+      >>> func(0)
+      Traceback (most recent call last):
+      ZeroDivisionError: division by zero
+    
+      >>> for i in range(1, 4):
+      ... print(func(i))
+      1.0
+      0.5
+      0.3333333333333333
+    
+    
+      Returns: 1 / a.
+      """
+      return 1 / a
+
+  if __name__ == "__main__":
+      import doctest
+      doctest.testmod()
+#+end_src
+
+这看起来像是一个合法的python文件。可以看到doctest块已经如愿插入到文档字符串中了。 证据就是我们可以运行这些doctest并使用python模块。我们接下来展示一下。
+
+* 3 运行测试
+
+现在，我们可以检查是否能在全新运行时通过测试(即不使用存储在jupyter内核中的函数版本)。运行doctest的标准方法如下:
+
+#+begin_src shell
+  python test.py -v
+#+end_src
+
+For example, here it is in a small Python script.
+嗯,就是这样!它工作正常。现在我们有了一个可以导入和重用的python文件，以及一些演示它如何工作的doctest。例如，下面是一个小型Python脚本。
+
+#+begin_src python
+  from test import func
+  print(func(3))
+#+end_src
+
+#+BEGIN_EXAMPLE
+0.3333333333333333
+#+END_EXAMPLE
+
+这里当然还有一些需要注意的地方。这只是一个简单的概念证明耳鸣，没有经过充分的证明。我不知道更复杂的文档测试会产生多少复杂性。但是，如果您喜欢使用doctest，喜欢使用org-mode和交互式/文学编程技术，那么继续研究下去似乎是一个好主意。
+
+在我看来，使用noweb来构建更好的代码文件绝对是一种有趣的方式。
+
+* 4 The noweb doctest block
+
+下面这些块用于noweb扩展。每个块接受一个表示代码块命的变量。这个块获取指定名称的代码块的内容，并按在REPL一样对其进行格式化。
+
+我们还获取指定名称代码块的结果并将其格式化为doctest所需的格式。我们使用一种启发式方法来检测Tracebacks并修改输出使之与doctest一致。在这种情况下，我们假设相关的Traceback在最后一行。
+
+诚然，这确实做了一些让人感觉很脆弱的事情，比如到处删除空白行，引用引号(在本例中并没有实际使用)，以及删除ob-ipython结果中的“:”部分。可能其他运行代码快方法并不适合这种情况。
+
+#+begin_src emacs-lisp
+  (org-babel-goto-named-src-block name)
+  (let* ((src (s-trim-right (org-element-property :value (org-element-context))))
+         (src-lines (split-string src "\n"))
+         body result)
+    (setq body
+          (s-trim-right
+           (s-concat ">>> " (car src-lines) "\n"
+                     (s-join "\n" (mapcar (lambda (s)
+                                            (concat "... " s))
+                                          (cdr src-lines))))))
+    ;; now the results
+    (org-babel-goto-named-result name)
+    (let ((result (org-element-context)))
+      (setq result
+            (thread-last
+                (buffer-substring (org-element-property :contents-begin result)
+                                  (org-element-property :contents-end result))
+              (s-trim)
+              ;; remove ": " from beginning of lines
+              (replace-regexp-in-string "^: *" "")
+              ;; quote quotes
+              (replace-regexp-in-string "\\\"" "\\\\\"")))
+      (when (string-match "Traceback" result)
+        (setq result (format
+                      "Traceback (most recent call last):\n%s"
+                      (car (last (split-string result "\n"))))))
+      (concat body "\n" result)))
+#+end_src
