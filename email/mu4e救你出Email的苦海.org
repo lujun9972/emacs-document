@@ -1,0 +1,172 @@
+#+TITLE: mu4e救你出Email的苦海
+#+URL: https://www.macs.hw.ac.uk/~rs46/posts/2014-01-13-mu4e-email-client.html
+#+AUTHOR: lujun9972
+#+TAGS: email
+#+DATE: [2020年 01月 15日 星期三 19:05:36 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+[[https://www.macs.hw.ac.uk/~rs46/images/site/phd-comic-emails.gif]]
+
+* mu4e是什么?
+:PROPERTIES:
+:CUSTOM_ID: what-is-mu4e
+:END:
+
+[[http://www.djcbsoftware.nl/code/mu/mu4e.html][mu4e]]是一个基于emacs的电子邮件客户端。 它完全以搜索为基础，用户界面为速度进行了优化,对很多常用操作都分配了快捷键。电子邮件可以使用org-mode来与富文本进行整合。支持电子邮件地址自动不全。异步操作，因此繁重的操作不会阻塞emacs。
+
+其基本思路是这样的:配置一个离线IMAP客户机来使远程电子邮件服务器与本地计算机同步。mbsync和offlineimap是两个最常用的IMAP同步工具。这篇文章基于mbsync。
+
+** 配置mbsync
+:PROPERTIES:
+:CUSTOM_ID: configure-mbsync
+:END:
+
+1. 安装mbsyncSSL身份验证所需的SSL开发文件。对于基于RPM的包管理器，使用 =sudo yum install openssl-devel= 如果使用 =dnf= (例如Fedora 22+)，则运行 =sudo dnf install openssl-devel=. 对于debian机器, =sudo apt-get install libssl-dev=.
+
+2. 安装mbsync，可以通过[[http://sourceforge.net/projects/isync/files/isync/][发布tarball]]安装，也可以通过[[http://sourceforge.net/p/isync/isync/ci/master/tree/][git]]安装。
+
+3. 创建一个临时文件 =.mbsyncpass= ,并在其中存储纯文本密码。接下来运行 =gpg2 --output .mbsyncpass.gpg --symmetric .mbsyncpass=.= 移动 =mysyncpass.gpg= 到 =~/.emacs.d= 并删除 =.mbsyncpass= 文件。
+
+4. 创建临时文件 =~/.authinfo= 并在其中存储以下纯文本，需要替换设置的主机、用户名、密码和端口信息:
+
+   =machine mail.example.com login myusername port 587 password mypassword=
+
+5. 使用命令 =gpg2 --output ~/.authinfo.gpg --symmetric ~/.authinfo= 生成加密文件. 删除 =~/.authinfo= 文件.
+
+6. 创建一个 =.mbsyncrc= 文件。我把它放在 =~/.emacs.d= 目录中以纳入版本控制，这样我能轻松地跨机器使用它。在工作服务器上仔细检查您希望同步的目录名(例如，它是“已发送”还是“已发送项”?). 选择本地存放邮件的目录地址。我选择的是=~/email/mysyncmail=。将以下内容添加到 =.mbsyncrc= 文件中:
+
+   #+begin_example
+     IMAPAccount uni
+     Host mail.example.com
+     User me@example.com
+     PassCmd "gpg2 -q --for-your-eyes-only --no-tty -d ~/.emacs.d/.mbsyncpass.gpg"
+     Port 993
+     SSLType IMAPS
+     AuthMechs Login
+     CertificateFile /etc/ssl/certs/ca-bundle.crt
+
+     IMAPStore uni-remote
+     Account uni
+
+     MaildirStore uni-local
+     Path ~/email/mbsyncmail/
+     Inbox ~/email/mbsyncmail/INBOX
+
+     Channel uni
+     Master :uni-remote:
+     Slave :uni-local:
+     Patterns "Sent Items" "INBOX" "Deleted Items"
+     Create Slave
+     Sync All
+     Expunge Both
+     SyncState *
+   #+end_example
+
+7. 运行 =mbsync= 命令来同步IMAP收件箱:  =mbsync -c ~/.emacs.d/.mbsyncrc work=
+
+** 配置mu4e
+:PROPERTIES:
+:CUSTOM_ID: configure-mu4e
+:END:
+
+1. 安装mu4e,可以使用包管理器或者通过tarball或git安装。[[http://www.djcbsoftware.nl/code/mu/mu4e/Installation.html][这里查看安装细节]]。
+
+2. 然后配置mu4e。查看有关变量的mu4e文档。确保以下内容存储在emacs加载的 =.el= 文件中，例如 =~.emacs= 文件。
+
+   #+begin_src emacs-lisp
+     (add-to-list 'load-path "~/place/to/your/mu4e")
+     (require 'smtpmail)
+
+                                             ; smtp
+     (setq message-send-mail-function 'smtpmail-send-it
+           smtpmail-starttls-credentials
+           '(("mail.example.com" 587 nil nil))
+           smtpmail-default-smtp-server "mail.example.com"
+           smtpmail-smtp-server "mail.example.com"
+           smtpmail-smtp-service 587
+           smtpmail-debug-info t)
+
+     (require 'mu4e)
+
+     (setq mu4e-maildir (expand-file-name "~/email/mbsyncmail"))
+
+     (setq mu4e-drafts-folder "/Drafts")
+     (setq mu4e-sent-folder "/Sent Items")
+     (setq mu4e-trash-folder "/Trash")
+     (setq message-signature-file "~/.emacs.d/.signature") ; put your signature in this file
+
+                                             ; get mail
+     (setq mu4e-get-mail-command "mbsync -c ~/.emacs.d/.mbsyncrc work"
+           mu4e-html2text-command "w3m -T text/html"
+           mu4e-update-interval 120
+           mu4e-headers-auto-update t
+           mu4e-compose-signature-auto-include nil)
+
+     (setq mu4e-maildir-shortcuts
+           '( ("/INBOX" . ?i)
+              ("/Sent Items" . ?s)
+              ("/Trash" . ?t)
+              ("/Drafts" . ?d)))
+
+     ;; show images
+     (setq mu4e-show-images t)
+
+     ;; use imagemagick, if available
+     (when (fboundp 'imagemagick-register-types)
+       (imagemagick-register-types))
+
+     ;; general emacs mail settings; used when composing e-mail
+     ;; the non-mu4e-* stuff is inherited from emacs/message-mode
+     (setq mu4e-reply-to-address "me@example.com"
+           user-mail-address "me@example.com"
+           user-full-name "Rob Stewart")
+
+     ;; don't save message to Sent Messages, IMAP takes care of this
+                                             ; (setq mu4e-sent-messages-behavior 'delete)
+
+     ;; spell check
+     (add-hook 'mu4e-compose-mode-hook
+               (defun my-do-compose-stuff ()
+                 "My settings for message composition."
+                 (set-fill-column 72)
+                 (flyspell-mode)))
+   #+end_src
+
+3. 然后，使用 =mu= 索引该目录，这一步必须做:
+
+   =mu index --maildir=~/email/mbsyncmail/=
+
+4. 现在是时候试试mu4e了。打开emacs, 输入 =M-x mu4e=.
+
+[[https://www.macs.hw.ac.uk/~rs46/images/site/mu4e-demo.png]]
+
+* 查看mu4e快捷键:
+:PROPERTIES:
+:CUSTOM_ID: check-out-the-mu4e-shortcuts
+:END:
+
+- =n/p= 转到下一个，前一个消息
+- =RET= 在message视图中打开消息
+- =s= 搜索
+- =j= 跳转到邮件目录，例如 =ji= 跳转到收件箱
+- =O= 改变排序顺序
+- =P= 切换threading
+- =d= 标记移动到垃圾文件夹的消息
+- =m= 标记消息，用于移动到另一个邮件目录文件夹
+- =?,!= 将消息标记为未读/已读
+- =R,F,C= 回复/转发/组合
+
+mu4e键绑定的完整列表列在[[http://www.djcbsoftware.nl/code/mu/mu4e/Keybindings.html][此处]]。
+
+* 选择IMAP离线客户端：Mbsync 对比 offlineimap
+:PROPERTIES:
+:CUSTOM_ID: choosing-offline-imap-client-mbsync-vs-offlineimap
+:END:
+
+[[http://en.wikipedia.org/wiki/OfflineIMAP][offlineimap]]要更流行一些，我曾经试用了一周。 后来我尝试了[[http://isync.sourceforge.net/mbsync.html][mbsync]]，对我来说它的效果更好。 人们选择offlineimap是因为它能够通过调用python文件提示用户输入密码，从而避免了纯文本密码存储在本地。
+幸运的是，mbsync现在[[http://sourceforge.net/mailarchive/message.php?msg_id=31795745][也实现了这个]]，也就是 =.mbsyncrc= 中 =PassCmd= 项的作用
+
+#+BEGIN_QUOTE
+*Zawinski's Law* “Every program attempts to expand until it can read mail. Those programs which cannot so expand are replaced by ones which can." Law of Software Envelopment, Jamie Zawinski.
+#+END_QUOTE
