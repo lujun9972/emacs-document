@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>python doctests中的文学编程应用 - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="org-mode" />
+  <!-- <link rel="stylesheet" href="../../../../../media/css/main.css" type="text/css"/>
+       <link rel="stylesheet" href="../../../../../media/css/comment.css" type="text/css"/> -->
+  <link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/kognise/water.css@latest/dist/dark.css'>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="../../../../../">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <ul class="trigger">
+        <li><a href="../../../../../years/">Years</a></li>
+        <li><a href="../../../../../authors/">Authors</a></li>
+        <li><a href="../../../../../tags/">Tags</a></li>
+        <li><a href="../../../../../about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="../../../../../rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="https://www.bing.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">python doctests中的文学编程应用</h1>
+<div id="table-of-contents">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#org73cb4c3">1 添加运行测试的方法</a></li>
+<li><a href="#org81537ab">2 Tangle 该 file</a></li>
+<li><a href="#orgd3014d5">3 运行测试</a></li>
+<li><a href="#org76af480">4 The noweb doctest block</a></li>
+</ul>
+</div>
+</div>
+<p>
+在org-mode的邮件列表中，我们对在文学编程中如何使用noweb和org-mode进行了很好的讨论。那次讨论的结果被写进了博客<a href="http://kdr2.com/tech/emacs/1805-approach-org-refcodetotext.html">里</a>。
+我想到了一个不同的文学编程应用程序来生成Python函数中的<a href="https://pymotw.com/3/doctest/">doctests</a>。
+我必须承认，我从来都不喜欢写这些doctests，因为我一直认为它们编写起来非常痛苦，基本上你必须把代码和结果放到一个文档字符串。
+上面文学编程讨论中提出的观点让我想到了一种新的写法，这种写法看起来非常合理。
+</p>
+
+<p>
+其思想就是将noweb占位符放在doctest的函数docstring中。当你tangle文件时，占位符被展开，它们从编写的其他代码块中获取内容并运行示例来进行测试。
+</p>
+
+<p>
+我将使用org-mode和我在scimax中的ob-ipython来说明这个想法。我ob-ipython设置的缺省值在本例中并没有用，因为它会将执行计数和输出的mime类型也放在输出中。这些在REPL中是没有的，所以我们通过设置下面变量来关闭这个功能。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">setq</span> ob-ipython-suppress-execution-count t
+      ob-ipython-show-mime-types nil)
+</pre>
+</div>
+
+<p>
+现在，我们创建一个示例函数，它接受单个参数并返回一除以该参数的值。
+这个块是可运行的，然后在jupyter kernel中定义该函数。
+该函数的文档字符串中包含几个noweb引用，这些引用指向我们稍后定义的doctest块。目前，他们还不起作用。这些doctest块在 <code>The noweb doctest block</code> 这一节中。
+此块还有一个tangle头，指明了要将结果tangle到哪个文件。当我运行这个块时，它被发送给Jupyter kernel并保存在内存中，以供后续块使用。
+</p>
+
+<p>
+下面是一个没有web扩展的块。请注意，原始的org源代码要已发布的博客更容易阅读。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-python"><span style="font-weight: bold;">def</span> <span style="font-weight: bold;">func</span>(a):
+    <span style="font-style: italic;">"""A function to divide one by a.</span>
+
+<span style="font-style: italic;">&lt;&lt;doctest("doctest-1")&gt;&gt;</span>
+
+<span style="font-style: italic;">&lt;&lt;doctest("doctest-2")&gt;&gt;</span>
+
+<span style="font-style: italic;">&lt;&lt;doctest("doctest-3")&gt;&gt;</span>
+
+<span style="font-style: italic;">Returns: 1 / a.</span>
+<span style="font-style: italic;">    """</span>
+    <span style="font-weight: bold;">return</span> 1 / a
+</pre>
+</div>
+
+<p>
+现在，我们可以编写一系列命名的块，这些块定义了我们希望用作doctest的各种测试。你可以在这里运行这些块，并验证它们是正确的。
+稍后，当我们tangle文档时，这些结果将被合并到我们在上面定义的docstring中的tangle文件中。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-python">func(5) == 0.2
+</pre>
+</div>
+
+<pre class="example">
+True
+</pre>
+
+<p>
+下面这个测试将引发一个异常，我们只是运行它以确保它确实如此。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-python">func(0)
+</pre>
+</div>
+
+<pre class="example">
+
+ZeroDivisionErrorTraceback (most recent call last)
+&lt;ipython-input-23-ba0cd5a88f0a&gt; in &lt;module&gt;()
+----&gt; 1 func(0)
+
+&lt;ipython-input-21-136dd7a84026&gt; in func(a)
+14 Returns: 1 / a.
+15 """
+---&gt; 16 return 1 / a
+
+ZeroDivisionError: division by zero
+</pre>
+
+<p>
+下面是一个带有缩进的doctest，这里演示如何使用它。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-python"><span style="font-weight: bold;">for</span> i <span style="font-weight: bold;">in</span> <span style="font-weight: bold;">range</span>(1, 4):
+    <span style="font-weight: bold;">print</span>(func(i))
+</pre>
+</div>
+
+<pre class="example">
+1.0
+0.5
+0.3333333333333333
+
+</pre>
+
+<p>
+以上就是我希望合并到doctest中的示例。每个块都有一个名称，该名称就是函数docstring中noweb引用的参数。
+</p>
+
+<div id="outline-container-org73cb4c3" class="outline-2">
+<h2 id="org73cb4c3">1 添加运行测试的方法</h2>
+<div class="outline-text-2" id="text-org73cb4c3">
+<p>
+这是一种常见的习惯用法，可以轻松运行doctest。这将被tangle到文件中。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-python"><span style="font-weight: bold;">if</span> <span style="font-weight: bold;">__name__</span> == <span style="font-style: italic;">"__main__"</span>:
+    <span style="font-weight: bold;">import</span> doctest
+    doctest.testmod()
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org81537ab" class="outline-2">
+<h2 id="org81537ab">2 Tangle 该 file</h2>
+<div class="outline-text-2" id="text-org81537ab">
+<p>
+到目前为止，我们编写的Python代码只存在于org文件和内存中。所谓Tangling就是将代码提取到代码文件中。
+</p>
+
+<p>
+我们运行下面这个命令，它会提取标记为tangling的代码块，并展开其中的noweb引用。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(org-babel-tangle)
+</pre>
+</div>
+
+<p>
+test.py
+</p>
+
+<p>
+下面是结果:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-python"><span style="font-weight: bold;">def</span> <span style="font-weight: bold;">func</span>(a):
+    <span style="font-style: italic;">"""A function to divide one by a.</span>
+
+<span style="font-style: italic;">    &gt;&gt;&gt; func(5) == 0.2</span>
+<span style="font-style: italic;">    True</span>
+
+<span style="font-style: italic;">    &gt;&gt;&gt; func(0)</span>
+<span style="font-style: italic;">    Traceback (most recent call last):</span>
+<span style="font-style: italic;">    ZeroDivisionError: division by zero</span>
+
+<span style="font-style: italic;">    &gt;&gt;&gt; for i in range(1, 4):</span>
+<span style="font-style: italic;">    ... print(func(i))</span>
+<span style="font-style: italic;">    1.0</span>
+<span style="font-style: italic;">    0.5</span>
+<span style="font-style: italic;">    0.3333333333333333</span>
+
+
+<span style="font-style: italic;">    Returns: 1 / a.</span>
+<span style="font-style: italic;">    """</span>
+    <span style="font-weight: bold;">return</span> 1 / a
+
+<span style="font-weight: bold;">if</span> <span style="font-weight: bold;">__name__</span> == <span style="font-style: italic;">"__main__"</span>:
+    <span style="font-weight: bold;">import</span> doctest
+    doctest.testmod()
+</pre>
+</div>
+
+<p>
+这看起来像是一个合法的python文件。可以看到doctest块已经如愿插入到文档字符串中了。 证据就是我们可以运行这些doctest并使用python模块。我们接下来展示一下。
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgd3014d5" class="outline-2">
+<h2 id="orgd3014d5">3 运行测试</h2>
+<div class="outline-text-2" id="text-orgd3014d5">
+<p>
+现在，我们可以检查是否能在全新运行时通过测试(即不使用存储在jupyter内核中的函数版本)。运行doctest的标准方法如下:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">python test.py -v
+</pre>
+</div>
+
+<p>
+For example, here it is in a small Python script.
+嗯,就是这样!它工作正常。现在我们有了一个可以导入和重用的python文件，以及一些演示它如何工作的doctest。例如，下面是一个小型Python脚本。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-python"><span style="font-weight: bold;">from</span> test <span style="font-weight: bold;">import</span> func
+<span style="font-weight: bold;">print</span>(func(3))
+</pre>
+</div>
+
+<pre class="example">
+0.3333333333333333
+</pre>
+
+<p>
+这里当然还有一些需要注意的地方。这只是一个简单的概念证明耳鸣，没有经过充分的证明。我不知道更复杂的文档测试会产生多少复杂性。但是，如果您喜欢使用doctest，喜欢使用org-mode和交互式/文学编程技术，那么继续研究下去似乎是一个好主意。
+</p>
+
+<p>
+在我看来，使用noweb来构建更好的代码文件绝对是一种有趣的方式。
+</p>
+</div>
+</div>
+
+<div id="outline-container-org76af480" class="outline-2">
+<h2 id="org76af480">4 The noweb doctest block</h2>
+<div class="outline-text-2" id="text-org76af480">
+<p>
+下面这些块用于noweb扩展。每个块接受一个表示代码块命的变量。这个块获取指定名称的代码块的内容，并按在REPL一样对其进行格式化。
+</p>
+
+<p>
+我们还获取指定名称代码块的结果并将其格式化为doctest所需的格式。我们使用一种启发式方法来检测Tracebacks并修改输出使之与doctest一致。在这种情况下，我们假设相关的Traceback在最后一行。
+</p>
+
+<p>
+诚然，这确实做了一些让人感觉很脆弱的事情，比如到处删除空白行，引用引号(在本例中并没有实际使用)，以及删除ob-ipython结果中的“:”部分。可能其他运行代码快方法并不适合这种情况。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(org-babel-goto-named-src-block name)
+(<span style="font-weight: bold;">let*</span> ((src (s-trim-right (org-element-property <span style="font-weight: bold;">:value</span> (org-element-context))))
+       (src-lines (split-string src <span style="font-style: italic;">"\n"</span>))
+       body result)
+  (<span style="font-weight: bold;">setq</span> body
+        (s-trim-right
+         (s-concat <span style="font-style: italic;">"&gt;&gt;&gt; "</span> (car src-lines) <span style="font-style: italic;">"\n"</span>
+                   (s-join <span style="font-style: italic;">"\n"</span> (mapcar (<span style="font-weight: bold;">lambda</span> (s)
+                                          (concat <span style="font-style: italic;">"... "</span> s))
+                                        (cdr src-lines))))))
+  <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">now the results</span>
+  (org-babel-goto-named-result name)
+  (<span style="font-weight: bold;">let</span> ((result (org-element-context)))
+    (<span style="font-weight: bold;">setq</span> result
+          (<span style="font-weight: bold;">thread-last</span>
+              (buffer-substring (org-element-property <span style="font-weight: bold;">:contents-begin</span> result)
+                                (org-element-property <span style="font-weight: bold;">:contents-end</span> result))
+            (s-trim)
+            <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">remove ": " from beginning of lines</span>
+            (replace-regexp-in-string <span style="font-style: italic;">"^: *"</span> <span style="font-style: italic;">""</span>)
+            <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">quote quotes</span>
+            (replace-regexp-in-string <span style="font-style: italic;">"\\\""</span> <span style="font-style: italic;">"\\\\\""</span>)))
+    (<span style="font-weight: bold;">when</span> (string-match <span style="font-style: italic;">"Traceback"</span> result)
+      (<span style="font-weight: bold;">setq</span> result (format
+                    <span style="font-style: italic;">"Traceback (most recent call last):\n%s"</span>
+                    (car (last (split-string result <span style="font-style: italic;">"\n"</span>))))))
+    (concat body <span style="font-style: italic;">"\n"</span> result)))
+</pre>
+</div>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2018-05-18</span>
+            <span title="last modification date" class="post-info">2020-01-25</span>
+            <span title="tags" class="post-info">:<a href="../../../../../tags/org-mode">org-mode</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-1620021c-e348-4e1e-b3f8-b0c3b6b7470f">lujun9972</a></span>
+        </div>
+    <script src="../../../../../media/js/jquery-2.1.3.min.js"></script>
+    <script src="../../../../../media/js/md5.min.js"></script>
+        <section>
+            <div id="gitalk-container"></div>
+            <script type="text/javascript">
+             var gitalk = new Gitalk({
+                 clientID: 'fdcb5d9da3f4acb4862c',
+                 clientSecret: 'dd0a16312a206782cb7669dcec5e96874ab48170',
+                 repo: 'lujun9972.github.com',
+                 owner: 'lujun9972',
+                 admin: ['lujun9972'],
+                 id: md5(location.pathname),      // Ensure uniqueness and length less than 50
+                 distractionFreeMode: false  // Facebook-like distraction free mode
+             })
+             gitalk.render('gitalk-container')
+            </script>
+        </section>
+    <script src="../../../../../media/js/main.js"></script>
+        <script>
+         var _hmt = _hmt || [];
+         (function() {
+             var hm = document.createElement("script");
+             hm.src = "https://hm.baidu.com/hm.js?7bac4fd0247f69c27887e0d4e3aee41e";
+             var s = document.getElementsByTagName("script")[0]; 
+             s.parentNode.insertBefore(hm, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-1620021c-e348-4e1e-b3f8-b0c3b6b7470f">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="../../../../../instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>
