@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>让Emacs俄罗斯方块变得更难的一些Advice - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="fun" />
+  <!-- <link rel="stylesheet" href="../../../../../media/css/main.css" type="text/css"/>
+       <link rel="stylesheet" href="../../../../../media/css/comment.css" type="text/css"/> -->
+  <link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/kognise/water.css@latest/dist/dark.css'>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="../../../../../">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <ul class="trigger">
+        <li><a href="../../../../../years/">Years</a></li>
+        <li><a href="../../../../../authors/">Authors</a></li>
+        <li><a href="../../../../../tags/">Tags</a></li>
+        <li><a href="../../../../../about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="../../../../../rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="https://www.bing.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">让Emacs俄罗斯方块变得更难的一些Advice</h1>
+<p>
+Did you know that <b>Emacs</b> comes bundled with an implementation of <b>Tetris</b>? Just hit <code>M-x tetris</code> and there it is:
+</p>
+
+<p>
+你知道吗, <b>Emacs</b> 与 <b>俄罗斯方块</b> 的实现捆绑在一起了? 只需要输入 <code>M-x tetris</code> 就行了。
+</p>
+
+<p>
+<a href="https://nickdrozd.github.io">https://nickdrozd.github.io</a><img src="file:///assets/2019-01-14-tetris/tetris-normal.png" alt="tetris-normal.png" />
+</p>
+
+<p>
+在文本编辑器讨论中，Emacs倡导者经常提到这一点。“没错，但是那个编辑器能运行俄罗斯方块吗?”
+我很好奇，这会让大家相信Emacs更优秀吗?比如，为什么有人会关心他们是否可以在文本编辑器中玩游戏呢?“是的，但是那台吸尘器能播放mp3吗?”
+</p>
+
+<p>
+有人说，俄罗斯方块总是很有趣的。像Emacs中的所有东西一样，它的源代码是开放的，易于检查和修改，因此 <b>我们可以使它变得更加有趣</b>. 所谓更多的乐趣，我意思是更难。
+</p>
+
+<p>
+让游戏变得更困难的一个最简单的方法就是“不要下一个块预览”。你无法再在知道下一个块会填满空间的情况下有意地将S/Z块放在一个危险的位置——你必须碰碰运气，希望出现最好的情况。
+下面是没有预览的情况(如你所见，没有预览，我做出的某些选择带来了“可怕的后果”):
+</p>
+
+
+<div class="figure">
+<p><img src="https://nickdrozd.github.io/assets/2019-01-14-tetris/tetris-no-preview.png" alt="tetris-no-preview.png" />
+</p>
+</div>
+
+<p>
+预览框由一个名为 <code>tetris-draw-next-shape</code> 的函数设置:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">tetris-draw-next-shape</span> ()
+  (<span style="font-weight: bold;">dotimes</span> (x 4)
+    (<span style="font-weight: bold;">dotimes</span> (y 4)
+      (gamegrid-set-cell (+ tetris-next-x x)
+                         (+ tetris-next-y y)
+                         tetris-blank)))
+  (<span style="font-weight: bold;">dotimes</span> (i 4)
+    (<span style="font-weight: bold;">let</span> ((tetris-shape tetris-next-shape)
+          (tetris-rot 0))
+      (gamegrid-set-cell (+ tetris-next-x
+                            (aref (tetris-get-shape-cell i) 0))
+                         (+ tetris-next-y
+                            (aref (tetris-get-shape-cell i) 1))
+                         tetris-shape))))
+</pre>
+</div>
+
+<p>
+首先，我们引入一个标志，决定是否允许显示下一个预览块:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defvar</span> <span style="font-weight: bold; font-style: italic;">tetris-preview-next-shape</span> nil
+  <span style="font-style: italic;">"When non-nil, show the next block the preview box."</span>)
+</pre>
+</div>
+
+<p>
+现在的问题是，我们如何才能让 <code>tetris-draw-next-shape</code> 遵从这个标志?最明显的方法是重新定义它:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">tetris-draw-next-shape</span> ()
+  (<span style="font-weight: bold;">when</span> tetris-preview-next-shape
+    <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">existing tetris-draw-next-shape logic</span>
+    ))
+</pre>
+</div>
+
+<p>
+但这不是理想的解决方案。同一个函数有两个定义，这很容易引起混淆，如果上游版本发生变化，我们必须维护修改后的定义。
+</p>
+
+<p>
+一个更好的方法是使用 <b>advice</b>. Emacs的advice类似于 <b>Python装饰器</b>,但是更加灵活，因为advice可以从任何地方添加到函数中。这意味着我们可以修改函数而不影响原始的源文件。
+</p>
+
+<p>
+有很多不同的方法使用Emacs advice(<a href="https://www.gnu.org/software/emacs/manual/html_node/elisp/Advising-Functions.html">查看手册</a>)，但是这里我们只使用 <code>advice-add</code> 函数和 <code>:around</code> 标志。
+advise函数将原始函数作为参数，原始函数可能执行也可能不执行。我们这里，我们让原始函数只有在预览标志是非空的情况下才能执行:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">tetris-maybe-draw-next-shape</span> (tetris-draw-next-shape)
+  (<span style="font-weight: bold;">when</span> tetris-preview-next-shape
+    (funcall tetris-draw-next-shape)))
+
+(advice-add 'tetris-draw-next-shape <span style="font-weight: bold;">:around</span> #'tetris-maybe-draw-next-shape)
+</pre>
+</div>
+
+<p>
+这段代码将修改 <code>tetris-draw-next-shape</code> 的行为，而且它可以存储在配置文件中，与实际的俄罗斯方块代码分离。
+</p>
+
+<p>
+去掉预览框是一个简单的改变。一个更激烈的变化是， <b>让块随机停止在空中</b>:
+</p>
+
+<p>
+<a href="https://nickdrozd.github.io">https://nickdrozd.github.io</a><img src="file:///assets/2019-01-14-tetris/tetris-air.png" alt="tetris-air.png" />
+</p>
+
+<p>
+本图中，红色的I和绿色的T部分没有掉下来，它们被固定下来了。这会让游戏变得 <b>及其难玩</b> ，但却很容易实现。
+</p>
+
+<p>
+和前面一样，我们首先定义一个标志:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defvar</span> <span style="font-weight: bold; font-style: italic;">tetris-stop-midair</span> t
+  <span style="font-style: italic;">"If non-nil, pieces will sometimes stop in the air."</span>)
+</pre>
+</div>
+
+<p>
+目前， <b>Emacs俄罗斯方块的工作方式</b> 类似这样子: 活动部件有x和y坐标。在每个时钟滴答声中，y坐标递增(块向下移动一行)，然后检查是否有与现存的块重叠。
+如果检测到重叠，则将该块回退(其y坐标递减)并设置该活动块到位。为了让一个块在半空中停下来，我们所要做的就是破解检测函数 <code>tetris-test-shape</code>.
+</p>
+
+<p>
+<b>这个函数内部做什么并不重要</b> —— 重要的是它是一个返回布尔值的无参数函数。我们需要它在正常情况下返回布尔值true(否则我们将出现奇怪的重叠情况)，但在其他时候也需要它返回true。我相信有很多方法可以做到这一点，以下是我的方法的:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">tetris-test-shape-random</span> (tetris-test-shape)
+  (<span style="font-weight: bold;">or</span> (<span style="font-weight: bold;">and</span>
+       tetris-stop-midair
+       <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Don't stop on the first shape.</span>
+       (&lt; 1 tetris-n-shapes )
+       <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Stop every INTERVAL pieces.</span>
+       (<span style="font-weight: bold;">let</span> ((interval 7))
+         (zerop (mod tetris-n-shapes interval)))
+       <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Don't stop too early (it makes the game unplayable).</span>
+       (<span style="font-weight: bold;">let</span> ((upper-limit 8))
+         (&lt; upper-limit tetris-pos-y))
+       <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Don't stop at the same place every time.</span>
+       (zerop (mod (random 7) 10)))
+      (funcall tetris-test-shape)))
+
+(advice-add 'tetris-test-shape <span style="font-weight: bold;">:around</span> #'tetris-test-shape-random)
+</pre>
+</div>
+
+<p>
+这里的硬编码参数使游戏变得更困难，但仍然可玩。当时我在飞机上喝醉了，所以它们可能需要进一步调整。
+</p>
+
+<p>
+顺便说一下，根据我的 <code>tetris-scores</code> 文件，我的 <b>最高分</b> 是
+</p>
+
+<pre class="example">
+01389   Wed Dec 5 15:32:19 2018
+</pre>
+
+<p>
+该文件中列出的分数默认最多为五位数，因此这个分数看起来不是很好。
+</p>
+
+<p>
+<b>给读者的练习</b>
+</p>
+
+<ol class="org-ol">
+<li>使用advice修改Emacs俄罗斯方块，使得每当方块下移动时就闪烁显示讯息“OH SHIT”。消息的大小与块堆的高度成比例(当没有块时，消息应该很小的或不存在的，当最高块接近天花板时，消息应该很大)。</li>
+
+<li>在这里给出的 <code>tetris-test-shape-random</code> 版本中，每隔七格就有一个半空中停止。一个玩家有可能能计算出时间间隔，并利用它来获得优势。修改它，使间隔随机在一些合理的范围内(例如，每5到10格)。</li>
+
+<li>另一个对使用Tetris使用advise的场景，你可以试试 <a href="https://nullprogram.com/blog/2014/10/19/"><code>autotetris-mode</code></a>。</li>
+
+<li>想出一个有趣的方法来打乱块的旋转机制，然后使用advice来实现它。</li>
+
+<li>Emacs只有一个大的全局命名空间，因此函数和变量名通常以它们的包名作为前缀，以避免冲突。</li>
+
+<li>很多人会告诉你，你不应该使用现有的名称空间前缀，你应该为你自己定义的任何东西保留一个名称空间前缀，例如 <code>my/tetris-preview-next-shape</code>. 但这样子很丑陋，而且通常是没有意义的，所以我不这样做。</li>
+</ol>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2019-02-26</span>
+            <span title="last modification date" class="post-info">2020-01-26</span>
+            <span title="tags" class="post-info">:<a href="../../../../../tags/fun">fun</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-3323406f-ce3d-4881-ac32-b5375ded520e">lujun9972</a></span>
+        </div>
+    <script src="../../../../../media/js/jquery-2.1.3.min.js"></script>
+    <script src="../../../../../media/js/md5.min.js"></script>
+        <section>
+            <div id="gitalk-container"></div>
+            <script type="text/javascript">
+             var gitalk = new Gitalk({
+                 clientID: 'fdcb5d9da3f4acb4862c',
+                 clientSecret: 'dd0a16312a206782cb7669dcec5e96874ab48170',
+                 repo: 'lujun9972.github.com',
+                 owner: 'lujun9972',
+                 admin: ['lujun9972'],
+                 id: md5(location.pathname),      // Ensure uniqueness and length less than 50
+                 distractionFreeMode: false  // Facebook-like distraction free mode
+             })
+             gitalk.render('gitalk-container')
+            </script>
+        </section>
+    <script src="../../../../../media/js/main.js"></script>
+        <script>
+         var _hmt = _hmt || [];
+         (function() {
+             var hm = document.createElement("script");
+             hm.src = "https://hm.baidu.com/hm.js?7bac4fd0247f69c27887e0d4e3aee41e";
+             var s = document.getElementsByTagName("script")[0]; 
+             s.parentNode.insertBefore(hm, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-3323406f-ce3d-4881-ac32-b5375ded520e">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="../../../../../instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>
