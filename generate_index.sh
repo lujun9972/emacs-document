@@ -1,7 +1,7 @@
 #!/bin/bash
 
 declare -A catalog_comment_dict
-catalog_comment_dict=([calc]="关于Calc的内容" [dired]="文件管理" [advertisement]="别看广告,看疗效" [elisp-common]="关于elisp的内容" [org-mode]="关于org-mode的内容" [eww]="Emacs看片，指日可待" [emacs-common]="其他未分类的emacs内容" [raw]="未翻译的内容,欢迎大家领取" [reddit]="reddit好问题" [Eshell]="Eshell之野望" [processing]="正在翻译的内容,别人的东西可不要抢哦~" [email]="使用Emacs收发邮件")
+catalog_comment_dict=([calc]="关于Calc的内容" [dired]="文件管理" [advertisement]="别看广告,看疗效" [elisp-common]="关于elisp的内容" [org-mode]="关于org-mode的内容" [eww]="Emacs看片，指日可待" [emacs-common]="其他未分类的emacs内容" [raw]="未翻译的内容,欢迎大家领取" [reddit]="reddit好问题" [Eshell]="Eshell之野望" [processing]="正在翻译的内容,别人的东西可不要抢哦~" [email]="使用Emacs收发邮件" [fun]="娱乐至上")
 
 catalogs=$(for catalog in ${!catalog_comment_dict[*]};do
                echo $catalog
