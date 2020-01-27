@@ -1,0 +1,182 @@
+#+TITLE: Emacs快捷键大师指南
+#+URL: http://www.wilfred.me.uk/blog/2018/01/06/the-emacs-guru-guide-to-key-bindings/
+#+AUTHOR: lujun9972
+#+TAGS: emacs-common
+#+DATE: [2018年 03月 12日 星期一 16:05:47 CST]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+* Emacs快捷键大师指南
+
+#+BEGIN_QUOTE
+假设您在Emacs中按住Control键并输入您的名字。你能描述将会发生什么?
+
+——“Emacs大师测试”
+#+END_QUOTE
+
+在一些初学者看来Emacs快捷方式(称为“键绑定”)可能看起来很可笑.
+一些Emacs用户甚至认为应该在使用Emacs之处就尽快更改它们.
+
+他们错了。在这篇文章中，我将描述Emacs快捷键背后的逻辑
+你不仅会更容易通过大师测试，而且可能会爱上这些默认设置!
+
+** 有多少快捷键啊?
+:PROPERTIES:
+:CUSTOM_ID: there-are-how-many
+:END:
+
+Emacs有大量的键绑定。
+
+#+BEGIN_EXAMPLE
+ELISP> (length global-map)
+143
+#+END_EXAMPLE
+
+Emacs是一种模式编辑器，所以大多数快捷键都是基于特定模式的。
+然而，我当前的Emacs实例有100多个全局快捷方式，它们在任何地方都可以工作。
+（keymap是一种嵌套的数据结构，所以这个值是严重低估的！例如 =C-h C-h= 和 =C-h f= 就没有单独计算。）
+但这与与我们允许为命令定义的快捷键相比，这甚至是小巫见大巫 
+
+#+BEGIN_EXAMPLE
+ELISP> (let ((total 0))
+(mapatoms
+(lambda (sym)
+(when (commandp sym)
+(setq total (1+ total)))))
+total)
+8612
+#+END_EXAMPLE
+
+我们怎么可能组织所有这些命令呢?
+
+** 助记快捷键
+:PROPERTIES:
+:CUSTOM_ID: mnemonic-key-bindings
+:END:
+
+基本命令通常根据其名称被设置快捷键。您在Emacs教程中会遇到所有这些重要的命令。
+
+| Command                      | Key Binding   |
+|------------------------------+---------------|
+| e*X*ecute-extended-command   | M-x           |
+| *N*ext-line                  | C-n           |
+| *P*revious-line              | C-p           |
+| *F*orward-char               | C-f           |
+| *B*ackward-car               | C-b           |
+| i*S*earch-forward            | C-s           |
+
+记忆法是一种非常有效的记忆方法。如果你能记住命令的名称，那么也就能记住这些快捷键。
+
+** 有组织的快捷键
+:PROPERTIES:
+:CUSTOM_ID: organised-key-bindings
+:END:
+
+Many Emacs movement commands are laid out in a consistent pattern.
+许多Emacs移动命令的布局模式是一致的。
+
+例如，不同程度的移动:
+
+| Command        | Key Binding   |
+|----------------+---------------|
+| forward-char   | C-f           |
+| forward-word   | M-f           |
+| forward-sexp   | C-M-f         |
+
+移动到某个事物的结尾:
+
+| Command            | Key Binding   |
+|--------------------+---------------|
+| move-end-of-line   | C-e           |
+| forward-sentence   | M-e           |
+| end-of-defun       | C-M-e         |
+
+换位，交换光标两边的文本:
+
+| Command           | Key Binding   |
+|-------------------+---------------|
+| transpose-chars   | C-t           |
+| transpose-words   | M-t           |
+| transpose-sexps   | C-M-t         |
+
+删除文本:
+
+| Command         | Key Binding   |
+|-----------------+---------------|
+| kill-line       | C-k           |
+| kill-sentence   | M-k           |
+| kill-sexp       | C-M-k         |
+
+你发现这个模式了吗?
+
+这个模式是, =C-whatever= 命令通常是小而直白的文本操作。
+=M-whatever= 命令则更大一些，通常对单词进行操作。
+=C-M-whatever= 命令有点神奇。这些命令可以理解正在查看的代码，并作用于整个表达式。Emacs使用术语“sexp”（s-expression）来表达这个概念，但这些命令通常在任何编程语言中都可以使用！
+
+** 发现快捷键
+:PROPERTIES:
+:CUSTOM_ID: discovering-key-bindings
+:END:
+
+按下 =C-a= 后会发生什么事情? Emacs 会告诉你答案. =C-h k C-a= 会告诉你具体运行哪个命令.
+
+[[http://www.wilfred.me.uk/assets/describe_key.png]]
+
+如果你不通过快捷键运行命令, Emacs 会贴心地告诉你该命令没有设置快捷键.
+
+[[http://www.wilfred.me.uk/assets/emacs_hint.png]]
+
+你还可以倒过来做! 若Emacs做了某些好的或意外的事情, 你想知道到底运行了什么命令. =C-h l= 会显示运行的命令是什么以及出发的快捷键是哪个.
+
+[[http://www.wilfred.me.uk/assets/view_lossage.png]]
+
+** Emacs空间
+:PROPERTIES:
+:CUSTOM_ID: room-for-emacs
+:END:
+
+为什么Emacs的快捷键如此清新脱俗？为什么不像其他程序一样 =C-c= 不是拷贝文本到粘帖板中
+
+Emacs在剪贴板命令的快捷键中使用记忆法：你“kill”和“yank”文本，因此快捷键是 =C-k= 和 =C-y=. 如果您真的需要，您可以使用[[https://www.gnu.org/software/emacs/manual/html_node/emacs/CUA Bindings.html][CUA mode]] 这样=C-x= 就会按您的预期操作。
+
+The problem is that Emacs commands are too versatile, too general to fit in the usual =C-x=, =C-c=, =C-v=. Emacs has /four/ clipboard commands:
+
+问题是Emacs命令太多用途，功能太广，无法适应通常的 =C-x=, =C-C=, =C-v= 操作。Emacs有 /4个/ 粘贴版命令：
+
+1. =kill=: 删除文本呢并将其插入 kill-ring 中. 这类似于剪贴板剪切，但您可以多次剪切，Emacs将 /记住/ 剪贴板中的每一项内容。
+2. =kill-ring-save=: 将所选的文本拷入 kill-ring. 这类似于剪贴板复制，但也可以多次执行此操作。
+3. =yank=: 从 kill-ring 中插入文本. 这就类似于剪贴板粘贴。
+4. =yank-pop=: 用kill ring中的中下一项内容替代之前粘帖的文本. 在只能保存一项内容的剪贴板中没有等效项！
+
+Emacs的广泛功能意味着很难为所有东西设置快捷键。其结果就是，快捷键可能会稍微长一些：打开一个文件的快捷键是 =C-x C-f=,这在其他程序上是 =C-o= 外加额外一些输入。
+
+** 你的空间
+:PROPERTIES:
+:CUSTOM_ID: room-for-you
+:END:
+
+既然已经定义了所有这些快捷键，那么你应该将哪些绑定用于个人喜爱的命令呢？
+
+与IP addresses =192.168.x.x= 是保留供私人使用一样，Emacs也有 [[https://www.gnu.org/software/emacs/manual/html_node/elisp/Key-Binding-Conventions.html][保留键]] 供用户配置。所有序列 =C-C LETTER=,例如 =C-C a=,都是为您保留的，类似的还有 =<F5>= 到 =<F9>=.
+
+例如，如果您发现自己经常使用 =imenu=,则可以将之绑定到 =C-C i=:
+
+#+begin_src emacs-lisp
+  (global-set-key (kbd "C-c i") #'imenu)
+#+end_src
+
+** 规则由你来定
+:PROPERTIES:
+:CUSTOM_ID: you-make-the-rules
+:END:
+
+这并不意味着你不应该修改快捷键. Emacse 使用者一直以来创建了很多 [[https://github.com/chrisdone/god-mode][怪异]] [[http://melpa.milkbox.net/#/key-chord][而]] [[https://github.com/abo-abo/hydra][超棒的]] 映射快捷键的方法.
+
+Emacs 甚至能够适应这一点. 如果你更改了基本的快捷键后打开教程,教程的内容也会相应的更改!
+
+[[http://www.wilfred.me.uk/assets/emacs_tutorial.png]]
+
+掌握Emacs的秘诀是记住一切都是self-documenting的。学习help命令以找出哪些命令具有默认快捷键。
+在定义新的快捷键或重写现有快捷键时，考虑 /遵循/ 现有的模式. 例如 =org-mode=，就重新定义 =C-M-t= 成交换org中的元素。
+
+一旦你理解了这个模式, 你就知道什么情况下可以遵循这一模式，什么时候可以打破这一模式. 你也更接近于通过大师测试了!
