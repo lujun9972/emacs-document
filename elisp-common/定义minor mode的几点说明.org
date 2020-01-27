@@ -1,0 +1,114 @@
+#+TITLE: 定义minor mode的几点说明
+#+URL: http://mbork.pl/2018-11-03_A_few_remarks_about_defining_minor_modes
+#+AUTHOR: lujun9972
+#+TAGS: elisp-common
+#+DATE: [2018年 12月 10日 星期一 14:23:32 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+今天的帖子技术含量很高，但我想分享一个几天前的有趣故事。
+
+我使用经典架构定义了一个minor mode
+
+#+begin_src emacs-lisp
+  (defun cool-start ()
+    "Start the cool-mode.")
+
+  (defun cool-stop ()
+    "Stop the cool-mode.")
+
+  (define-minor-mode my-cool-minor-mode
+    "Toggle a mode for doing cool stuff."
+    :init-value nil
+    :lighter " 8-)"
+    (if my-cool-minor-mode
+        (cool-start)
+      (cool-stop)))
+#+end_src
+
+我很好奇是否可以使用前缀参数来决定在启动模式时做什么。这似乎有点冒险，因为前缀参数已经用于决定打开或关闭模式了。
+
+实际上, =my-cool-minor-mode= 命令的参数的文档点误导人。以下是Emacs手册中的一段摘录:
+
+- 如果你直接调用mode命令而不带任何前缀参数(通过“M-x”，或通过绑定到一个键并输入该键[…])，就会“切换” minor-mode。minor-mode若关闭则打开，若打开则关闭。
+- 如果你使用前缀参数调用mode命令，则若参数为0或负数，minor-mode将无条件关闭;否则，将被无条件地打开。
+- 如果通过Lisp调用mode命令，则若参数被省略或为“nil”，则minor-mode将无条件打开。这使得通过major mode的mode hook来打开minor-mode变得很容易[...]。非'nil'参数的处理方式类似于前面描述的交互式前缀参数。
+
+以下是Elisp手册中的一段话:
+
+toggle命令接受一个可选的(前缀)参数。如果交互方式调用则没有参数的情况下，它切换打开或关闭模式,正的前缀参数启用该模式，任何其他前缀参数将禁用该模式。
+在Lisp中调用的话，‘toggle’参数切换模式，而省略或‘nil’参数启用该模式。例如,这可以使通过major mode的mode hook来打开minor mode变得很容易.
+如果DOC为“nil”，则宏提供一个默认的文档字符串来解释上述内容。
+
+正如你所见，从Elisp手册中并不完全清楚是否可以通过代码提供数值参数(显然，您不能交互地提供='toggle=参数)。
+
+原来, =define-minor-mode= 宏以一种非常复杂的方式定义了负责打开和关闭模式的函数。
+
+首先，该宏包含了下面片段:
+
+#+begin_src emacs-lisp
+  (interactive (list (or current-prefix-arg 'toggle)))
+#+end_src
+
+这意味着没有参数(在交互调用时)与 ='toggle= 参数完全等价。
+
+另一个技巧是:
+
+#+begin_src emacs-lisp
+  (,@setter
+   (if (eq arg 'toggle)
+       (not ,getter)
+     ;; A nil argument also means ON now.
+     (> (prefix-numeric-value arg) 0)))
+#+end_src
+
+=define-minor-mode= 在前面将 =setter= 设置成了 =(setq <mode-name>)=, 将 =getter= 设置成了 =<mode-name>=. 
+这里有一个非常聪明的技巧: =getter= 变量其实就是mode，而 =setter= 是将 =getter= 变量设置为某个值的Elisp form的开头部分。
+(如果您认为这太抽象，让我告诉您，我的描述还算是简化过得:例如，对于全局模式来说, =setter= 和 =getter= 就跟这里说的有所不同。)
+
+正如您从上面的技巧中看到的，我的原始问题有一个简单的答案:是的，我们可以在Elisp代码中提供数值参数，实际上，提供一个负参数是通过编程手段关闭模式的唯一方法。
+
+了解了这一点，我们现在可以着手解决最初的问题了。既然任何正的前缀参数都意味着“打开模式”，那么我们可以使用它的实际值来做各种事情吗?
+
+答案当然是肯定的。我们可以有两个选择。首先，我们的模式主体可以检查 =current-prefix-arg=. 此外我们还可以使用 =arg=.(=define-minor-mode= 宏就是通过该参数调用新定义的切换函数的)。
+后者显然没有那么明显(特别是它依赖于的实现细节可能在另一个Emacs版本中更改)，所以让我们忘记它吧。(实际上，与其使用 =arg= 符号，不如使用一些类似于Common Lisp =gensym= 的东西。Elisp没有该函数. =cl= 包有 =cl-gensym=, 但是内置的特性并不依赖于 =cl= 包,这是可以理解的。
+
+但是故事还没结束呢。 还有一些关键字参数在 =define-minor-mode= 的docstring和手册中都尚未提及. 其中一个就是 =:extra-args=. 
+(有趣的旁注: 该 =:extra-args= 关键字在整个Emacs源中只提到了三次. 根据 =git blame= 的结果，其中一次是定义,最后一次由 Stefan Monnier 在2012-06-10使用。
+第二次在 =use-hard-newlines= minor mode中，最后一次由 Stefan Monnier 在 2001-10-30 使用。
+第三次是在 =global-font-lock-mode= 的注释中提及，该注释写的诗 What was this ~:extra-args thingy for? --Stef~, 最后一次在2009-09-13使用，作者你是猜猜是谁?)
+
+All these arguments (including the first one) are optional, and you can't supply the =:extra-args= on an interactive call. You can, however, supply them from Elisp code. Here is an example.
+你可以这样使用它。在 =:extra-args= 关键字之后的值应该是一个(unqouted的)列表，这个列表会被添加到打开本模式的函数的第一个参数之后(例如，在以交互方式调用mode命令的前缀参数)。
+所有这些参数(包括第一个参数)都是可选的，您不能在交互式调用中提供 =:extra-args=. 但是，你可以通过Elisp代码提供这些参数。例如:
+
+#+begin_src emacs-lisp
+  (define-minor-mode my-cool-minor-mode
+    "Toggle a mode for doing cool stuff."
+    :init-value nil
+    :lighter " 8-)"
+    :extra-args (cool-arg-1 cool-arg-2)
+    (if my-cool-minor-mode
+        (progn
+          (cool-start)
+          (message "cool-arg-1: %s, cool-arg-2: %s" cool-arg-1 cool-arg-2))
+      (cool-stop)))
+#+end_src
+
+试着执行: =M-:(my-cool-min -mode 1 "this")= 看看 =cool-arg-1= 是否变成了 ="this"= , =cool-arg-2= 变成 nil。
+
+最后一个关于 =define-minor-mode= 的趣闻是 =My-Cool minor mode 在当前buffer启用时= 的默认消息. 我注意到 =message= 函数放到mode的启动代码中时，该默认消息不会现实。
+为了找到原因,一开始我在Emacs源码中搜索单词 “enabled” (2774 处) 和 “disabled” (1324 处). 没有结果。
+然后我 [[http://mbork.pl/2016-05-15_debug-on-whatever][回想起了]] =debug-on-message= 变量, 结果发现我的搜索完全没有. 原因是(简化了一点):
+
+#+begin_src emacs-lisp
+  (message
+   "Some-mode %sabled"
+   (if mode-variable "en" "dis"))
+#+end_src
+
+好吧，这让我哭笑不得(特别是我必须要处理一点软件国际化的事情)，但我承认它在某种程度上是个不错的做法。
+
+更有趣的是，如果负责初始化(或关闭)模式的代码提供了自己的 =message=,那么“enable/disable”消息实际上是会关闭的。这是在 =current-message= 函数的帮助下完成的，该函数返回当前在echo区域中显示的内容。
+
+总之，我只是简单地了解了下表层。如果你深入文件 =easy-mmode.el= (所有代码都在该文件中),你会发现相当多的细节(比如 =easy-mmode-pretty-mode-name= 有数十行代码但只做一件事情那就是将mode符号转换成方便人阅读的形式--使用mode的 lighter 参数来推断大写形式!)。
+这是Emacs开发人员非常关注细节的另一个例子，即使在开发过程中存在一些有问题的实践。[[http://mbork.pl/smileys/24/mb-wink.gif]]
