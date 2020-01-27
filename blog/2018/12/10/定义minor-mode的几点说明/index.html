@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>定义minor mode的几点说明 - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="elisp-common" />
+  <!-- <link rel="stylesheet" href="../../../../../media/css/main.css" type="text/css"/>
+       <link rel="stylesheet" href="../../../../../media/css/comment.css" type="text/css"/> -->
+  <link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/kognise/water.css@latest/dist/dark.css'>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="../../../../../">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <ul class="trigger">
+        <li><a href="../../../../../years/">Years</a></li>
+        <li><a href="../../../../../authors/">Authors</a></li>
+        <li><a href="../../../../../tags/">Tags</a></li>
+        <li><a href="../../../../../about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="../../../../../rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="https://www.bing.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">定义minor mode的几点说明</h1>
+<p>
+今天的帖子技术含量很高，但我想分享一个几天前的有趣故事。
+</p>
+
+<p>
+我使用经典架构定义了一个minor mode
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">cool-start</span> ()
+  <span style="font-style: italic;">"Start the cool-mode."</span>)
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">cool-stop</span> ()
+  <span style="font-style: italic;">"Stop the cool-mode."</span>)
+
+(<span style="font-weight: bold;">define-minor-mode</span> <span style="font-weight: bold;">my-cool-minor-mode</span>
+  <span style="font-style: italic;">"Toggle a mode for doing cool stuff."</span>
+  <span style="font-weight: bold;">:init-value</span> nil
+  <span style="font-weight: bold;">:lighter</span> <span style="font-style: italic;">" 8-)"</span>
+  (<span style="font-weight: bold;">if</span> my-cool-minor-mode
+      (cool-start)
+    (cool-stop)))
+</pre>
+</div>
+
+<p>
+我很好奇是否可以使用前缀参数来决定在启动模式时做什么。这似乎有点冒险，因为前缀参数已经用于决定打开或关闭模式了。
+</p>
+
+<p>
+实际上, <code>my-cool-minor-mode</code> 命令的参数的文档点误导人。以下是Emacs手册中的一段摘录:
+</p>
+
+<ul class="org-ul">
+<li>如果你直接调用mode命令而不带任何前缀参数(通过“M-x”，或通过绑定到一个键并输入该键[…])，就会“切换” minor-mode。minor-mode若关闭则打开，若打开则关闭。</li>
+<li>如果你使用前缀参数调用mode命令，则若参数为0或负数，minor-mode将无条件关闭;否则，将被无条件地打开。</li>
+<li>如果通过Lisp调用mode命令，则若参数被省略或为“nil”，则minor-mode将无条件打开。这使得通过major mode的mode hook来打开minor-mode变得很容易[...]。非'nil'参数的处理方式类似于前面描述的交互式前缀参数。</li>
+</ul>
+
+<p>
+以下是Elisp手册中的一段话:
+</p>
+
+<p>
+toggle命令接受一个可选的(前缀)参数。如果交互方式调用则没有参数的情况下，它切换打开或关闭模式,正的前缀参数启用该模式，任何其他前缀参数将禁用该模式。
+在Lisp中调用的话，‘toggle’参数切换模式，而省略或‘nil’参数启用该模式。例如,这可以使通过major mode的mode hook来打开minor mode变得很容易.
+如果DOC为“nil”，则宏提供一个默认的文档字符串来解释上述内容。
+</p>
+
+<p>
+正如你所见，从Elisp手册中并不完全清楚是否可以通过代码提供数值参数(显然，您不能交互地提供='toggle=参数)。
+</p>
+
+<p>
+原来, <code>define-minor-mode</code> 宏以一种非常复杂的方式定义了负责打开和关闭模式的函数。
+</p>
+
+<p>
+首先，该宏包含了下面片段:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">interactive</span> (list (<span style="font-weight: bold;">or</span> current-prefix-arg 'toggle)))
+</pre>
+</div>
+
+<p>
+这意味着没有参数(在交互调用时)与 <code>'toggle</code> 参数完全等价。
+</p>
+
+<p>
+另一个技巧是:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(,@setter
+ (<span style="font-weight: bold;">if</span> (eq arg 'toggle)
+     (not ,getter)
+   <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">A nil argument also means ON now.</span>
+   (&gt; (prefix-numeric-value arg) 0)))
+</pre>
+</div>
+
+<p>
+<code>define-minor-mode</code> 在前面将 <code>setter</code> 设置成了 <code>(setq &lt;mode-name&gt;)</code>, 将 <code>getter</code> 设置成了 <code>&lt;mode-name&gt;</code>. 
+这里有一个非常聪明的技巧: <code>getter</code> 变量其实就是mode，而 <code>setter</code> 是将 <code>getter</code> 变量设置为某个值的Elisp form的开头部分。
+(如果您认为这太抽象，让我告诉您，我的描述还算是简化过得:例如，对于全局模式来说, <code>setter</code> 和 <code>getter</code> 就跟这里说的有所不同。)
+</p>
+
+<p>
+正如您从上面的技巧中看到的，我的原始问题有一个简单的答案:是的，我们可以在Elisp代码中提供数值参数，实际上，提供一个负参数是通过编程手段关闭模式的唯一方法。
+</p>
+
+<p>
+了解了这一点，我们现在可以着手解决最初的问题了。既然任何正的前缀参数都意味着“打开模式”，那么我们可以使用它的实际值来做各种事情吗?
+</p>
+
+<p>
+答案当然是肯定的。我们可以有两个选择。首先，我们的模式主体可以检查 <code>current-prefix-arg</code>. 此外我们还可以使用 <code>arg</code>.(<code>define-minor-mode</code> 宏就是通过该参数调用新定义的切换函数的)。
+后者显然没有那么明显(特别是它依赖于的实现细节可能在另一个Emacs版本中更改)，所以让我们忘记它吧。(实际上，与其使用 <code>arg</code> 符号，不如使用一些类似于Common Lisp <code>gensym</code> 的东西。Elisp没有该函数. <code>cl</code> 包有 <code>cl-gensym</code>, 但是内置的特性并不依赖于 <code>cl</code> 包,这是可以理解的。
+</p>
+
+<p>
+但是故事还没结束呢。 还有一些关键字参数在 <code>define-minor-mode</code> 的docstring和手册中都尚未提及. 其中一个就是 <code>:extra-args</code>. 
+(有趣的旁注: 该 <code>:extra-args</code> 关键字在整个Emacs源中只提到了三次. 根据 <code>git blame</code> 的结果，其中一次是定义,最后一次由 Stefan Monnier 在2012-06-10使用。
+第二次在 <code>use-hard-newlines</code> minor mode中，最后一次由 Stefan Monnier 在 2001-10-30 使用。
+第三次是在 <code>global-font-lock-mode</code> 的注释中提及，该注释写的诗 What was this <code>:extra-args thingy for? --Stef</code>, 最后一次在2009-09-13使用，作者你是猜猜是谁?)
+</p>
+
+<p>
+All these arguments (including the first one) are optional, and you can't supply the <code>:extra-args</code> on an interactive call. You can, however, supply them from Elisp code. Here is an example.
+你可以这样使用它。在 <code>:extra-args</code> 关键字之后的值应该是一个(unqouted的)列表，这个列表会被添加到打开本模式的函数的第一个参数之后(例如，在以交互方式调用mode命令的前缀参数)。
+所有这些参数(包括第一个参数)都是可选的，您不能在交互式调用中提供 <code>:extra-args</code>. 但是，你可以通过Elisp代码提供这些参数。例如:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">define-minor-mode</span> <span style="font-weight: bold;">my-cool-minor-mode</span>
+  <span style="font-style: italic;">"Toggle a mode for doing cool stuff."</span>
+  <span style="font-weight: bold;">:init-value</span> nil
+  <span style="font-weight: bold;">:lighter</span> <span style="font-style: italic;">" 8-)"</span>
+  <span style="font-weight: bold;">:extra-args</span> (cool-arg-1 cool-arg-2)
+  (<span style="font-weight: bold;">if</span> my-cool-minor-mode
+      (<span style="font-weight: bold;">progn</span>
+        (cool-start)
+        (message <span style="font-style: italic;">"cool-arg-1: %s, cool-arg-2: %s"</span> cool-arg-1 cool-arg-2))
+    (cool-stop)))
+</pre>
+</div>
+
+<p>
+试着执行: <code>M-:(my-cool-min -mode 1 "this")</code> 看看 <code>cool-arg-1</code> 是否变成了 <code>"this"</code> , <code>cool-arg-2</code> 变成 nil。
+</p>
+
+<p>
+最后一个关于 <code>define-minor-mode</code> 的趣闻是 <code>My-Cool minor mode 在当前buffer启用时</code> 的默认消息. 我注意到 <code>message</code> 函数放到mode的启动代码中时，该默认消息不会现实。
+为了找到原因,一开始我在Emacs源码中搜索单词 “enabled” (2774 处) 和 “disabled” (1324 处). 没有结果。
+然后我 <a href="http://mbork.pl/2016-05-15_debug-on-whatever">回想起了</a> <code>debug-on-message</code> 变量, 结果发现我的搜索完全没有. 原因是(简化了一点):
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(message
+ <span style="font-style: italic;">"Some-mode %sabled"</span>
+ (<span style="font-weight: bold;">if</span> mode-variable <span style="font-style: italic;">"en"</span> <span style="font-style: italic;">"dis"</span>))
+</pre>
+</div>
+
+<p>
+好吧，这让我哭笑不得(特别是我必须要处理一点软件国际化的事情)，但我承认它在某种程度上是个不错的做法。
+</p>
+
+<p>
+更有趣的是，如果负责初始化(或关闭)模式的代码提供了自己的 <code>message</code>,那么“enable/disable”消息实际上是会关闭的。这是在 <code>current-message</code> 函数的帮助下完成的，该函数返回当前在echo区域中显示的内容。
+</p>
+
+<p>
+总之，我只是简单地了解了下表层。如果你深入文件 <code>easy-mmode.el</code> (所有代码都在该文件中),你会发现相当多的细节(比如 <code>easy-mmode-pretty-mode-name</code> 有数十行代码但只做一件事情那就是将mode符号转换成方便人阅读的形式--使用mode的 lighter 参数来推断大写形式!)。
+这是Emacs开发人员非常关注细节的另一个例子，即使在开发过程中存在一些有问题的实践。<img src="http://mbork.pl/smileys/24/mb-wink.gif" alt="mb-wink.gif" />
+</p>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2018-12-10</span>
+            <span title="last modification date" class="post-info">2020-01-27</span>
+            <span title="tags" class="post-info">:<a href="../../../../../tags/elisp-common">elisp-common</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-0802debc-61f4-4a37-95dc-bf655a31f098">lujun9972</a></span>
+        </div>
+    <script src="../../../../../media/js/jquery-2.1.3.min.js"></script>
+    <script src="../../../../../media/js/md5.min.js"></script>
+        <section>
+            <div id="gitalk-container"></div>
+            <script type="text/javascript">
+             var gitalk = new Gitalk({
+                 clientID: 'fdcb5d9da3f4acb4862c',
+                 clientSecret: 'dd0a16312a206782cb7669dcec5e96874ab48170',
+                 repo: 'lujun9972.github.com',
+                 owner: 'lujun9972',
+                 admin: ['lujun9972'],
+                 id: md5(location.pathname),      // Ensure uniqueness and length less than 50
+                 distractionFreeMode: false  // Facebook-like distraction free mode
+             })
+             gitalk.render('gitalk-container')
+            </script>
+        </section>
+    <script src="../../../../../media/js/main.js"></script>
+        <script>
+         var _hmt = _hmt || [];
+         (function() {
+             var hm = document.createElement("script");
+             hm.src = "https://hm.baidu.com/hm.js?7bac4fd0247f69c27887e0d4e3aee41e";
+             var s = document.getElementsByTagName("script")[0]; 
+             s.parentNode.insertBefore(hm, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-0802debc-61f4-4a37-95dc-bf655a31f098">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="../../../../../instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>
