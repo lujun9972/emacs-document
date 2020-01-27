@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Emacs Lisp Lambda 表达式不是自求值的 - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="elisp-common" />
+  <!-- <link rel="stylesheet" href="../../../../../media/css/main.css" type="text/css"/>
+       <link rel="stylesheet" href="../../../../../media/css/comment.css" type="text/css"/> -->
+  <link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/kognise/water.css@latest/dist/dark.css'>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="../../../../../">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <ul class="trigger">
+        <li><a href="../../../../../years/">Years</a></li>
+        <li><a href="../../../../../authors/">Authors</a></li>
+        <li><a href="../../../../../tags/">Tags</a></li>
+        <li><a href="../../../../../about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="../../../../../rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="https://www.bing.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">Emacs Lisp Lambda 表达式不是自求值的</h1>
+<div id="table-of-contents">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#taming-an-old-dragon">驯服这条老恶龙</a>
+<ul>
+<li><a href="#eval-after-load">eval-after-load</a></li>
+<li><a href="#a-workaround">变通之法</a></li>
+</ul>
+</li>
+<li><a href="#evaluating-function-objects">函数对象取值</a></li>
+<li><a href="#solving-the-problem-with-one-character">用一个字符解决问题</a></li>
+</ul>
+</div>
+</div>
+<p>
+这周我犯了一个错误，它最终启发了我关于Emacs Lisp中函数对象的本质。Emacs Lisp中有三种类型的函数对象，但这些对象计算时，它们的行为各不相同。
+</p>
+
+<p>
+但在此之前，我们先来谈谈Emacs中的一个令人尴尬的老问题: <code>eval-after-load</code>.
+</p>
+
+<div id="outline-container-orga241c0c" class="outline-2">
+<h2 id="taming-an-old-dragon"><a id="orga241c0c"></a>驯服这条老恶龙</h2>
+<div class="outline-text-2" id="text-taming-an-old-dragon">
+<p>
+Emacs的一个长期存在的问题是加载Emacs Lisp文件太慢(.el和.elc)，即使这些文件已经被字节编译过了。为了解决这个问题，已经出现了许多不规范的补丁方法，其中最大、最糟糕的就是<a href="https://lwn.net/Articles/707615/">dumper</a>，也被称为unexec。
+</p>
+
+<p>
+你使用的Emacs实际上是从之前死亡中复活的Emacs实例。您的亡灵Emacs可能是在它最初编译的时候创建的,时间可能是几个月前到几年前不等。编译Emacs的第一阶段是编译一个名为 <code>temacs</code> 的最小C内核。第二阶段是加载一堆Emacs Lisp文件，然后以不可移植的、依赖于平台的方式转储内存映像。在Linux上，这实际上<a href="https://lwn.net/Articles/707615/">需要使用glibc中的特殊钩子</a>。您所熟悉和喜爱的Emacs就是这个转储后的镜像，重新被加载到内存中后，从编译后停止的地方继续执行。不管你自己对这件事的感觉如何，你必须承认<a href="http://nullprogram.com/blog/2011/01/30/">这是一件非常有Lispy风范的事情</a>。
+</p>
+
+<p>
+Emacs的dumper两个值得注意的成本:
+</p>
+
+<ol class="org-ol">
+<li>转储映像包含硬编码的内存地址。这意味着Emacs不能是独立于位置的可执行文件(PIE)。它无法利用一个叫做地址空间布局随机化(ASLR)的安全特性，这将增加<a href="http://nullprogram.com/blog/2017/07/19/">exploiting</a><a href="http://nullprogram.com/blog/2012/09/28/">类BUG</a>的难度。 若你用Emacs处理不受信任的数据，比如将其用作<a href="http://nullprogram.com/blog/2013/09/03/">一个邮件客户端</a>、<a href="https://github.com/skeeto/emacs-webserver">一个web服务器</a>或只是<a href="https://github.com/skeeto/elfeed">解析从网络下载的数据</a>，那这一点对你可能很重要。</li>
+
+<li>不能交叉编译Emacs，因为它只能通过在其目标平台上运行 <code>temacs</code> 来转储。我做了一个实验，尝试使用<a href="https://www.winehq.org/">Wine</a>在Linux上转储Emacs的Windows版本，但是没有成功。</li>
+</ol>
+
+<p>
+好消息是，<a href="https://lists.gnu.org/archive/html/emacs-devel/2018-02/msg00347.html">有一种可移植的dumper</a> 正在研制中，这使它的危害大大降低。
+如果你是个冒险家，可以通过在 <a href="https://lists.gnu.org/archive/html/bug-gnu-emacs/2016-11/msg00729.html">在编译时设置 <code>CANNOT_DUMP=yes</code></a> 并直接运行 =temacs=来禁用转储. 
+但是要注意，非转储的Emacs在开始加载您自己的配置之前需要花几秒钟甚至更多的时间来初始化。
+它也有一些bug，因为似乎没有人能以这种方式有效率地运行它。
+</p>
+
+<p>
+Emacs用户解决加载慢的另一个主要方法是积极使用延迟加载，通常是通过自动加载来实现延迟加载。包主要交互入口点被预先定义为stub函数。当调用这些stub时，就会加载完整的包，从而覆盖stub定义，最后stub将使用相同的参数重新调用新定义。
+</p>
+
+<p>
+为了进一步帮助延迟加载, <code>defvar</code> form执行后不会覆盖现有的全局变量的绑定。 这意味着，在某种程度上，你可以在加载包之前配置这些全局变量。包加载时不会破坏任何现有的配置。
+这也解释了各种钩子函数(比如 <code>add-hook</code> 和 <code>run-hook</code>)的接口为何如此奇怪。它们接受符号——变量的名称——而不是通常情况下的变量值。
+<code>add-to-list</code> 函数也是一样。这一切都是为了配合延迟加载，在延迟加载时变量可能还没有定义。
+</p>
+</div>
+
+<div id="outline-container-org7a355f4" class="outline-3">
+<h3 id="eval-after-load"><a id="org7a355f4"></a>eval-after-load</h3>
+<div class="outline-text-3" id="text-eval-after-load">
+<p>
+有时这还不够，您需要在加载包之后进行一些配置，但又不能强制它提前加载。
+也就是说，您需要告诉Emacs“在这个特定的包加载之后再运行这段代码”。这就是 <code>eval-after-load</code> 发挥作用的地方了，只是它有一个致命缺陷:它完全按照字面意思理解“eval”这个词。
+</p>
+
+<p>
+<code>eval-after-load</code> 的第一个参数是包的名称。很没问题。第二个参数是一个form，在加载包之后传递给 <code>eval</code> 执行。
+等一下。一般的经验告诉我们，调用 <code>eval</code> 可能会出现严重错误，这个函数也不例外。
+这对于 <code>eval-fater-load</code> 的这个任务来说这个机制完全是错误的。
+</p>
+
+<p>
+第二个参数应该是函数——要么是(尖引号)符号，要么是函数对象。然后用更合理的方法代替 <code>eval</code> (比如 <code>funcall</code>)。
+也许这个改进的版本应该命名为 <code>call-after-load</code> 或 <code>run-after-load</code>.
+</p>
+
+<p>
+<a href="http://nullprogram.com/blog/2017/12/14/">我以前提到过运行lambda的重要性</a>. <code>eval-after-load</code> 不仅鼓励编写糟糕的Emacs Lisp，它还要求这么做.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp"><span style="font-weight: bold; font-style: italic;">;;; </span><span style="font-weight: bold; font-style: italic;">BAD!</span>
+(eval-after-load 'simple-httpd
+  '(push '(<span style="font-style: italic;">"c"</span> . <span style="font-style: italic;">"text/plain"</span>) httpd-mime-types))
+</pre>
+</div>
+
+<p>
+这在Emacs 25中得到了纠正。如果 <code>eval-after-load</code> 的第二个参数是一个函数——应用 <code>functionp</code> 检测的的结果是非空的—— 使用 <code>funcall</code> 执行该函数.
+还有一个新的宏 <code>with-eval-after-load</code>,可以很好地打包所有内容。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp"><span style="font-weight: bold; font-style: italic;">;;; </span><span style="font-weight: bold; font-style: italic;">Better (Emacs &gt;= 25 only)</span>
+(eval-after-load 'simple-httpd
+  (<span style="font-weight: bold;">lambda</span> ()
+    (<span style="font-weight: bold;">push</span> '(<span style="font-style: italic;">"c"</span> . <span style="font-style: italic;">"text/plain"</span>) httpd-mime-types)))
+
+<span style="font-weight: bold; font-style: italic;">;;; </span><span style="font-weight: bold; font-style: italic;">Best (Emacs &gt;= 25 only)</span>
+(<span style="font-weight: bold;">with-eval-after-load</span> 'simple-httpd
+  (<span style="font-weight: bold;">push</span> '(<span style="font-style: italic;">"c"</span> . <span style="font-style: italic;">"text/plain"</span>) httpd-mime-types))
+</pre>
+</div>
+
+<p>
+虽然在这两个例子中编译器可能会警告 <code>httpd-mime-type</code> 没有被定义。但那是另一个问题了。
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgc14cb0e" class="outline-3">
+<h3 id="a-workaround"><a id="orgc14cb0e"></a>变通之法</h3>
+<div class="outline-text-3" id="text-a-workaround">
+<p>
+但是，如果您 <a href="https://github.com/skeeto/elfeed/pull/268">遇到像本文一样的情况</a> 需要使用Emacs 24，那该怎么办呢? 我们可以用问题版本的 <code>eval-after-load</code> 做什么呢?
+我们可以放置一个lambda表达式，对它求之后将得到的函数对象传递给 <code>eval-after-load</code> 语句中，所有操作都使用反引号。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp"><span style="font-weight: bold; font-style: italic;">;;; </span><span style="font-weight: bold; font-style: italic;">Note: this is subtly broken</span>
+(eval-after-load 'simple-httpd
+  `(funcall
+    ,(<span style="font-weight: bold;">lambda</span> ()
+       (<span style="font-weight: bold;">push</span> '(<span style="font-style: italic;">"c"</span> . <span style="font-style: italic;">"text/plain"</span>) httpd-mime-types)))
+</pre>
+</div>
+
+<p>
+所有内容都被编译后，这个反引号的语句就变成了:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(funcall #[0 &lt;bytecode&gt; [httpd-mime-types (<span style="font-style: italic;">"c"</span> . <span style="font-style: italic;">"text/plain"</span>)] 2])
+</pre>
+</div>
+
+<p>
+这里第二个值 (<code>#[...]</code>) 是一个 <a href="http://nullprogram.com/blog/2014/01/04/">字节码对象</a>. 
+然而，正如评论所指出的那样，这样还有不太好的地方。一种更简洁和正确的方法是使用一个命名函数来解决所有这些问题. <code>eval-after-load</code> 所造成的损失将(基本上)减至最低。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">my-simple-httpd-hook</span> ()
+  (<span style="font-weight: bold;">push</span> '(<span style="font-style: italic;">"c"</span> . <span style="font-style: italic;">"text/plain"</span>) httpd-mime-types))
+
+(eval-after-load 'simple-httpd
+  '(funcall #'my-simple-httpd-hook))
+</pre>
+</div>
+
+<p>
+但是，让我们在回到匿名函数这个解决方案中来。还有什么不太好的地方?它与函数对象的求值有关。
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgdb4e0ac" class="outline-2">
+<h2 id="evaluating-function-objects"><a id="orgdb4e0ac"></a>函数对象取值</h2>
+<div class="outline-text-2" id="text-evaluating-function-objects">
+<p>
+那么当我们用 <code>eval</code> 对上面这样的表达式求值时会发生什么呢? 其形式如下。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(funcall #[...])
+</pre>
+</div>
+
+<p>
+首先, <code>eval</code> 注意到它被赋予了一个非空列表，所以它可能是一个函数调用。第一个参数是要调用的函数的名称(<code>funcall</code>)，其余的元素是它的参数。但是每个元素都必须先求值，然后求值的结果就是参数。
+</p>
+
+<p>
+任何不是列表或符号的值都是自求值的。也就是说，它的计算值就是自己:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(eval 10)
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">=&gt; 10</span>
+</pre>
+</div>
+
+<p>
+如果值是符号，则将其视为变量。如果该值是一个列表，那么它又需要经历一次所描述的函数调用过程(或者其他一些特殊情况，例如宏展开、lambda表达式和特殊语句)。
+</p>
+
+<p>
+因此，在概念上 <code>eval</code> 在函数对象 <code>#[...]</code> 上进行递归。函数对象不是列表或符号，所以它是自求值的。没有问题。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp"><span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Byte-code objects are self-evaluating</span>
+
+(<span style="font-weight: bold;">let</span> ((x (byte-compile (<span style="font-weight: bold;">lambda</span> ()))))
+  (eq x (eval x)))
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">=&gt; t</span>
+</pre>
+</div>
+
+<p>
+如果这段代码没有被编译呢?我们为解释器提供一些其他类型的函数对象，而不是字节码对象会怎样。
+让我们看看动态作用域的(恐怖)情况。这里，lambda的结果似乎就是自己，但外表可能具有欺骗性:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(eval (<span style="font-weight: bold;">lambda</span> ())
+      <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">=&gt; (lambda ())</span>
+</pre>
+</div>
+
+<p>
+然而，这不是自运算. <b>Lambda表达式的值不是自己</b>. 对lambda表达式求值的结果与原始表达式相似只是个巧合。
+这只是Emacs Lisp解释器目前的实现方式而已，严格地说，它是一个实现细节，恰好与自元算的字节码对象基本兼容。
+但依赖这一点是错误的。
+</p>
+
+<p>
+In contrast, a self-evaluating value is also idempotent under evaluation, but with <code>eq</code> results.
+相反, <b>动态作用于lambda表达式求值是<a href="https://labs.spotify.com/2013/06/18/creusernames/">幂等的</a>.</b> 对结果应用 <code>eval</code> 将返回一个相等(<code>equal</code>),但不相同的表达式(<code>eq</code>)。
+相反，一个自运算的值在被运行时也是幂等的，而且结果相同(<code>eq</code>)。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp"><span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Not self-evaluating:</span>
+
+(<span style="font-weight: bold;">let</span> ((x '(lambda ())))
+  (eq x (eval x)))
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">=&gt; nil</span>
+
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Evaluation is idempotent:</span>
+
+(<span style="font-weight: bold;">let</span> ((x '(lambda ())))
+  (equal x (eval x)))
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">=&gt; t</span>
+
+(<span style="font-weight: bold;">let</span> ((x '(lambda ())))
+  (equal x (eval (eval x))))
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">=&gt; t</span>
+</pre>
+</div>
+
+<p>
+因此，对于动态作用域，这个有点问题的反引号示例仍然能用，但这完全是靠运气。在静态作用域下，就没那么幸运了:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp"><span style="font-weight: bold; font-style: italic;">;;; </span><span style="font-weight: bold; font-style: italic;">-*- lexical-scope: t; -*-</span>
+
+(<span style="font-weight: bold;">lambda</span> ())
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">=&gt; (closure (t) nil)</span>
+</pre>
+</div>
+
+<p>
+这些执行后的lambda函数既不是自求值函数，也不是幂等函数。传递 <code>t</code> 作为 <code>eval</code> 的第二个参数可以告诉它使用词法作用域，如下所示:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp"><span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Not self-evaluating:</span>
+
+(<span style="font-weight: bold;">let</span> ((x '(lambda ())))
+  (eq x (eval x t)))
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">=&gt; nil</span>
+
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Not idempotent:</span>
+
+(<span style="font-weight: bold;">let</span> ((x '(lambda ())))
+  (equal x (eval x t)))
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">=&gt; nil</span>
+
+(<span style="font-weight: bold;">let</span> ((x '(lambda ())))
+  (equal x (eval (eval x t) t)))
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">error: (void-function closure)</span>
+</pre>
+</div>
+
+<p>
+I can <a href="file:///blog/2017/05/03/">imagine an implementation</a> of Emacs Lisp where dynamic scope lambda expressions are in the same boat, where they're not even idempotent. For example:
+我可以<a href="http://nullprogram.com/blog/2017/05/03/">想象一种Emacs Lisp实现</a>，其动态作用域下的lambda表达式也一样不是幂等的。例如:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp"><span style="font-weight: bold; font-style: italic;">;;; </span><span style="font-weight: bold; font-style: italic;">-*- lexical-binding: nil; -*-</span>
+
+(<span style="font-weight: bold;">lambda</span> ())
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">=&gt; (totally-not-a-closure ())</span>
+</pre>
+</div>
+
+<p>
+大多数Emacs Lisp代码在这种变化下能正常工作，只有出现某种逻辑错误的代码—在lambda表达式嵌套求值的地方—才会中断。
+在Emacs 24之后，当大量代码被悄悄地切换到词法作用域时，这种情况基本上已经发生了。
+Lambda的幂等性丢失了，编写良好的代码则没有影响。
+</p>
+
+<p>
+Emacs尝试过定义一个 <code>closure</code> 函数或特殊形式，以允许解释器闭包对象可以自求值和幂等的。
+但这是一个错误。它只能作为一种hack，用来掩盖导致嵌套计算的逻辑错误。尽早发现这些问题会更好。
+</p>
+</div>
+</div>
+
+<div id="outline-container-org3d2c13f" class="outline-2">
+<h2 id="solving-the-problem-with-one-character"><a id="org3d2c13f"></a>用一个字符解决问题</h2>
+<div class="outline-text-2" id="text-solving-the-problem-with-one-character">
+<p>
+那么，我们如何修复这个小问题呢?有策略地在逗号前加上引号即可。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(eval-after-load 'simple-httpd
+  `(funcall
+    ',(<span style="font-weight: bold;">lambda</span> ()
+        (<span style="font-weight: bold;">push</span> '(<span style="font-style: italic;">"c"</span> . <span style="font-style: italic;">"text/plain"</span>) httpd-mime-types)))
+</pre>
+</div>
+
+<p>
+因此，传递给 <code>eval-after-load</code> 的语句变成:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp"><span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Compiled:</span>
+(funcall (<span style="font-weight: bold;">quote</span> #[...]))
+
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Dynamic scope:</span>
+(funcall (<span style="font-weight: bold;">quote</span> (<span style="font-weight: bold;">lambda</span> () ...)))
+
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Lexical scope:</span>
+(funcall (<span style="font-weight: bold;">quote</span> (closure (t) () ...)))
+</pre>
+</div>
+
+<p>
+引号阻止了 <code>eval</code> 对函数对象求值，这要么是不必要的，要么是有害的。
+还有一种说法是，这种情况非常适合使用sharp-quote(<code>#'</code>),它用来对函数进行应用。
+</p>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2018-03-28</span>
+            <span title="last modification date" class="post-info">2020-01-27</span>
+            <span title="tags" class="post-info">:<a href="../../../../../tags/elisp-common">elisp-common</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-388a2dfc-36ca-4a98-9c3c-05c545e904ac">lujun9972</a></span>
+        </div>
+    <script src="../../../../../media/js/jquery-2.1.3.min.js"></script>
+    <script src="../../../../../media/js/md5.min.js"></script>
+        <section>
+            <div id="gitalk-container"></div>
+            <script type="text/javascript">
+             var gitalk = new Gitalk({
+                 clientID: 'fdcb5d9da3f4acb4862c',
+                 clientSecret: 'dd0a16312a206782cb7669dcec5e96874ab48170',
+                 repo: 'lujun9972.github.com',
+                 owner: 'lujun9972',
+                 admin: ['lujun9972'],
+                 id: md5(location.pathname),      // Ensure uniqueness and length less than 50
+                 distractionFreeMode: false  // Facebook-like distraction free mode
+             })
+             gitalk.render('gitalk-container')
+            </script>
+        </section>
+    <script src="../../../../../media/js/main.js"></script>
+        <script>
+         var _hmt = _hmt || [];
+         (function() {
+             var hm = document.createElement("script");
+             hm.src = "https://hm.baidu.com/hm.js?7bac4fd0247f69c27887e0d4e3aee41e";
+             var s = document.getElementsByTagName("script")[0]; 
+             s.parentNode.insertBefore(hm, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-388a2dfc-36ca-4a98-9c3c-05c545e904ac">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="../../../../../instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>
