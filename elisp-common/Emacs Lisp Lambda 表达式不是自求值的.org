@@ -1,0 +1,253 @@
+#+TITLE: Emacs Lisp Lambda 表达式不是自求值的
+#+URL: http://nullprogram.com/blog/2018/02/22/
+#+AUTHOR: lujun9972
+#+TAGS: elisp-common
+#+DATE: [2018年 03月 28日 星期三 12:31:54 CST]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+这周我犯了一个错误，它最终启发了我关于Emacs Lisp中函数对象的本质。Emacs Lisp中有三种类型的函数对象，但这些对象计算时，它们的行为各不相同。
+
+但在此之前，我们先来谈谈Emacs中的一个令人尴尬的老问题: =eval-after-load=.
+
+* 驯服这条老恶龙
+:PROPERTIES:
+:CUSTOM_ID: taming-an-old-dragon
+:END:
+
+Emacs的一个长期存在的问题是加载Emacs Lisp文件太慢(.el和.elc)，即使这些文件已经被字节编译过了。为了解决这个问题，已经出现了许多不规范的补丁方法，其中最大、最糟糕的就是[[https://lwn.net/Articles/707615/][dumper]]，也被称为unexec。
+
+你使用的Emacs实际上是从之前死亡中复活的Emacs实例。您的亡灵Emacs可能是在它最初编译的时候创建的,时间可能是几个月前到几年前不等。编译Emacs的第一阶段是编译一个名为 =temacs= 的最小C内核。第二阶段是加载一堆Emacs Lisp文件，然后以不可移植的、依赖于平台的方式转储内存映像。在Linux上，这实际上[[https://lwn.net/Articles/707615/][需要使用glibc中的特殊钩子]]。您所熟悉和喜爱的Emacs就是这个转储后的镜像，重新被加载到内存中后，从编译后停止的地方继续执行。不管你自己对这件事的感觉如何，你必须承认[[http://nullprogram.com/blog/2011/01/30/][这是一件非常有Lispy风范的事情]]。
+
+Emacs的dumper两个值得注意的成本:
+
+1. 转储映像包含硬编码的内存地址。这意味着Emacs不能是独立于位置的可执行文件(PIE)。它无法利用一个叫做地址空间布局随机化(ASLR)的安全特性，这将增加[[http://nullprogram.com/blog/2017/07/19/][exploiting]][[http://nullprogram.com/blog/2012/09/28/][类BUG]]的难度。 若你用Emacs处理不受信任的数据，比如将其用作[[http://nullprogram.com/blog/2013/09/03/][一个邮件客户端]]、[[https://github.com/skeeto/emacs-webserver][一个web服务器]]或只是[[https://github.com/skeeto/elfeed][解析从网络下载的数据]]，那这一点对你可能很重要。
+
+2. 不能交叉编译Emacs，因为它只能通过在其目标平台上运行 =temacs= 来转储。我做了一个实验，尝试使用[[https://www.winehq.org/][Wine]]在Linux上转储Emacs的Windows版本，但是没有成功。
+
+好消息是，[[https://lists.gnu.org/archive/html/emacs-devel/2018-02/msg00347.html][有一种可移植的dumper]] 正在研制中，这使它的危害大大降低。
+如果你是个冒险家，可以通过在 [[https://lists.gnu.org/archive/html/bug-gnu-emacs/2016-11/msg00729.html][在编译时设置 ~CANNOT_DUMP=yes~]] 并直接运行 =temacs=来禁用转储. 
+但是要注意，非转储的Emacs在开始加载您自己的配置之前需要花几秒钟甚至更多的时间来初始化。
+它也有一些bug，因为似乎没有人能以这种方式有效率地运行它。
+
+Emacs用户解决加载慢的另一个主要方法是积极使用延迟加载，通常是通过自动加载来实现延迟加载。包主要交互入口点被预先定义为stub函数。当调用这些stub时，就会加载完整的包，从而覆盖stub定义，最后stub将使用相同的参数重新调用新定义。
+
+为了进一步帮助延迟加载, =defvar= form执行后不会覆盖现有的全局变量的绑定。 这意味着，在某种程度上，你可以在加载包之前配置这些全局变量。包加载时不会破坏任何现有的配置。
+这也解释了各种钩子函数(比如 =add-hook= 和 =run-hook=)的接口为何如此奇怪。它们接受符号——变量的名称——而不是通常情况下的变量值。
+=add-to-list= 函数也是一样。这一切都是为了配合延迟加载，在延迟加载时变量可能还没有定义。
+
+** eval-after-load
+:PROPERTIES:
+:CUSTOM_ID: eval-after-load
+:END:
+
+有时这还不够，您需要在加载包之后进行一些配置，但又不能强制它提前加载。
+也就是说，您需要告诉Emacs“在这个特定的包加载之后再运行这段代码”。这就是 =eval-after-load= 发挥作用的地方了，只是它有一个致命缺陷:它完全按照字面意思理解“eval”这个词。
+
+=eval-after-load= 的第一个参数是包的名称。很没问题。第二个参数是一个form，在加载包之后传递给 =eval= 执行。
+等一下。一般的经验告诉我们，调用 =eval= 可能会出现严重错误，这个函数也不例外。
+这对于 =eval-fater-load= 的这个任务来说这个机制完全是错误的。
+
+第二个参数应该是函数——要么是(尖引号)符号，要么是函数对象。然后用更合理的方法代替 =eval= (比如 =funcall=)。
+也许这个改进的版本应该命名为 =call-after-load= 或 =run-after-load=.
+
+ [[http://nullprogram.com/blog/2017/12/14/][我以前提到过运行lambda的重要性]]. =eval-after-load= 不仅鼓励编写糟糕的Emacs Lisp，它还要求这么做.
+
+ #+begin_src emacs-lisp
+   ;;; BAD!
+   (eval-after-load 'simple-httpd
+     '(push '("c" . "text/plain") httpd-mime-types))
+ #+end_src
+
+这在Emacs 25中得到了纠正。如果 =eval-after-load= 的第二个参数是一个函数——应用 =functionp= 检测的的结果是非空的—— 使用 =funcall= 执行该函数.
+还有一个新的宏 =with-eval-after-load=,可以很好地打包所有内容。
+
+#+begin_src emacs-lisp
+  ;;; Better (Emacs >= 25 only)
+  (eval-after-load 'simple-httpd
+    (lambda ()
+      (push '("c" . "text/plain") httpd-mime-types)))
+
+  ;;; Best (Emacs >= 25 only)
+  (with-eval-after-load 'simple-httpd
+    (push '("c" . "text/plain") httpd-mime-types))
+#+end_src
+
+虽然在这两个例子中编译器可能会警告 =httpd-mime-type= 没有被定义。但那是另一个问题了。
+
+** 变通之法
+:PROPERTIES:
+:CUSTOM_ID: a-workaround
+:END:
+
+但是，如果您 [[https://github.com/skeeto/elfeed/pull/268][遇到像本文一样的情况]] 需要使用Emacs 24，那该怎么办呢? 我们可以用问题版本的 =eval-after-load= 做什么呢?
+我们可以放置一个lambda表达式，对它求之后将得到的函数对象传递给 =eval-after-load= 语句中，所有操作都使用反引号。
+
+#+begin_src emacs-lisp
+  ;;; Note: this is subtly broken
+  (eval-after-load 'simple-httpd
+    `(funcall
+      ,(lambda ()
+         (push '("c" . "text/plain") httpd-mime-types)))
+#+end_src
+
+所有内容都被编译后，这个反引号的语句就变成了:
+
+#+begin_src emacs-lisp
+  (funcall #[0 <bytecode> [httpd-mime-types ("c" . "text/plain")] 2])
+#+end_src
+
+这里第二个值 (=#[...]=) 是一个 [[http://nullprogram.com/blog/2014/01/04/][字节码对象]]. 
+然而，正如评论所指出的那样，这样还有不太好的地方。一种更简洁和正确的方法是使用一个命名函数来解决所有这些问题. =eval-after-load= 所造成的损失将(基本上)减至最低。
+
+#+begin_src emacs-lisp
+  (defun my-simple-httpd-hook ()
+    (push '("c" . "text/plain") httpd-mime-types))
+
+  (eval-after-load 'simple-httpd
+    '(funcall #'my-simple-httpd-hook))
+#+end_src
+
+但是，让我们在回到匿名函数这个解决方案中来。还有什么不太好的地方?它与函数对象的求值有关。
+
+* 函数对象取值
+:PROPERTIES:
+:CUSTOM_ID: evaluating-function-objects
+:END:
+
+那么当我们用 =eval= 对上面这样的表达式求值时会发生什么呢? 其形式如下。
+
+#+begin_src emacs-lisp
+  (funcall #[...])
+#+end_src
+
+首先, =eval= 注意到它被赋予了一个非空列表，所以它可能是一个函数调用。第一个参数是要调用的函数的名称(=funcall=)，其余的元素是它的参数。但是每个元素都必须先求值，然后求值的结果就是参数。
+
+任何不是列表或符号的值都是自求值的。也就是说，它的计算值就是自己:
+
+#+begin_src emacs-lisp
+  (eval 10)
+  ;; => 10
+#+end_src
+
+如果值是符号，则将其视为变量。如果该值是一个列表，那么它又需要经历一次所描述的函数调用过程(或者其他一些特殊情况，例如宏展开、lambda表达式和特殊语句)。
+
+因此，在概念上 =eval= 在函数对象 =#[...]= 上进行递归。函数对象不是列表或符号，所以它是自求值的。没有问题。
+
+#+begin_src emacs-lisp
+  ;; Byte-code objects are self-evaluating
+
+  (let ((x (byte-compile (lambda ()))))
+    (eq x (eval x)))
+  ;; => t
+#+end_src
+
+如果这段代码没有被编译呢?我们为解释器提供一些其他类型的函数对象，而不是字节码对象会怎样。
+让我们看看动态作用域的(恐怖)情况。这里，lambda的结果似乎就是自己，但外表可能具有欺骗性:
+
+#+begin_src emacs-lisp
+  (eval (lambda ())
+        ;; => (lambda ())
+#+end_src
+
+然而，这不是自运算. *Lambda表达式的值不是自己*. 对lambda表达式求值的结果与原始表达式相似只是个巧合。
+这只是Emacs Lisp解释器目前的实现方式而已，严格地说，它是一个实现细节，恰好与自元算的字节码对象基本兼容。
+但依赖这一点是错误的。
+
+In contrast, a self-evaluating value is also idempotent under evaluation, but with =eq= results.
+相反, *动态作用于lambda表达式求值是[[https://labs.spotify.com/2013/06/18/creusernames/][幂等的]].* 对结果应用 =eval= 将返回一个相等(=equal=),但不相同的表达式(=eq=)。
+相反，一个自运算的值在被运行时也是幂等的，而且结果相同(=eq=)。
+
+#+begin_src emacs-lisp
+  ;; Not self-evaluating:
+
+  (let ((x '(lambda ())))
+    (eq x (eval x)))
+  ;; => nil
+
+  ;; Evaluation is idempotent:
+
+  (let ((x '(lambda ())))
+    (equal x (eval x)))
+  ;; => t
+
+  (let ((x '(lambda ())))
+    (equal x (eval (eval x))))
+  ;; => t
+#+end_src
+
+因此，对于动态作用域，这个有点问题的反引号示例仍然能用，但这完全是靠运气。在静态作用域下，就没那么幸运了:
+
+#+begin_src emacs-lisp
+  ;;; -*- lexical-scope: t; -*-
+
+  (lambda ())
+  ;; => (closure (t) nil)
+#+end_src
+
+这些执行后的lambda函数既不是自求值函数，也不是幂等函数。传递 =t= 作为 =eval= 的第二个参数可以告诉它使用词法作用域，如下所示:
+
+#+begin_src emacs-lisp
+  ;; Not self-evaluating:
+
+  (let ((x '(lambda ())))
+    (eq x (eval x t)))
+  ;; => nil
+
+  ;; Not idempotent:
+
+  (let ((x '(lambda ())))
+    (equal x (eval x t)))
+  ;; => nil
+
+  (let ((x '(lambda ())))
+    (equal x (eval (eval x t) t)))
+  ;; error: (void-function closure)
+#+end_src
+
+I can [[/blog/2017/05/03/][imagine an implementation]] of Emacs Lisp where dynamic scope lambda expressions are in the same boat, where they're not even idempotent. For example:
+我可以[[http://nullprogram.com/blog/2017/05/03/][想象一种Emacs Lisp实现]]，其动态作用域下的lambda表达式也一样不是幂等的。例如:
+
+#+begin_src emacs-lisp
+  ;;; -*- lexical-binding: nil; -*-
+
+  (lambda ())
+  ;; => (totally-not-a-closure ())
+#+end_src
+
+大多数Emacs Lisp代码在这种变化下能正常工作，只有出现某种逻辑错误的代码—在lambda表达式嵌套求值的地方—才会中断。
+在Emacs 24之后，当大量代码被悄悄地切换到词法作用域时，这种情况基本上已经发生了。
+Lambda的幂等性丢失了，编写良好的代码则没有影响。
+
+Emacs尝试过定义一个 =closure= 函数或特殊形式，以允许解释器闭包对象可以自求值和幂等的。
+但这是一个错误。它只能作为一种hack，用来掩盖导致嵌套计算的逻辑错误。尽早发现这些问题会更好。
+
+* 用一个字符解决问题
+:PROPERTIES:
+:CUSTOM_ID: solving-the-problem-with-one-character
+:END:
+
+那么，我们如何修复这个小问题呢?有策略地在逗号前加上引号即可。
+
+#+begin_src emacs-lisp
+  (eval-after-load 'simple-httpd
+    `(funcall
+      ',(lambda ()
+          (push '("c" . "text/plain") httpd-mime-types)))
+#+end_src
+
+因此，传递给 =eval-after-load= 的语句变成:
+
+#+begin_src emacs-lisp
+  ;; Compiled:
+  (funcall (quote #[...]))
+
+  ;; Dynamic scope:
+  (funcall (quote (lambda () ...)))
+
+  ;; Lexical scope:
+  (funcall (quote (closure (t) () ...)))
+#+end_src
+
+引号阻止了 =eval= 对函数对象求值，这要么是不必要的，要么是有害的。
+还有一种说法是，这种情况非常适合使用sharp-quote(=#'=),它用来对函数进行应用。
