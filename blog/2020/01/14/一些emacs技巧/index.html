@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>一些Emacs技巧 - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="emacs-common" />
+  <!-- <link rel="stylesheet" href="../../../../../media/css/main.css" type="text/css"/>
+       <link rel="stylesheet" href="../../../../../media/css/comment.css" type="text/css"/> -->
+  <link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/kognise/water.css@latest/dist/dark.css'>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="../../../../../">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <ul class="trigger">
+        <li><a href="../../../../../years/">Years</a></li>
+        <li><a href="../../../../../authors/">Authors</a></li>
+        <li><a href="../../../../../tags/">Tags</a></li>
+        <li><a href="../../../../../about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="../../../../../rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="https://www.bing.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">一些Emacs技巧</h1>
+<div id="table-of-contents">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#automatically-reload-the-browser-when-editing-html">编辑HTML时浏览器自动重新加载</a></li>
+<li><a href="#one-sentence-per-line-for-editing-shared-latex">编辑共享LaTeX时每行一个句子</a></li>
+<li><a href="#preview-definitions-when-editing-assembly">编辑汇编语言时预览定义</a></li>
+<li><a href="#highlight-todo-keywords">突出显示TODO关键字</a></li>
+<li><a href="#insert-screenshots-into-org-documents">在org文档中插入截图</a></li>
+<li><a href="#insert-delete-or-change-delimiters">插入、删除或更改分隔符</a></li>
+<li><a href="#auto-revert-without-the-lag">无延迟auto-revert</a></li>
+</ul>
+</div>
+</div>
+<p>
+下面是我配置中的一些对他人可能有用的Emacs Lisp内容。
+我不想把它们发表在MELPA上，因为我不想维护它们。它们可能有bug，未经过彻底的测试等问题。
+如果它们适合你的需要，你可以随意挑选，但是如果它们不起作用，也不要抱怨!
+</p>
+
+<div id="outline-container-orgda8b614" class="outline-2">
+<h2 id="automatically-reload-the-browser-when-editing-html"><a id="orgda8b614"></a>编辑HTML时浏览器自动重新加载</h2>
+<div class="outline-text-2" id="text-automatically-reload-the-browser-when-editing-html">
+<p>
+Switching to the browser and refreshing it got old rather quickly, so I scripted it.
+当我使用HTML/CSS/JS进行web编程时，我喜欢使用浏览器来快速测试我的更改。
+切换到浏览器再刷新这种方法已经过时了，而且太慢，因此我编写了个脚本来完成它。
+</p>
+
+<p>
+<a href="https://github.com/fmdkdd/dotfiles/blob/master/emacs/.emacs.d/elisp/reload-browser.el"><code>reload-browser.el</code></a> 提供了一个函数来重新加载多个浏览器窗口。
+第一次调用它时，它会把光标变成一个方框，要求您单击要重新加载的窗口。之后，再次调用该函数将重新加载所选择的窗口。
+如果你传递一个数字前缀参数，您还可以选择多个窗口(例如，Firefox和Chrome)。
+无需更复杂的设置，我就能通过快捷键来保存当前buffer并重新加载所有浏览器窗口了。
+</p>
+
+<p>
+在后台，它只是简单地调用 <code>xdotool</code> 来完成繁重的工作。脚本基本上很直观，但Chromium需要光标定位后才能重新加载，而Firefox则不需要，脚本中必须处理这个问题。
+</p>
+</div>
+</div>
+
+<div id="outline-container-orga3e3694" class="outline-2">
+<h2 id="one-sentence-per-line-for-editing-shared-latex"><a id="orga3e3694"></a>编辑共享LaTeX时每行一个句子</h2>
+<div class="outline-text-2" id="text-one-sentence-per-line-for-editing-shared-latex">
+<p>
+我在写东西的时候通常会开启 <code>auto-fill-mode</code>,它让一行只包含80个字符，从而使编辑结果在任何文本编辑器中都便于阅读。
+不过，在使用LaTeX写文章时，我希望每行都是一句完整的话，这样更方便检查差异和处理冲突。
+当然，我希望我的编辑器自动帮我以这种法那个时进行填充。
+</p>
+
+<p>
+<a href="https://github.com/fmdkdd/dotfiles/blob/master/emacs/.emacs.d/elisp/ospl.el"><code>ospl.el</code></a> 重新定义了 <code>auto-fill-function</code> 来进行断句，并提供了 <code>ospl-paragraph</code> 函数将当前段落填充为每行一句。
+这里的技巧是检测句子的结束位置再插入新行。Emacs可以通过查找冒号来识别句子，但是请注意缩写词也以冒号结尾(“e.g.”、“i.e.”)。
+处理这种情况的最佳方法是在句子后面使用双空格，在其他冒号使用情况后面使用单空格(请参阅变量 <code>sentence-end-double-space</code>)。
+</p>
+
+<p>
+不幸的是，并不是每个人都认识到双空格是更好的形式，所以 <code>ospl</code> 假设您使用单空格，并避免在常见的缩写词之后中断，这使得它变得更复杂一些。
+</p>
+</div>
+</div>
+
+<div id="outline-container-orga34ccbe" class="outline-2">
+<h2 id="preview-definitions-when-editing-assembly"><a id="orga34ccbe"></a>编辑汇编语言时预览定义</h2>
+<div class="outline-text-2" id="text-preview-definitions-when-editing-assembly">
+<p>
+最近我一直在涉猎6502汇编，浏览代码时，我经常发现需要查看光标所在标签的定义。
+因此，我编写了一个用于汇编的xref后端(<a href="https://github.com/fmdkdd/dotfiles/blob/master/emacs/.emacs.d/elisp/xrefasm.el"><code>xrefasm.el</code></a>)，这样就可以使用标准的快捷键跳转到定义并返回了。
+不多对于大多数标签，我并不需要特意跳转到定义处，只需要看到标签上下几行，就可以记起它的作用。
+</p>
+
+<p>
+因此我编写了 <a href="https://github.com/fmdkdd/dotfiles/blob/master/emacs/.emacs.d/elisp/xref-posframe.el"><code>xref-posframe.el</code></a>, 另一个使用 <code>posframe</code> 来预览定义的包. 
+Posframe 允许你创建不带window decoration的一次性Emacs frame, 这要比在当前buffer内容上的overlay要更方便也更利于配置，而且速度也足够快。借助 <code>xref-posframe</code> 我可以一键预览定义。
+</p>
+
+<p>
+再按一键，我甚至可以跳转到定义。
+</p>
+
+<p>
+而且它可以在支持xref的任何地方工作，而不仅仅是在汇编语言时。
+</p>
+</div>
+</div>
+
+<div id="outline-container-org080a582" class="outline-2">
+<h2 id="highlight-todo-keywords"><a id="org080a582"></a>突出显示TODO关键字</h2>
+<div class="outline-text-2" id="text-highlight-todo-keywords">
+<p>
+This can be done by adding keywords to font lock:
+这个很简单。我让评论中的 <code>TODO:</code> 和 <code>FIXME:</code> 关键字现实时使用自定义字体，这样我可以立即看到它们，知道有东西要修复。这可以通过为font lock添加关键字来实现:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">add-watchwords</span> ()
+  <span style="font-style: italic;">"Add TODO: words to font-lock keywords."</span>
+  (font-lock-add-keywords
+   nil '((<span style="font-style: italic;">"</span><span style="font-weight: bold; font-style: italic;">\</span><span style="font-style: italic;">(</span><span style="font-weight: bold; font-style: italic;">\</span><span style="font-style: italic;">&lt;TODO</span><span style="font-weight: bold; font-style: italic;">\</span><span style="font-style: italic;">|</span><span style="font-weight: bold; font-style: italic;">\</span><span style="font-style: italic;">&lt;FIXME</span><span style="font-weight: bold; font-style: italic;">\</span><span style="font-style: italic;">|</span><span style="font-weight: bold; font-style: italic;">\</span><span style="font-style: italic;">&lt;HACK</span><span style="font-weight: bold; font-style: italic;">\</span><span style="font-style: italic;">|@.+</span><span style="font-weight: bold; font-style: italic;">\</span><span style="font-style: italic;">):"</span>
+          1 font-lock-warning-face t))))
+(add-hook 'prog-mode-hook #'add-watchwords)
+</pre>
+</div>
+
+
+<div class="figure">
+<p><img src="https://0xc0de.fr/img/posts/todo-highlight.png" alt="todo-highlight.png" />
+</p>
+</div>
+
+<p>
+这种方法有一个缺点:它会高亮现实编程buffer中所有出现这些单词的地方，即使在注释之外也是如此。 有一些复杂的包可以以更健壮的方式进行高亮，确保只在注释中突出显示这些词。 但我认为不值得因为这些情况而增加复杂性。对我来说，99.99%的情况下，上面的方法是有效的。当出现假阳性时，我就忽略它。
+</p>
+
+<p>
+最近我使用了更多描述性的关键字，比如 <code>@correct:</code> 或 <code>@optimization:</code>,所以我在后面添加了一个通配符来处理 "<code>@</code>" 和 "<code>:</code>" 之间的所有单词。即便如此，误报也不是问题。
+</p>
+</div>
+</div>
+
+<div id="outline-container-org767f77a" class="outline-2">
+<h2 id="insert-screenshots-into-org-documents"><a id="org767f77a"></a>在org文档中插入截图</h2>
+<div class="outline-text-2" id="text-insert-screenshots-into-org-documents">
+<p>
+我在Org上做了很多笔记。当我做一些设计可视化的东西时，我比较喜欢包含一些屏幕截图，因为它们通常更有助于表达。为了减少截屏，剪切，插入链接到Org文件的不爽之处，我写了一些Elisp来帮我:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">insert-screenshot</span> (file-name)
+  <span style="font-style: italic;">"Save screenshot to FILE-NAME and insert an Org link at point.</span>
+
+<span style="font-style: italic;">This calls the `</span><span style="font-weight: bold; font-style: italic; text-decoration: underline;">import</span><span style="font-style: italic;">' from ImageMagick to take the screenshot,</span>
+<span style="font-style: italic;">and `</span><span style="font-weight: bold; font-style: italic; text-decoration: underline;">optipng</span><span style="font-style: italic;">' to reduce the file size if the program is present."</span>
+  (<span style="font-weight: bold;">interactive</span> <span style="font-style: italic;">"FSave to file: "</span>)
+  <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Get absolute path</span>
+  (<span style="font-weight: bold;">let</span> ((file (expand-file-name file-name)))
+    <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Create the directory if necessary</span>
+    (make-directory (file-name-directory file) 'parents)
+    <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Still, make sure to signal if the screenshot was in fact not created</span>
+    (<span style="font-weight: bold;">unless</span> (= 0 (call-process <span style="font-style: italic;">"import"</span> nil nil nil file))
+      (<span style="font-weight: bold;">user-error</span> <span style="font-style: italic;">"`</span><span style="font-weight: bold; font-style: italic; text-decoration: underline;">import</span><span style="font-style: italic;">' failed to create screenshot %s"</span> file))
+    (<span style="font-weight: bold;">if</span> (executable-find <span style="font-style: italic;">"optipng"</span>)
+        (start-process <span style="font-style: italic;">"optipng"</span> nil <span style="font-style: italic;">"optipng"</span> file))
+    (insert
+     <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">A link relative to the buffer where it is inserted is more portable</span>
+     (format <span style="font-style: italic;">"[[file:%s]]"</span>
+             (file-relative-name file
+                                 (file-name-directory buffer-file-name))))
+    (<span style="font-weight: bold;">when</span> (eq major-mode 'org-mode)
+      (org-redisplay-inline-images))))
+</pre>
+</div>
+
+<p>
+这段代码请求输入一个文件名，然后调用 <code>import</code> 来选择我想要截屏的区域并保存它，然后在光标处插入一个org格式的图像链接。
+org-mode会显示内联图像，这样我就可以立即看到结果。如果安装了 <code>optipng</code>,它甚至会压缩屏幕截图以节省空间。
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgde189af" class="outline-2">
+<h2 id="insert-delete-or-change-delimiters"><a id="orgde189af"></a>插入、删除或更改分隔符</h2>
+<div class="outline-text-2" id="text-insert-delete-or-change-delimiters">
+<p>
+在Spacemacs和Vim中，有一种极好的方法可以快速地用引号、大括号和其他分隔符包裹一部分文本分。当我用会普通Emacs时，手动添加引号就很无聊了。
+</p>
+
+<p>
+<a href="https://github.com/fmdkdd/dotfiles/blob/master/emacs/.emacs.d/elisp/delimiter.el"><code>delimiter.el</code></a> 解决了这个问题. 它非常简单: <code>delimiter-surround</code> 会提示你输入分隔符，并用它包裹选中的文本. 
+如果没有选中区域，它将包裹当前的语句。因此我只需要快速按两次键，就能引用一个单词。
+某些分隔符是成对的，比如一个左大括号 "<code>{</code>" 使用与其匹配的右大括号 "<code>}</code>" 作为结束分隔符。
+</p>
+
+<p>
+还有一个 <code>delimiter-change</code> 能将现有的分隔符对更改为其他内容，还有一个 <code>delimiter-delete</code> 这个作用看名字就知道干啥的了。
+</p>
+
+<p>
+注意，这个函数不太聪明:如果您有嵌套的分隔符，它将只删除最接近光标的分隔符，所以在以下情况下(插入符用 <code>|</code> 标记点):
+</p>
+
+<pre class="example">
+(he|re (is) a list)
+</pre>
+
+<p>
+执行 <code>M-x delimiter-delete ( RET</code> 会产生下面记i恶果:
+</p>
+
+<pre class="example">
+he|re (is a list)
+</pre>
+
+<p>
+但我们想要的应该是删除最外层括号:
+</p>
+
+<pre class="example">
+he|re (is) a list
+</pre>
+
+<p>
+如果你想要聪明的行为，你去别的地方找找看。
+</p>
+</div>
+</div>
+
+<div id="outline-container-org98cfb95" class="outline-2">
+<h2 id="auto-revert-without-the-lag"><a id="org98cfb95"></a>无延迟auto-revert</h2>
+<div class="outline-text-2" id="text-auto-revert-without-the-lag">
+<p>
+就在昨天，我还想研究某些简单C文件GCC的汇编输出。我打开了两个窗口:一个是C代码，另一个是汇编输出。我将后者置于 <code>auto-revert-mode</code> 中，这样我就能在重新编译后快速看到结果。
+</p>
+
+<p>
+结果, <code>auto-revert-mode</code> 在我的机器上出现了一些奇怪的延迟，有时候需要几秒钟才能刷新缓冲区让我看到结果。
+还不如直接在终端上运行 <code>watch -n 0.1 cat a.s</code> 呢。
+</p>
+
+<p>
+我编写了一个小小的minor模式，它在从 <code>inotify</code> 获取到更改事件后就会刷新buffer，并且持续这种瞬时操作。
+</p>
+
+<p>
+稍后，我检查了 <code>auto-revert-mode</code> 的源代码，发现它与我的minor模式大致相同，首先使用 <code>filenotify</code> watcher，如果不支持filenotify或调用filenotify失败，则使用轮询。
+然而，它仍然需要花几秒钟时间来刷新，而我的minor mode工作正常。
+</p>
+
+<p>
+如果您遇到了与 <code>auto-revert-mode</code> 相同的问题，您可以尝试一下 <a href="https://github.com/fmdkdd/dotfiles/blob/master/emacs/.emacs.d/elisp/inotify-revert.el"><code>inotify-revert.el</code></a>。
+</p>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2020-01-14</span>
+            <span title="last modification date" class="post-info">2020-01-28</span>
+            <span title="tags" class="post-info">:<a href="../../../../../tags/emacs-common">emacs-common</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-3d81d59b-10ec-4b3e-99bc-3e12d4e18eba">lujun9972</a></span>
+        </div>
+    <script src="../../../../../media/js/jquery-2.1.3.min.js"></script>
+    <script src="../../../../../media/js/md5.min.js"></script>
+        <section>
+            <div id="gitalk-container"></div>
+            <script type="text/javascript">
+             var gitalk = new Gitalk({
+                 clientID: 'fdcb5d9da3f4acb4862c',
+                 clientSecret: 'dd0a16312a206782cb7669dcec5e96874ab48170',
+                 repo: 'lujun9972.github.com',
+                 owner: 'lujun9972',
+                 admin: ['lujun9972'],
+                 id: md5(location.pathname),      // Ensure uniqueness and length less than 50
+                 distractionFreeMode: false  // Facebook-like distraction free mode
+             })
+             gitalk.render('gitalk-container')
+            </script>
+        </section>
+    <script src="../../../../../media/js/main.js"></script>
+        <script>
+         var _hmt = _hmt || [];
+         (function() {
+             var hm = document.createElement("script");
+             hm.src = "https://hm.baidu.com/hm.js?7bac4fd0247f69c27887e0d4e3aee41e";
+             var s = document.getElementsByTagName("script")[0]; 
+             s.parentNode.insertBefore(hm, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-3d81d59b-10ec-4b3e-99bc-3e12d4e18eba">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="../../../../../instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>
