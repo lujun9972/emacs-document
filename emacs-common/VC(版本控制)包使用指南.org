@@ -1,0 +1,178 @@
+#+TITLE: VC(版本控制)包使用指南
+#+URL: http://alexott.net/en/writings/emacs-vcs/EmacsVC.html
+#+AUTHOR: lujun9972
+#+TAGS: emacs-common
+#+DATE: [2020年 01月 15日 星期三 14:40:17 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+VC包通过统一的用户界面为用户提供使用不同版本控制系统(VCS)的能力。现在它支持以下VCS(通过VCS特定的模块):rcs、CVS、MetaCVS、Subversion、GNU Arch、sccs、Darcs、SourceSafe、ClearCase、Git和Mercurial(其中一些只能在GNU Emacs 22.0、GNU Emacs开发仓库和作者的站点上获得)。
+
+* <<sec1>>基本概念和方法
+:PROPERTIES:
+:CUSTOM_ID: basic-concepts-and-approaches
+:END:
+
+VC包的设计从rcs版本控制系统的设计中吸取了很多东西。许多概念与VCS的概念紧密地结合在一起。
+
+当文件在VCS控制下时，我们说它在VCS中“注册了”。对于每个存在“主”文件的文件，这个主文件中包含文件数据和更改历史。
+每个“主”文件可以有相应的“工作”文件，工作文件可以被修改。
+在某些VCS中，您需要在更改之前为工作文件加锁。在其他VCS中，您可以更改工作文件的副本，然后显式地将更改提交到存储库。
+对于需要显式锁定文件的系统，要修改文件，需要先将文件从只读状态切换到读写状态。
+通常这类系统中，只有一个用户可以对锁定的文件进行更改，其他用户应该等待该用户完成对文件的修改并删除文件锁。
+
+当你使用VC包时，一些状态信息会显示在状态栏上。信息以以下形式表示:首先是当前文件所属VCS的缩写，然后是描述文件状态的符号，然后是文件版本号。如果状态符号是 =-= , 则表示文件未被锁或更改。
+如果文件被锁或修改，则符号更改为 =:=. 如果文件被其他用户锁住，则状态字段将显示为 =:user:=.
+
+* <<sec2>> 包的使用方法
+:PROPERTIES:
+:CUSTOM_ID: work-with-package
+:END:
+
+** <<sec3>> 基本工作顺序
+:PROPERTIES:
+:CUSTOM_ID: basic-work-sequence
+:END:
+
+The main function of VC package is =vc-next-action= (=C-x v v=), that performs next logical command of version control system. Depending on used VCS, order of commands in this sequence could differ. For systems, that require blocking of file (rcs, sccs, and CVS with corresponding setup), order of executions is following:
+VC包的主要函数是 =vc-next-action= (=C-x v v=)，它执行版本控制系统的逻辑上的下一个命令。根据使用的VCS，这个序列中的命令顺序可能有所不同。
+对于需要锁文件的系统(rcs、sccs和设置了锁文件的CVS)，执行顺序如下:
+
+- 如果文件没有在VCS中注册，那么注册它;
+- 如果文件已注册，但未被锁，则从库中获取最新版本并锁之;
+- 如果文件被当前用户锁住了，但没有修改，则获取新版本并更新buffer;
+- 如果文件被更改，则显示一个新的buffer让你输入有关更改的注释，并提交更改;
+- 如果文件被其他用户锁住，那么VC会阻止下一步操作。
+
+对于不支持显式锁文件的系统，执行顺序略有不同:
+
+- 如果文件没有在VCS中注册，那么注册它，但不提交它;
+- 如果文件已经添加，但尚未提交，则提交;
+- 如果文件被更改，则显示一个新的buffer用于输入有关更改的注释，并提交更改;
+- 如果文件在仓库中被更改，那么询问用户是否为工作文件副本执行合并更改。
+
+用户可以将前缀参数传递给 =vc-next-action= 函数。传递这个参数允许用户更改函数的行为——例如，用户可以为新文件设置版本号，或者从存储库获取指定版本呢的文件，或者更改使用的版本控制系统(如果文件在不同的VCS中注册)。
+
+在名为 =*VC-Log*= 的特殊buffer中输入提交消息。用户输入消息后按 =C-c c= 提交更改。如果您不想提交更改，只需不按 =C-c c= 直接离开缓冲区。
+如果您希望对多个文件使用相同的提交消息，那么您可以使用 =M-n=, =M-p=, =M-s= 和 =M-r= 快捷键，它们允许您在消息历史记录中导航。
+
+** <<sec4>> 修改类操作
+:PROPERTIES:
+:CUSTOM_ID: work-with-changes
+:END:
+
+用户可以使用VC来查看文件所做过的更改。用户可以使用 =vc-diff= 函数 (C-x v = ) 来获取工作拷贝和最新提交版本之间的变化列表。
+如果用户运行此函数时带了prefix参数，则可以获得任意两个版本之间的更改列表。
+=vc-version-other-window= 函数 (=C-x v ~=)允许从存储库获取任何版本的文件，并在单独的buffer中显示它。
+在某些VCS中，您可以获得文件的注释版本(annotated version). VC通过 =vc-annotate= 函数(函数绑定到 =C-x v g=)来支持这个特性。
+使用注释版本，你可以看到谁做了具体的更改，在哪个版本中进行了更改，等信息。
+
+用户可以通过 =vc-revert-buffer= 函数 (=C-x v u=)取消变更，该函数删除更改并前文件回复到库中的实际版本。
+执行 =vc-revert-buffer= 后文件不再处于锁状态，因此需要再锁一次进行新的更改。
+
+** <<sec5>> 文件类操作
+:PROPERTIES:
+:CUSTOM_ID: work-with-files
+:END:
+
+使用 =vc-register= 函数 (=C-x v i=)在存储库中注册文件。
+VC决定使用哪套版本控制系统取决于多个参数。
+如果目录中有文件已经在某个VCS中注册了，那么当前文件将在这个系统中注册。
+如果目录中有文件同时注册在多个VCS中，那么文件将注册在 =vc-handled-backends= 列表中第一个匹配的系统中。
+如果目录中没有注册文件，则VC从 =vc-handled-backends= 列表中抽取第一个名字。
+举个例子，只有在显式指定VCS的名称时，你才能在CVS中注册文件。 默认情况下，新文件的版本号为1.1。如果为 =vc-register= 函数提供前缀参数，则可以设置另一个版本号。
+如果 =vc-initial-comment= 变量为非 =nil=, 那么这个函数也会要求用户输入注释，用来描述该文件。
+
+VC包还支持重命名注册文件。使用 =vc-rename-file= 函数来重命名你的工作文件，以及“主”文件。
+这个函数也会更新所有的快照，这样这些快照就会指向正确的文件名。但是您不能将此函数用于被锁的文件。
+
+用户还可以通过使用 =vc-print-log= 函数获取当前文件的相关信息，该函数绑定到 =C-x v l= 上. 此命令显示文件更改的历史记录以及每个更改的注释内容。
+
+** <<sec6>> 与Dired一起联用VC
+:PROPERTIES:
+:CUSTOM_ID: use-vc-together-with-dired
+:END:
+
+如前所述，VC函数被设计成处理单独的文件。但是大型项目通常需要处理一组文件——查看哪些文件被修改了，显示整个项目的更改列表，等等。
+为了允许用户这样操作，VC包实现了一个特殊模式—— =vc-dired-mode=. 
+用户可以使用 =vc-directory= 函数 (=C-x v d=)创建这种模式的buffer。
+除了用户可以看到在VCS中注册的递归文件列表之外，该命令创建的buffer与通常Dired的buffer几乎没有区别。
+
+在使用Dired的缓冲区时，我们可以以短模式或全模式显示数据。 在短模式下，在缓冲区中只显示已修改或未更新的文件。 在完模式下，在缓冲区中显示所有在VCS中注册的文件。 用户可以通过 =v t= 快捷键在短模式和全模式之间进行切换。
+在buffer中还显示了用户的相关信息，谁锁了文件(对于支持该特性的系统)以及文件状态是什么(对于所有其他系统)。
+在 =vc-dired-mode= 模式下的buffer支持所有Dired的函数和快捷键，除了把 =v= 键作为前缀键用于所有VC函数。
+用户可用的所有VC函数(在其他地方会讲到)，这时不再使用 =C-x= 前缀，而且可以应用于多个文件。
+
+** <<sec7>> <<branches>> 分支相关操作
+:PROPERTIES:
+:CUSTOM_ID: work-with-branches
+:END:
+
+与其他VCS类的包一样，VC包也支持操作项目分支作,包括创建分支、切换分支换以及合并分支。
+要切换到其他分支，只需为 =vc-next-action= 函数提供前缀参数即可。
+用户可以使用分支版本代替文件的现有版本。下一步操作将在选定的分支上执行。
+创建新分支的过程与此类似——使用 =vc-next-action= 提交数据时，提供前缀参数和版本号即可。
+如果您提供的分支号不存在，将会创建分支。创建分支后，所有工作都将在其上执行，如果用户需要，也可以显式地切换到其他分支。
+
+要合并分支，可以使用 =vc-merge= 函数，该函数快捷键是 =C-x v m=. 这个命令将询问您希望从哪个分支合并更改，并将它们应用到当前的分支上。
+如果您没有指定分支版本，那么合并的更改来自于仓库， 如果有人在您的工作期间提交了更改，当前合并的变更来自于你的当前分支。
+如果在合并过程中出现了一些冲突，那么VC包会通知你，并在文件中标记它们.你可以运行Ediff来解决这些冲突。
+你还可以使用 =vc-resolve-conflicts= 函数来解决现有的冲突。此函数会运行新的Ediff会话，可以在其中可以查看所有冲突，并接受或取消建议的修改方案。
+
+** <<sec8>> 远程仓库相关操作
+:PROPERTIES:
+:CUSTOM_ID: work-with-remote-repositories
+:END:
+
+有些VCS有“中央存储库”的概念，其用于保存文件的“主”版本以及更改历史。
+存储库可以是本地的，也可以位于远程服务器上。
+当储存库位于远程服务器上时，特别是当与服务器的连接非常慢或不稳定时，VC会自动检测远程服务器的情况，并做一些事情来有效地处理数据。
+当用户对文件进行第一次更改时，会创建原始文件的本地副本。
+这允许你在不建立网络连接的情况下执行函数恢复更改。原始版本文件的名字类似于 =File.~version.~=. 将更改提交到存储库时，原始文件的本地副本将被删除。
+用户还可以使用 =vc-version-other-window= 函数手动创建文件的备用副本。
+这两个副本的区别在于，自动副本在 =~= 之前有附加的 =.= 字符。
+许多VC函数可以在这两种拷贝存在时使用它们。
+
+** <<sec9>> 快照相关操作
+:PROPERTIES:
+:CUSTOM_ID: work-with-snapshots
+:END:
+
+快照是具有特定版本的文件集合，可以作为单独的对象来使用。一些VCS内部支持这个概念，所以VC只使用现有的功能即可。对于其他系统，VC自己实现了这个功能，这时只有在使用VC包时，快照才可用。
+为配合快照工作，VC包提供了两个函数。=vc-create-snapshot= 函数 (=C-x v s=)给予当前目录(以及所有子目录)中现有文件的版本创建一个新的快照。
+=vc-retrieve-snapshot= 函数 (=C-x v r=)允许用户取回给定名称的快照。
+许多VC函数允许用户使用快照的名称作为参数，而不是使用版本号。
+这在查看两个程序版本之间的更改列表时特别有用。
+
+** <<sec10>> 其他功能
+:PROPERTIES:
+:CUSTOM_ID: other-functions
+:END:
+
+通常情况下，在VCS中注册的变更历史记录会分别保存在每个文件中。但是在GNU项目中，人们通常会为整个项目或每个目录保留变更日志。
+为了支持这类更改日志，VC包实现了 =vc-update-change-log= 函数 (=C-x v a=)，它通过所有修改文件的更新日志来生成公共更改日志。
+当这个命令获得一个前缀参数时，它就可以从指定文件中的更新日志中生成公共变更日志。
+
+您还可以将特殊的头信息插入文件中。这些头信息的具体内容依赖于具体的VCS，在某些VCS中起到辅助作用。
+要插入这样的头信息，可以使用 =vc-insert-headers= 函数 (=C-x v h=)。
+VC会自动选择适合当前的VC头信息。所有的头信息都保存在 =vc-BACKEND-header= 变量中，因此您可以修改这些变量来插入自定义的头信息。
+
+* <<sec11>> 自定义
+:PROPERTIES:
+:CUSTOM_ID: customization
+:END:
+
+用户可以通过Emacs的标准自定义模式来配置VC包的行为。你只需要执行 =M-x customize-group vc= 就可以了。
+有些选项适用于所有支持的VCS，但有些选项仅适用于特定的后端。你可以在VC的手册中找到配置变量的完整描述。
+
+* <<sec12>> 附加信息
+:PROPERTIES:
+:CUSTOM_ID: additional-information
+:END:
+
+VC包的详细描述包含在Emacs文档中。除此之外，你可以在[[http://www.emacswiki.org/cgi-bin/wiki/CategoryVersionControl][Emacs WiKi]]找到更多关于VC包的信息。
+
+有些整合VC与具体VCS的模块没有包含在GNU Emacs和XEmacs发行版中。这些模块可以在作者的网站上找到:
++ vc-darcs — http://www.emacswiki.org/elisp/vc-darcs.el
++ vc-vss — http://www.chezmarshall.freeserve.co.uk/elisp/vcvss.html
++ vc-clearcase — http://www.fukt.hk-r.se/~flognat/vc/
