@@ -1,0 +1,278 @@
+#+TITLE: 通过命令行实现笔记本的按键功能
+#+URL: http://tech.toryanderson.com/2018/03/10/command-line-solutions-to-laptop-functions/
+#+AUTHOR: lujun9972
+#+TAGS: emacs-common
+#+DATE: [2018年 04月 16日 星期一 11:14:26 CST]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+*编辑添加:*
+
+- 2018.03.28 自从我现在使用nm-applet后，就补充了网络部分的内容,此外还添加了Alt+Tab交换缓冲区和emacs.el的exwm部分的内容。
+
+我正在尝试使用exwm,它与i3wm体验类似(但文档记录较少)，重量级的窗口管理器能为您的笔记本电脑提供很多功能。目前我旅行用的笔记本电脑就经常使用这些功能，我每天用它连接不同的wifi网络，连接对接站，连接额外的显示器和其他设备，切换触摸板等等。
+在我寻求在exwm实现这些功能的过程中，我主要解决了以下这些问题。
+
+* 控制电源键
+:PROPERTIES:
+:CUSTOM_ID: controlling-the-power-key
+:END:
+
+电源按钮不是由窗口管理器管理的，而是由systemd管理的
+
+例如，在我的 =/etc/systemd/logind.conf= 中有以下内容
+
+#+BEGIN_EXAMPLE
+[Login]
+HandlePowerKey=hibernate
+HandleLidSwitch=ignore
+IdleAction=suspend
+IdleActionSec=20min
+#+END_EXAMPLE
+
+* 切换触摸板
+:PROPERTIES:
+:CUSTOM_ID: toggling-the-touchpad
+:END:
+
+这是通过shell脚本实现的:
+
+#+begin_src shell
+  #!/bin/bash
+
+  declare -i ID
+  ID=`xinput list | grep -Eo 'Touchpads*id=[0-9]{1,2}' | grep -Eo '[0-9]{1,2}'`
+  declare -i STATE
+  STATE=`xinput list-props $ID|grep 'Device Enabled'|awk '{print $4}'`
+  if [ $STATE -eq 1 ]
+  then
+      xinput disable $ID
+      echo "Touchpad disabled."
+      # notify-send -a 'Touchpad' 'Disabled' -i /usr/share/icons/Adwaita/48x48/devices/input-touchpad.png
+  else
+      xinput enable $ID
+      echo "Touchpad enabled."
+      # notify-send -a 'Touchpad' 'Enabled' -i /usr/share/icons/Adwaita/48x48/devices/input-touchpad.png
+  fi
+#+end_src
+
+然后我将该脚本绑定到我想要的快捷键上(因为我使用exwm，所以我将它配置到我的emacs.el中，并以 =touchpad_toggle= 作为脚本名):
+
+#+begin_src emacs-lisp
+  (exwm-input-set-key (kbd "s-<f7>")
+                      (lambda () (interactive)
+                        (shell-command (executable-find "touchpad_toggle"))))
+#+end_src
+
+* 锁屏
+:PROPERTIES:
+:CUSTOM_ID: lock-screen
+:END:
+
+xscreensaver解决了这个问题。一旦从repos安装了xscreensaver后(包括额外包以获得我想要的作为锁屏屏保的gl-slideshow),我通过 =xscreensaver-demo= 来配置屏保。
+然后我创建了一个名为 =lockscreen= 的单行程序，并将它写入我的emacs文件:
+
+#+begin_src shell
+  #!/bin/bash
+
+  xscreensaver-command -lock
+#+end_src
+
+#+begin_src emacs-lisp
+  (exwm-input-set-key (kbd "s-l") (lambda () (interactive) (shell-command (executable-find "lockscreen"))))
+#+end_src
+
+然后就是关闭锁屏时遇到了一个问题:
+
+[[https://unix.stackexchange.com/questions/81692/suspend-and-lock-screen-on-closing-lid-in-arch-systemd]]
+
+* 电池状态
+:PROPERTIES:
+:CUSTOM_ID: battery-status
+:END:
+
+简单地使用 =fancy-battery= mode 就好 (它现在已经不再维护的，但我在melpa上安装好它后，目前在我电脑上工作正常)
+
+#+begin_src emacs-lisp
+  (use-package fancy-battery
+    :ensure t
+    (fancy-battery-mode))
+#+end_src
+
+* 简单的Wifi管理
+:PROPERTIES:
+:CUSTOM_ID: simple-wifi-management
+:END:
+
+nmtui 带有一个很好的NetworkManager文本接口，它的接口也是最简单的。问题是，它不能用于任何一种Emacs终端中，这些Emacs终端作为是我的shell解决方案已经有很长一段时间了。
+
+放弃通过CLI接口来管理Wifi，我发现 =nm-applet= 挺不错的。它的图标停靠屏幕的底部而且还具有我想要的密码记忆和自动连接功能。
+
+* 简单地快速切换到多个监视器
+:PROPERTIES:
+:CUSTOM_ID: simple-quick-transitions-to-multiple-monitors
+:END:
+
+However, exwm has solutions for this, which go into my emacs.el file:
+当我插入一个外部显示器时，在KDE下只需要简单地插上显示器就可以了(尽管我可能需要做调整一下分辨率)。
+但是在exwm中，这么做什么都不会发生。不过，exwm对此有解决方案，我把这些解决方案放入我的emacs.el文件中:
+
+#+begin_src emacs-lisp
+  (require 'exwm-randr)
+  (setq exwm-randr-workspace-output-plist '(0 "DP-1")) ;; DP-1 being the name of my new monitor as shown by `randr'
+  (add-hook 'exwm-randr-screen-change-hook
+            (lambda ()
+              (start-process-shell-command
+               "xrandr" nil "xrandr --output DP-1 --left-of eDP-1 --auto"))) ;; eDP-1 being the name of my original (laptop) monitor
+  (exwm-enable)
+  (exwm-randr-enable)
+#+end_src
+
+* 音频音量
+:PROPERTIES:
+:CUSTOM_ID: audio-volume
+:END:
+
+幸好我的声音是基于Alsa的，所以不需要安装任何东西。
+根据之前在不同设备上的尝试经验，声音是很难处理的。
+通过Alsa，我可以在exwm配置中调节音量。
+
+#+begin_src emacs-lisp
+  (exwm-input-set-key (kbd "<XF86AudioLowerVolume>")
+                      (lambda () (interactive) (shell-command "amixer set Master 5%-")))
+  (exwm-input-set-key (kbd "<XF86AudioRaiseVolume>")
+                      (lambda () (interactive) (shell-command "amixer set Master 5%+")))
+  (exwm-input-set-key (kbd "<XF86AudioMute>")
+                      (lambda () (interactive) (shell-command "amixer set Master 1+ toggle")))
+#+end_src
+
+* 屏幕亮度
+:PROPERTIES:
+:CUSTOM_ID: screen-brightness
+:END:
+
+我在KDE下可以通过硬件键使我的屏幕变暗/变亮。我怎样才能在exwm中恢复这个功能?答案是light包(它比xbacklight容易得多，后者总是告诉我“No outputs have backlight property”)。
+
+[[https://github.com/haikarainen/light]]
+
+按照说明安装后再设置好快捷键:
+
+#+begin_src emacs-lisp
+  (exwm-input-set-key (kbd "<XF86MonBrightnessDown>") (lambda () (interactive) (shell-command "light -U 5; light")))
+  (exwm-input-set-key (kbd "<XF86MonBrightnessUp>") (lambda () (interactive) (shell-command "light -A 5; light")))
+#+end_src
+
+* 截图
+:PROPERTIES:
+:CUSTOM_ID: screenshot
+:END:
+
+我写这篇文章时，意识到我最不需要的就是截屏。
+我最喜欢的截图工具是KDE自带的 *Spectacle*. 我已经安装安装好了它，因此只需要把它绑定到Printscreen键就行了:
+
+#+begin_src emacs-lisp
+  (exwm-input-set-key (kbd "<print>") (lambda () (interactive) (start-process-shell-command "spectacle" nil "spectacle")))
+#+end_src
+
+* 使用Alt-Tab切换Buffer
+:PROPERTIES:
+:CUSTOM_ID: alt-tab-buffer-swapping
+:END:
+
+通过iflipb包很容易就能重新获得 =alt+tab= 的功能(这个功能我经常在其他系统上使用)。下载后，我只需要配置一下:
+
+#+begin_src emacs-lisp
+  (exwm-input-set-key (kbd "M-<tab>") 'iflipb-next-buffer)
+  (exwm-input-set-key (kbd "M-<iso-lefttab>") 'iflipb-previous-buffer)
+#+end_src
+
+* 我的全部设置
+:PROPERTIES:
+:CUSTOM_ID: my-full-setup
+:END:
+
+use-package使得配置变得简单和干净。这是我的emacs.el。其中包括一些没有在这里描述的片段:
+
+#+begin_src emacs-lisp
+  (use-package exwm
+    :ensure t
+    :init
+    (setq mouse-autoselect-window t
+          focus-follows-mouse t)
+    (use-package exwm-config)
+    (require 'exwm-randr)
+    (setq exwm-workspace-show-all-buffers t)
+    (setq exwm-layout-show-all-buffers t)
+    (setq exwm-randr-workspace-output-plist '(0 "DP1"))
+    (add-hook 'exwm-randr-screen-change-hook
+              (lambda ()
+                (start-process-shell-command
+                 "xrandr" nil "xrandr --output DP1 --left-of eDP1 --auto")))
+    (exwm-enable)
+    (exwm-randr-enable) ; https://github.com/ch11ng/exwm/wiki
+    (require 'exwm-systemtray)
+    (exwm-systemtray-enable)
+    :config
+    (add-hook 'exwm-update-class-hook
+              (lambda () (unless (or (string-prefix-p "sun-awt-X11-" exwm-instance-name) (string= "gimp" exwm-instance-name))
+                           (exwm-workspace-rename-buffer exwm-class-name))))
+    (defun tsa/exwm-rename ()
+      (interactive)
+      (exwm-workspace-rename-buffer (concat exwm-class-name " : " exwm-title)))
+    (add-hook 'exwm-update-title-hook 'tsa/exwm-rename)
+    (setq tsa/default-simulation-keys
+          '(
+            ;; move
+            ([?C-b] . left)
+            ([?M-b] . C-left)
+            ([?C-f] . right)
+            ([?M-f] . C-right)
+            ([?C-p] . up)
+            ([?C-n] . down)
+            ([?M-<] . C-home)
+            ([?M->] . C-end)
+            ([?C-a] . home)
+            ([?C-e] . end) ;; in spreadsheets: C-e C-p - go to top; C-e C-n - go to bottom
+            ([?M-v] . prior)
+            ([?C-v] . next)
+            ;; delete
+            ([?C-d] . delete)
+            ([?C-k] . (S-end delete))
+            ([?M-d] . (C-S-right delete))
+            ;; cut/copy/paste.
+                                          ;([?C-w] . ?C-x)
+            ([?M-w] . ?C-c)
+            ([?C-y] . ?C-v)
+            ;; search
+            ([?C-s] . ?C-f)
+            ))
+    (exwm-input-set-simulation-keys tsa/default-simulation-keys)
+    (exwm-input-set-key (kbd "s-r") 'exwm-reset)
+    (exwm-input-set-key (kbd "s-n") 'tsa/exwm-rename)
+    (exwm-input-set-key (kbd "s-N") 'rename-buffer)
+    (exwm-input-set-key (kbd "s-w") #'exwm-workspace-switch)
+    (exwm-input-set-key (kbd "s-f")
+                        (lambda ()
+                          (interactive)
+                          (start-process-shell-command "firefox" nil "firefox")))
+    (exwm-input-set-key (kbd "s-t")
+                        (lambda ()
+                          (interactive)
+                          (start-process-shell-command "Telegram" nil "Telegram")))
+    (exwm-input-set-key (kbd "s-<f7>") (lambda () (interactive) (shell-command (executable-find "touchpad_toggle"))))
+    (exwm-input-set-key (kbd "C-c o") 'hydra-global-org/body)
+    (exwm-input-set-key (kbd "C-M-o") 'hydra-window/body)
+    (exwm-input-set-key (kbd "s-l") (lambda () (interactive) (shell-command (executable-find "lockscreen"))))
+    (exwm-input-set-key (kbd "<f8>") 'tsa/go-or-make-agenda)
+    (exwm-input-set-key (kbd "<f11>") 'helm-org-capture-templates)
+    (exwm-input-set-key (kbd "<f9>") 'tsa/quick-gnus)
+    (exwm-input-set-key (kbd "<XF86AudioLowerVolume>") (lambda () (interactive) (shell-command "amixer set Master 2%-")))
+    (exwm-input-set-key (kbd "<XF86AudioRaiseVolume>") (lambda () (interactive) (shell-command "amixer set Master 2%+")))
+    (exwm-input-set-key (kbd "<XF86AudioMute>") (lambda () (interactive) (shell-command "amixer set Master 1+ toggle")))
+    (exwm-input-set-key (kbd "<XF86MonBrightnessDown>") (lambda () (interactive) (shell-command "light -U 5; light")))
+    (exwm-input-set-key (kbd "<XF86MonBrightnessUp>") (lambda () (interactive) (shell-command "light -A 5; light")))
+    (exwm-input-set-key (kbd "<print>") (lambda () (interactive) (start-process-shell-command "spectacle" nil "spectacle")))
+    (exwm-input-set-key (kbd "s-<f9>") (lambda () (interactive) (shell-command "/home/torysa/bin/get-mail &" nil nil)))
+    (exwm-input-set-key (kbd "M-<tab>") 'iflipb-next-buffer)
+    (exwm-input-set-key (kbd "M-<iso-lefttab>") 'iflipb-previous-buffer))
+#+end_src
