@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>通过命令行实现笔记本的按键功能 - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="emacs-common" />
+  <!-- <link rel="stylesheet" href="../../../../../media/css/main.css" type="text/css"/>
+       <link rel="stylesheet" href="../../../../../media/css/comment.css" type="text/css"/> -->
+  <link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/kognise/water.css@latest/dist/dark.css'>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="../../../../../">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <ul class="trigger">
+        <li><a href="../../../../../years/">Years</a></li>
+        <li><a href="../../../../../authors/">Authors</a></li>
+        <li><a href="../../../../../tags/">Tags</a></li>
+        <li><a href="../../../../../about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="../../../../../rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="https://www.bing.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">通过命令行实现笔记本的按键功能</h1>
+<div id="table-of-contents">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#controlling-the-power-key">控制电源键</a></li>
+<li><a href="#toggling-the-touchpad">切换触摸板</a></li>
+<li><a href="#lock-screen">锁屏</a></li>
+<li><a href="#battery-status">电池状态</a></li>
+<li><a href="#simple-wifi-management">简单的Wifi管理</a></li>
+<li><a href="#simple-quick-transitions-to-multiple-monitors">简单地快速切换到多个监视器</a></li>
+<li><a href="#audio-volume">音频音量</a></li>
+<li><a href="#screen-brightness">屏幕亮度</a></li>
+<li><a href="#screenshot">截图</a></li>
+<li><a href="#alt-tab-buffer-swapping">使用Alt-Tab切换Buffer</a></li>
+<li><a href="#my-full-setup">我的全部设置</a></li>
+</ul>
+</div>
+</div>
+<p>
+<b>编辑添加:</b>
+</p>
+
+<ul class="org-ul">
+<li>2018.03.28 自从我现在使用nm-applet后，就补充了网络部分的内容,此外还添加了Alt+Tab交换缓冲区和emacs.el的exwm部分的内容。</li>
+</ul>
+
+<p>
+我正在尝试使用exwm,它与i3wm体验类似(但文档记录较少)，重量级的窗口管理器能为您的笔记本电脑提供很多功能。目前我旅行用的笔记本电脑就经常使用这些功能，我每天用它连接不同的wifi网络，连接对接站，连接额外的显示器和其他设备，切换触摸板等等。
+在我寻求在exwm实现这些功能的过程中，我主要解决了以下这些问题。
+</p>
+
+<div id="outline-container-org1449715" class="outline-2">
+<h2 id="controlling-the-power-key"><a id="org1449715"></a>控制电源键</h2>
+<div class="outline-text-2" id="text-controlling-the-power-key">
+<p>
+电源按钮不是由窗口管理器管理的，而是由systemd管理的
+</p>
+
+<p>
+例如，在我的 <code>/etc/systemd/logind.conf</code> 中有以下内容
+</p>
+
+<pre class="example">
+[Login]
+HandlePowerKey=hibernate
+HandleLidSwitch=ignore
+IdleAction=suspend
+IdleActionSec=20min
+</pre>
+</div>
+</div>
+
+<div id="outline-container-org758e3e6" class="outline-2">
+<h2 id="toggling-the-touchpad"><a id="org758e3e6"></a>切换触摸板</h2>
+<div class="outline-text-2" id="text-toggling-the-touchpad">
+<p>
+这是通过shell脚本实现的:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell"><span style="font-weight: bold; font-style: italic;">#</span><span style="font-weight: bold; font-style: italic;">!/bin/</span><span style="font-weight: bold;">bash</span>
+
+<span style="font-weight: bold;">declare</span> -i ID
+<span style="font-weight: bold; font-style: italic;">ID</span>=<span style="font-weight: bold;">`xinput list | grep -Eo 'Touchpads*id=[0-9]{1,2}' | grep -Eo '[0-9]{1,2}'`</span>
+<span style="font-weight: bold;">declare</span> -i STATE
+<span style="font-weight: bold; font-style: italic;">STATE</span>=<span style="font-weight: bold;">`xinput list-props $ID|grep 'Device Enabled'|awk '{print $4}'`</span>
+<span style="font-weight: bold;">if</span> [ $<span style="font-weight: bold; font-style: italic;">STATE</span> -eq 1 ]
+<span style="font-weight: bold;">then</span>
+    xinput disable $<span style="font-weight: bold; font-style: italic;">ID</span>
+    <span style="font-weight: bold;">echo</span> <span style="font-style: italic;">"Touchpad disabled."</span>
+    <span style="font-weight: bold; font-style: italic;"># </span><span style="font-weight: bold; font-style: italic;">notify-send -a 'Touchpad' 'Disabled' -i /usr/share/icons/Adwaita/48x48/devices/input-touchpad.png</span>
+<span style="font-weight: bold;">else</span>
+    xinput enable $<span style="font-weight: bold; font-style: italic;">ID</span>
+    <span style="font-weight: bold;">echo</span> <span style="font-style: italic;">"Touchpad enabled."</span>
+    <span style="font-weight: bold; font-style: italic;"># </span><span style="font-weight: bold; font-style: italic;">notify-send -a 'Touchpad' 'Enabled' -i /usr/share/icons/Adwaita/48x48/devices/input-touchpad.png</span>
+<span style="font-weight: bold;">fi</span>
+</pre>
+</div>
+
+<p>
+然后我将该脚本绑定到我想要的快捷键上(因为我使用exwm，所以我将它配置到我的emacs.el中，并以 <code>touchpad_toggle</code> 作为脚本名):
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(exwm-input-set-key (kbd <span style="font-style: italic;">"s-&lt;f7&gt;"</span>)
+                    (<span style="font-weight: bold;">lambda</span> () (<span style="font-weight: bold;">interactive</span>)
+                      (shell-command (executable-find <span style="font-style: italic;">"touchpad_toggle"</span>))))
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org3093324" class="outline-2">
+<h2 id="lock-screen"><a id="org3093324"></a>锁屏</h2>
+<div class="outline-text-2" id="text-lock-screen">
+<p>
+xscreensaver解决了这个问题。一旦从repos安装了xscreensaver后(包括额外包以获得我想要的作为锁屏屏保的gl-slideshow),我通过 <code>xscreensaver-demo</code> 来配置屏保。
+然后我创建了一个名为 <code>lockscreen</code> 的单行程序，并将它写入我的emacs文件:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell"><span style="font-weight: bold; font-style: italic;">#</span><span style="font-weight: bold; font-style: italic;">!/bin/</span><span style="font-weight: bold;">bash</span>
+
+xscreensaver-command -lock
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(exwm-input-set-key (kbd <span style="font-style: italic;">"s-l"</span>) (<span style="font-weight: bold;">lambda</span> () (<span style="font-weight: bold;">interactive</span>) (shell-command (executable-find <span style="font-style: italic;">"lockscreen"</span>))))
+</pre>
+</div>
+
+<p>
+然后就是关闭锁屏时遇到了一个问题:
+</p>
+
+<p>
+<a href="https://unix.stackexchange.com/questions/81692/suspend-and-lock-screen-on-closing-lid-in-arch-systemd">https://unix.stackexchange.com/questions/81692/suspend-and-lock-screen-on-closing-lid-in-arch-systemd</a>
+</p>
+</div>
+</div>
+
+<div id="outline-container-org99c5741" class="outline-2">
+<h2 id="battery-status"><a id="org99c5741"></a>电池状态</h2>
+<div class="outline-text-2" id="text-battery-status">
+<p>
+简单地使用 <code>fancy-battery</code> mode 就好 (它现在已经不再维护的，但我在melpa上安装好它后，目前在我电脑上工作正常)
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(use-package fancy-battery
+  <span style="font-weight: bold;">:ensure</span> t
+  (fancy-battery-mode))
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org64de9b6" class="outline-2">
+<h2 id="simple-wifi-management"><a id="org64de9b6"></a>简单的Wifi管理</h2>
+<div class="outline-text-2" id="text-simple-wifi-management">
+<p>
+nmtui 带有一个很好的NetworkManager文本接口，它的接口也是最简单的。问题是，它不能用于任何一种Emacs终端中，这些Emacs终端作为是我的shell解决方案已经有很长一段时间了。
+</p>
+
+<p>
+放弃通过CLI接口来管理Wifi，我发现 <code>nm-applet</code> 挺不错的。它的图标停靠屏幕的底部而且还具有我想要的密码记忆和自动连接功能。
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgbde4c5b" class="outline-2">
+<h2 id="simple-quick-transitions-to-multiple-monitors"><a id="orgbde4c5b"></a>简单地快速切换到多个监视器</h2>
+<div class="outline-text-2" id="text-simple-quick-transitions-to-multiple-monitors">
+<p>
+However, exwm has solutions for this, which go into my emacs.el file:
+当我插入一个外部显示器时，在KDE下只需要简单地插上显示器就可以了(尽管我可能需要做调整一下分辨率)。
+但是在exwm中，这么做什么都不会发生。不过，exwm对此有解决方案，我把这些解决方案放入我的emacs.el文件中:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">require</span> '<span style="font-weight: bold; text-decoration: underline;">exwm-randr</span>)
+(<span style="font-weight: bold;">setq</span> exwm-randr-workspace-output-plist '(0 <span style="font-style: italic;">"DP-1"</span>)) <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">DP-1 being the name of my new monitor as shown by `</span><span style="font-weight: bold; font-style: italic; text-decoration: underline;">randr</span><span style="font-weight: bold; font-style: italic;">'</span>
+(add-hook 'exwm-randr-screen-change-hook
+          (<span style="font-weight: bold;">lambda</span> ()
+            (start-process-shell-command
+             <span style="font-style: italic;">"xrandr"</span> nil <span style="font-style: italic;">"xrandr --output DP-1 --left-of eDP-1 --auto"</span>))) <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">eDP-1 being the name of my original (laptop) monitor</span>
+(exwm-enable)
+(exwm-randr-enable)
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org2eea828" class="outline-2">
+<h2 id="audio-volume"><a id="org2eea828"></a>音频音量</h2>
+<div class="outline-text-2" id="text-audio-volume">
+<p>
+幸好我的声音是基于Alsa的，所以不需要安装任何东西。
+根据之前在不同设备上的尝试经验，声音是很难处理的。
+通过Alsa，我可以在exwm配置中调节音量。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(exwm-input-set-key (kbd <span style="font-style: italic;">"&lt;XF86AudioLowerVolume&gt;"</span>)
+                    (<span style="font-weight: bold;">lambda</span> () (<span style="font-weight: bold;">interactive</span>) (shell-command <span style="font-style: italic;">"amixer set Master 5%-"</span>)))
+(exwm-input-set-key (kbd <span style="font-style: italic;">"&lt;XF86AudioRaiseVolume&gt;"</span>)
+                    (<span style="font-weight: bold;">lambda</span> () (<span style="font-weight: bold;">interactive</span>) (shell-command <span style="font-style: italic;">"amixer set Master 5%+"</span>)))
+(exwm-input-set-key (kbd <span style="font-style: italic;">"&lt;XF86AudioMute&gt;"</span>)
+                    (<span style="font-weight: bold;">lambda</span> () (<span style="font-weight: bold;">interactive</span>) (shell-command <span style="font-style: italic;">"amixer set Master 1+ toggle"</span>)))
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org99ef290" class="outline-2">
+<h2 id="screen-brightness"><a id="org99ef290"></a>屏幕亮度</h2>
+<div class="outline-text-2" id="text-screen-brightness">
+<p>
+我在KDE下可以通过硬件键使我的屏幕变暗/变亮。我怎样才能在exwm中恢复这个功能?答案是light包(它比xbacklight容易得多，后者总是告诉我“No outputs have backlight property”)。
+</p>
+
+<p>
+<a href="https://github.com/haikarainen/light">https://github.com/haikarainen/light</a>
+</p>
+
+<p>
+按照说明安装后再设置好快捷键:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(exwm-input-set-key (kbd <span style="font-style: italic;">"&lt;XF86MonBrightnessDown&gt;"</span>) (<span style="font-weight: bold;">lambda</span> () (<span style="font-weight: bold;">interactive</span>) (shell-command <span style="font-style: italic;">"light -U 5; light"</span>)))
+(exwm-input-set-key (kbd <span style="font-style: italic;">"&lt;XF86MonBrightnessUp&gt;"</span>) (<span style="font-weight: bold;">lambda</span> () (<span style="font-weight: bold;">interactive</span>) (shell-command <span style="font-style: italic;">"light -A 5; light"</span>)))
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org447fac9" class="outline-2">
+<h2 id="screenshot"><a id="org447fac9"></a>截图</h2>
+<div class="outline-text-2" id="text-screenshot">
+<p>
+我写这篇文章时，意识到我最不需要的就是截屏。
+我最喜欢的截图工具是KDE自带的 <b>Spectacle</b>. 我已经安装安装好了它，因此只需要把它绑定到Printscreen键就行了:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(exwm-input-set-key (kbd <span style="font-style: italic;">"&lt;print&gt;"</span>) (<span style="font-weight: bold;">lambda</span> () (<span style="font-weight: bold;">interactive</span>) (start-process-shell-command <span style="font-style: italic;">"spectacle"</span> nil <span style="font-style: italic;">"spectacle"</span>)))
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgf00a277" class="outline-2">
+<h2 id="alt-tab-buffer-swapping"><a id="orgf00a277"></a>使用Alt-Tab切换Buffer</h2>
+<div class="outline-text-2" id="text-alt-tab-buffer-swapping">
+<p>
+通过iflipb包很容易就能重新获得 <code>alt+tab</code> 的功能(这个功能我经常在其他系统上使用)。下载后，我只需要配置一下:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(exwm-input-set-key (kbd <span style="font-style: italic;">"M-&lt;tab&gt;"</span>) 'iflipb-next-buffer)
+(exwm-input-set-key (kbd <span style="font-style: italic;">"M-&lt;iso-lefttab&gt;"</span>) 'iflipb-previous-buffer)
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org02d9e23" class="outline-2">
+<h2 id="my-full-setup"><a id="org02d9e23"></a>我的全部设置</h2>
+<div class="outline-text-2" id="text-my-full-setup">
+<p>
+use-package使得配置变得简单和干净。这是我的emacs.el。其中包括一些没有在这里描述的片段:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(use-package exwm
+  <span style="font-weight: bold;">:ensure</span> t
+  <span style="font-weight: bold;">:init</span>
+  (<span style="font-weight: bold;">setq</span> mouse-autoselect-window t
+        focus-follows-mouse t)
+  (use-package exwm-config)
+  (<span style="font-weight: bold;">require</span> '<span style="font-weight: bold; text-decoration: underline;">exwm-randr</span>)
+  (<span style="font-weight: bold;">setq</span> exwm-workspace-show-all-buffers t)
+  (<span style="font-weight: bold;">setq</span> exwm-layout-show-all-buffers t)
+  (<span style="font-weight: bold;">setq</span> exwm-randr-workspace-output-plist '(0 <span style="font-style: italic;">"DP1"</span>))
+  (add-hook 'exwm-randr-screen-change-hook
+            (<span style="font-weight: bold;">lambda</span> ()
+              (start-process-shell-command
+               <span style="font-style: italic;">"xrandr"</span> nil <span style="font-style: italic;">"xrandr --output DP1 --left-of eDP1 --auto"</span>)))
+  (exwm-enable)
+  (exwm-randr-enable) <span style="font-weight: bold; font-style: italic;">; </span><span style="font-weight: bold; font-style: italic;">https://github.com/ch11ng/exwm/wiki</span>
+  (<span style="font-weight: bold;">require</span> '<span style="font-weight: bold; text-decoration: underline;">exwm-systemtray</span>)
+  (exwm-systemtray-enable)
+  <span style="font-weight: bold;">:config</span>
+  (add-hook 'exwm-update-class-hook
+            (<span style="font-weight: bold;">lambda</span> () (<span style="font-weight: bold;">unless</span> (<span style="font-weight: bold;">or</span> (string-prefix-p <span style="font-style: italic;">"sun-awt-X11-"</span> exwm-instance-name) (string= <span style="font-style: italic;">"gimp"</span> exwm-instance-name))
+                         (exwm-workspace-rename-buffer exwm-class-name))))
+  (<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">tsa/exwm-rename</span> ()
+    (<span style="font-weight: bold;">interactive</span>)
+    (exwm-workspace-rename-buffer (concat exwm-class-name <span style="font-style: italic;">" : "</span> exwm-title)))
+  (add-hook 'exwm-update-title-hook 'tsa/exwm-rename)
+  (<span style="font-weight: bold;">setq</span> tsa/default-simulation-keys
+        '(
+          <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">move</span>
+          ([?C-b] . left)
+          ([?M-b] . C-left)
+          ([?C-f] . right)
+          ([?M-f] . C-right)
+          ([?C-p] . up)
+          ([?C-n] . down)
+          ([?M-&lt;] . C-home)
+          ([?M-&gt;] . C-end)
+          ([?C-a] . home)
+          ([?C-e] . end) <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">in spreadsheets: C-e C-p - go to top; C-e C-n - go to bottom</span>
+          ([?M-v] . prior)
+          ([?C-v] . next)
+          <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">delete</span>
+          ([?C-d] . delete)
+          ([?C-k] . (S-end delete))
+          ([?M-d] . (C-S-right delete))
+          <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">cut/copy/paste.</span>
+                                        <span style="font-weight: bold; font-style: italic;">;</span><span style="font-weight: bold; font-style: italic;">([?C-w] . ?C-x)</span>
+          ([?M-w] . ?C-c)
+          ([?C-y] . ?C-v)
+          <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">search</span>
+          ([?C-s] . ?C-f)
+          ))
+  (exwm-input-set-simulation-keys tsa/default-simulation-keys)
+  (exwm-input-set-key (kbd <span style="font-style: italic;">"s-r"</span>) 'exwm-reset)
+  (exwm-input-set-key (kbd <span style="font-style: italic;">"s-n"</span>) 'tsa/exwm-rename)
+  (exwm-input-set-key (kbd <span style="font-style: italic;">"s-N"</span>) 'rename-buffer)
+  (exwm-input-set-key (kbd <span style="font-style: italic;">"s-w"</span>) #'exwm-workspace-switch)
+  (exwm-input-set-key (kbd <span style="font-style: italic;">"s-f"</span>)
+                      (<span style="font-weight: bold;">lambda</span> ()
+                        (<span style="font-weight: bold;">interactive</span>)
+                        (start-process-shell-command <span style="font-style: italic;">"firefox"</span> nil <span style="font-style: italic;">"firefox"</span>)))
+  (exwm-input-set-key (kbd <span style="font-style: italic;">"s-t"</span>)
+                      (<span style="font-weight: bold;">lambda</span> ()
+                        (<span style="font-weight: bold;">interactive</span>)
+                        (start-process-shell-command <span style="font-style: italic;">"Telegram"</span> nil <span style="font-style: italic;">"Telegram"</span>)))
+  (exwm-input-set-key (kbd <span style="font-style: italic;">"s-&lt;f7&gt;"</span>) (<span style="font-weight: bold;">lambda</span> () (<span style="font-weight: bold;">interactive</span>) (shell-command (executable-find <span style="font-style: italic;">"touchpad_toggle"</span>))))
+  (exwm-input-set-key (kbd <span style="font-style: italic;">"C-c o"</span>) 'hydra-global-org/body)
+  (exwm-input-set-key (kbd <span style="font-style: italic;">"C-M-o"</span>) 'hydra-window/body)
+  (exwm-input-set-key (kbd <span style="font-style: italic;">"s-l"</span>) (<span style="font-weight: bold;">lambda</span> () (<span style="font-weight: bold;">interactive</span>) (shell-command (executable-find <span style="font-style: italic;">"lockscreen"</span>))))
+  (exwm-input-set-key (kbd <span style="font-style: italic;">"&lt;f8&gt;"</span>) 'tsa/go-or-make-agenda)
+  (exwm-input-set-key (kbd <span style="font-style: italic;">"&lt;f11&gt;"</span>) 'helm-org-capture-templates)
+  (exwm-input-set-key (kbd <span style="font-style: italic;">"&lt;f9&gt;"</span>) 'tsa/quick-gnus)
+  (exwm-input-set-key (kbd <span style="font-style: italic;">"&lt;XF86AudioLowerVolume&gt;"</span>) (<span style="font-weight: bold;">lambda</span> () (<span style="font-weight: bold;">interactive</span>) (shell-command <span style="font-style: italic;">"amixer set Master 2%-"</span>)))
+  (exwm-input-set-key (kbd <span style="font-style: italic;">"&lt;XF86AudioRaiseVolume&gt;"</span>) (<span style="font-weight: bold;">lambda</span> () (<span style="font-weight: bold;">interactive</span>) (shell-command <span style="font-style: italic;">"amixer set Master 2%+"</span>)))
+  (exwm-input-set-key (kbd <span style="font-style: italic;">"&lt;XF86AudioMute&gt;"</span>) (<span style="font-weight: bold;">lambda</span> () (<span style="font-weight: bold;">interactive</span>) (shell-command <span style="font-style: italic;">"amixer set Master 1+ toggle"</span>)))
+  (exwm-input-set-key (kbd <span style="font-style: italic;">"&lt;XF86MonBrightnessDown&gt;"</span>) (<span style="font-weight: bold;">lambda</span> () (<span style="font-weight: bold;">interactive</span>) (shell-command <span style="font-style: italic;">"light -U 5; light"</span>)))
+  (exwm-input-set-key (kbd <span style="font-style: italic;">"&lt;XF86MonBrightnessUp&gt;"</span>) (<span style="font-weight: bold;">lambda</span> () (<span style="font-weight: bold;">interactive</span>) (shell-command <span style="font-style: italic;">"light -A 5; light"</span>)))
+  (exwm-input-set-key (kbd <span style="font-style: italic;">"&lt;print&gt;"</span>) (<span style="font-weight: bold;">lambda</span> () (<span style="font-weight: bold;">interactive</span>) (start-process-shell-command <span style="font-style: italic;">"spectacle"</span> nil <span style="font-style: italic;">"spectacle"</span>)))
+  (exwm-input-set-key (kbd <span style="font-style: italic;">"s-&lt;f9&gt;"</span>) (<span style="font-weight: bold;">lambda</span> () (<span style="font-weight: bold;">interactive</span>) (shell-command <span style="font-style: italic;">"/home/torysa/bin/get-mail &amp;"</span> nil nil)))
+  (exwm-input-set-key (kbd <span style="font-style: italic;">"M-&lt;tab&gt;"</span>) 'iflipb-next-buffer)
+  (exwm-input-set-key (kbd <span style="font-style: italic;">"M-&lt;iso-lefttab&gt;"</span>) 'iflipb-previous-buffer))
+</pre>
+</div>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2018-04-16</span>
+            <span title="last modification date" class="post-info">2020-01-28</span>
+            <span title="tags" class="post-info">:<a href="../../../../../tags/emacs-common">emacs-common</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-5970f703-140a-4d80-bd4d-7dd6e487d067">lujun9972</a></span>
+        </div>
+    <script src="../../../../../media/js/jquery-2.1.3.min.js"></script>
+    <script src="../../../../../media/js/md5.min.js"></script>
+        <section>
+            <div id="gitalk-container"></div>
+            <script type="text/javascript">
+             var gitalk = new Gitalk({
+                 clientID: 'fdcb5d9da3f4acb4862c',
+                 clientSecret: 'dd0a16312a206782cb7669dcec5e96874ab48170',
+                 repo: 'lujun9972.github.com',
+                 owner: 'lujun9972',
+                 admin: ['lujun9972'],
+                 id: md5(location.pathname),      // Ensure uniqueness and length less than 50
+                 distractionFreeMode: false  // Facebook-like distraction free mode
+             })
+             gitalk.render('gitalk-container')
+            </script>
+        </section>
+    <script src="../../../../../media/js/main.js"></script>
+        <script>
+         var _hmt = _hmt || [];
+         (function() {
+             var hm = document.createElement("script");
+             hm.src = "https://hm.baidu.com/hm.js?7bac4fd0247f69c27887e0d4e3aee41e";
+             var s = document.getElementsByTagName("script")[0]; 
+             s.parentNode.insertBefore(hm, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-5970f703-140a-4d80-bd4d-7dd6e487d067">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="../../../../../instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>
