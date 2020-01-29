@@ -1,0 +1,152 @@
+#+TITLE: 如何使用Emacs Org模式和Reveal.js创建幻灯片
+#+URL: https://opensource.com/article/18/2/how-create-slides-emacs-org-mode-and-revealjs
+#+AUTHOR: lujun9972
+#+TAGS: org-mode
+#+DATE: [2018年 03月 09日 星期五 14:02:29 CST]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+[[https://opensource.com/sites/default/files/styles/image-full-size/public/lead-images/bus_presentation.png]]
+
+在过去一年左右的时间里，我开始大量使用Emacs和[[https://orgmode.org/][Org模式]]包(用于做笔记、组织自己，等等)。同时我也开始尝试做一些简短的演讲。我一直想知道如何将Emacs与演讲结合起来。
+
+您可能会问，展示与文本编辑器有什么关系?实际上关系相当密切!
+
+像许多演讲者一样，我在演讲时使用幻灯片。我的幻灯片非常少——要么是几个字，要么是一张图片。
+我使用[[http://lab.hakim.se/reveal-js/][Reveal.js]]来创建这些幻灯片，这也给了我一个拥抱内心极客理想手工编码HTML的机会。
+
+那么，Emacs和Reveal.js的融合点在那呢?它以Emacs包的形式出现，名为[[https://github.com/yjwen/Org-Reveal][Org-Reveal]]。让我们看看如何使用Emacs、Org-Reveal和Reveal.js来创建简单的演示幻灯片吧。
+
+* 开始
+:PROPERTIES:
+:CUSTOM_ID: getting-started
+:END:
+
+我假设您的计算机上安装了Emacs和Org模式。如果没有，下载你的操作系统 [[https://www.gnu.org/software/emacs/download.html][对应的Emacs]]，[[http://orgmode.org/][下载]]最新版本的Org模式。Org模式官网上也有安装说明。
+
+此外还需要安装[[https://github.com/yjwen/Org-Reveal][Org-Reveal]]，并获取[[https://github.com/hakimel/reveal.js][Reveal.js]]归档文件的副本。你可以解压Reveal.js到任意地方。我把它放在文件夹 =~/slide/reveal.js= 中,这也是我存放幻灯片的地方。
+
+完成所有这些之后，将以下内容添加到 =.emacs= 文件中中从而将Org-Reveal集成到emacs中去:
+
+#+begin_src emacs-lisp
+  ;; Reveal.js + Org mode
+
+  (require 'ox-reveal)
+
+  (setq Org-Reveal-root "file:///path-to-reveal.js")
+
+  (setq Org-Reveal-title-slide nil)
+#+end_src
+
+在上面的例子中, =path-to-reveal.js= 是您解压Reveal.js归档文件的地方。在我的设置中，这个地址是 =file:///home/scott/slides/reveal.js=.
+
+这个工作量很小。而且幸运的是，你只需要做一次就行了。现在，你可以开始了。
+
+* 创建幻灯片组和幻灯片
+:PROPERTIES:
+属性:
+:CUSTOM_ID: creating-your-slide-deck-and-slides
+:CUSTOM_ID creating-your-slide-deck-and-slides
+:END:
+结束:
+
+启动Emacs并创建一个新文件。名称随意，只需要扩展名是 =.org= 就行。该扩展名告诉Emacs这是一个Org模式文件。
+每当您打开具有该扩展名的文件时，Emacs都会应用正确的语法高亮显示，并使Org菜单在菜单栏上可用。
+
+将以下信息内容到文件的顶部:
+
+#+begin_src org
+  ,#+OPTIONS: num:nil toc:nil
+
+  ,#+REVEAL_TRANS: None/Fade/Slide/Convex/Concave/Zoom
+
+  ,#+REVEAL_THEME: Black/White/League/Sky/Beige/Simple/Serif/Blood/Night/Moon/Solarized
+
+  ,#+Title: Title of Your Talk
+
+  ,#+Author: Your Name
+
+  ,#+Email: Your Email Address or Twitter Handle
+#+end_src
+
+这部分内容就像是幻灯片的元数据。让我们来看看其中前三项内容:
+
+- =num:nil= 和 =toc:nil= 在生成幻灯片时禁止标题编号和创建目录
+- =#REVEAL_TRANS= 控制幻灯片的  [[http://lab.hakim.se/reveal-js/#/transitions][切换样式]]。我通常直接使用默认值，不过你可以随意尝试
+- =#REVEAL_THEME= 控制[[http://lab.hakim.se/reve-js/?transition=none#/themes][幻灯片的外观]]。我一贯常用黑色或白色主题，不过你也可以随意尝试
+
+在元数据块之后添加输入星号、空格和一些文本形成一个标题。这个生成的幻灯片用来展示标题用的。(标题一定要好!)
+
+如果你想在标题下面加上你的名字，那么直接按下回车。Emacs会在标题下面添加一个空白的、缩进的空间。在其中输入你的名字和其他信息。
+
+向文件添加标题(就是前面有星号和空格的文本，还记得吗?)会将新的幻灯片添加到幻灯片组中。这很简单,不是吗?
+
+下面是一个简单的Emacs展示:
+
+[[https://opensource.com/sites/default/files/styles/panopoly_image_original/public/u128651/org-reveal-sample.png]]
+
+在网络浏览器中它是这样子的:
+
+[[https://opensource.com/sites/default/files/styles/panopoly_image_original/public/u128651/org-reveal-slides-in-browser.png]]
+
+如果您创建的幻灯片只包含文本，那么这种方法很有效。那带图片的幻灯片怎么办?
+
+* 添加图片
+:PROPERTIES:
+:CUSTOM_ID: adding-images
+:END:
+
+除了文本，我也经常在幻灯片中使用图片。 这些图片的目的不是为了让人眼花缭乱或分心。 这些图片能够提供了一些视觉环境，起到了视觉提示的作用。它并不适用于每一张幻灯片或每一次演讲，但使用正确的图像很有用，也可以很有趣。
+
+要将图像添加到幻灯片中，首先在幻灯片文件的文件夹中创建一个子文件夹存放图片。我通常将这个文件夹命名为 =images=, 它虽然缺乏想象力，但直观。将幻灯片中要使用的图像都放入该文件夹。
+
+接下来，在幻灯片文件中创建一个空标题——一个带星号但没有文本的标题。按回车键在该标题下添加空间，然后将下面内容添加到空间中:
+
+#+begin_src org
+  :PROPERTIES:
+  :reveal_background: images/name-of-image
+  :reveal_background_size: width-of-image
+  :reveal_background_trans: slide
+  :END:
+#+end_src
+
+将 =name-of-image= 替换为图片的文件名(包括其扩展名)。将 =width-of-image= 替换为图像的宽度(以像素为单位)，例如 =640px=.确保你的图像不太宽，否则它们会超出你的屏幕边缘。我尽量把幻灯片上的图片保持在1000像素以下。
+
+* 添加演讲笔记
+:PROPERTIES:
+:CUSTOM_ID: adding-speaker-notes
+:END:
+
+js有一个很棒的功能，可以让你在播放幻灯片的电脑上显示演讲笔记。只有当你按下键盘上的 *s* 键后，你才能看到这些内容。
+
+要在幻灯片中添加注释，按回车键在标题下创建空白区域，然后添加下面内容:
+
+#+begin_src org
+  ,#+BEGIN_NOTES
+
+  Your note
+
+  ,#+END_NOTES
+#+end_src
+
+把 =Your note= 替换成提示的内容。
+
+* 生成幻灯片
+:PROPERTIES:
+:CUSTOM_ID: generating-your-slides
+:END:
+
+你精心制作了演示中的每一张幻灯片。然后怎么办呢?若您还想要生成幻灯片组的HTML版本,那么，在键盘上按 *Ctrl+c Ctrl+e* 打开Org模式的导出缓冲区, 然后,输入 *R+R* 让Emacs在保存幻灯片文件的文件夹中创建单个HTML文件。
+
+在web浏览器中打开该HTML文件后你可以通过按键盘上的箭头键来移动幻灯片了。
+
+* 最后的想法
+:PROPERTIES:
+:CUSTOM_ID: final-thought
+:END:
+
+Reveal.js和Org-Reveal还可以做更多的事情。我没有深入探讨这个问题，因为我喜欢保持幻灯片简洁。
+
+通过Reveal.js和Emacs与Org模式创建演示幻灯片似乎有些多余。说实话，我不会用这种方式制作所有的演示幻灯片。但当我需要快速地完成一个幻灯片时，这套系统挺不错的。
+
+而且，因为我很喜欢这套方案，我创建了一个 [[https://archive.org/download/OrgModeReveal.jsSlides/org-mode+Reveal.js%20Slides.org][简单的Org-Reveal幻灯片模板]]，你可以下载、使用或修改想要的内容。不客气
