@@ -7,61 +7,35 @@
 #+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
 12 Jan 2020
 
-It's been a while since the last post, one reason is that for the past few
-months I've been drawn to [[https://apps.ankiweb.net/][Anki]], the spaced-repetition flashcard program. If you
-haven't checked it out yet, I strongly recommended it. ([[http://augmentingcognition.com/ltm.html][Why? Read Michael
-Nielson's article]])
+It's been a while since the last post, one reason is that for the past few months I've been drawn to [[https://apps.ankiweb.net/][Anki]], the spaced-repetition flashcard program. If you haven't checked it out yet, I strongly recommended it. ([[http://augmentingcognition.com/ltm.html][Why? Read Michael Nielson's article]])
 
-One question recurred among Anki community is how to generate cards quickly. 3
-approaches are common:
+One question recurred among Anki community is how to generate cards quickly. 3 approaches are common:
 
 1. Use Anki's “Import” function to read csv/tsv
 2. Write Python scripts with [[https://github.com/kerrickstaley/genanki][genanki]] that generate =.apkg= for import
 3. Use third-party browser plugin that supports [[https://ankiweb.net/shared/info/2055492159][AnkiConnect]] (e.g. [[https://foosoft.net/projects/yomichan/][yomichan]])
 
-While these are viable and oftentimes powerful options, for users they usually
-don't come as flexible for customization (change matching of columns & fields,
-ad-hoc editing, formula/highlight/table/etc support). Programming experience is
-yet another entry barrier for many people.
+While these are viable and oftentimes powerful options, for users they usually don't come as flexible for customization (change matching of columns & fields, ad-hoc editing, formula/highlight/table/etc support). Programming experience is yet another entry barrier for many people.
 
-In this post I'll try to demonstrate some workflows of creating cards in Emacs
-based on [[https://github.com/louietan/anki-editor][anki-editor]], a package that connects Emacs's Org-mode and AnkiConnect.
-Combining =anki-editor='s connectivity, Emacs's customizability, and Org-mode's
-rich formatting and export support, a few card generation scenarios can be
-handled with ease:
+In this post I'll try to demonstrate some workflows of creating cards in Emacs based on [[https://github.com/louietan/anki-editor][anki-editor]], a package that connects Emacs's Org-mode and AnkiConnect. Combining =anki-editor='s connectivity, Emacs's customizability, and Org-mode's rich formatting and export support, a few card generation scenarios can be handled with ease:
 
 - Utilize a powerful editor for card editing
 - Capture ideas with least interruption as you encounter interesting content
 - Customize shortcut keys and workflow, minimize mouse pointing/clicking
 - etc...
 
-*Note for Anki users who hear of Org-mode for the first time*: Take a look at
-[[https://www.youtube.com/watch?v=fgizHHd7nOo][John Kitchin - org mode is awesome]] to have a grasp of Org's capability. (Find a
-pencil and mark down the date, it may become commemorable later :)). If you
-already knew that Org can do outline-structured editing, has tagging system and
-rich export support, you should be able to follow the post fine.
+*Note for Anki users who hear of Org-mode for the first time*: Take a look at [[https://www.youtube.com/watch?v=fgizHHd7nOo][John Kitchin - org mode is awesome]] to have a grasp of Org's capability. (Find a pencil and mark down the date, it may become commemorable later :)). If you already knew that Org can do outline-structured editing, has tagging system and rich export support, you should be able to follow the post fine.
 
-*Note for setup*: Most setup is done in Emacs configuration language, Emacs
-Lisp, under Linux. I will point out where I think is relevant to explain the
-details, and provide download at the end of article. But as always, YMMV in
-other platforms. If you are not sure how to configure, comment below, take a
-look at [[https://github.com/yiufung/dot-emacs/blob/master/init.el][my init.el]], or join the friendly [[https://www.reddit.com/r/emacs/][r/emacs]], [[https://www.reddit.com/r/orgmode/][r/orgmode]] and raise your hand.
+*Note for setup*: Most setup is done in Emacs configuration language, Emacs Lisp, under Linux. I will point out where I think is relevant to explain the details, and provide download at the end of article. But as always, YMMV in other platforms. If you are not sure how to configure, comment below, take a look at [[https://github.com/yiufung/dot-emacs/blob/master/init.el][my init.el]], or join the friendly [[https://www.reddit.com/r/emacs/][r/emacs]], [[https://www.reddit.com/r/orgmode/][r/orgmode]] and raise your hand.
 
 ** Emacs/Org-mode as editor to Anki
    :PROPERTIES:
    :CUSTOM_ID: emacs-org-mode-as-editor-to-anki
    :END:
 
-An Anki note is represented as an Org entry with [[https://orgmode.org/manual/Property-syntax.html#Property-syntax][property]] =ANKI_NOTE_TYPE=. Each
-subheading of the entry corresponds to a =field= in Anki. [[https://orgmode.org/manual/Tags.html][Tags]] can be synchronized
-to Anki. =anki-editor= uses property value =ANKI_NOTE_ID= to synchronized an Org
-entry and corresponding Anki note.
+An Anki note is represented as an Org entry with [[https://orgmode.org/manual/Property-syntax.html#Property-syntax][property]] =ANKI_NOTE_TYPE=. Each subheading of the entry corresponds to a =field= in Anki. [[https://orgmode.org/manual/Tags.html][Tags]] can be synchronized to Anki. =anki-editor= uses property value =ANKI_NOTE_ID= to synchronized an Org entry and corresponding Anki note.
 
-Upon pushing to Anki, =anki-editor= will export Org tree as Anki-compatible HTML.
-However, without a proper CSS file it will still look plain. So we replace it
-with [[https://github.com/gongzhitaao/orgcss][gongzhitaao/orgcss]], a simple stylesheet for Org-exported HTML, to obtain a
-proper styling for source code blocks, lists, tables, etc. (Download at the end
-of article)
+Upon pushing to Anki, =anki-editor= will export Org tree as Anki-compatible HTML. However, without a proper CSS file it will still look plain. So we replace it with [[https://github.com/gongzhitaao/orgcss][gongzhitaao/orgcss]], a simple stylesheet for Org-exported HTML, to obtain a proper styling for source code blocks, lists, tables, etc. (Download at the end of article)
 
 Apart from “Basic”, another commonly-used note type is Cloze Deletion.
 
@@ -102,22 +76,8 @@ Apart from “Basic”, another commonly-used note type is Cloze Deletion.
    )
 #+END_EXAMPLE
 
-- By default =anki-editor-cloze-{dwim,region}= always asks for hints and requires
-  card number input. I don't use hints much, and usually want card number to
-  increase, so two helper functions
-  =anki-editor-cloze-region-{auto-incr,dont-incr}= are written to skip these
-  behaviors. (Note: Such kind of customizations are ubiquitous in Emacs
-  community, where users don't have to wait for upstream to implement a desired
-  new feature. This is quite different from Anki community where version updates
-  frequently break existing add-ons, leaving end-users hands tied, or new
-  features being delayed due to technical difficulty in understanding the code
-  base.)
-- By default =anki-editor-push-notes= will push the whole file. This is slow when
-  the file contain old entries that didn't really need to change. In my
-  workflow, I keep all pending notes under =Dispatch Shelf= subtree, and push that
-  whole subtree (with =<f9>=) when I feel ready. Once they're pushed, I would
-  [[https://orgmode.org/manual/Refile-and-copy.html#Refile-and-copy][refile]]/relocate them under =Exported= subtree. =anki-editor-push-tree= is added
-  for this purpose.
+- By default =anki-editor-cloze-{dwim,region}= always asks for hints and requires card number input. I don't use hints much, and usually want card number to increase, so two helper functions =anki-editor-cloze-region-{auto-incr,dont-incr}= are written to skip these behaviors. (Note: Such kind of customizations are ubiquitous in Emacs community, where users don't have to wait for upstream to implement a desired new feature. This is quite different from Anki community where version updates frequently break existing add-ons, leaving end-users hands tied, or new features being delayed due to technical difficulty in understanding the code base.)
+- By default =anki-editor-push-notes= will push the whole file. This is slow when the file contain old entries that didn't really need to change. In my workflow, I keep all pending notes under =Dispatch Shelf= subtree, and push that whole subtree (with =<f9>=) when I feel ready. Once they're pushed, I would [[https://orgmode.org/manual/Refile-and-copy.html#Refile-and-copy][refile]]/relocate them under =Exported= subtree. =anki-editor-push-tree= is added for this purpose.
 - Assign handy keybindings (=<f9>-<f12>= in this case) to your liking.
 
 ** Org-capture: Swiftly create cards
@@ -125,9 +85,7 @@ Apart from “Basic”, another commonly-used note type is Cloze Deletion.
    :CUSTOM_ID: org-capture-swiftly-create-cards
    :END:
 
-Now that we know what a proper Anki note should look like in Org-mode, we can
-define a template and use =org-capture= to create cards swiftly as we came across
-different materials on web.
+Now that we know what a proper Anki note should look like in Org-mode, we can define a template and use =org-capture= to create cards swiftly as we came across different materials on web.
 
 #+BEGIN_EXAMPLE
   ;; Org-capture templates
@@ -149,79 +107,43 @@ different materials on web.
 #+END_EXAMPLE
 
 - [[https://youtu.be/fgizHHd7nOo?t=203][What's org-capture?]]
-- Note the =%x= in =org-capture-templates=: this means we want to fill in content of
-  X clipboard upon capture. For Cloze note, this would be in =Text= field. For
-  Basic note, I usually like to put them in =Back=, and come up with a good
-  question for =Front= field.
-- The key to be as lazy as possible is to let Emacs not only read explicitly
-  copied/paste content (via =C-c= / =C-v=, the =CLIPBOARD= selection), but also the
-  *currently selected text* (the =PRIMARY= selection). That way, after highlighting
-  text with mouse I can immediately call =org-capture (C-c c)= in Emacs. See
-  [[https://wiki.archlinux.org/index.php/Clipboard][Clipboard - ArchWiki]] for details.
-- Header name does not really matter in =anki-editor=, =%H:%M= is an arbitrary
-  choice
-- I put most notes in a =Mega= deck following Michael Nielson's advice ([[http://augmentingcognition.com/ltm.html][Search
-  “Use one big deck”]]). It served me well. If you have many decks/note types, you
-  may want to create multiple capture templates, or write some elisp functions
-  to reduce typing.
+- Note the =%x= in =org-capture-templates=: this means we want to fill in content of X clipboard upon capture. For Cloze note, this would be in =Text= field. For Basic note, I usually like to put them in =Back=, and come up with a good question for =Front= field.
+- The key to be as lazy as possible is to let Emacs not only read explicitly copied/paste content (via =C-c= / =C-v=, the =CLIPBOARD= selection), but also the *currently selected text* (the =PRIMARY= selection). That way, after highlighting text with mouse I can immediately call =org-capture (C-c c)= in Emacs. See [[https://wiki.archlinux.org/index.php/Clipboard][Clipboard - ArchWiki]] for details.
+- Header name does not really matter in =anki-editor=, =%H:%M= is an arbitrary choice
+- I put most notes in a =Mega= deck following Michael Nielson's advice ([[http://augmentingcognition.com/ltm.html][Search “Use one big deck”]]). It served me well. If you have many decks/note types, you may want to create multiple capture templates, or write some elisp functions to reduce typing.
 
-Enabling X clipboard support makes Emacs versatile for textual input from any
-other applications. For me it's mainly web articles from Firefox, and sometimes
-books in PDF.js ... Or, do I really need PDF.js when I can read books in
-[[https://github.com/politza/pdf-tools][=pdf-tools=]], the best PDF reader in Emacs?
+Enabling X clipboard support makes Emacs versatile for textual input from any other applications. For me it's mainly web articles from Firefox, and sometimes books in PDF.js ... Or, do I really need PDF.js when I can read books in [[https://github.com/politza/pdf-tools][=pdf-tools=]], the best PDF reader in Emacs?
 
-Emacs command =fill-paragraph (M-q)= comes handy for aligning irregular-shaped
-text copied from PDF.
+Emacs command =fill-paragraph (M-q)= comes handy for aligning irregular-shaped text copied from PDF.
 
 ** org-download + Flameshot: Add image too
    :PROPERTIES:
    :CUSTOM_ID: org-download-flameshot-add-image-too
    :END:
 
-Lastly, it's also good to use screen crop as note content. Thankfully
-=anki-editor= also supports that, we only need to find a convenient way to
-download image in Emacs.
+Lastly, it's also good to use screen crop as note content. Thankfully =anki-editor= also supports that, we only need to find a convenient way to download image in Emacs.
 
-There are many packages for adding images to Emacs, as well as for screenshots.
-I chose the combination of [[https://github.com/abo-abo/org-download][abo-abo/org-download]] and [[https://github.com/lupoDharkael/flameshot][Flameshot]]. While Flameshot
-allows me to add preliminary annotation, it's a little tricky to get it working
-properly. Curious minds may search “flameshot” in [[https://github.com/yiufung/dot-emacs/blob/master/init.el][my config]] for details.
+There are many packages for adding images to Emacs, as well as for screenshots. I chose the combination of [[https://github.com/abo-abo/org-download][abo-abo/org-download]] and [[https://github.com/lupoDharkael/flameshot][Flameshot]]. While Flameshot allows me to add preliminary annotation, it's a little tricky to get it working properly. Curious minds may search “flameshot” in [[https://github.com/yiufung/dot-emacs/blob/master/init.el][my config]] for details.
 
 ** Conclusion
    :PROPERTIES:
    :CUSTOM_ID: conclusion
    :END:
 
-This setup has served me well in the past few months. During daytime, as I was
-writing code in Emacs or browsing web articles, I may capture code snippets or
-interesting information without switching to Anki Desktop to do much clicking.
-At nighttime I would polish the notes (fixing typo, adding context/images), push
-them in one go and call it a day.
+This setup has served me well in the past few months. During daytime, as I was writing code in Emacs or browsing web articles, I may capture code snippets or interesting information without switching to Anki Desktop to do much clicking. At nighttime I would polish the notes (fixing typo, adding context/images), push them in one go and call it a day.
 
-The possibilities don't end there. Given Org's capabilities, I'm sure there are
-more interesting applications. Here are some I have in mind:
+The possibilities don't end there. Given Org's capabilities, I'm sure there are more interesting applications. Here are some I have in mind:
 
-- [[https://orgmode.org/worg/org-contrib/babel/][Org Babel]] to evaluate code block in place, pushing *both code and output* (plain
-  text, images, tables) to Anki: [[https://github.com/mjago/ob-lilypond][=ob-lilypond=]], [[https://orgmode.org/worg/org-contrib/babel/languages/ob-doc-dot.html][=ob-dot=]], [[https://orgmode.org/worg/org-contrib/babel/languages/ob-doc-R.html][ob-R]]
+- [[https://orgmode.org/worg/org-contrib/babel/][Org Babel]] to evaluate code block in place, pushing *both code and output* (plain text, images, tables) to Anki: [[https://github.com/mjago/ob-lilypond][=ob-lilypond=]], [[https://orgmode.org/worg/org-contrib/babel/languages/ob-doc-dot.html][=ob-dot=]], [[https://orgmode.org/worg/org-contrib/babel/languages/ob-doc-R.html][ob-R]]
 - Use [[https://www.youtube.com/watch?v=JfZ9fCHzkJw][keyboard macro]] to create cards in bulk, quickly
-- An [[https://en.wikipedia.org/wiki/Incremental%5Freading][Incremental Reading]] system may be built from utilities that centered on
-  plain/PDF/EPUB([[https://github.com/wasamasa/nov.el][nov.el]]) text processing, and that integrate with [[https://github.com/weirdNox/org-noter][=org-noter=]]
-  (note taking with =pdf-tools=), [[https://github.com/jkitchin/org-ref][=org-ref=]] (academic paper management),
-  =org-capture= (content capture), [[https://www.google.com/search?q=org-agenda][=org-agenda=]] (schedule/deadline reminder,
-  progress tracking)...
-- An Emacs distribution that is solely designed to smooth out learning curve for
-  users from Anki community, just as what Spacemacs is for Vimmers, encompassing
-  above-mentioned features with reasonable defaults
+- An [[https://en.wikipedia.org/wiki/Incremental%5Freading][Incremental Reading]] system may be built from utilities that centered on plain/PDF/EPUB([[https://github.com/wasamasa/nov.el][nov.el]]) text processing, and that integrate with [[https://github.com/weirdNox/org-noter][=org-noter=]] (note taking with =pdf-tools=), [[https://github.com/jkitchin/org-ref][=org-ref=]] (academic paper management), =org-capture= (content capture), [[https://www.google.com/search?q=org-agenda][=org-agenda=]] (schedule/deadline reminder, progress tracking)...
+- An Emacs distribution that is solely designed to smooth out learning curve for users from Anki community, just as what Spacemacs is for Vimmers, encompassing above-mentioned features with reasonable defaults
 - etc...
 
-Hope it's useful for users from either Anki or Emacs, and I'm sure there will be
-bold, imaginative design that stemmed from the intersection of both. Until next
-time, happy hacking, learning and living under the sun!
+Hope it's useful for users from either Anki or Emacs, and I'm sure there will be bold, imaginative design that stemmed from the intersection of both. Until next time, happy hacking, learning and living under the sun!
 
 Download files used in this post:
 
 - [[https://yiufung.net/ox-hugo/anki-cards.el][anki-cards.el]]: configuration code in this article
-- [[https://yiufung.net/ox-hugo/anki-basic.css][anki-basic.css]]: css template for basic cards. It's simply a concatentation of
-  =org.css=, =htmlize.css= and =normalize.css= from [[https://github.com/gongzhitaao/orgcss/][gongzhitaao/orgcss]]
-- [[https://yiufung.net/ox-hugo/anki-org-sample.org][anki-org-sample.org]]: a sample org file demonstrating the use of file-local
-  tags and options
+- [[https://yiufung.net/ox-hugo/anki-basic.css][anki-basic.css]]: css template for basic cards. It's simply a concatentation of =org.css=, =htmlize.css= and =normalize.css= from [[https://github.com/gongzhitaao/orgcss/][gongzhitaao/orgcss]]
+- [[https://yiufung.net/ox-hugo/anki-org-sample.org][anki-org-sample.org]]: a sample org file demonstrating the use of file-local tags and options
