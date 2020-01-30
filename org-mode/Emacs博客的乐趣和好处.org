@@ -1,0 +1,264 @@
+#+TITLE: Emacs博客的乐趣和好处
+#+URL: https://loomcom.com/blog/0110_emacs_blogging_for_fun_and_profit.html
+#+AUTHOR: lujun9972
+#+TAGS: org-mode
+#+DATE: [2019年 07月 08日 星期一 17:08:55 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+如果你读过这个博客，你可能会注意到它的一些不同之处,是的外观和感觉不同了，但不仅仅这么肤浅。
+
+在过去的九年里，我一直用WordPress写博客,WordPress是一个功能丰富的博客平台。
+但是，从今天开始，我将整个网站都切换到始于一项上世纪70年代的技术:Emacs，一款古老的文本编辑器。
+
+我是疯了吗?不，我只是觉得它更适合我的工作流程。
+
+* 背景
+:PROPERTIES:
+:CUSTOM_ID: orgaf8ffa8
+:END:
+
+多年来我一直是Emacs的用户。Emacs不仅仅是一个文本编辑器:它是一把瑞士军刀，一个由其他工具组成的可扩展的工具. 其中一个工具是Org模式， 一种允许您组织思想，编写大纲，做笔记，做预算，做议程,时间线、写文档，等等工作。
+
+Org模式非常强大，最近很多人都出于想用Org Mode的缘故而使用Emacs。[[https://orgmode.org/manual/index.html][在线手册]]和[[https://orgmode.org/worg/][用户编写的文档]]能够让你全面了解Org模式的功能。
+
+Org模式特别擅长的一点是 /编写文档/. 在Org文档满是标记和链接后，你可以将其导出成HTML文档(或者LaTeX文档，PDF文档，等等……)
+
+* 设置
+:PROPERTIES:
+:CUSTOM_ID: orgf2c958a
+:END:
+
+这个站点的每个页面，包括所有的博客文章，都是独立文件。
+它们都是通过一个单独的设置和一个单独的程序一起发布的命令，使用Org模式的= Org -publish=特性。
+他们都通过Org Mode的 =org-publish= 功能，使用一份配置和一个命令来发布.
+
+你可以[[https://github.com/sethm/loomcom/][这里Github上]]看到完整的源代码。
+
+配置并不太难。基本上，整个配置都在一个elisp文件中，被我的主 =init.el= 文件加载。
+我将整个网站放在到一个名为 =~/Projects/loomcom= 工作目录中.
+
+I'll go through my config bit by bit, but first, I must acknowledge
+我将一点一点地带你过一便我的配置，但首先，我必须承认我的配置灵感来源于 Dennis Ogbe 的网站 ([[https://ogbe.net/]]), 和他的博文 [[https://ogbe.net/blog/blogging_with_org.html][“只使用org-mode写博客”]].
+
+** Emacs配置
+:PROPERTIES:
+:CUSTOM_ID: orgd821461
+:END:
+
+我要做的第一件事是定义一个名为 =loomcom/project-dir= 的符号, 这个符号将用在其他地方。它存放的是从 GitHub 签出网站所在的父文件夹陆军.
+
+#+begin_src emacs-lisp
+  (setq loomcom/project-dir "~/Projects/loomcom/")
+#+end_src
+
+然后我设置 org-publish 使用一个本地目录进行缓存,这样才不会污染我的HOME目录。
+为了方便，我把这个目录放进去进 =.gitignore= 文件。
+
+#+begin_src emacs-lisp
+  (setq org-publish-timestamp-directory (concat loomcom/project-dir "cache/"))
+#+end_src
+
+接下来，我设置另一个符号 =loomcom/extra-head=. 这个符号在后面会被用用于为每个页面的 =<head>...</head>= 元素设置额外的HTML片段.
+它基本上就是从 =/res/style.css= 加载CSS资源.
+
+#+begin_src emacs-lisp
+  (setq loomcom/extra-head
+        "<link rel=\"stylesheet\" type=\"text/css\" href=\"/res/style.css\">")
+#+end_src
+
+然后我再定义两个符号, =loomcom/header-file= 和 =loomcom/footer=, 它们会注入两个HTML块:第一个是在插入到主要内容前的静态代码片段,第二个是在气候插入的字符串。
+
+#+begin_src emacs-lisp
+  (setq loomcom/header-file
+        (concat loomcom/project-dir "pages/header.html"))
+
+  (setq loomcom/footer
+        (concat
+         "<div id=\"footer\">n"
+         "<p>Seth Morabito</p>n"
+         "<p>Proudly published with "
+         "<a href=\"https://www.gnu.org/software/emacs/\">Emacs</a> and "
+         "<a href=\"https://orgmode.org/\">Org Mode</a>"
+         "</div>"))
+#+end_src
+
+然后我启用了 HTML5 fancy变量，这样Org模式就可以使用了新的HTML5特性。
+
+#+begin_src emacs-lisp
+  (setq org-html-html5-fancy t)
+#+end_src
+
+现在我们进入正题。
+
+我不希望博客上的所有文章都放在一张网页上。
+相反，我想只显示一个预览，若用户想看全文的话可以点击 /“Read More...”/ 链接。
+为此，我定义了一个名为 =loomcom/get-preview= 的函数, 它只返回博客主页上每篇博文的一部分.
+
+Org模式没有内置该功能，所以我只能自己实现。
+由于没有内置的语法，所以我在所有想在主页显示片段的博客文章中使用了一个特殊的(但毫无意义的)org-mode块，语法为:
+
+#+begin_src org
+  ,#+BEGIN_more
+  ,#+END_more
+#+end_src
+
+下面的函数打开文件，查找这个标记，然后返回标题和标记之间的博客内容。如果没有标记，它会返回整个帖子。
+
+它还返回一些元数据:一个指示是否渲染  /“Read More...”/ 的布尔值
+
+#+begin_src emacs-lisp
+  (defun loomcom/get-preview (filename)
+    "Returns a list: '(<needs-more> <preview-string>) where
+  <needs-more> is t or nil, indicating whether a \"Read More...\"
+  link is needed."
+    (with-temp-buffer
+      (insert-file-contents (concat loomcom/project-dir "blog/" filename))
+      (goto-char (point-min))
+      (let ((content-start (or
+                            ;; Look for the first non-keyword line
+                            (and (re-search-forward "^[^#]" nil t)
+                                 (match-beginning 0))
+                            ;; Failing that, assume we're malformed and
+                            ;; have no content
+                            (buffer-size)))
+            (marker (or
+                     (and (re-search-forward "^#\\+BEGIN_more$" nil t)
+                          (match-beginning 0))
+                     (buffer-size))))
+        ;; Return a pair of '(needs-more preview-string)
+        (list (not (= marker (buffer-size)))
+#+end_src
+
+接下来是实际生成博客主页面的函数。 Org模式的发布功能称之为“Site Map”， 但是对于我的网站来说，它是一个博客页面。
+
+默认情况下，Org模式将以项目符号列表的形式发布条目。
+我不希望这样，所以重载了默认的发布函数。
+它所做的就是在页面上放置一个标题并返回每个以 =nn= 分隔的条目。
+
+#+begin_src emacs-lisp
+  (defun loomcom/sitemap (title list)
+    "Generate the sitemap (Blog Main Page)"
+    (concat "#+TITLE: " title "\n" "--------\n"
+            (string-join (mapcar #'car (cdr list)) "\n\n")))
+#+end_src
+
+然后，我定义一个函数来为sitemap的每个博文页面生成条目。
+
+该函数接受一个文件名，并将其传递给 =(loomcom/get-preview)= 来获得预览文本，在需要的时候添加 /“Read More...”/链接，并为每个条目返回Org Mode标记。
+
+#+begin_src emacs-lisp
+  (defun loomcom/sitemap-entry (entry style project)
+    "Sitemap (Blog Main Page) Entry Formatter"
+    (when (not (directory-name-p entry))
+      (format (string-join
+               '("* [[file:%s][%s]]\n"
+                 "#+BEGIN_published\n"
+                 "%s\n"
+                 "#+END_published\n\n"
+                 "%s\n"
+                 "--------\n"))
+              entry
+              (org-publish-find-title entry project)
+              (format-time-string "%A, %B %_d %Y at %l:%M %p %Z" (org-publish-find-date entry project))
+              (let* ((preview (loomcom/get-preview entry))
+                     (needs-more (car preview))
+                     (preview-text (cadr preview)))
+                (if needs-more
+                    (format
+                     (concat
+                      "%s\n\n"
+                      "#+BEGIN_morelink\n"
+                      "[[file:%s][Read More...]]\n"
+                      "#+END_morelink\n")
+                     preview-text entry)
+                  (format "%s" preview-text))))))
+#+end_src
+
+接下来，我定义一个被org-publish用来加载HTML头文件片段的函数.这个函数在一个临时buffer中打开头文件并返回内容。
+
+#+begin_src emacs-lisp
+  (defun loomcom/header (arg)
+    (with-temp-buffer
+      (insert-file-contents loomcom/header-file)
+      (buffer-string)))
+#+end_src
+
+最后是问题的关键部分。我使用 =org-publish-project-alist= 变量来设置 org-publish 项目。 
+
+它定义了四个组件:
+
+- *blog* - 存放所有博客条目的目录
+- *pages* - 定义站点其余部分的静态页面
+- *res* - CSS和JavaScript之类的资源文件
+- *images* - 静态图像
+
+  #+begin_src emacs-lisp
+    (setq org-publish-project-alist
+          `(("loomcom"
+             :components ("blog" "pages" "res" "images"))
+            ("blog"
+             :base-directory ,(concat loomcom/project-dir "blog/")
+             :base-extension "org"
+             :publishing-directory ,(concat loomcom/project-dir "www/blog/")
+             :publishing-function org-html-publish-to-html
+             :with-author t
+             :with-creator nil
+             :with-date t
+             :section-numbers nil
+             :with-title t
+             :with-toc nil
+             :with-drawers t
+             :with-sub-superscript nil
+             :html-doctype "html5"
+             :html-link-home "/"
+             :html-head nil
+             :html-head-extra ,loomcom/extra-head
+             :html-head-include-default-style nil
+             :html-head-include-scripts nil
+             :html-viewport nil
+             :html-link-up ""
+             :html-link-home ""
+             :html-preamble loomcom/header
+             :html-postamble ,loomcom/footer
+             :auto-sitemap t
+             :sitemap-function loomcom/sitemap
+             :sitemap-format-entry loomcom/sitemap-entry
+             :sitemap-filename "index.org"
+             :sitemap-title "A Weblog"
+             :sitemap-sort-files anti-chronologically)
+            ("pages"
+             :base-directory ,(concat loomcom/project-dir "pages/")
+             :base-extension "org"
+             :publishing-directory ,(concat loomcom/project-dir "www/")
+             :publishing-function org-html-publish-to-html
+             :section-numbers nil
+             :recursive t
+             :with-title t
+             :with-toc nil
+             :with-drawers t
+             :with-sub-superscript nil
+             :html-link-home "/"
+             :html-head nil
+             :html-doctype "html5"
+             :html-head-extra ,loomcom/extra-head
+             :html-head-include-default-style nil
+             :html-head-include-scripts nil
+             :html-link-up ""
+             :html-link-home ""
+             :html-preamble loomcom/header
+             :html-postamble ,loomcom/footer
+             :html-viewport nil)
+            ("res"
+             :base-directory ,(concat loomcom/project-dir "res/")
+             :base-extension ".*"
+             :publishing-directory ,(concat loomcom/project-dir "www/res/")
+             :publishing-function org-publish-attachment)
+            ("images"
+             :base-directory ,(concat loomcom/project-dir "images/")
+             :base-extension ".*"
+             :publishing-directory ,(concat loomcom/project-dir "www/images/")
+             :publishing-function org-publish-attachment)))
+  #+end_src
+
+唷。就是这样。
