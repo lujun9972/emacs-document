@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>通过org-font-lock-hook为源码块添加keymap - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="emacs-lisp" />
+  <!-- <link rel="stylesheet" href="../../../../../media/css/main.css" type="text/css"/>
+       <link rel="stylesheet" href="../../../../../media/css/comment.css" type="text/css"/> -->
+  <link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/kognise/water.css@latest/dist/dark.css'>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="../../../../../">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <ul class="trigger">
+        <li><a href="../../../../../years/">Years</a></li>
+        <li><a href="../../../../../authors/">Authors</a></li>
+        <li><a href="../../../../../tags/">Tags</a></li>
+        <li><a href="../../../../../about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="../../../../../rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="https://www.bing.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">通过org-font-lock-hook为源码块添加keymap</h1>
+<p>
+我有一个在代码块中使用自定义快捷键的想法。例如，在org文件中无需进入org-special-edit就能直接在使用lispy，或者在python块中使用elpy快捷键。
+我还见过其他的解决方案，比如polymode就声称可以做到这一点。你可能在想，如果这些解决方案真的能行那我也就不会写这篇文章了!
+在org-mode的邮件列表中有一些关于这个想法的不错的讨论，Nicolas Goaziou就指出这可以通过 org-font-lock-hook 来完成。
+</p>
+
+<p>
+你可以在这里观看视频:
+</p>
+
+<p>
+<a href="https://www.youtube.com/embed/a2jHqB1qWiY">https://www.youtube.com/embed/a2jHqB1qWiY</a>
+</p>
+
+<p>
+解决这个问题相对容易。文本区域进行font-lock时可以为其添加Keymap，因此我只需使为org-mode的font lock系统中添加一个钩子函数，该函数查找代码块并将keymap作为文本属性添加其中即可。这包括三个步骤:
+</p>
+
+<ol class="org-ol">
+<li>定义要使用的keymap。我使用一个由 <code>(language . map)</code> 组成的alist来存放这些信息</li>
+<li>定义font-lock函数。该函数将向代码块中添加keymap属性。</li>
+<li>定义一个minor mode来打开和关闭此功能。</li>
+</ol>
+
+<p>
+下面是keymap们的定义。通常我只是复制我想要的mode-map，然后往里面添加一些东西。
+有时我们仍然需要跳到org-special-edit模式。例如，若您在Python块中使用命令将缓冲区发送到repl，在org模式下会报错!
+如果您经常使用 <code>C-c C-e</code> 导出命令，那么你可能会想要把它加到keymap中。
+当然，你也可以复制org-map并向其添加额外的快捷键。选择权在你。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">require</span> '<span style="font-weight: bold; text-decoration: underline;">lispy</span>)
+(<span style="font-weight: bold;">require</span> '<span style="font-weight: bold; text-decoration: underline;">elpy</span>)
+
+(<span style="font-weight: bold;">setq</span> scimax-src-block-keymaps
+      `((<span style="font-style: italic;">"ipython"</span> . ,(<span style="font-weight: bold;">let</span> ((map (make-composed-keymap
+                                  `(,elpy-mode-map ,python-mode-map ,pyvenv-mode-map)
+                                  org-mode-map)))
+                        <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">In org-mode I define RET so we f</span>
+                        (define-key map (kbd <span style="font-style: italic;">"&lt;return&gt;"</span>) 'newline)
+                        (define-key map (kbd <span style="font-style: italic;">"C-c C-c"</span>) 'org-ctrl-c-ctrl-c)
+                        map))
+        (<span style="font-style: italic;">"python"</span> . ,(<span style="font-weight: bold;">let</span> ((map (make-composed-keymap
+                                 `(,elpy-mode-map ,python-mode-map ,pyvenv-mode-map)
+                                 org-mode-map)))
+                       <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">In org-mode I define RET so we f</span>
+                       (define-key map (kbd <span style="font-style: italic;">"&lt;return&gt;"</span>) 'newline)
+                       (define-key map (kbd <span style="font-style: italic;">"C-c C-c"</span>) 'org-ctrl-c-ctrl-c)
+                       map))
+        (<span style="font-style: italic;">"emacs-lisp"</span> . ,(<span style="font-weight: bold;">let</span> ((map (make-composed-keymap `(,lispy-mode-map
+                                                            ,emacs-lisp-mode-map
+                                                            ,outline-minor-mode-map)
+                                                          org-mode-map)))
+                           (define-key map (kbd <span style="font-style: italic;">"C-c C-c"</span>) 'org-ctrl-c-ctrl-c)
+                           map))))
+</pre>
+</div>
+
+<p>
+接下来，我们定义将keymap应用到每个代码块的函数。
+只有在上面的变量中定义了的keymap，才会应用它们。
+这个函数派生自 <code>org-fontify-meta-line-and-blocks-1</code>.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">scimax-add-keymap-to-src-blocks</span> (limit)
+  <span style="font-style: italic;">"Add keymaps to src-blocks defined in `</span><span style="font-weight: bold; font-style: italic; text-decoration: underline;">scimax-src-block-keymaps</span><span style="font-style: italic;">'."</span>
+  (<span style="font-weight: bold;">let</span> ((case-fold-search t)
+        lang)
+    (<span style="font-weight: bold;">while</span> (re-search-forward org-babel-src-block-regexp limit t)
+      (<span style="font-weight: bold;">let</span> ((lang (match-string 2))
+            (beg (match-beginning 0))
+            (end (match-end 0)))
+        (<span style="font-weight: bold;">if</span> (assoc (org-no-properties lang) scimax-src-block-keymaps)
+            (<span style="font-weight: bold;">progn</span>
+              (add-text-properties
+               beg end `(local-map ,(cdr (assoc
+                                          (org-no-properties lang)
+                                          scimax-src-block-keymaps))))
+              (add-text-properties
+               beg end `(cursor-sensor-functions
+                         ((<span style="font-weight: bold;">lambda</span> (win prev-pos sym)
+                            <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">This simulates a mouse click and makes a menu change</span>
+                            (org-mouse-down-mouse nil)))))))))))
+</pre>
+</div>
+
+<p>
+在这里，我们创建一个advice来欺骗所有需要知道major模式的函数。
+我们只将该欺骗应用于org模式及其代码块块中,其他情况下我们依然调用原始函数。
+到目前为止，lispy-eval是我唯一需要应用欺骗的函数。但这是一种通用策略，可以用来做其他的事情，比如缩小到源码块，甚至在需要的情况下临时进入特殊的编辑模式。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">scimax-spoof-mode</span> (orig-func <span style="font-weight: bold; text-decoration: underline;">&amp;rest</span> args)
+  <span style="font-style: italic;">"Advice function to spoof commands in org-mode src blocks.</span>
+<span style="font-style: italic;">It is for commands that depend on the major mode. One example is</span>
+<span style="font-style: italic;">`</span><span style="font-weight: bold; font-style: italic; text-decoration: underline;">lispy--eval</span><span style="font-style: italic;">'."</span>
+  (<span style="font-weight: bold;">if</span> (org-in-src-block-p)
+      (<span style="font-weight: bold;">let</span> ((major-mode (intern (format <span style="font-style: italic;">"%s-mode"</span> (first (org-babel-get-src-block-info))))))
+        (apply orig-func args))
+    (apply orig-func args)))
+</pre>
+</div>
+
+<p>
+我们还定义了一个minor模式，让我们可以开关它。
+我们这里将这个函数添加到 <code>org-font-lock-hook</code> 中，并对lispy-eval函数添加advise。
+出于某些原因，我不得不将 <code>font-lock-function</code> 添加到 <code>org-font-lock-hook</code> 的末尾，并将local-map添加为一个额外管理的属性，以便在关闭该mode时将其删除。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">define-minor-mode</span> <span style="font-weight: bold;">scimax-src-keymap-mode</span>
+  <span style="font-style: italic;">"Minor mode to add mode keymaps to src-blocks."</span>
+  <span style="font-weight: bold;">:init-value</span> nil
+  (<span style="font-weight: bold;">if</span> scimax-src-keymap-mode
+      (<span style="font-weight: bold;">progn</span>
+        (add-hook 'org-font-lock-hook #'scimax-add-keymap-to-src-blocks t)
+        (add-to-list 'font-lock-extra-managed-props 'local-map)
+        (add-to-list 'font-lock-extra-managed-props 'cursor-sensor-functions)
+        (advice-add 'lispy--eval <span style="font-weight: bold;">:around</span> 'scimax-spoof-mode)
+        (cursor-sensor-mode +1))
+    (remove-hook 'org-font-lock-hook #'scimax-add-keymap-to-src-blocks)
+    (advice-remove 'lispy--eval 'scimax-spoof-mode)
+    (cursor-sensor-mode -1))
+  (font-lock-fontify-buffer))
+
+(add-hook 'org-mode-hook (<span style="font-weight: bold;">lambda</span> ()
+                           (scimax-src-keymap-mode +1)))
+</pre>
+</div>
+
+<p>
+就是这样!我很确定这是个好主意。当您编写大量的短小代码块和几乎相同数量的文本时(如本文这样)，它会很有帮助。
+它还有助于编写代码，因为许多事情如缩进、括号等都是自动处理的。而这些辅助功能也是我之前进入special-edit模式的主要原因!
+</p>
+
+<p>
+我使用这个方案的时间还不够长，不知道它是否会引起其他意外。如果你尝试该方案并找到了问题，请留下评论!
+</p>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2017-06-14</span>
+            <span title="last modification date" class="post-info">2020-01-30</span>
+            <span title="tags" class="post-info">:<a href="../../../../../tags/emacs-lisp">emacs-lisp</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-0a17e32c-7e07-47e2-8688-7f7c8a2e78ef">lujun9972</a></span>
+        </div>
+    <script src="../../../../../media/js/jquery-2.1.3.min.js"></script>
+    <script src="../../../../../media/js/md5.min.js"></script>
+        <section>
+            <div id="gitalk-container"></div>
+            <script type="text/javascript">
+             var gitalk = new Gitalk({
+                 clientID: 'fdcb5d9da3f4acb4862c',
+                 clientSecret: 'dd0a16312a206782cb7669dcec5e96874ab48170',
+                 repo: 'lujun9972.github.com',
+                 owner: 'lujun9972',
+                 admin: ['lujun9972'],
+                 id: md5(location.pathname),      // Ensure uniqueness and length less than 50
+                 distractionFreeMode: false  // Facebook-like distraction free mode
+             })
+             gitalk.render('gitalk-container')
+            </script>
+        </section>
+    <script src="../../../../../media/js/main.js"></script>
+        <script>
+         var _hmt = _hmt || [];
+         (function() {
+             var hm = document.createElement("script");
+             hm.src = "https://hm.baidu.com/hm.js?7bac4fd0247f69c27887e0d4e3aee41e";
+             var s = document.getElementsByTagName("script")[0]; 
+             s.parentNode.insertBefore(hm, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-0a17e32c-7e07-47e2-8688-7f7c8a2e78ef">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="../../../../../instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>
