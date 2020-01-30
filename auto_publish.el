@@ -46,4 +46,25 @@ There are two things you can do about this warning:
 (setq org-export-use-babel nil)
 (setq debug-on-error t)
 (setq org-src-fontify-natively t)
+
+;; 增加video link，用于为html生成video tag
+(defun org-video-link-export (path desc backend)
+  (let ((ext (file-name-extension path)))
+    (cond
+     ((eq 'html backend)
+      (format "<video preload='metadata' controls='controls'><source type='video/%s' src='%s' /></video>" ext path))
+     ;; fall-through case for everything else
+     (t
+      path))))
+
+(defun org-video-link-follow (path)
+  (let* ((player (or (executable-find "mpv")
+                     (executable-find "vlc")
+                     (executable-find "smplayer")
+                     (executable-find "mplayer")))
+         (command (format "%s '%s'" player path)))
+    (async-shell-command command)))
+
+(org-link-set-parameters "video" :export 'org-video-link-export :follow 'org-video-link-follow)
+
 (ego-do-publication "emacs-document" nil nil nil)
