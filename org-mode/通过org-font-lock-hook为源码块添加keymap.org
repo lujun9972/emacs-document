@@ -1,0 +1,124 @@
+#+TITLE: 通过org-font-lock-hook为源码块添加keymap
+#+AUTHOR: lujun9972
+#+URL: http://kitchingroup.cheme.cmu.edu/blog/2017/06/10/Adding-keymaps-to-src-blocks-via-org-font-lock-hook/
+#+TAGS: emacs-lisp
+#+DATE: [2017-06-14 三 16:19]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+
+我有一个在代码块中使用自定义快捷键的想法。例如，在org文件中无需进入org-special-edit就能直接在使用lispy，或者在python块中使用elpy快捷键。
+我还见过其他的解决方案，比如polymode就声称可以做到这一点。你可能在想，如果这些解决方案真的能行那我也就不会写这篇文章了!
+在org-mode的邮件列表中有一些关于这个想法的不错的讨论，Nicolas Goaziou就指出这可以通过 org-font-lock-hook 来完成。
+
+你可以在这里观看视频:
+
+[[https://www.youtube.com/embed/a2jHqB1qWiY]]
+
+解决这个问题相对容易。文本区域进行font-lock时可以为其添加Keymap，因此我只需使为org-mode的font lock系统中添加一个钩子函数，该函数查找代码块并将keymap作为文本属性添加其中即可。这包括三个步骤:
+
+1. 定义要使用的keymap。我使用一个由 =(language . map)= 组成的alist来存放这些信息
+2. 定义font-lock函数。该函数将向代码块中添加keymap属性。
+3. 定义一个minor mode来打开和关闭此功能。
+
+下面是keymap们的定义。通常我只是复制我想要的mode-map，然后往里面添加一些东西。
+有时我们仍然需要跳到org-special-edit模式。例如，若您在Python块中使用命令将缓冲区发送到repl，在org模式下会报错!
+如果您经常使用 =C-c C-e= 导出命令，那么你可能会想要把它加到keymap中。
+当然，你也可以复制org-map并向其添加额外的快捷键。选择权在你。
+
+#+begin_src emacs-lisp
+  (require 'lispy)
+  (require 'elpy)
+
+  (setq scimax-src-block-keymaps
+        `(("ipython" . ,(let ((map (make-composed-keymap
+                                    `(,elpy-mode-map ,python-mode-map ,pyvenv-mode-map)
+                                    org-mode-map)))
+                          ;; In org-mode I define RET so we f
+                          (define-key map (kbd "<return>") 'newline)
+                          (define-key map (kbd "C-c C-c") 'org-ctrl-c-ctrl-c)
+                          map))
+          ("python" . ,(let ((map (make-composed-keymap
+                                   `(,elpy-mode-map ,python-mode-map ,pyvenv-mode-map)
+                                   org-mode-map)))
+                         ;; In org-mode I define RET so we f
+                         (define-key map (kbd "<return>") 'newline)
+                         (define-key map (kbd "C-c C-c") 'org-ctrl-c-ctrl-c)
+                         map))
+          ("emacs-lisp" . ,(let ((map (make-composed-keymap `(,lispy-mode-map
+                                                              ,emacs-lisp-mode-map
+                                                              ,outline-minor-mode-map)
+                                                            org-mode-map)))
+                             (define-key map (kbd "C-c C-c") 'org-ctrl-c-ctrl-c)
+                             map))))
+#+end_src
+
+接下来，我们定义将keymap应用到每个代码块的函数。
+只有在上面的变量中定义了的keymap，才会应用它们。
+这个函数派生自 =org-fontify-meta-line-and-blocks-1=.
+
+#+begin_src emacs-lisp
+  (defun scimax-add-keymap-to-src-blocks (limit)
+    "Add keymaps to src-blocks defined in `scimax-src-block-keymaps'."
+    (let ((case-fold-search t)
+          lang)
+      (while (re-search-forward org-babel-src-block-regexp limit t)
+        (let ((lang (match-string 2))
+              (beg (match-beginning 0))
+              (end (match-end 0)))
+          (if (assoc (org-no-properties lang) scimax-src-block-keymaps)
+              (progn
+                (add-text-properties
+                 beg end `(local-map ,(cdr (assoc
+                                            (org-no-properties lang)
+                                            scimax-src-block-keymaps))))
+                (add-text-properties
+                 beg end `(cursor-sensor-functions
+                           ((lambda (win prev-pos sym)
+                              ;; This simulates a mouse click and makes a menu change
+                              (org-mouse-down-mouse nil)))))))))))
+#+end_src
+
+在这里，我们创建一个advice来欺骗所有需要知道major模式的函数。
+我们只将该欺骗应用于org模式及其代码块块中,其他情况下我们依然调用原始函数。
+到目前为止，lispy-eval是我唯一需要应用欺骗的函数。但这是一种通用策略，可以用来做其他的事情，比如缩小到源码块，甚至在需要的情况下临时进入特殊的编辑模式。
+
+#+begin_src emacs-lisp
+  (defun scimax-spoof-mode (orig-func &rest args)
+    "Advice function to spoof commands in org-mode src blocks.
+  It is for commands that depend on the major mode. One example is
+  `lispy--eval'."
+    (if (org-in-src-block-p)
+        (let ((major-mode (intern (format "%s-mode" (first (org-babel-get-src-block-info))))))
+          (apply orig-func args))
+      (apply orig-func args)))
+#+end_src
+
+我们还定义了一个minor模式，让我们可以开关它。
+我们这里将这个函数添加到 =org-font-lock-hook= 中，并对lispy-eval函数添加advise。
+出于某些原因，我不得不将 =font-lock-function= 添加到 =org-font-lock-hook= 的末尾，并将local-map添加为一个额外管理的属性，以便在关闭该mode时将其删除。
+
+#+begin_src emacs-lisp
+  (define-minor-mode scimax-src-keymap-mode
+    "Minor mode to add mode keymaps to src-blocks."
+    :init-value nil
+    (if scimax-src-keymap-mode
+        (progn
+          (add-hook 'org-font-lock-hook #'scimax-add-keymap-to-src-blocks t)
+          (add-to-list 'font-lock-extra-managed-props 'local-map)
+          (add-to-list 'font-lock-extra-managed-props 'cursor-sensor-functions)
+          (advice-add 'lispy--eval :around 'scimax-spoof-mode)
+          (cursor-sensor-mode +1))
+      (remove-hook 'org-font-lock-hook #'scimax-add-keymap-to-src-blocks)
+      (advice-remove 'lispy--eval 'scimax-spoof-mode)
+      (cursor-sensor-mode -1))
+    (font-lock-fontify-buffer))
+
+  (add-hook 'org-mode-hook (lambda ()
+                             (scimax-src-keymap-mode +1)))
+#+end_src
+
+就是这样!我很确定这是个好主意。当您编写大量的短小代码块和几乎相同数量的文本时(如本文这样)，它会很有帮助。
+它还有助于编写代码，因为许多事情如缩进、括号等都是自动处理的。而这些辅助功能也是我之前进入special-edit模式的主要原因!
+
+我使用这个方案的时间还不够长，不知道它是否会引起其他意外。如果你尝试该方案并找到了问题，请留下评论!
