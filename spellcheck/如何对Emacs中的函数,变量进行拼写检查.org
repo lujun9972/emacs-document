@@ -1,0 +1,201 @@
+#+TITLE: 如何对Emacs中的函数/变量进行拼写检查
+#+URL: http://blog.binchen.org/posts/how-to-spell-check-functionvariable-in-emacs.html
+#+AUTHOR: lujun9972
+#+TAGS: spellcheck
+#+DATE: [2018年 07月 05日 星期四 16:46:10 CST]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+[[http://blog.binchen.org/posts/effecspell-check-in-emacs.html][本文]]解释了开发人员如何在使用Emacs编程时检查函数/变量的拼写错误的。
+
+它使用[[http://aspell.net/][GNU Aspell]]的 =--run-together= 选项来检查驼峰格式的单词。
+
+但这个解决方案并不完美。它错误地将两个字符组成的内部单词识别为错词。
+例如，“onChange”被认为是拼写错误，因为内部单词“on”是由两个字符组成的。
+另一个问题是函数名的命名空间。例如，“MSToggleButton”中的“MS”是“Microsoft”的别名。如果“MS”被标识为错词，则每个包含名称空间“MS”的单词都被视为错词。
+
+在这篇文章中,
+
+- 我将解释 *Emacs拼写检查的工作原理*
+- 然后研究aspell的*算法
+- 最后，我将向你展示 *一个完整的设置*
+
+在Emacs中使用内置的插件[[https://www.emacswiki.org/emacs/FlySpell][Fly Spell]]来负责拼写检查。它将选项和纯文本传递给命令行工具aspell。
+Aspell将文本的拼写错误信息发送回 =Fly Spell=. =Fly Spell= 然后选择某些拼写错误显示出来。例如，当启用[[https://www.gnu.org/software/emacs/manual/html_node/emacs/Spelling.html][flyspell-prog-mode]]时，只能看到注释和字符串中的拼写错误。
+
+所以aspell并不懂任何编程语言的语法。它只是扫描纯文本并报告所有的拼写错误。
+
+在aspell中，有两个额外的“连词(run-together)”选项:
+
+- =--run-together-limit= 是 “可以串在一起的最大单词数”
+- =--run-together-min= 是“内部单词的最小长度” 
+
+让我们研究一下aspell的代码来理解这两个选项。在“modules/speller/default/suggest.cpp”文件中的 =Working::check_word= 函数实现了 “run-together”算法。
+
+为了帮助你理解这个函数，我逐行记录了这段代码，
+
+#+begin_src C++
+  class Working : public Score {
+    unsigned check_word(char 0_sync_master.sh 1_add_new_article_manual.sh 1_add_new_article_newspaper.sh 2_start_translating.sh 3_continue_the_work.sh 4_finish.sh 5_pause.sh base.sh parse_url_by_manual.sh parse_url_by_newspaper.py parse_url_by_newspaper.sh project.cfg reformat.sh texput.log urls_checker.sh word, char 0_sync_master.sh 1_add_new_article_manual.sh 1_add_new_article_newspaper.sh 2_start_translating.sh 3_continue_the_work.sh 4_finish.sh 5_pause.sh base.sh parse_url_by_manual.sh parse_url_by_newspaper.py parse_url_by_newspaper.sh project.cfg reformat.sh texput.log urls_checker.sh word_end, CheckInfo 0_sync_master.sh 1_add_new_article_manual.sh 1_add_new_article_newspaper.sh 2_start_translating.sh 3_continue_the_work.sh 4_finish.sh 5_pause.sh base.sh parse_url_by_manual.sh parse_url_by_newspaper.py parse_url_by_newspaper.sh project.cfg reformat.sh texput.log urls_checker.sh ci, unsigned pos = 1);
+  };
+  unsigned Working::check_word(char 0_sync_master.sh 1_add_new_article_manual.sh 1_add_new_article_newspaper.sh 2_start_translating.sh 3_continue_the_work.sh 4_finish.sh 5_pause.sh base.sh parse_url_by_manual.sh parse_url_by_newspaper.py parse_url_by_newspaper.sh project.cfg reformat.sh texput.log urls_checker.sh word, char 0_sync_master.sh 1_add_new_article_manual.sh 1_add_new_article_newspaper.sh 2_start_translating.sh 3_continue_the_work.sh 4_finish.sh 5_pause.sh base.sh parse_url_by_manual.sh parse_url_by_newspaper.py parse_url_by_newspaper.sh project.cfg reformat.sh texput.log urls_checker.sh word_end, CheckInfo 0_sync_master.sh 1_add_new_article_manual.sh 1_add_new_article_newspaper.sh 2_start_translating.sh 3_continue_the_work.sh 4_finish.sh 5_pause.sh base.sh parse_url_by_manual.sh parse_url_by_newspaper.py parse_url_by_newspaper.sh project.cfg reformat.sh texput.log urls_checker.sh ci,
+                               /bin /boot /dev /etc /home /lib /lib64 /lost+found /media /mnt /opt /proc /root /run /sbin /srv /sys /tmp /usr /var it WILL modify word */
+                               unsigned pos)
+  {
+    // check the whole word before go into run-together mode
+    unsigned res = check_word_s(word, ci);
+    // if `res` is true, it's a valid word, don't bother run-together
+    if (res) return pos + 1;
+    // it's typo because number of interior words is greater than "--run-together-limit"
+    if (pos + 1 >= sp->run_together_limit_) return 0;
+
+    // `i` is the `end` of interior word, the poition AFTER last character of interior word
+    for (char 0_sync_master.sh 1_add_new_article_manual.sh 1_add_new_article_newspaper.sh 2_start_translating.sh 3_continue_the_work.sh 4_finish.sh 5_pause.sh base.sh parse_url_by_manual.sh parse_url_by_newspaper.py parse_url_by_newspaper.sh project.cfg reformat.sh texput.log urls_checker.sh i = word + sp->run_together_min_;
+         // already checked the whole word; besides, any interior word whose size is less
+         // than "--run-together-min" is regarded as invalid
+         i <= word_end - sp->run_together_min_;
+         ++i)
+      {
+        char t = *i;
+
+        // read the interior word by set the character at `end` position to '0'
+        ,*i = '0';
+        res = check_word_s(word, ci);
+        // restore original character at `end` position
+        ,*i = t;
+
+        // Current interior word is invalid, we need append the character at current
+        // `end` position to creata new interior word.
+        // Inncrement `i` because `i` always points to the `end` of interior word
+        if (!res) continue;
+
+        // Current interior word is valid, strip it from the whole word to create a totally
+        // new word for `check_word`, `check_word` is a recursive function
+        res = check_word(i, word_end, ci + 1, pos + 1);
+        if (res) return res;
+      }
+    memset(ci, 0, sizeof(CheckInfo));
+    return 0;
+  }
+#+end_src
+
+让我们使用“hisHelle”作为例子看看 =check_word= 是如何运行的:
+
+- “word”指向字符串“hisHelle”(在C/C++中，字符串是字符数组。数组的最后一个字符是字符'0')
+- “sp->run_together_min_”为3，所以“i”最初指向字符“H”，在内部单词“his”的末尾。
+- "check_word_s"检查内部单词“his”然后返回"true"
+- 所以我们把“his”从“hisHelle”中去掉，然后递归调用“check_word”来检查新单词“Helle”
+- 在“check_word”的新语境中，我们首先从“Helle”中提取“Hel”
+- “Hel”是无效单词的。我们从Helle中提取了Hell并得到了新单词e,然后递归地在e上应用check_word
+- “e”是无效的，且位于递归尾部。所以hisHelle是一个拼写错误
+
+以下是我们研究代码后得出的结论:
+
+- =--run-together-limit= 在你电脑有足够内存的情况下可以设置大一些，它的默认值为8,但是我推荐16.
+- =--run-together-min= 不能是2，因为太多的拼写错误是由“正确的”双字符内部单词(“hehe”、“isme”、……)组成的。
+- =--run-together-min= 不能大于3，否则，过多的“正确的”三字符内部单词会被视为无效(“his”、“her”、“one”、“two”)
+- =--run-together-min= 应该总是3，这是它的默认值。实际上，它在一开始就不应该被用户调整
+
+既然 =--run-together-min= 为3。“onChange”这个词就会被认为是拼写错误，因为它包含双字符的内部单词“on”。由于我们在aspell方面无能为力，我们不得不求助于Emacs来解决这个问题。
+
+当Emacs获取到潜在的拼写错误时，我们可以从原来的单词中去掉所有的双字符内部单词，并再次检查新单词的拼写。
+
+我们可以把一个判断函数附加到特定的major模式中。判断函数在游标处单词错误时返回 =t=.
+
+#+begin_src emacs-lisp
+  (defun js-flyspell-verify ()
+    (let* ((font-face (get-text-property (- (point) 1) 'face))
+           (word (thing-at-point 'word)))
+      (message "font-face=%s word=%s" font-face word)
+      t))
+  (put 'js2-mode 'flyspell-mode-predicate 'js-flyspell-verify)
+#+end_src
+
+从上面的代码中可以看到，我们完全控制着 =js-flyspelli-verify= 中应该显示哪些拼写错误。
+所以命名空间问题也变得简单。如果名称空间是三个字符，它会被aspell自动处理。我们需要做的就是将名称空间添加到个人字典中 =$HOME/.aspell.en.pws=.
+如果名称空间只有一两个字符，我们就把它从原来的单词中去掉。就像我们处理双字符内部词一样。
+
+下面是可以粘贴到 =.emacs= 中的完整配置(我只设置了 =js2-mode= 和 =rjsx-mode= 但是代码足够通用)，
+
+#+begin_src emacs-lisp
+  (defun flyspell-detect-ispell-args (&optional run-together)
+    "If RUN-TOGETHER is true, spell check the CamelCase words.
+  Please note RUN-TOGETHER will make aspell less capable. So it should only be used in prog-mode-hook."
+    ;; force the English dictionary, support Camel Case spelling check (tested with aspell 0.6)
+    (let* ((args (list "--sug-mode=ultra" "--lang=en_US"))args)
+      (if run-together
+          (setq args (append args '("--run-together" "--run-together-limit=16"))))
+      args))
+
+  (setq ispell-program-name "aspell")
+  (setq-default ispell-extra-args (flyspell-detect-ispell-args t))
+
+  (defvar extra-flyspell-predicate '(lambda (word) t)
+    "A callback to check WORD. Return t if WORD is typo.")
+
+  (defun my-flyspell-predicate (word)
+    "Use aspell to check WORD. If it's typo return true."
+    (if (string-match-p (concat "^& " word)
+                        (shell-command-to-string (format "echo %s | %s %s pipe"
+                                                         word
+                                                         ispell-program-name
+                                                         (mapconcat 'identity
+                                                                    (flyspell-detect-ispell-args t)
+                                                                    " "))))
+        t))
+
+  (defmacro my-flyspell-predicate-factory (preffix)
+    `(lambda (word)
+       (let* ((pattern (concat "^\(" ,preffix "\)\([A-Z]\)"))
+              rlt)
+         (cond
+          ((string-match-p pattern word)
+           (setq word (replace-regexp-in-string pattern "\2" word))
+           (setq rlt (my-flyspell-predicate word)))
+          (t
+           (setq rlt t)))
+         rlt)))
+
+  (defun js-flyspell-verify ()
+    (let* ((case-fold-search nil)
+           (font-matched (memq (get-text-property (- (point) 1) 'face)
+                               '(js2-function-call
+                                 js2-function-param
+                                 js2-object-property
+                                 font-lock-variable-name-face
+                                 font-lock-string-face
+                                 font-lock-function-name-face
+                                 font-lock-builtin-face
+                                 rjsx-tag
+                                 rjsx-attr)))
+           word
+           (rlt t))
+      (cond
+       ((not font-matched)
+        (setq rlt nil))
+       ((not (string-match-p "aspell$" ispell-program-name))
+        ;; Only override aspell's result
+        (setq rlt t))
+       ((string-match-p "^[a-zA-Z][a-zA-Z]$"
+                        (setq word (thing-at-point 'word)))
+        (setq rlt nil))
+       ((string-match-p "\([A-Z][a-z]\|^[a-z][a-z]\)[A-Z]\|[a-z][A-Z][a-z]$"
+                        word)
+        ;; strip two character interior words
+        (setq word (replace-regexp-in-string "\([A-Z][a-z]\|^[a-z][a-z]\)\([A-Z]\)" "\2" word))
+        (setq word (replace-regexp-in-string "\([a-z]\)[A-Z][a-z]$" "\1" word))
+        ;; check stripped word
+        (setq rlt (my-flyspell-predicate word)))
+       (t
+        (setq rlt (funcall extra-flyspell-predicate word))))
+      rlt))
+  (put 'js2-mode 'flyspell-mode-predicate 'js-flyspell-verify)
+  (put 'rjsx-mode 'flyspell-mode-predicate 'js-flyspell-verify)
+
+  (defun prog-mode-hook-setup ()
+    ;; remove namespace "MS" and "X"
+    (setq-local extra-flyspell-predicate (my-flyspell-predicate-factory "MS\|X")))
+  (add-hook 'prog-mode-hook 'prog-mode-hook-setup)
+#+end_src
+
+或者，你可以查看[[https://github.com/redguardtoo/emacs.d/blob/master/lisp/initspelling.el]]，以了解我的全部设置。
