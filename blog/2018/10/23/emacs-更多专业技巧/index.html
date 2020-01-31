@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Emacs:更多专业技巧 - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="emacs-common" />
+  <!-- <link rel="stylesheet" href="../../../../../media/css/main.css" type="text/css"/>
+       <link rel="stylesheet" href="../../../../../media/css/comment.css" type="text/css"/> -->
+  <link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/kognise/water.css@latest/dist/dark.css'>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="../../../../../">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <ul class="trigger">
+        <li><a href="../../../../../years/">Years</a></li>
+        <li><a href="../../../../../authors/">Authors</a></li>
+        <li><a href="../../../../../tags/">Tags</a></li>
+        <li><a href="../../../../../about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="../../../../../rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="https://www.bing.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">Emacs:更多专业技巧</h1>
+<div id="table-of-contents">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#org66b55d4">避免“加载旧字节码而不是新的源代码”的陷阱</a></li>
+<li><a href="#org718f681">用于本地存放包和开发内容的site Lisp文件夹</a></li>
+<li><a href="#orgba21dae">Flyspell 以及 whitespace-mode</a></li>
+<li><a href="#org04d4d10">下载光标所在的视频网址</a></li>
+<li><a href="#org2f30f14">列出当前的minor模式</a></li>
+<li><a href="#org9e799e0">窗口管理</a></li>
+<li><a href="#orgc93c4c3">使用FreeDesktop.org的垃圾箱</a></li>
+<li><a href="#org23b1d66">Lisp的括号编辑</a></li>
+<li><a href="#org38303e5">再见Paredit，你好Lispy</a></li>
+<li><a href="#org07699e3">图像处理和缩略图库</a></li>
+<li><a href="#org6dc7ac7">不要使用终端emacs</a></li>
+<li><a href="#org71b36ce">在Emacs中制作音乐</a></li>
+<li><a href="#org1135ce5">Emacs图表库</a></li>
+<li><a href="#org426780b">奇怪的nconc行为</a></li>
+<li><a href="#org2cc2711">引用</a></li>
+</ul>
+</div>
+</div>
+<p>
+这是我第一篇 <a href="https://ambrevar.xyz/emacs/index.html">Emacs pro-tips</a> 的后续.
+</p>
+
+<div id="outline-container-org233b74b" class="outline-2">
+<h2 id="org66b55d4"><a id="org233b74b"></a>避免“加载旧字节码而不是新的源代码”的陷阱</h2>
+<div class="outline-text-2" id="text-org66b55d4">
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">setq</span> load-prefer-newer t)
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org4a37979" class="outline-2">
+<h2 id="org718f681"><a id="org4a37979"></a>用于本地存放包和开发内容的site Lisp文件夹</h2>
+<div class="outline-text-2" id="text-org718f681">
+<p>
+我们需要编写自己的函数，因此我们希望把本地的site文件夹放在 <code>load-path</code> 的前面，然而 <code>normal-top-level-add-subdirs-to-load-path</code> 会把它添加到 <code>load-path</code> 的最后.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">ambrevar/package-refresh-load-path</span> (path)
+  <span style="font-style: italic;">"Add every non-hidden sub-folder of PATH to `</span><span style="font-weight: bold; font-style: italic; text-decoration: underline;">load-path</span><span style="font-style: italic;">'."</span>
+  (<span style="font-weight: bold;">when</span> (file-directory-p path)
+    (<span style="font-weight: bold;">dolist</span> (dir (directory-files path t <span style="font-style: italic;">"^[</span><span style="font-style: italic;">^</span><span style="font-weight: bold; font-style: italic;">\</span><span style="font-style: italic;">.]"</span>))
+      (<span style="font-weight: bold;">when</span> (file-directory-p dir)
+        (<span style="font-weight: bold;">setq</span> load-path (add-to-list 'load-path dir))
+        (<span style="font-weight: bold;">dolist</span> (subdir (directory-files dir t <span style="font-style: italic;">"^[</span><span style="font-style: italic;">^</span><span style="font-weight: bold; font-style: italic;">\</span><span style="font-style: italic;">.]"</span>))
+          (<span style="font-weight: bold;">when</span> (file-directory-p subdir)
+            (<span style="font-weight: bold;">setq</span> load-path (add-to-list 'load-path subdir))))))))
+(<span style="font-weight: bold;">let</span> ((site-lisp (expand-file-name <span style="font-style: italic;">"site-lisp/"</span> <span style="font-style: italic;">"~/.local/share/emacs/"</span>)))
+  (add-to-list 'load-path site-lisp)
+  (ambrevar/package-refresh-load-path site-lisp))
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgec52422" class="outline-2">
+<h2 id="orgba21dae"><a id="orgec52422"></a>Flyspell 以及 whitespace-mode</h2>
+<div class="outline-text-2" id="text-orgba21dae">
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">ambrevar/flyspell-and-whitespace-mode</span> ()
+  <span style="font-style: italic;">"Toggle `</span><span style="font-weight: bold; font-style: italic; text-decoration: underline;">flyspell-mode</span><span style="font-style: italic;">' and `</span><span style="font-weight: bold; font-style: italic; text-decoration: underline;">whitespace-mode</span><span style="font-style: italic;">'."</span>
+  (<span style="font-weight: bold;">interactive</span>)
+  (<span style="font-weight: bold;">if</span> (derived-mode-p 'prog-mode)
+      (flyspell-prog-mode)
+    (flyspell-mode)
+    (<span style="font-weight: bold;">when</span> flyspell-mode
+      (flyspell-buffer)))
+  (whitespace-mode 'toggle))
+
+(global-set-key (kbd <span style="font-style: italic;">"&lt;f9&gt;"</span>) #'ambrevar/flyspell-and-whitespace-mode)
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgf5a5fdf" class="outline-2">
+<h2 id="org04d4d10"><a id="orgf5a5fdf"></a>下载光标所在的视频网址</h2>
+<div class="outline-text-2" id="text-org04d4d10">
+<p>
+下面代码需要 <code>youtube-dl</code> 程序的支持。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">ambrevar/youtube-dl-at-point</span> (<span style="font-weight: bold; text-decoration: underline;">&amp;optional</span> url)
+  <span style="font-style: italic;">"Run 'youtube-dl' over the URL at point.</span>
+<span style="font-style: italic;">If URL is non-nil, use that instead."</span>
+  (<span style="font-weight: bold;">interactive</span>)
+  (<span style="font-weight: bold;">setq</span> url (<span style="font-weight: bold;">or</span> url (thing-at-point-url-at-point)))
+  (<span style="font-weight: bold;">let</span> ((eshell-buffer-name <span style="font-style: italic;">"*youtube-dl*"</span>))
+    (eshell)
+    (<span style="font-weight: bold;">when</span> (eshell-interactive-process)
+      (eshell t))
+    (eshell-interrupt-process)
+    (insert <span style="font-style: italic;">"cd ~/temp &amp;&amp; youtube-dl "</span> url)
+    (eshell-send-input)))
+</pre>
+</div>
+
+<p>
+参见 <a href="https://github.com/skeeto/youtube-dl-emacs">youtube-dl-emacs</a>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orge4d70b0" class="outline-2">
+<h2 id="org2f30f14"><a id="orge4d70b0"></a>列出当前的minor模式</h2>
+<div class="outline-text-2" id="text-org2f30f14">
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">ambrevar/current-minor-modes</span> ()
+  <span style="font-style: italic;">"Return the list of minor modes enabled in the current buffer."</span>
+  (<span style="font-weight: bold;">interactive</span>)
+  (delq nil
+        (mapcar (<span style="font-weight: bold;">lambda</span> (mode)
+                  (<span style="font-weight: bold;">if</span> (<span style="font-weight: bold;">and</span> (boundp mode) (symbol-value mode))
+                      mode))
+                minor-mode-list)))
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org6f5520e" class="outline-2">
+<h2 id="org9e799e0"><a id="org6f5520e"></a>窗口管理</h2>
+<div class="outline-text-2" id="text-org9e799e0">
+<p>
+由于我使用 <a href="../emacs-everywhere/index.html">EXWM</a> 作为窗口管理器, 因此我将 <code>super</code> 键用于进行窗口管理.
+</p>
+
+<p>
+下面是一些简单而有效的规则:
+</p>
+
+<ul class="org-ul">
+<li><code>s-TAB</code>: 切换到最后一个缓冲区。</li>
+<li><code>s-&lt;箭头&gt;</code> (或在Evil中的 <code>s-&lt;hjkl&gt;</code>): 在选定的方向上选择窗口。</li>
+<li><code>S-s-&lt;arrows&gt;</code> (or <code>S-s-&lt;hjkl&gt;</code> with Evil): swap current window with window in</li>
+<li><code>S-s-&lt;箭头&gt;</code> (或在Evil中的 <code>S-s-&lt;hjkl&gt;</code>): 与选择方向的窗口进行互换</li>
+<li><code>s-</code>: 切换水平或垂直分隔。</li>
+<li><code>s-o</code>: 切换是否隐藏所有其他窗口。</li>
+</ul>
+
+<p>
+With Helm, I use <code>C-c o</code> (or my custom binding <code>S-RET</code>) to find a file or a
+在Helm中，我使用 <code>C-c o</code> (或这我自定义的快捷键 <code>S-RET</code>)来在新分割的窗口上打开文件或buffer
+</p>
+
+<p>
+我需要一些额外的函数来实现上述工作流程:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">ambrevar/swap-windows</span> (<span style="font-weight: bold; text-decoration: underline;">&amp;optional</span> w1 w2)
+  <span style="font-style: italic;">"If 2 windows are up, swap them.</span>
+<span style="font-style: italic;">Else if W1 is a window, swap it with current window.</span>
+<span style="font-style: italic;">If W2 is a window too, swap both."</span>
+  (<span style="font-weight: bold;">interactive</span>)
+  (<span style="font-weight: bold;">unless</span> (<span style="font-weight: bold;">or</span> (= 2 (count-windows))
+              (windowp w1)
+              (windowp w2))
+    (<span style="font-weight: bold;">error</span> <span style="font-style: italic;">"Ambiguous window selection"</span>))
+  (<span style="font-weight: bold;">let*</span> ((w1 (<span style="font-weight: bold;">or</span> w1 (car (window-list))))
+         (w2 (<span style="font-weight: bold;">or</span> w2
+                 (<span style="font-weight: bold;">if</span> (eq w1 (car (window-list)))
+                     (nth 1 (window-list))
+                   (car (window-list)))))
+         (b1 (window-buffer w1))
+         (b2 (window-buffer w2))
+         (s1 (window-start w1))
+         (s2 (window-start w2)))
+    (<span style="font-weight: bold;">with-temp-buffer</span>
+      <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Some buffers like EXWM buffers can only be in one live buffer at once.</span>
+      <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Switch to a dummy buffer in w2 so that we don't display any buffer twice.</span>
+      (set-window-buffer w2 (current-buffer))
+      (set-window-buffer w1 b2)
+      (set-window-buffer w2 b1))
+    (set-window-start w1 s2)
+    (set-window-start w2 s1))
+  (select-window w1))
+(global-set-key (kbd <span style="font-style: italic;">"C-x \\"</span>) 'swap-windows)
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">ambrevar/swap-windows-left</span> ()
+<span style="font-style: italic;">"Swap current window with the window to the left."</span>
+(<span style="font-weight: bold;">interactive</span>)
+(ambrevar/swap-windows (window-in-direction 'left)))
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">ambrevar/swap-windows-below</span> ()
+<span style="font-style: italic;">"Swap current window with the window below."</span>
+(<span style="font-weight: bold;">interactive</span>)
+(ambrevar/swap-windows (window-in-direction 'below)))
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">ambrevar/swap-windows-above</span> ()
+<span style="font-style: italic;">"Swap current window with the window above."</span>
+(<span style="font-weight: bold;">interactive</span>)
+(ambrevar/swap-windows (window-in-direction 'above)))
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">ambrevar/swap-windows-right</span> ()
+<span style="font-style: italic;">"Swap current window with the window to the right."</span>
+(<span style="font-weight: bold;">interactive</span>)
+(ambrevar/swap-windows (window-in-direction 'right)))
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">ambrevar/switch-to-last-buffer</span> ()
+<span style="font-style: italic;">"Switch to last open buffer in current window."</span>
+(<span style="font-weight: bold;">interactive</span>)
+(switch-to-buffer (other-buffer (current-buffer) 1)))
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">ambrevar/toggle-single-window</span> ()
+  <span style="font-style: italic;">"Un-maximize current window.</span>
+<span style="font-style: italic;">If multiple windows are active, save window configuration and</span>
+<span style="font-style: italic;">delete other windows. If only one window is active and a window</span>
+<span style="font-style: italic;">configuration was previously save, restore that configuration."</span>
+  (<span style="font-weight: bold;">interactive</span>)
+  (<span style="font-weight: bold;">if</span> (= (count-windows) 1)
+      (<span style="font-weight: bold;">when</span> single-window--last-configuration
+        (set-window-configuration single-window--last-configuration))
+    (<span style="font-weight: bold;">setq</span> single-window--last-configuration (current-window-configuration))
+    (delete-other-windows)))
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">ambrevar/toggle-window-split</span> ()
+  <span style="font-style: italic;">"Switch between vertical and horizontal split.</span>
+<span style="font-style: italic;">It only works for frames with exactly two windows."</span>
+  (<span style="font-weight: bold;">interactive</span>)
+  (<span style="font-weight: bold;">if</span> (= (count-windows) 2)
+      (<span style="font-weight: bold;">let*</span> ((this-win-buffer (window-buffer))
+             (next-win-buffer (window-buffer (next-window)))
+             (this-win-edges (window-edges (selected-window)))
+             (next-win-edges (window-edges (next-window)))
+             (this-win-2nd (not (<span style="font-weight: bold;">and</span> (&lt;= (car this-win-edges)
+                                         (car next-win-edges))
+                                     (&lt;= (cadr this-win-edges)
+                                         (cadr next-win-edges)))))
+             (splitter
+              (<span style="font-weight: bold;">if</span> (= (car this-win-edges)
+                     (car (window-edges (next-window))))
+                  'split-window-horizontally
+                'split-window-vertically)))
+        (delete-other-windows)
+        (<span style="font-weight: bold;">let</span> ((first-win (selected-window)))
+          (funcall splitter)
+          (<span style="font-weight: bold;">if</span> this-win-2nd (other-window 1))
+          (set-window-buffer (selected-window) this-win-buffer)
+          (set-window-buffer (next-window) next-win-buffer)
+          (select-window first-win)
+          (<span style="font-weight: bold;">if</span> this-win-2nd (other-window 1))))))
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org53a79e2" class="outline-2">
+<h2 id="orgc93c4c3"><a id="org53a79e2"></a>使用FreeDesktop.org的垃圾箱</h2>
+<div class="outline-text-2" id="text-orgc93c4c3">
+<p>
+Whenever Emacs “delete” a file (from <code>dired</code>, Helm Find-Files or Elisp 原语),让Emacs把它移到垃圾箱里:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">setq</span> delete-by-moving-to-trash t)
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgf0f6710" class="outline-2">
+<h2 id="org23b1d66"><a id="orgf0f6710"></a>Lisp的括号编辑</h2>
+<div class="outline-text-2" id="text-org23b1d66">
+<p>
+Lisp的一个常见问题是需要平衡括号。
+</p>
+
+<p>
+这太明显了. 既然这种人物对及计算机没有任何难度，那很明显Emacs为你可以提供帮助
+</p>
+
+<p>
+首先，让我们高亮显示括号。我取消延迟让Emacs立即高亮匹配的括号:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp"><span style="font-weight: bold; font-style: italic;">;;; </span><span style="font-weight: bold; font-style: italic;">Show matching parenthesis</span>
+(show-paren-mode 1)
+<span style="font-weight: bold; font-style: italic;">;;; </span><span style="font-weight: bold; font-style: italic;">By default, there&#8217;s a small delay before showing a matching parenthesis. Set</span>
+<span style="font-weight: bold; font-style: italic;">;;; </span><span style="font-weight: bold; font-style: italic;">it to 0 to deactivate.</span>
+(<span style="font-weight: bold;">setq</span> show-paren-delay 0)
+(<span style="font-weight: bold;">setq</span> show-paren-when-point-inside-paren t)
+
+(<span style="font-weight: bold;">with-eval-after-load</span> 'paren
+  (set-face-background 'show-paren-match <span style="font-style: italic;">"#555555"</span>)
+  (set-face-foreground 'show-paren-match <span style="font-style: italic;">"#def"</span>)
+  (set-face-attribute 'show-paren-match nil <span style="font-weight: bold;">:weight</span> 'extra-bold))
+</pre>
+</div>
+
+<p>
+接下来，我们安装 <a href="https://github.com/fanael/rainbow-delimiter"><code>rainbow-delimiter</code></a> 这个第三方包，它会根据括号深度显示不同的颜色。就跟C或Algol家族语言中的缩进差不多。
+</p>
+</div>
+</div>
+
+<div id="outline-container-org0eaf7f1" class="outline-2">
+<h2 id="org38303e5"><a id="org0eaf7f1"></a>再见Paredit，你好Lispy</h2>
+<div class="outline-text-2" id="text-org38303e5">
+<p>
+Consider using <a href="https://github.com/abo-abo/lispy">Lispy</a> which brings Lisp syntactic editing to a whole new level:
+考虑使用<a href="https://github.com/abo-abo/lispy">Lispy</a>，它将Lisp语法编辑带到一个全新的层次::
+除了括号平衡之外(这使得前面部分变得多余的)，它还提供了高级的表达式导航、代码转换和样式美化等功能。
+</p>
+
+<p>
+看一下演示中的那些具体例子。
+</p>
+
+<p>
+仔细想想，Lispy对Lisp的编辑器支持有了明显的改进:
+它真正利用了Lisp语言的语法是抽象愈发术的这一事实.不使用这一财产真是耻辱啊。
+</p>
+</div>
+</div>
+
+<div id="outline-container-org3b6a5f3" class="outline-2">
+<h2 id="org07699e3"><a id="org3b6a5f3"></a>图像处理和缩略图库</h2>
+<div class="outline-text-2" id="text-org07699e3">
+<p>
+有一个不太知名的命令 <code>image-dired</code>: 当在一个图片目录下运行时，它会显示一个带预览的缩略图图库。
+按下 <code>空格</code> 就能在另一个window中显示下一张图片,而 <code>C-RET</code> 会使用 <code>image-dired-external-viewer</code> 打开图片.
+你还可以旋转文件，在dired中对它们添加标签或添加评论。
+</p>
+
+<p>
+第三方包 <a href="https://github.com/mhayashi1120/Emacs-imagex"><code>image+</code></a> 为Emacs增加了额外的图片功能，比如stiky转换和文件修改。
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgf0ace3d" class="outline-2">
+<h2 id="org6dc7ac7"><a id="orgf0ace3d"></a>不要使用终端emacs</h2>
+<div class="outline-text-2" id="text-org6dc7ac7">
+<p>
+<a href="https://blog.aaronbieber.com/2016/12/29/don-t-use-terminal-emacs.html">https://blog.aaronbieber.com/2016/12/29/don-t-use-terminal-emacs.html</a>
+</p>
+</div>
+</div>
+
+<div id="outline-container-org32419af" class="outline-2">
+<h2 id="org71b36ce"><a id="org32419af"></a>在Emacs中制作音乐</h2>
+<div class="outline-text-2" id="text-org71b36ce">
+<p>
+<a href="https://vimeo.com/22798433">Quick Intro to Live Programming with Overtone</a>
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgee0c092" class="outline-2">
+<h2 id="org1135ce5"><a id="orgee0c092"></a>Emacs图表库</h2>
+<div class="outline-text-2" id="text-org1135ce5">
+<p>
+<a href="http://francismurillo.github.io/2017-04-15-Exploring-Emacs-chart-Library/">http://francismurillo.github.io/2017-04-15-Exploring-Emacs-chart-Library/</a>
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgbf2726c" class="outline-2">
+<h2 id="org426780b"><a id="orgbf2726c"></a>奇怪的nconc行为</h2>
+<div class="outline-text-2" id="text-org426780b">
+<p>
+Elisp语言中少数奇怪的地方之一:
+<a href="https://stackoverflow.com/questions/25157349/odd-behaviour-with-nconc-in-emacs-lisp">https://stackoverflow.com/questions/25157349/odd-behaviour-with-nconc-in-emacs-lisp</a>
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgd1ff34f" class="outline-2">
+<h2 id="org2cc2711"><a id="orgd1ff34f"></a>引用</h2>
+<div class="outline-text-2" id="text-org2cc2711">
+<ul class="org-ul">
+<li><a href="http://emacs.sexy/">http://emacs.sexy/</a></li>
+<li><a href="https://writequit.org/org/">https://writequit.org/org/</a></li>
+<li><a href="http://doc.rix.si/cce/cce.html">Emacs as a Complete Computing Environment</a></li>
+<li><a href="https://github.com/bbatsov/emacs-lisp-style-guide/">The Emacs Lisp Style Guide</a></li>
+<li><a href="https://two-wrongs.com/why-you-should-buy-into-the-emacs-platform">Why You Should Buy Into the Emacs Platform</a></li>
+</ul>
+
+<p>
+环境依靠:
+</p>
+
+<ul class="org-ul">
+<li><a href="http://emacs-bootstrap.com/">http://emacs-bootstrap.com/</a> (generic)</li>
+<li><a href="https://portacle.github.io/">https://portacle.github.io/</a> (Common Lisp)</li>
+</ul>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2018-10-23</span>
+            <span title="last modification date" class="post-info">2020-01-31</span>
+            <span title="tags" class="post-info">:<a href="../../../../../tags/emacs-common">emacs-common</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-974194e3-b35c-414c-a595-e06f871d967e">lujun9972</a></span>
+        </div>
+    <script src="../../../../../media/js/jquery-2.1.3.min.js"></script>
+    <script src="../../../../../media/js/md5.min.js"></script>
+        <section>
+            <div id="gitalk-container"></div>
+            <script type="text/javascript">
+             var gitalk = new Gitalk({
+                 clientID: 'fdcb5d9da3f4acb4862c',
+                 clientSecret: 'dd0a16312a206782cb7669dcec5e96874ab48170',
+                 repo: 'lujun9972.github.com',
+                 owner: 'lujun9972',
+                 admin: ['lujun9972'],
+                 id: md5(location.pathname),      // Ensure uniqueness and length less than 50
+                 distractionFreeMode: false  // Facebook-like distraction free mode
+             })
+             gitalk.render('gitalk-container')
+            </script>
+        </section>
+    <script src="../../../../../media/js/main.js"></script>
+        <script>
+         var _hmt = _hmt || [];
+         (function() {
+             var hm = document.createElement("script");
+             hm.src = "https://hm.baidu.com/hm.js?7bac4fd0247f69c27887e0d4e3aee41e";
+             var s = document.getElementsByTagName("script")[0]; 
+             s.parentNode.insertBefore(hm, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-974194e3-b35c-414c-a595-e06f871d967e">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="../../../../../instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>
