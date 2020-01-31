@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>如何创建一个Emacs Minor Mode - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="elisp-common" />
+  <!-- <link rel="stylesheet" href="../../../../../media/css/main.css" type="text/css"/>
+       <link rel="stylesheet" href="../../../../../media/css/comment.css" type="text/css"/> -->
+  <link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/kognise/water.css@latest/dist/dark.css'>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="../../../../../">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <ul class="trigger">
+        <li><a href="../../../../../years/">Years</a></li>
+        <li><a href="../../../../../authors/">Authors</a></li>
+        <li><a href="../../../../../tags/">Tags</a></li>
+        <li><a href="../../../../../about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="../../../../../rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="https://www.bing.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">如何创建一个Emacs Minor Mode</h1>
+<div id="table-of-contents">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#minor-mode-options">minor模式选项</a></li>
+<li><a href="#minor-mode-body">Minor Mode 主要内容</a></li>
+<li><a href="#automatically-enabling-the-minor-mode">自动启用Minor模式</a></li>
+<li><a href="#full-code">完整代码</a></li>
+</ul>
+</div>
+</div>
+<p>
+Emacs缓冲区总是会有一个major模式和零个或多个minor模式。major模式实现起来往往非费劲，特别是当涉及到自动缩进时。
+相比之下，minor模式通常很简单，可能只是覆盖一小个kemap来实现附加功能。创建一个新的minor模式非常简单，只需理解Emacs的约定即可。
+</p>
+
+<p>
+模式名应该以 <code>-mode</code> 结尾，用于切换模式的命令应该与模式名相名。模式的keymap应该被称为 mode=-map=, 模式切换的钩子应该被称为 mode=-hook=.在为minor模式选择名称时，请记住所有这些约定。
+</p>
+
+<p>
+在手动构建minor模式时，还需要考虑许多其他繁琐的问题。好消息是，其中大部分都无需让人担心!
+Lisp通过宏来减少样板代码，因此有一个宏能用于构建minor模式: <code>define-minor-mode</code>. 下面是创建一个新的minor模式 <code>foo-mode</code> 所需的全部内容。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">define-minor-mode</span> <span style="font-weight: bold;">foo-mode</span>
+  <span style="font-style: italic;">"Get your foos in the right places."</span>)
+</pre>
+</div>
+
+<p>
+这将创建一个用于切换minor模式的命令 <code>foo-mode</code> 和一个名为 <code>foo-mode-hook</code> 的钩子。
+关于这个钩子有一个奇怪的值得注意的地方:它没有立即声明为一个变量。我猜测这是某种古老的优化措施，但是现在这种设计很糟糕了。
+hook函数 <code>add-hook</code> 将在需要时惰性地创建这个变量，而函数 <code>run-hook</code> 将忽略还不存在的hook变量，因此在这种设计下也不会有问题。
+总的来说，尽管它的初始状态很奇怪，但新的minor模式将在添加函数后立即使用这个钩子。
+</p>
+
+<div id="outline-container-org7d1a070" class="outline-2">
+<h2 id="minor-mode-options"><a id="org7d1a070"></a>minor模式选项</h2>
+<div class="outline-text-2" id="text-minor-mode-options">
+<p>
+It's just a toggle and a hook that's run when the toggle is used. To add more to the mode, <code>define-minor-mode</code> accepts a number of keywords. Here are the important ones.
+这个模式还不能做任何事情。它没有自己的keymap，甚至不在modeline中显示。
+它只有一个切换命令以及一个切换命令运行的钩子。
+<code>define-minor-mode</code> 接受一些关键字,能向模式添加更多内容。下面这些是重要的关键字：
+</p>
+
+<ul class="org-ul">
+<li><code>:lighter</code>: 名称，字符串形式，在modeline中显示</li>
+<li><code>:keymap</code>: 模式的 keymap</li>
+<li><code>:global</code>: 指定 minor mode 是否为全局模式</li>
+</ul>
+
+<p>
+<code>:lighter</code> 选项有一个值得关注的地方: 它会直接拼接到 modeline 后，没有任何分隔符。这意味着它需要以空格作为前缀。我认为该设计是错误的，但我们可能永远都无法摆脱它。否则这个字符串只能很短:modeline上通常没有太多空间。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">define-minor-mode</span> <span style="font-weight: bold;">foo-mode</span>
+  <span style="font-style: italic;">"Get your foos in the right places."</span>
+  <span style="font-weight: bold;">:lighter</span> <span style="font-style: italic;">" foo"</span>)
+</pre>
+</div>
+
+<p>
+使用 <code>(make-keymap)</code> 或 <code>(make-sparse-keymap)</code> 创建新的空 keymap。当 keymap 中包含少量键绑定时(大多数minor mode都是这样的)，后者的效率更高。
+这些不同函数的存在可能是另一个过时的、不成熟的优化。为了避免混淆，我建议使用你常用的那个函数就行。
+</p>
+
+<p>
+keymap 可以直接提供给 <code>:keymap</code> 参数，并自动绑定到 <code>foo-mode-map</code> 上.
+我也可以在这里放置一个空的keymap，并在 <code>define-minor-mode</code> 声明之外单独定义快捷键，但是我喜欢在一个表达式中创建整个 keymap 的想法。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">insert-foo</span> ()
+  (<span style="font-weight: bold;">interactive</span>)
+  (insert <span style="font-style: italic;">"foo"</span>))
+
+(<span style="font-weight: bold;">define-minor-mode</span> <span style="font-weight: bold;">foo-mode</span>
+  <span style="font-style: italic;">"Get your foos in the right places."</span>
+  <span style="font-weight: bold;">:lighter</span> <span style="font-style: italic;">" foo"</span>
+  <span style="font-weight: bold;">:keymap</span> (<span style="font-weight: bold;">let</span> ((map (make-sparse-keymap)))
+            (define-key map (kbd <span style="font-style: italic;">"C-c f"</span>) 'insert-foo)
+            map))
+</pre>
+</div>
+
+<p>
+<code>:global</code> 选项意味着minor模式不仅仅作用于当前buffer，而是作用于所有buffer。据我所知，我唯一使用过的global minor模式是 <a href="https://github.com/capitaomorte/yasnippet">YASnippet</a>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org47894f6" class="outline-2">
+<h2 id="minor-mode-body"><a id="org47894f6"></a>Minor Mode 主要内容</h2>
+<div class="outline-text-2" id="text-minor-mode-body">
+<p>
+<code>define-minor-mode</code> 的剩下部分是一段任意Lisp代码，跟 <code>defun</code> 类似。
+每次模式被关闭或打开时，它都会运行，所以它就像一个内置的钩子函数。
+你可以使用它来进行任何特殊的设置或清理，例如挂钩或取消Emacs的挂钩。
+这里通常要做的一件事是指定缓冲区局部变量。
+</p>
+
+<p>
+在Emacs解释器运行表达式时，总有一个充当上下文的当前缓冲区。
+许多对缓冲区进行操作的函数实际上并不接受缓冲区作为参数。相反，它们对当前缓冲区进行操作。
+此外，有些变量是尽在缓冲区本地有效的:它们动态地绑定在当前缓冲区上。
+这对维护仅与特定缓冲区相关的状态非常有用。
+</p>
+
+<p>
+旁注: <code>with-current-buffer</code> 宏用于为一段代码指定另一个缓冲区作为当前缓冲区。
+它可以用来访问其他缓冲区的局部变量。
+类似地, <code>with-temp-buffer</code> 则创建一个全新的缓冲区，将其用作主体代码的当前缓冲区，然后销毁该缓冲区。
+</p>
+
+<p>
+例如，假设我想记录 <code>foo-mode</code> 向当前缓冲区插入“foo”的次数。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defvar</span> <span style="font-weight: bold; font-style: italic;">foo-count</span> 0
+  <span style="font-style: italic;">"Number of foos inserted into the current buffer."</span>)
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">insert-foo</span> ()
+  (<span style="font-weight: bold;">interactive</span>)
+  (<span style="font-weight: bold;">setq</span> foo-count (1+ foo-count))
+  (insert <span style="font-style: italic;">"foo"</span>))
+
+(<span style="font-weight: bold;">define-minor-mode</span> <span style="font-weight: bold;">foo-mode</span>
+  <span style="font-style: italic;">"Get your foos in the right places."</span>
+  <span style="font-weight: bold;">:lighter</span> <span style="font-style: italic;">" foo"</span>
+  <span style="font-weight: bold;">:keymap</span> (<span style="font-weight: bold;">let</span> ((map (make-sparse-keymap)))
+            (define-key map (kbd <span style="font-style: italic;">"C-c f"</span>) 'insert-foo)
+            map)
+  (make-local-variable 'foo-count))
+</pre>
+</div>
+
+<p>
+内置函数 <code>make-local-variable</code> 在当前缓冲区中创建全局变量在新缓冲区中的局部副本。
+这里，缓冲区局部的 <code>foo-count</code> 将使用全局变量的值0进行初始化，但是所有的重新赋值只在当前缓冲区中可见。
+</p>
+
+<p>
+但是，在本例中，最好在全局变量上使用 <code>make-variable-buffer-local</code>,并跳过 <code>make-local-variable</code> 语句。
+主要原因是，我不希望 <code>insert-foo</code> 在没有启用minor模式的缓冲区中调用时修改了全局变量。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(make-variable-buffer-local
+ (<span style="font-weight: bold;">defvar</span> <span style="font-weight: bold; font-style: italic;">foo-count</span> 0
+   <span style="font-style: italic;">"Number of foos inserted into the current buffer."</span>))
+</pre>
+</div>
+
+<p>
+这种方法有一个很大的优点就是任意地方查看该变量的文档说明，都能看出该变量的作用域局限在缓冲区。此消息会出现在变量的文档中。
+</p>
+
+<blockquote>
+<p>
+Automatically becomes buffer-local when set in any fashion.
+</p>
+</blockquote>
+
+<p>
+你使用哪种方法取决于你的个人喜好。Emacs文档鼓励前者，但我认为后者在许多情况下更好。
+</p>
+</div>
+</div>
+
+<div id="outline-container-orga984a35" class="outline-2">
+<h2 id="automatically-enabling-the-minor-mode"><a id="orga984a35"></a>自动启用Minor模式</h2>
+<div class="outline-text-2" id="text-automatically-enabling-the-minor-mode">
+<p>
+某些minor模式不与任何特定的major模式相关，用户可以随意切换。
+某些minor模式则只有在与特定的major模式一起使用时才有意义，通常与这个major模式一起自动启用。
+自动启动是通过挂起major模式的钩子来完成的。只要模式遵循前面提到的Emacs的约定，就应该很容易找到这个钩子。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(add-hook 'text-mode-hook 'foo-mode)
+</pre>
+</div>
+
+<p>
+这里，=foo-mode= 将在所有 <code>text-mode</code> buffer中自动激活。
+</p>
+</div>
+</div>
+
+<div id="outline-container-org44ff605" class="outline-2">
+<h2 id="full-code"><a id="org44ff605"></a>完整代码</h2>
+<div class="outline-text-2" id="text-full-code">
+<p>
+下面是minor模式的最终代码，保存为 <code>foo-mode.el</code>.它有一个快捷键，用户可以很容易地在 <code>foo-mode-map</code> 中定义更多的快捷键。当用户编辑纯文本文件时，它也会自动激活。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(make-variable-buffer-local
+ (<span style="font-weight: bold;">defvar</span> <span style="font-weight: bold; font-style: italic;">foo-count</span> 0
+   <span style="font-style: italic;">"Number of foos inserted into the current buffer."</span>))
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">insert-foo</span> ()
+  (<span style="font-weight: bold;">interactive</span>)
+  (<span style="font-weight: bold;">setq</span> foo-count (1+ foo-count))
+  (insert <span style="font-style: italic;">"foo"</span>))
+
+<span style="font-weight: bold; font-style: italic;">;;;</span><span style="font-weight: bold; font-style: italic;">###</span><span style="font-weight: bold; font-style: italic;">autoload</span>
+(<span style="font-weight: bold;">define-minor-mode</span> <span style="font-weight: bold;">foo-mode</span>
+  <span style="font-style: italic;">"Get your foos in the right places."</span>
+  <span style="font-weight: bold;">:lighter</span> <span style="font-style: italic;">" foo"</span>
+  <span style="font-weight: bold;">:keymap</span> (<span style="font-weight: bold;">let</span> ((map (make-sparse-keymap)))
+            (define-key map (kbd <span style="font-style: italic;">"C-c f"</span>) 'insert-foo)
+            map))
+
+<span style="font-weight: bold; font-style: italic;">;;;</span><span style="font-weight: bold; font-style: italic;">###</span><span style="font-weight: bold; font-style: italic;">autoload</span>
+(add-hook 'text-mode-hook 'foo-mode)
+
+(<span style="font-weight: bold;">provide</span> '<span style="font-weight: bold; text-decoration: underline;">foo-mode</span>)
+</pre>
+</div>
+
+<p>
+我添加了一些 autoload 声明和一个 <code>provide</code> 以防该模式被作为包分发或使用。为这个minor模式生成了 autoload 脚本会定义一个名为 <code>foo-mode</code> 的临时函数，这个函数的惟一目的就是加载真正的 <code>foo-mode.el</code>,然后再次调用 <code>foo-mode</code>, <code>foo-mode</code> 的新定义会覆盖临时定义。
+</p>
+
+<p>
+autoload 脚本还将这个临时的 <code>foo-mode</code> 函数添加到 <code>text-mode-hook</code> 中。如果创建了 <code>text-mode</code> buffer，钩子将调用 <code>foo-mode</code>,从而加载 <code>foo-mode.el</code>,重新定义 <code>foo-mode</code> 为实际定义,然后激活 <code>foo-mode</code>.
+</p>
+
+<p>
+autoload 的目的是将加载代码的时间延迟到需要的时候。你可能会注意到,在启动Emacs后第一次激活模式时有一个短暂的延迟.这就是尽管Emacs在启动时装载了数百万行Elisp，但启动时间依然合理的原因。
+</p>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2018-07-05</span>
+            <span title="last modification date" class="post-info">2020-01-31</span>
+            <span title="tags" class="post-info">:<a href="../../../../../tags/elisp-common">elisp-common</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-4187be2f-c1cc-4b23-be52-d211b91e1b37">lujun9972</a></span>
+        </div>
+    <script src="../../../../../media/js/jquery-2.1.3.min.js"></script>
+    <script src="../../../../../media/js/md5.min.js"></script>
+        <section>
+            <div id="gitalk-container"></div>
+            <script type="text/javascript">
+             var gitalk = new Gitalk({
+                 clientID: 'fdcb5d9da3f4acb4862c',
+                 clientSecret: 'dd0a16312a206782cb7669dcec5e96874ab48170',
+                 repo: 'lujun9972.github.com',
+                 owner: 'lujun9972',
+                 admin: ['lujun9972'],
+                 id: md5(location.pathname),      // Ensure uniqueness and length less than 50
+                 distractionFreeMode: false  // Facebook-like distraction free mode
+             })
+             gitalk.render('gitalk-container')
+            </script>
+        </section>
+    <script src="../../../../../media/js/main.js"></script>
+        <script>
+         var _hmt = _hmt || [];
+         (function() {
+             var hm = document.createElement("script");
+             hm.src = "https://hm.baidu.com/hm.js?7bac4fd0247f69c27887e0d4e3aee41e";
+             var s = document.getElementsByTagName("script")[0]; 
+             s.parentNode.insertBefore(hm, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-4187be2f-c1cc-4b23-be52-d211b91e1b37">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="../../../../../instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>
