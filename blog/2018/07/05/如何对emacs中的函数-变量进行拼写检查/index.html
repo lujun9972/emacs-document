@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>如何对Emacs中的函数/变量进行拼写检查 - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="spellcheck" />
+  <!-- <link rel="stylesheet" href="../../../../../media/css/main.css" type="text/css"/>
+       <link rel="stylesheet" href="../../../../../media/css/comment.css" type="text/css"/> -->
+  <link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/kognise/water.css@latest/dist/dark.css'>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="../../../../../">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <ul class="trigger">
+        <li><a href="../../../../../years/">Years</a></li>
+        <li><a href="../../../../../authors/">Authors</a></li>
+        <li><a href="../../../../../tags/">Tags</a></li>
+        <li><a href="../../../../../about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="../../../../../rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="https://www.bing.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">如何对Emacs中的函数/变量进行拼写检查</h1>
+<p>
+<a href="http://blog.binchen.org/posts/effecspell-check-in-emacs.html">本文</a>解释了开发人员如何在使用Emacs编程时检查函数/变量的拼写错误的。
+</p>
+
+<p>
+它使用<a href="http://aspell.net/">GNU Aspell</a>的 <code>--run-together</code> 选项来检查驼峰格式的单词。
+</p>
+
+<p>
+但这个解决方案并不完美。它错误地将两个字符组成的内部单词识别为错词。
+例如，“onChange”被认为是拼写错误，因为内部单词“on”是由两个字符组成的。
+另一个问题是函数名的命名空间。例如，“MSToggleButton”中的“MS”是“Microsoft”的别名。如果“MS”被标识为错词，则每个包含名称空间“MS”的单词都被视为错词。
+</p>
+
+<p>
+在这篇文章中,
+</p>
+
+<ul class="org-ul">
+<li>我将解释 <b>Emacs拼写检查的工作原理</b></li>
+<li>然后研究aspell的*算法</li>
+<li>最后，我将向你展示 <b>一个完整的设置</b></li>
+</ul>
+
+<p>
+在Emacs中使用内置的插件<a href="https://www.emacswiki.org/emacs/FlySpell">Fly Spell</a>来负责拼写检查。它将选项和纯文本传递给命令行工具aspell。
+Aspell将文本的拼写错误信息发送回 <code>Fly Spell</code>. <code>Fly Spell</code> 然后选择某些拼写错误显示出来。例如，当启用<a href="https://www.gnu.org/software/emacs/manual/html_node/emacs/Spelling.html">flyspell-prog-mode</a>时，只能看到注释和字符串中的拼写错误。
+</p>
+
+<p>
+所以aspell并不懂任何编程语言的语法。它只是扫描纯文本并报告所有的拼写错误。
+</p>
+
+<p>
+在aspell中，有两个额外的“连词(run-together)”选项:
+</p>
+
+<ul class="org-ul">
+<li><code>--run-together-limit</code> 是 “可以串在一起的最大单词数”</li>
+<li><code>--run-together-min</code> 是“内部单词的最小长度”</li>
+</ul>
+
+<p>
+让我们研究一下aspell的代码来理解这两个选项。在“modules/speller/default/suggest.cpp”文件中的 <code>Working::check_word</code> 函数实现了 “run-together”算法。
+</p>
+
+<p>
+为了帮助你理解这个函数，我逐行记录了这段代码，
+</p>
+
+<div class="org-src-container">
+<pre class="src src-C++"><span style="font-weight: bold;">class</span> <span style="font-weight: bold; text-decoration: underline;">Working</span> : <span style="font-weight: bold;">public</span> <span style="font-weight: bold; text-decoration: underline;">Score</span> {
+  <span style="font-weight: bold; text-decoration: underline;">unsigned</span> <span style="font-weight: bold;">check_word</span>(<span style="font-weight: bold; text-decoration: underline;">char</span> 0_sync_master.sh 1_add_new_article_manual.sh 1_add_new_article_newspaper.sh 2_start_translating.sh 3_continue_the_work.sh 4_finish.sh 5_pause.sh base.sh parse_url_by_manual.sh parse_url_by_newspaper.py parse_url_by_newspaper.sh project.cfg reformat.sh texput.log urls_checker.sh word, <span style="font-weight: bold; text-decoration: underline;">char</span> 0_sync_master.sh 1_add_new_article_manual.sh 1_add_new_article_newspaper.sh 2_start_translating.sh 3_continue_the_work.sh 4_finish.sh 5_pause.sh base.sh parse_url_by_manual.sh parse_url_by_newspaper.py parse_url_by_newspaper.sh project.cfg reformat.sh texput.log urls_checker.sh word_end, CheckInfo 0_sync_master.sh 1_add_new_article_manual.sh 1_add_new_article_newspaper.sh 2_start_translating.sh 3_continue_the_work.sh 4_finish.sh 5_pause.sh base.sh parse_url_by_manual.sh parse_url_by_newspaper.py parse_url_by_newspaper.sh project.cfg reformat.sh texput.log urls_checker.sh ci, <span style="font-weight: bold; text-decoration: underline;">unsigned</span> <span style="font-weight: bold; font-style: italic;">pos</span> = 1);
+};
+<span style="font-weight: bold; text-decoration: underline;">unsigned</span> <span style="font-weight: bold; text-decoration: underline;">Working</span>::<span style="font-weight: bold;">check_word</span>(<span style="font-weight: bold; text-decoration: underline;">char</span> 0_sync_master.sh 1_add_new_article_manual.sh 1_add_new_article_newspaper.sh 2_start_translating.sh 3_continue_the_work.sh 4_finish.sh 5_pause.sh base.sh parse_url_by_manual.sh parse_url_by_newspaper.py parse_url_by_newspaper.sh project.cfg reformat.sh texput.log urls_checker.sh word, <span style="font-weight: bold; text-decoration: underline;">char</span> 0_sync_master.sh 1_add_new_article_manual.sh 1_add_new_article_newspaper.sh 2_start_translating.sh 3_continue_the_work.sh 4_finish.sh 5_pause.sh base.sh parse_url_by_manual.sh parse_url_by_newspaper.py parse_url_by_newspaper.sh project.cfg reformat.sh texput.log urls_checker.sh word_end, CheckInfo 0_sync_master.sh 1_add_new_article_manual.sh 1_add_new_article_newspaper.sh 2_start_translating.sh 3_continue_the_work.sh 4_finish.sh 5_pause.sh base.sh parse_url_by_manual.sh parse_url_by_newspaper.py parse_url_by_newspaper.sh project.cfg reformat.sh texput.log urls_checker.sh ci,
+                             /bin /boot /dev /etc /home /lib /lib64 /lost+found /media /mnt /opt /proc /root /run /sbin /srv /sys /tmp /usr /var it WILL modify word */
+                             <span style="font-weight: bold; text-decoration: underline;">unsigned</span> pos)
+{
+  <span style="font-weight: bold; font-style: italic;">// </span><span style="font-weight: bold; font-style: italic;">check the whole word before go into run-together mode</span>
+  <span style="font-weight: bold; text-decoration: underline;">unsigned</span> <span style="font-weight: bold; font-style: italic;">res</span> = check_word_s(word, ci);
+  <span style="font-weight: bold; font-style: italic;">// </span><span style="font-weight: bold; font-style: italic;">if `res` is true, it's a valid word, don't bother run-together</span>
+  <span style="font-weight: bold;">if</span> (res) <span style="font-weight: bold;">return</span> pos + 1;
+  <span style="font-weight: bold; font-style: italic;">// </span><span style="font-weight: bold; font-style: italic;">it's typo because number of interior words is greater than "--run-together-limit"</span>
+  <span style="font-weight: bold;">if</span> (pos + 1 &gt;= sp-&gt;run_together_limit_) <span style="font-weight: bold;">return</span> 0;
+
+  <span style="font-weight: bold; font-style: italic;">// </span><span style="font-weight: bold; font-style: italic;">`i` is the `end` of interior word, the poition AFTER last character of interior word</span>
+  <span style="font-weight: bold;">for</span> (<span style="font-weight: bold; text-decoration: underline;">char</span> 0_sync_master.sh 1_add_new_article_manual.sh 1_add_new_article_newspaper.sh 2_start_translating.sh 3_continue_the_work.sh 4_finish.sh 5_pause.sh base.sh parse_url_by_manual.sh parse_url_by_newspaper.py parse_url_by_newspaper.sh project.cfg reformat.sh texput.log urls_checker.sh i = word + sp-&gt;run_together_min_;
+       <span style="font-weight: bold; font-style: italic;">// </span><span style="font-weight: bold; font-style: italic;">already checked the whole word; besides, any interior word whose size is less</span>
+       <span style="font-weight: bold; font-style: italic;">// </span><span style="font-weight: bold; font-style: italic;">than "--run-together-min" is regarded as invalid</span>
+       i &lt;= word_end - sp-&gt;run_together_min_;
+       ++i)
+    {
+      <span style="font-weight: bold; text-decoration: underline;">char</span> <span style="font-weight: bold; font-style: italic;">t</span> = *i;
+
+      <span style="font-weight: bold; font-style: italic;">// </span><span style="font-weight: bold; font-style: italic;">read the interior word by set the character at `end` position to '0'</span>
+      *i = <span style="font-style: italic;">'0'</span>;
+      res = check_word_s(word, ci);
+      <span style="font-weight: bold; font-style: italic;">// </span><span style="font-weight: bold; font-style: italic;">restore original character at `end` position</span>
+      *i = t;
+
+      <span style="font-weight: bold; font-style: italic;">// </span><span style="font-weight: bold; font-style: italic;">Current interior word is invalid, we need append the character at current</span>
+      <span style="font-weight: bold; font-style: italic;">// </span><span style="font-weight: bold; font-style: italic;">`end` position to creata new interior word.</span>
+      <span style="font-weight: bold; font-style: italic;">// </span><span style="font-weight: bold; font-style: italic;">Inncrement `i` because `i` always points to the `end` of interior word</span>
+      <span style="font-weight: bold;">if</span> (!res) <span style="font-weight: bold;">continue</span>;
+
+      <span style="font-weight: bold; font-style: italic;">// </span><span style="font-weight: bold; font-style: italic;">Current interior word is valid, strip it from the whole word to create a totally</span>
+      <span style="font-weight: bold; font-style: italic;">// </span><span style="font-weight: bold; font-style: italic;">new word for `check_word`, `check_word` is a recursive function</span>
+      res = check_word(i, word_end, ci + 1, pos + 1);
+      <span style="font-weight: bold;">if</span> (res) <span style="font-weight: bold;">return</span> res;
+    }
+  memset(ci, 0, <span style="font-weight: bold;">sizeof</span>(CheckInfo));
+  <span style="font-weight: bold;">return</span> 0;
+}
+</pre>
+</div>
+
+<p>
+让我们使用“hisHelle”作为例子看看 <code>check_word</code> 是如何运行的:
+</p>
+
+<ul class="org-ul">
+<li>“word”指向字符串“hisHelle”(在C/C++中，字符串是字符数组。数组的最后一个字符是字符'0')</li>
+<li>“sp-&gt;run_together_min_”为3，所以“i”最初指向字符“H”，在内部单词“his”的末尾。</li>
+<li>"check_word_s"检查内部单词“his”然后返回"true"</li>
+<li>所以我们把“his”从“hisHelle”中去掉，然后递归调用“check_word”来检查新单词“Helle”</li>
+<li>在“check_word”的新语境中，我们首先从“Helle”中提取“Hel”</li>
+<li>“Hel”是无效单词的。我们从Helle中提取了Hell并得到了新单词e,然后递归地在e上应用check_word</li>
+<li>“e”是无效的，且位于递归尾部。所以hisHelle是一个拼写错误</li>
+</ul>
+
+<p>
+以下是我们研究代码后得出的结论:
+</p>
+
+<ul class="org-ul">
+<li><code>--run-together-limit</code> 在你电脑有足够内存的情况下可以设置大一些，它的默认值为8,但是我推荐16.</li>
+<li><code>--run-together-min</code> 不能是2，因为太多的拼写错误是由“正确的”双字符内部单词(“hehe”、“isme”、……)组成的。</li>
+<li><code>--run-together-min</code> 不能大于3，否则，过多的“正确的”三字符内部单词会被视为无效(“his”、“her”、“one”、“two”)</li>
+<li><code>--run-together-min</code> 应该总是3，这是它的默认值。实际上，它在一开始就不应该被用户调整</li>
+</ul>
+
+<p>
+既然 <code>--run-together-min</code> 为3。“onChange”这个词就会被认为是拼写错误，因为它包含双字符的内部单词“on”。由于我们在aspell方面无能为力，我们不得不求助于Emacs来解决这个问题。
+</p>
+
+<p>
+当Emacs获取到潜在的拼写错误时，我们可以从原来的单词中去掉所有的双字符内部单词，并再次检查新单词的拼写。
+</p>
+
+<p>
+我们可以把一个判断函数附加到特定的major模式中。判断函数在游标处单词错误时返回 <code>t</code>.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">js-flyspell-verify</span> ()
+  (<span style="font-weight: bold;">let*</span> ((font-face (get-text-property (- (point) 1) 'face))
+         (word (thing-at-point 'word)))
+    (message <span style="font-style: italic;">"font-face=%s word=%s"</span> font-face word)
+    t))
+(put 'js2-mode 'flyspell-mode-predicate 'js-flyspell-verify)
+</pre>
+</div>
+
+<p>
+从上面的代码中可以看到，我们完全控制着 <code>js-flyspelli-verify</code> 中应该显示哪些拼写错误。
+所以命名空间问题也变得简单。如果名称空间是三个字符，它会被aspell自动处理。我们需要做的就是将名称空间添加到个人字典中 <code>$HOME/.aspell.en.pws</code>.
+如果名称空间只有一两个字符，我们就把它从原来的单词中去掉。就像我们处理双字符内部词一样。
+</p>
+
+<p>
+下面是可以粘贴到 <code>.emacs</code> 中的完整配置(我只设置了 <code>js2-mode</code> 和 <code>rjsx-mode</code> 但是代码足够通用)，
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">flyspell-detect-ispell-args</span> (<span style="font-weight: bold; text-decoration: underline;">&amp;optional</span> run-together)
+  <span style="font-style: italic;">"If RUN-TOGETHER is true, spell check the CamelCase words.</span>
+<span style="font-style: italic;">Please note RUN-TOGETHER will make aspell less capable. So it should only be used in prog-mode-hook."</span>
+  <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">force the English dictionary, support Camel Case spelling check (tested with aspell 0.6)</span>
+  (<span style="font-weight: bold;">let*</span> ((args (list <span style="font-style: italic;">"--sug-mode=ultra"</span> <span style="font-style: italic;">"--lang=en_US"</span>))args)
+    (<span style="font-weight: bold;">if</span> run-together
+        (<span style="font-weight: bold;">setq</span> args (append args '(<span style="font-style: italic;">"--run-together"</span> <span style="font-style: italic;">"--run-together-limit=16"</span>))))
+    args))
+
+(<span style="font-weight: bold;">setq</span> ispell-program-name <span style="font-style: italic;">"aspell"</span>)
+(<span style="font-weight: bold;">setq-default</span> ispell-extra-args (flyspell-detect-ispell-args t))
+
+(<span style="font-weight: bold;">defvar</span> <span style="font-weight: bold; font-style: italic;">extra-flyspell-predicate</span> '(lambda (word) t)
+  <span style="font-style: italic;">"A callback to check WORD. Return t if WORD is typo."</span>)
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">my-flyspell-predicate</span> (word)
+  <span style="font-style: italic;">"Use aspell to check WORD. If it's typo return true."</span>
+  (<span style="font-weight: bold;">if</span> (string-match-p (concat <span style="font-style: italic;">"^&amp; "</span> word)
+                      (shell-command-to-string (format <span style="font-style: italic;">"echo %s | %s %s pipe"</span>
+                                                       word
+                                                       ispell-program-name
+                                                       (mapconcat 'identity
+                                                                  (flyspell-detect-ispell-args t)
+                                                                  <span style="font-style: italic;">" "</span>))))
+      t))
+
+(<span style="font-weight: bold;">defmacro</span> <span style="font-weight: bold;">my-flyspell-predicate-factory</span> (preffix)
+  `(<span style="font-weight: bold;">lambda</span> (word)
+     (<span style="font-weight: bold;">let*</span> ((pattern (concat <span style="font-style: italic;">"^</span><span style="font-weight: bold; font-style: italic;">\</span><span style="font-style: italic;">("</span> ,preffix <span style="font-style: italic;">"</span><span style="font-weight: bold; font-style: italic;">\</span><span style="font-style: italic;">)</span><span style="font-weight: bold; font-style: italic;">\</span><span style="font-style: italic;">([A-Z]</span><span style="font-weight: bold; font-style: italic;">\</span><span style="font-style: italic;">)"</span>))
+            rlt)
+       (<span style="font-weight: bold;">cond</span>
+        ((string-match-p pattern word)
+         (<span style="font-weight: bold;">setq</span> word (replace-regexp-in-string pattern <span style="font-style: italic;">"\2"</span> word))
+         (<span style="font-weight: bold;">setq</span> rlt (my-flyspell-predicate word)))
+        (t
+         (<span style="font-weight: bold;">setq</span> rlt t)))
+       rlt)))
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">js-flyspell-verify</span> ()
+  (<span style="font-weight: bold;">let*</span> ((case-fold-search nil)
+         (font-matched (memq (get-text-property (- (point) 1) 'face)
+                             '(js2-function-call
+                               js2-function-param
+                               js2-object-property
+                               font-lock-variable-name-face
+                               font-lock-string-face
+                               font-lock-function-name-face
+                               font-lock-builtin-face
+                               rjsx-tag
+                               rjsx-attr)))
+         word
+         (rlt t))
+    (<span style="font-weight: bold;">cond</span>
+     ((not font-matched)
+      (<span style="font-weight: bold;">setq</span> rlt nil))
+     ((not (string-match-p <span style="font-style: italic;">"aspell$"</span> ispell-program-name))
+      <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Only override aspell's result</span>
+      (<span style="font-weight: bold;">setq</span> rlt t))
+     ((string-match-p <span style="font-style: italic;">"^[a-zA-Z][a-zA-Z]$"</span>
+                      (<span style="font-weight: bold;">setq</span> word (thing-at-point 'word)))
+      (<span style="font-weight: bold;">setq</span> rlt nil))
+     ((string-match-p <span style="font-style: italic;">"</span><span style="font-weight: bold; font-style: italic;">\</span><span style="font-style: italic;">([A-Z][a-z]</span><span style="font-weight: bold; font-style: italic;">\</span><span style="font-style: italic;">|^[a-z][a-z]</span><span style="font-weight: bold; font-style: italic;">\</span><span style="font-style: italic;">)[A-Z]</span><span style="font-weight: bold; font-style: italic;">\</span><span style="font-style: italic;">|[a-z][A-Z][a-z]$"</span>
+                      word)
+      <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">strip two character interior words</span>
+      (<span style="font-weight: bold;">setq</span> word (replace-regexp-in-string <span style="font-style: italic;">"</span><span style="font-weight: bold; font-style: italic;">\</span><span style="font-style: italic;">([A-Z][a-z]</span><span style="font-weight: bold; font-style: italic;">\</span><span style="font-style: italic;">|^[a-z][a-z]</span><span style="font-weight: bold; font-style: italic;">\</span><span style="font-style: italic;">)</span><span style="font-weight: bold; font-style: italic;">\</span><span style="font-style: italic;">([A-Z]</span><span style="font-weight: bold; font-style: italic;">\</span><span style="font-style: italic;">)"</span> <span style="font-style: italic;">"\2"</span> word))
+      (<span style="font-weight: bold;">setq</span> word (replace-regexp-in-string <span style="font-style: italic;">"</span><span style="font-weight: bold; font-style: italic;">\</span><span style="font-style: italic;">([a-z]</span><span style="font-weight: bold; font-style: italic;">\</span><span style="font-style: italic;">)[A-Z][a-z]$"</span> <span style="font-style: italic;">"\1"</span> word))
+      <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">check stripped word</span>
+      (<span style="font-weight: bold;">setq</span> rlt (my-flyspell-predicate word)))
+     (t
+      (<span style="font-weight: bold;">setq</span> rlt (funcall extra-flyspell-predicate word))))
+    rlt))
+(put 'js2-mode 'flyspell-mode-predicate 'js-flyspell-verify)
+(put 'rjsx-mode 'flyspell-mode-predicate 'js-flyspell-verify)
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">prog-mode-hook-setup</span> ()
+  <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">remove namespace "MS" and "X"</span>
+  (<span style="font-weight: bold;">setq-local</span> extra-flyspell-predicate (my-flyspell-predicate-factory <span style="font-style: italic;">"MS</span><span style="font-weight: bold; font-style: italic;">\</span><span style="font-style: italic;">|X"</span>)))
+(add-hook 'prog-mode-hook 'prog-mode-hook-setup)
+</pre>
+</div>
+
+<p>
+或者，你可以查看<a href="https://github.com/redguardtoo/emacs.d/blob/master/lisp/initspelling.el">https://github.com/redguardtoo/emacs.d/blob/master/lisp/initspelling.el</a>，以了解我的全部设置。
+</p>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2018-07-05</span>
+            <span title="last modification date" class="post-info">2020-01-31</span>
+            <span title="tags" class="post-info">:<a href="../../../../../tags/spellcheck">spellcheck</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-678dd7a2-4369-48be-b820-b26c8b692a99">lujun9972</a></span>
+        </div>
+    <script src="../../../../../media/js/jquery-2.1.3.min.js"></script>
+    <script src="../../../../../media/js/md5.min.js"></script>
+        <section>
+            <div id="gitalk-container"></div>
+            <script type="text/javascript">
+             var gitalk = new Gitalk({
+                 clientID: 'fdcb5d9da3f4acb4862c',
+                 clientSecret: 'dd0a16312a206782cb7669dcec5e96874ab48170',
+                 repo: 'lujun9972.github.com',
+                 owner: 'lujun9972',
+                 admin: ['lujun9972'],
+                 id: md5(location.pathname),      // Ensure uniqueness and length less than 50
+                 distractionFreeMode: false  // Facebook-like distraction free mode
+             })
+             gitalk.render('gitalk-container')
+            </script>
+        </section>
+    <script src="../../../../../media/js/main.js"></script>
+        <script>
+         var _hmt = _hmt || [];
+         (function() {
+             var hm = document.createElement("script");
+             hm.src = "https://hm.baidu.com/hm.js?7bac4fd0247f69c27887e0d4e3aee41e";
+             var s = document.getElementsByTagName("script")[0]; 
+             s.parentNode.insertBefore(hm, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-678dd7a2-4369-48be-b820-b26c8b692a99">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="../../../../../instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>
