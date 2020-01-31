@@ -1,0 +1,347 @@
+#+TITLE: Emacs:更多专业技巧
+#+URL: https://ambrevar.xyz/emacs2/
+#+AUTHOR: lujun9972
+#+TAGS: emacs-common
+#+DATE: [2018年 10月 23日 星期二 10:14:06 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+
+这是我第一篇 [[https://ambrevar.xyz/emacs/index.html][Emacs pro-tips]] 的后续.
+
+** COMMENT 加快初始化
+:PROPERTIES:
+:CUSTOM_ID: org9520fb1
+:END:
+
+如果您没有使用Emacs守护进程，或者你对Emacs进行开发，您可能需要经常重启它。
+在这种情况下，让启动时间最小化就很有用了。
+
+#+begin_src emacs-lisp
+  ;;; Temporarily reduce garbage collection during startup. Inspect `gcs-done'.
+  (defun ambrevar/reset-gc-cons-threshold ()
+    (setq gc-cons-threshold (car (get 'gc-cons-threshold 'standard-value))))
+  (setq gc-cons-threshold (* 64 1024 1024))
+  (add-hook 'after-init-hook #'ambrevar/reset-gc-cons-threshold)
+
+  ;;; Temporarily disable the file name handler.
+  (setq default-file-name-handler-alist file-name-handler-alist)
+  (setq file-name-handler-alist nil)
+  (defun ambrevar/reset-file-name-handler-alist ()
+    (setq file-name-handler-alist
+          (append default-file-name-handler-alist
+                  file-name-handler-alist))
+    (cl-delete-duplicates file-name-handler-alist :test 'equal))
+  (add-hook 'after-init-hook #'ambrevar/reset-file-name-handler-alist)
+#+end_src
+
+** 避免“加载旧字节码而不是新的源代码”的陷阱
+:PROPERTIES:
+:CUSTOM_ID: org66b55d4
+:END:
+
+#+begin_src emacs-lisp
+  (setq load-prefer-newer t)
+#+end_src
+
+** 用于本地存放包和开发内容的site Lisp文件夹
+:PROPERTIES:
+:CUSTOM_ID: org718f681
+:END:
+
+我们需要编写自己的函数，因此我们希望把本地的site文件夹放在 =load-path= 的前面，然而 =normal-top-level-add-subdirs-to-load-path= 会把它添加到 =load-path= 的最后.
+
+#+begin_src emacs-lisp
+  (defun ambrevar/package-refresh-load-path (path)
+    "Add every non-hidden sub-folder of PATH to `load-path'."
+    (when (file-directory-p path)
+      (dolist (dir (directory-files path t "^[^\.]"))
+        (when (file-directory-p dir)
+          (setq load-path (add-to-list 'load-path dir))
+          (dolist (subdir (directory-files dir t "^[^\.]"))
+            (when (file-directory-p subdir)
+              (setq load-path (add-to-list 'load-path subdir))))))))
+  (let ((site-lisp (expand-file-name "site-lisp/" "~/.local/share/emacs/")))
+    (add-to-list 'load-path site-lisp)
+    (ambrevar/package-refresh-load-path site-lisp))
+#+end_src
+
+** Flyspell 以及 whitespace-mode
+:PROPERTIES:
+:CUSTOM_ID: orgba21dae
+:END:
+
+#+begin_src emacs-lisp
+  (defun ambrevar/flyspell-and-whitespace-mode ()
+    "Toggle `flyspell-mode' and `whitespace-mode'."
+    (interactive)
+    (if (derived-mode-p 'prog-mode)
+        (flyspell-prog-mode)
+      (flyspell-mode)
+      (when flyspell-mode
+        (flyspell-buffer)))
+    (whitespace-mode 'toggle))
+
+  (global-set-key (kbd "<f9>") #'ambrevar/flyspell-and-whitespace-mode)
+#+end_src
+
+** 下载光标所在的视频网址
+:PROPERTIES:
+:CUSTOM_ID: org04d4d10
+:END:
+
+下面代码需要 =youtube-dl= 程序的支持。
+
+#+begin_src emacs-lisp
+  (defun ambrevar/youtube-dl-at-point (&optional url)
+    "Run 'youtube-dl' over the URL at point.
+  If URL is non-nil, use that instead."
+    (interactive)
+    (setq url (or url (thing-at-point-url-at-point)))
+    (let ((eshell-buffer-name "*youtube-dl*"))
+      (eshell)
+      (when (eshell-interactive-process)
+        (eshell t))
+      (eshell-interrupt-process)
+      (insert "cd ~/temp && youtube-dl " url)
+      (eshell-send-input)))
+#+end_src
+
+参见 [[https://github.com/skeeto/youtube-dl-emacs][youtube-dl-emacs]].
+
+** 列出当前的minor模式
+:PROPERTIES:
+:CUSTOM_ID: org2f30f14
+:END:
+
+#+begin_src emacs-lisp
+  (defun ambrevar/current-minor-modes ()
+    "Return the list of minor modes enabled in the current buffer."
+    (interactive)
+    (delq nil
+          (mapcar (lambda (mode)
+                    (if (and (boundp mode) (symbol-value mode))
+                        mode))
+                  minor-mode-list)))
+#+end_src
+
+** 窗口管理
+:PROPERTIES:
+:CUSTOM_ID: org9e799e0
+:END:
+
+由于我使用 [[../emacs-everywhere/index.html][EXWM]] 作为窗口管理器, 因此我将 =super= 键用于进行窗口管理.
+
+下面是一些简单而有效的规则:
+
+- =s-TAB=: 切换到最后一个缓冲区。
+- =s-<箭头>= (或在Evil中的 =s-<hjkl>=): 在选定的方向上选择窗口。
+- =S-s-<arrows>= (or =S-s-<hjkl>= with Evil): swap current window with window in
+- =S-s-<箭头>= (或在Evil中的 =S-s-<hjkl>=): 与选择方向的窗口进行互换
+- =s-=: 切换水平或垂直分隔。
+- =s-o=: 切换是否隐藏所有其他窗口。
+
+With Helm, I use =C-c o= (or my custom binding =S-RET=) to find a file or a
+在Helm中，我使用 =C-c o= (或这我自定义的快捷键 =S-RET=)来在新分割的窗口上打开文件或buffer
+
+我需要一些额外的函数来实现上述工作流程:
+
+#+begin_src emacs-lisp
+  (defun ambrevar/swap-windows (&optional w1 w2)
+    "If 2 windows are up, swap them.
+  Else if W1 is a window, swap it with current window.
+  If W2 is a window too, swap both."
+    (interactive)
+    (unless (or (= 2 (count-windows))
+                (windowp w1)
+                (windowp w2))
+      (error "Ambiguous window selection"))
+    (let* ((w1 (or w1 (car (window-list))))
+           (w2 (or w2
+                   (if (eq w1 (car (window-list)))
+                       (nth 1 (window-list))
+                     (car (window-list)))))
+           (b1 (window-buffer w1))
+           (b2 (window-buffer w2))
+           (s1 (window-start w1))
+           (s2 (window-start w2)))
+      (with-temp-buffer
+        ;; Some buffers like EXWM buffers can only be in one live buffer at once.
+        ;; Switch to a dummy buffer in w2 so that we don't display any buffer twice.
+        (set-window-buffer w2 (current-buffer))
+        (set-window-buffer w1 b2)
+        (set-window-buffer w2 b1))
+      (set-window-start w1 s2)
+      (set-window-start w2 s1))
+    (select-window w1))
+  (global-set-key (kbd "C-x \\") 'swap-windows)
+
+  (defun ambrevar/swap-windows-left ()
+  "Swap current window with the window to the left."
+  (interactive)
+  (ambrevar/swap-windows (window-in-direction 'left)))
+  (defun ambrevar/swap-windows-below ()
+  "Swap current window with the window below."
+  (interactive)
+  (ambrevar/swap-windows (window-in-direction 'below)))
+  (defun ambrevar/swap-windows-above ()
+  "Swap current window with the window above."
+  (interactive)
+  (ambrevar/swap-windows (window-in-direction 'above)))
+  (defun ambrevar/swap-windows-right ()
+  "Swap current window with the window to the right."
+  (interactive)
+  (ambrevar/swap-windows (window-in-direction 'right)))
+
+  (defun ambrevar/switch-to-last-buffer ()
+  "Switch to last open buffer in current window."
+  (interactive)
+  (switch-to-buffer (other-buffer (current-buffer) 1)))
+
+  (defun ambrevar/toggle-single-window ()
+    "Un-maximize current window.
+  If multiple windows are active, save window configuration and
+  delete other windows. If only one window is active and a window
+  configuration was previously save, restore that configuration."
+    (interactive)
+    (if (= (count-windows) 1)
+        (when single-window--last-configuration
+          (set-window-configuration single-window--last-configuration))
+      (setq single-window--last-configuration (current-window-configuration))
+      (delete-other-windows)))
+
+  (defun ambrevar/toggle-window-split ()
+    "Switch between vertical and horizontal split.
+  It only works for frames with exactly two windows."
+    (interactive)
+    (if (= (count-windows) 2)
+        (let* ((this-win-buffer (window-buffer))
+               (next-win-buffer (window-buffer (next-window)))
+               (this-win-edges (window-edges (selected-window)))
+               (next-win-edges (window-edges (next-window)))
+               (this-win-2nd (not (and (<= (car this-win-edges)
+                                           (car next-win-edges))
+                                       (<= (cadr this-win-edges)
+                                           (cadr next-win-edges)))))
+               (splitter
+                (if (= (car this-win-edges)
+                       (car (window-edges (next-window))))
+                    'split-window-horizontally
+                  'split-window-vertically)))
+          (delete-other-windows)
+          (let ((first-win (selected-window)))
+            (funcall splitter)
+            (if this-win-2nd (other-window 1))
+            (set-window-buffer (selected-window) this-win-buffer)
+            (set-window-buffer (next-window) next-win-buffer)
+            (select-window first-win)
+            (if this-win-2nd (other-window 1))))))
+#+end_src
+
+** 使用FreeDesktop.org的垃圾箱
+:PROPERTIES:
+:CUSTOM_ID: orgc93c4c3
+:END:
+
+Whenever Emacs “delete” a file (from =dired=, Helm Find-Files or Elisp 原语),让Emacs把它移到垃圾箱里:
+
+#+begin_src emacs-lisp
+  (setq delete-by-moving-to-trash t)
+#+end_src
+
+** Lisp的括号编辑
+:PROPERTIES:
+:CUSTOM_ID: org23b1d66
+:END:
+
+Lisp的一个常见问题是需要平衡括号。
+
+这太明显了. 既然这种人物对及计算机没有任何难度，那很明显Emacs为你可以提供帮助
+
+首先，让我们高亮显示括号。我取消延迟让Emacs立即高亮匹配的括号:
+
+#+begin_src emacs-lisp
+  ;;; Show matching parenthesis
+  (show-paren-mode 1)
+  ;;; By default, there’s a small delay before showing a matching parenthesis. Set
+  ;;; it to 0 to deactivate.
+  (setq show-paren-delay 0)
+  (setq show-paren-when-point-inside-paren t)
+
+  (with-eval-after-load 'paren
+    (set-face-background 'show-paren-match "#555555")
+    (set-face-foreground 'show-paren-match "#def")
+    (set-face-attribute 'show-paren-match nil :weight 'extra-bold))
+#+end_src
+
+接下来，我们安装 [[https://github.com/fanael/rainbow-delimiter][=rainbow-delimiter=]] 这个第三方包，它会根据括号深度显示不同的颜色。就跟C或Algol家族语言中的缩进差不多。
+
+** 再见Paredit，你好Lispy
+:PROPERTIES:
+:CUSTOM_ID: org38303e5
+:END:
+
+Consider using [[https://github.com/abo-abo/lispy][Lispy]] which brings Lisp syntactic editing to a whole new level:
+考虑使用[[https://github.com/abo-abo/lispy][Lispy]]，它将Lisp语法编辑带到一个全新的层次::
+除了括号平衡之外(这使得前面部分变得多余的)，它还提供了高级的表达式导航、代码转换和样式美化等功能。
+
+看一下演示中的那些具体例子。
+
+仔细想想，Lispy对Lisp的编辑器支持有了明显的改进:
+它真正利用了Lisp语言的语法是抽象愈发术的这一事实.不使用这一财产真是耻辱啊。
+
+** 图像处理和缩略图库
+:PROPERTIES:
+:CUSTOM_ID: org07699e3
+:END:
+
+有一个不太知名的命令 =image-dired=: 当在一个图片目录下运行时，它会显示一个带预览的缩略图图库。
+按下 =空格= 就能在另一个window中显示下一张图片,而 =C-RET= 会使用 =image-dired-external-viewer= 打开图片.
+你还可以旋转文件，在dired中对它们添加标签或添加评论。
+
+第三方包 [[https://github.com/mhayashi1120/Emacs-imagex][=image+=]] 为Emacs增加了额外的图片功能，比如stiky转换和文件修改。
+
+** 不要使用终端emacs
+:PROPERTIES:
+:CUSTOM_ID: org6dc7ac7
+:END:
+
+[[https://blog.aaronbieber.com/2016/12/29/don-t-use-terminal-emacs.html]]
+
+** 在Emacs中制作音乐
+:PROPERTIES:
+:CUSTOM_ID: org71b36ce
+:END:
+
+[[https://vimeo.com/22798433][Quick Intro to Live Programming with Overtone]]
+
+** Emacs图表库
+:PROPERTIES:
+:CUSTOM_ID: org1135ce5
+:END:
+
+[[http://francismurillo.github.io/2017-04-15-Exploring-Emacs-chart-Library/]]
+
+** 奇怪的nconc行为
+:PROPERTIES:
+:CUSTOM_ID: org426780b
+:END:
+
+Elisp语言中少数奇怪的地方之一:
+[[https://stackoverflow.com/questions/25157349/odd-behaviour-with-nconc-in-emacs-lisp]]
+
+** 引用
+:PROPERTIES:
+:CUSTOM_ID: org2cc2711
+:END:
+
+- [[http://emacs.sexy/]]
+- [[https://writequit.org/org/]]
+- [[http://doc.rix.si/cce/cce.html][Emacs as a Complete Computing Environment]]
+- [[https://github.com/bbatsov/emacs-lisp-style-guide/][The Emacs Lisp Style Guide]]
+- [[https://two-wrongs.com/why-you-should-buy-into-the-emacs-platform][Why You Should Buy Into the Emacs Platform]]
+
+环境依靠:
+
+- [[http://emacs-bootstrap.com/]] (generic)
+- [[https://portacle.github.io/]] (Common Lisp)
