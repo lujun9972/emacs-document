@@ -1,0 +1,237 @@
+#+TITLE: Delim Col:一个创建漂亮表格并转换成不同格式的方便工具
+#+URL: https://emacsnotes.wordpress.com/2018/09/24/delim-col-a-handy-tool-for-creating-pretty-tables-and-converting-those-to-different-table-formats/
+#+AUTHOR: lujun9972
+#+TAGS: emacs-common
+#+DATE: [2018年 10月 22日 星期一 11:53:10 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+* 问题与解决方案
+:PROPERTIES:
+:CUSTOM_ID: a-problem-and-a-solution
+:END:
+
+您有如下表格[[https://github.com/emacs-mirror/emacs/blob/75386e305f388ff51bc8cf52c29c14427cd/lisp/delim-col.el#L35][1]]
+
+#+BEGIN_EXAMPLE
+a b c d
+aaaa bb ccc ddddd
+aaa bbb cccc dddd
+aa bb ccccccc ddd
+#+END_EXAMPLE
+
+如何生成这个表
+
+#+BEGIN_EXAMPLE
+[ a , b , c , d ]
+[ aaaa, bb , ccc , ddddd ]
+[ aaa , bbb, cccc , dddd ]
+[ aa , bb , ccccccc, ddd ]
+#+END_EXAMPLE
+
+和这个表
+
+#+BEGIN_EXAMPLE
+a [ b , c ] d
+aaaa [ bb , ccc ] ddddd
+aaa [ bbb, cccc ] dddd
+aa [ bb , ccccccc ] ddd
+#+END_EXAMPLE
+
+还有这个表
+
+#+BEGIN_EXAMPLE
+[ <a> , <b> , <c> , <d> ]
+[ <aaaa>, <bb> , <ccc> , <ddddd> ]
+[ <aaa> , <bbb>, <cccc> , <dddd> ]
+[ <aa> , <bb> , <ccccccc>, <ddd> ]
+#+END_EXAMPLE
+
+以及这个表
+
+#+BEGIN_EXAMPLE
+a [ <b> , <c> ] d
+aaaa [ <bb> , <ccc> ] ddddd
+aaa [ <bbb>, <cccc> ] dddd
+aa [ <bb> , <ccccccc> ] ddd
+#+END_EXAMPLE
+
+答案是使用Emacs的内置库 =delim-col=[[https://github.com/emacs-mirror/emacs/blob/master/lisp/delim-col.el][1]]。
+
+* =delimi-col= 做什么的?
+:PROPERTIES:
+属性:
+:CUSTOM_ID: what-does-delim-col-do
+:CUSTOM_ID what-does-delim-col-do
+:END:
+
+=delim-col= 包对自己的描述为
+
+#+BEGIN_QUOTE
+=delimi-col= 有助于美化文本区域或矩形中的列
+#+END_QUOTE
+
+在我看来，上面的描述并不能说明它为用户提供了什么。相应的，我将把这个包描述为
+
+#+BEGIN_QUOTE
+=delim-col= 通过文本区域创建漂亮的表并帮助将那些表转换成不同的格式,比如 =TSV=[[https://en.wikipedia.org/wiki/Tab-separated_values][1]], =CSV=[[https://en.wikipedia.org/wiki/Comma-separated_values][1]], =Org=[[https://www.gnu.org/software/emacs/manual/html_node/org/Built_002din-table-editor.html#Built_002din-table-editor][1]], =LaTeX=[[https://en.wikibooks.org/wiki/LaTeX/Mathematics#Matrices_and_arrays][1]], =GFM=[[https://docs.gitlab.com/ee/user/markdown.html#tables][1]], [[https://help.github.com/articles/organizing-information-with-tables/][2]]  等。
+#+END_QUOTE
+
+* =delimi-col= 不做什么?
+:PROPERTIES:
+:CUSTOM_ID: what-does-delim-col-not-do
+:END:
+
+在执行上述转换时，您可能觉得 =delimi-col= 会提示您输入所有这些参数
+
+1. 分隔每个列的正则表达式
+2. 要插入每个列之前(和之后)的字符串
+3. 每一列之间插入的字符串
+4. 要插入到每行开头(和结尾)的字符串
+
+以及一种填充的方法。
+
+不幸的是，上面的参数是硬编码的，而不是每次运行时从用户那里收集的。
+
+* 第一步:创建菜单
+:PROPERTIES:
+:CUSTOM_ID: step-1-create-a-menu
+:END:
+
+复制下面的 =Emacs Lisp= 代码片段[[https://raw.githubusercontent.com/emacksnotes/emacsnotes.wordpress.com/master/my-delim-col-menu.el][1]]到你的 =.emacs= 中并重新启动您的 =EMACS=。
+
+这段代码会执行以下操作
+
+1. 修改命令 =delimit-columns-region= 和 =delimit-columns-rectangle=,每次运行时提示输入。
+2. 将名为 =Extra Tools= 的子菜单添加到菜单中。在这个子菜单中，它添加了另一个名为 =Delimit Columns in ...= 的子菜单。
+
+   
+#+begin_src emacs-lisp
+  (defun my-delimits-column-region (orig-fun &rest args)
+    (let
+        ((delimit-columns-separator
+          (read-regexp
+           (format "%s (%s): " "Specify the regexp which separates each column" delimit-columns-separator)
+           (list delimit-columns-separator)))
+         (delimit-columns-before
+          (read-string
+           (format "%s (%s): " "Specify a string to be inserted before each column" delimit-columns-before)
+           nil nil delimit-columns-before))
+         (delimit-columns-after
+          (read-string
+           (format "%s (%s): " "Specify a string to be inserted after each column" delimit-columns-after)
+           nil nil delimit-columns-after))
+         (delimit-columns-str-separator
+          (read-string
+           (format "%s (%s): " "Specify a string to be inserted between each column" delimit-columns-str-separator)
+           nil nil delimit-columns-str-separator))
+         (delimit-columns-str-before
+          (read-string
+           (format "%s (%s): " "Specify a string to be inserted before the first column" delimit-columns-str-before)
+           nil nil delimit-columns-str-before))
+         (delimit-columns-str-after
+          (read-string
+           (format "%s (%s): " "Specify a string to be inserted after the last column" delimit-columns-str-after)
+           nil nil delimit-columns-str-after))
+         (delimit-columns-format
+          (let*
+              ((choices
+                '(("Align Columns" . t)
+                  ("No Formatting")
+                  ("Align Separators" . separator)
+                  ("Pad Columns" . padding)))
+               (default-choice
+                 (car
+                  (rassoc delimit-columns-format choices)))
+               (choice
+                (completing-read
+                 (format "%s (%s): " "Specify how to format columns" default-choice)
+                 choices nil t nil nil default-choice)))
+            (message "%s" choice)
+            (assoc-default choice choices))))
+      (apply orig-fun args)))
+
+  (advice-add 'delimit-columns-region :around #'my-delimits-column-region)
+  (advice-add 'delimit-columns-rectangle :around #'my-delimits-column-region)
+
+  (define-key-after global-map
+    [menu-bar extra-tools]
+    (cons "Extra Tools"
+          (easy-menu-create-menu "Extra Tools" nil))
+    'tools)
+
+  (easy-menu-define my-delim-col-menu nil "Menu for Delim Col"
+    '("Delimit Columns in ..."
+      ["Region" delimit-columns-region :help "Prettify all columns in a text region"]
+      ["Rectangle" delimit-columns-rectangle :help "Prettify all columns in a text rectangle"]
+      "---"
+      ["Customize" delimit-columns-customize :help "Customization of `columns' group"]))
+
+  (easy-menu-add-item (current-global-map) '("menu-bar" "extra-tools") my-delim-col-menu)
+#+end_src
+
+* 步骤2:确保有 =Extra Tools= 子菜单
+:PROPERTIES:
+:CUSTOM_ID: step-2-ensure-that-you-have-the-extra-tools-submenu
+:END:
+
+重新启动Emacs后，你将在菜单栏中看到 =Extra Tools= 子菜单。如果您没有看到这个子菜单，请重复前面的步骤。
+
+* 步骤3:将表复制粘贴到Emacs Buffer中
+:PROPERTIES:
+:CUSTOM_ID: step-3-copy-paste-the-table-in-to-an-emacs-buffer
+:END:
+
+从本文中或者 =delim-col= 库[[https://github.com/emacs-mirror/emacs/blob/75386e305f388ff51bc8cf9945f52c29c14427cd/lisp/delim-col.el#L35][1]] 中复制粘贴表格. 值得注意的是,从本文中的表格使用空格(而不是TAB), 而 =delim-col= 中的表格带TAB。
+
+* 步骤4:标记区域或矩形
+
+* 第五步:转换
+:PROPERTIES:
+:CUSTOM_ID: step-5-do-the-conversion
+:END:
+
+[[https://emacsnotes.files.wordpress.com/2018/09/screenshot-from-2018-09-23-22-08-05.png]]
+
+Emacs将提示您进一步的输入。输入你认为合适的参数。
+
+提示字符串的默认值显示在 =()= 中。你可以直接按 =Enter= 接受默认设置。
+
+当将本文中的原始表复制到Emacs中时，该表使用空格进行分隔。
+因此，当提示 =Specify the regexp which separates echo column= 时，输入 = += (即 =SPC+=).
+
+当提示输入 =Specify how to format columns= 时,你可以按下 =TAB=,然后在显示的候选项中进行选择。
+从下面的屏幕截图中可以看到，我这里选择了 =Align separator =.
+
+[[https://emacsnotes.files.wordpress.com/2018/09/screenshot-from-2018-09-23-22-28-54.png]]
+
+这是结果
+
+[[https://emacsnotes.files.wordpress.com/2018/09/screenshot-from-2018-09-23-22-33-24.png]]
+
+* 结束的话
+:PROPERTIES:
+:CUSTOM_ID: concluding-words
+:END:
+
+你可以向Emacs的资深用户提出前面那个问题。每个用户都有自己的解决建议。
+大多数用户会建议使用rectangle命令[[https://www.gnu.org/software/emacs/manual/html_node/emacs/Rectangles.html][1]]。某些用户会建议你使用 =org-table-convert-region= [[https://github.com/emacs-mirror/emacs/blob/d0e2a341dd9a9a365fd311748df024ecb25b70ec/lisp/org/org-table.el#L579][1]] 来将原始表格转换为 =Org= 格式的表，再通过  =orgtbl-to-generic= [[https://github.com/emacs-mirror/emacs/blob/d0e2a341dd9a9a365fd311748df024ecb25b70ec/lisp/org/org-table.el#L4798][1]] 创建临时代码(我敢打赌没有人会建议使用 =delim-col= 因为这个包没有在手册上介绍过).
+你听到的这些解决方案都不具有 =delimi-col= 那样的简单性和快速性. 在我看来, =delimi-col= 是工具箱中非常有用的工具。
+
+* 附录
+:PROPERTIES:
+:CUSTOM_ID: appendix
+:END:
+
+这篇关于 =delim-col= 的文章是为了帮助我的一个朋友[[https://www.reddit.com/r/emacs/comments/9i2o7r/quoting_two_columns_of_text_using_macros/][1]], 她时一个Emacs新手,想把从web [[https://useast.ensembl.org/info/genome/stable_ids/prefixes.html][1]] 中提取的表转换成Python字典 [[https://docs.python.org/3/tutorial/datastructures.html#dictionaries][1]].
+
+具体来说，她想要将一个像这样的HTML表
+
+[[https://emacsnotes.files.wordpress.com/2018/09/screenshot-2018-9-23-ensembl-stable-id-prefixes.png?w=740]]
+
+转换成一个像这样的 =python= 字典中
+
+[[https://emacsnotes.files.wordpress.com/2018/09/screenshot-from-2018-09-24-00-04-58.png?w=740]]
+
+只要有点想象力，就很容易看出她如何使用 =delimo-col= 来实现的。
+
+我听到有人问我 “如果你朋友表中的第二列恰好是数字,而她不希望是的字段被引用怎么办呢……”。在这种情况下，我想 =delimi-col= 不能直接完成该任务，恐怕我这朋友需要使用其他方法了。
