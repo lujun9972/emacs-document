@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Delim Col:一个创建漂亮表格并转换成不同格式的方便工具 - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="emacs-common" />
+  <!-- <link rel="stylesheet" href="../../../../../media/css/main.css" type="text/css"/>
+       <link rel="stylesheet" href="../../../../../media/css/comment.css" type="text/css"/> -->
+  <link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/kognise/water.css@latest/dist/dark.css'>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="../../../../../">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <ul class="trigger">
+        <li><a href="../../../../../years/">Years</a></li>
+        <li><a href="../../../../../authors/">Authors</a></li>
+        <li><a href="../../../../../tags/">Tags</a></li>
+        <li><a href="../../../../../about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="../../../../../rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="https://www.bing.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">Delim Col:一个创建漂亮表格并转换成不同格式的方便工具</h1>
+<div id="table-of-contents">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#a-problem-and-a-solution">问题与解决方案</a></li>
+<li><a href="#orgd90976c"><code>delimi-col</code> 做什么的?</a></li>
+<li><a href="#what-does-delim-col-not-do"><code>delimi-col</code> 不做什么?</a></li>
+<li><a href="#step-1-create-a-menu">第一步:创建菜单</a></li>
+<li><a href="#step-2-ensure-that-you-have-the-extra-tools-submenu">步骤2:确保有 <code>Extra Tools</code> 子菜单</a></li>
+<li><a href="#step-3-copy-paste-the-table-in-to-an-emacs-buffer">步骤3:将表复制粘贴到Emacs Buffer中</a></li>
+<li><a href="#orgbe7fbd8">步骤4:标记区域或矩形</a></li>
+<li><a href="#step-5-do-the-conversion">第五步:转换</a></li>
+<li><a href="#concluding-words">结束的话</a></li>
+<li><a href="#appendix">附录</a></li>
+</ul>
+</div>
+</div>
+<div id="outline-container-org0f06604" class="outline-2">
+<h2 id="a-problem-and-a-solution"><a id="org0f06604"></a>问题与解决方案</h2>
+<div class="outline-text-2" id="text-a-problem-and-a-solution">
+<p>
+您有如下表格<a href="https://github.com/emacs-mirror/emacs/blob/75386e305f388ff51bc8cf52c29c14427cd/lisp/delim-col.el#L35">1</a>
+</p>
+
+<pre class="example">
+a b c d
+aaaa bb ccc ddddd
+aaa bbb cccc dddd
+aa bb ccccccc ddd
+</pre>
+
+<p>
+如何生成这个表
+</p>
+
+<pre class="example">
+[ a , b , c , d ]
+[ aaaa, bb , ccc , ddddd ]
+[ aaa , bbb, cccc , dddd ]
+[ aa , bb , ccccccc, ddd ]
+</pre>
+
+<p>
+和这个表
+</p>
+
+<pre class="example">
+a [ b , c ] d
+aaaa [ bb , ccc ] ddddd
+aaa [ bbb, cccc ] dddd
+aa [ bb , ccccccc ] ddd
+</pre>
+
+<p>
+还有这个表
+</p>
+
+<pre class="example">
+[ &lt;a&gt; , &lt;b&gt; , &lt;c&gt; , &lt;d&gt; ]
+[ &lt;aaaa&gt;, &lt;bb&gt; , &lt;ccc&gt; , &lt;ddddd&gt; ]
+[ &lt;aaa&gt; , &lt;bbb&gt;, &lt;cccc&gt; , &lt;dddd&gt; ]
+[ &lt;aa&gt; , &lt;bb&gt; , &lt;ccccccc&gt;, &lt;ddd&gt; ]
+</pre>
+
+<p>
+以及这个表
+</p>
+
+<pre class="example">
+a [ &lt;b&gt; , &lt;c&gt; ] d
+aaaa [ &lt;bb&gt; , &lt;ccc&gt; ] ddddd
+aaa [ &lt;bbb&gt;, &lt;cccc&gt; ] dddd
+aa [ &lt;bb&gt; , &lt;ccccccc&gt; ] ddd
+</pre>
+
+<p>
+答案是使用Emacs的内置库 <code>delim-col</code><a href="https://github.com/emacs-mirror/emacs/blob/master/lisp/delim-col.el">1</a>。
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgd90976c" class="outline-2">
+<h2 id="orgd90976c"><code>delimi-col</code> 做什么的?</h2>
+<div class="outline-text-2" id="text-orgd90976c">
+<p>
+属性:
+:CUSTOM_ID: what-does-delim-col-do
+:CUSTOM_ID what-does-delim-col-do
+</p>
+
+<p>
+<code>delim-col</code> 包对自己的描述为
+</p>
+
+<blockquote>
+<p>
+<code>delimi-col</code> 有助于美化文本区域或矩形中的列
+</p>
+</blockquote>
+
+<p>
+在我看来，上面的描述并不能说明它为用户提供了什么。相应的，我将把这个包描述为
+</p>
+
+<blockquote>
+<p>
+<code>delim-col</code> 通过文本区域创建漂亮的表并帮助将那些表转换成不同的格式,比如 <code>TSV</code><a href="https://en.wikipedia.org/wiki/Tab-separated_values">1</a>, <code>CSV</code><a href="https://en.wikipedia.org/wiki/Comma-separated_values">1</a>, <code>Org</code><a href="https://www.gnu.org/software/emacs/manual/html_node/org/Built_002din-table-editor.html#Built_002din-table-editor">1</a>, <code>LaTeX</code><a href="https://en.wikibooks.org/wiki/LaTeX/Mathematics#Matrices_and_arrays">1</a>, <code>GFM</code><a href="https://docs.gitlab.com/ee/user/markdown.html#tables">1</a>, <a href="https://help.github.com/articles/organizing-information-with-tables/">2</a>  等。
+</p>
+</blockquote>
+</div>
+</div>
+
+<div id="outline-container-org0d7e91b" class="outline-2">
+<h2 id="what-does-delim-col-not-do"><a id="org0d7e91b"></a><code>delimi-col</code> 不做什么?</h2>
+<div class="outline-text-2" id="text-what-does-delim-col-not-do">
+<p>
+在执行上述转换时，您可能觉得 <code>delimi-col</code> 会提示您输入所有这些参数
+</p>
+
+<ol class="org-ol">
+<li>分隔每个列的正则表达式</li>
+<li>要插入每个列之前(和之后)的字符串</li>
+<li>每一列之间插入的字符串</li>
+<li>要插入到每行开头(和结尾)的字符串</li>
+</ol>
+
+<p>
+以及一种填充的方法。
+</p>
+
+<p>
+不幸的是，上面的参数是硬编码的，而不是每次运行时从用户那里收集的。
+</p>
+</div>
+</div>
+
+<div id="outline-container-orga92f03a" class="outline-2">
+<h2 id="step-1-create-a-menu"><a id="orga92f03a"></a>第一步:创建菜单</h2>
+<div class="outline-text-2" id="text-step-1-create-a-menu">
+<p>
+复制下面的 <code>Emacs Lisp</code> 代码片段<a href="https://raw.githubusercontent.com/emacksnotes/emacsnotes.wordpress.com/master/my-delim-col-menu.el">1</a>到你的 <code>.emacs</code> 中并重新启动您的 =EMACS=。
+</p>
+
+<p>
+这段代码会执行以下操作
+</p>
+
+<ol class="org-ol">
+<li>修改命令 <code>delimit-columns-region</code> 和 <code>delimit-columns-rectangle</code>,每次运行时提示输入。</li>
+<li>将名为 <code>Extra Tools</code> 的子菜单添加到菜单中。在这个子菜单中，它添加了另一个名为 <code>Delimit Columns in ...</code> 的子菜单。</li>
+</ol>
+
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">my-delimits-column-region</span> (orig-fun <span style="font-weight: bold; text-decoration: underline;">&amp;rest</span> args)
+  (<span style="font-weight: bold;">let</span>
+      ((delimit-columns-separator
+        (read-regexp
+         (format <span style="font-style: italic;">"%s (%s): "</span> <span style="font-style: italic;">"Specify the regexp which separates each column"</span> delimit-columns-separator)
+         (list delimit-columns-separator)))
+       (delimit-columns-before
+        (read-string
+         (format <span style="font-style: italic;">"%s (%s): "</span> <span style="font-style: italic;">"Specify a string to be inserted before each column"</span> delimit-columns-before)
+         nil nil delimit-columns-before))
+       (delimit-columns-after
+        (read-string
+         (format <span style="font-style: italic;">"%s (%s): "</span> <span style="font-style: italic;">"Specify a string to be inserted after each column"</span> delimit-columns-after)
+         nil nil delimit-columns-after))
+       (delimit-columns-str-separator
+        (read-string
+         (format <span style="font-style: italic;">"%s (%s): "</span> <span style="font-style: italic;">"Specify a string to be inserted between each column"</span> delimit-columns-str-separator)
+         nil nil delimit-columns-str-separator))
+       (delimit-columns-str-before
+        (read-string
+         (format <span style="font-style: italic;">"%s (%s): "</span> <span style="font-style: italic;">"Specify a string to be inserted before the first column"</span> delimit-columns-str-before)
+         nil nil delimit-columns-str-before))
+       (delimit-columns-str-after
+        (read-string
+         (format <span style="font-style: italic;">"%s (%s): "</span> <span style="font-style: italic;">"Specify a string to be inserted after the last column"</span> delimit-columns-str-after)
+         nil nil delimit-columns-str-after))
+       (delimit-columns-format
+        (<span style="font-weight: bold;">let*</span>
+            ((choices
+              '((<span style="font-style: italic;">"Align Columns"</span> . t)
+                (<span style="font-style: italic;">"No Formatting"</span>)
+                (<span style="font-style: italic;">"Align Separators"</span> . separator)
+                (<span style="font-style: italic;">"Pad Columns"</span> . padding)))
+             (default-choice
+               (car
+                (rassoc delimit-columns-format choices)))
+             (choice
+              (completing-read
+               (format <span style="font-style: italic;">"%s (%s): "</span> <span style="font-style: italic;">"Specify how to format columns"</span> default-choice)
+               choices nil t nil nil default-choice)))
+          (message <span style="font-style: italic;">"%s"</span> choice)
+          (assoc-default choice choices))))
+    (apply orig-fun args)))
+
+(advice-add 'delimit-columns-region <span style="font-weight: bold;">:around</span> #'my-delimits-column-region)
+(advice-add 'delimit-columns-rectangle <span style="font-weight: bold;">:around</span> #'my-delimits-column-region)
+
+(define-key-after global-map
+  [menu-bar extra-tools]
+  (cons <span style="font-style: italic;">"Extra Tools"</span>
+        (easy-menu-create-menu <span style="font-style: italic;">"Extra Tools"</span> nil))
+  'tools)
+
+(<span style="font-weight: bold;">easy-menu-define</span> my-delim-col-menu nil <span style="font-style: italic;">"Menu for Delim Col"</span>
+  '(<span style="font-style: italic;">"Delimit Columns in ..."</span>
+    [<span style="font-style: italic;">"Region"</span> delimit-columns-region <span style="font-weight: bold;">:help</span> <span style="font-style: italic;">"Prettify all columns in a text region"</span>]
+    [<span style="font-style: italic;">"Rectangle"</span> delimit-columns-rectangle <span style="font-weight: bold;">:help</span> <span style="font-style: italic;">"Prettify all columns in a text rectangle"</span>]
+    <span style="font-style: italic;">"---"</span>
+    [<span style="font-style: italic;">"Customize"</span> delimit-columns-customize <span style="font-weight: bold;">:help</span> <span style="font-style: italic;">"Customization of `</span><span style="font-weight: bold; font-style: italic; text-decoration: underline;">columns</span><span style="font-style: italic;">' group"</span>]))
+
+(easy-menu-add-item (current-global-map) '(<span style="font-style: italic;">"menu-bar"</span> <span style="font-style: italic;">"extra-tools"</span>) my-delim-col-menu)
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orga4d22b9" class="outline-2">
+<h2 id="step-2-ensure-that-you-have-the-extra-tools-submenu"><a id="orga4d22b9"></a>步骤2:确保有 <code>Extra Tools</code> 子菜单</h2>
+<div class="outline-text-2" id="text-step-2-ensure-that-you-have-the-extra-tools-submenu">
+<p>
+重新启动Emacs后，你将在菜单栏中看到 <code>Extra Tools</code> 子菜单。如果您没有看到这个子菜单，请重复前面的步骤。
+</p>
+</div>
+</div>
+
+<div id="outline-container-org2ca55a9" class="outline-2">
+<h2 id="step-3-copy-paste-the-table-in-to-an-emacs-buffer"><a id="org2ca55a9"></a>步骤3:将表复制粘贴到Emacs Buffer中</h2>
+<div class="outline-text-2" id="text-step-3-copy-paste-the-table-in-to-an-emacs-buffer">
+<p>
+从本文中或者 <code>delim-col</code> 库<a href="https://github.com/emacs-mirror/emacs/blob/75386e305f388ff51bc8cf9945f52c29c14427cd/lisp/delim-col.el#L35">1</a> 中复制粘贴表格. 值得注意的是,从本文中的表格使用空格(而不是TAB), 而 <code>delim-col</code> 中的表格带TAB。
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgbe7fbd8" class="outline-2">
+<h2 id="orgbe7fbd8">步骤4:标记区域或矩形</h2>
+</div>
+
+<div id="outline-container-org645ee81" class="outline-2">
+<h2 id="step-5-do-the-conversion"><a id="org645ee81"></a>第五步:转换</h2>
+<div class="outline-text-2" id="text-step-5-do-the-conversion">
+
+<div class="figure">
+<p><img src="https://emacsnotes.files.wordpress.com/2018/09/screenshot-from-2018-09-23-22-08-05.png" alt="screenshot-from-2018-09-23-22-08-05.png" />
+</p>
+</div>
+
+<p>
+Emacs将提示您进一步的输入。输入你认为合适的参数。
+</p>
+
+<p>
+提示字符串的默认值显示在 <code>()</code> 中。你可以直接按 <code>Enter</code> 接受默认设置。
+</p>
+
+<p>
+当将本文中的原始表复制到Emacs中时，该表使用空格进行分隔。
+因此，当提示 <code>Specify the regexp which separates echo column</code> 时，输入 <code> +</code> (即 <code>SPC+</code>).
+</p>
+
+<p>
+当提示输入 <code>Specify how to format columns</code> 时,你可以按下 <code>TAB</code>,然后在显示的候选项中进行选择。
+从下面的屏幕截图中可以看到，我这里选择了 =Align separator =.
+</p>
+
+
+<div class="figure">
+<p><img src="https://emacsnotes.files.wordpress.com/2018/09/screenshot-from-2018-09-23-22-28-54.png" alt="screenshot-from-2018-09-23-22-28-54.png" />
+</p>
+</div>
+
+<p>
+这是结果
+</p>
+
+
+<div class="figure">
+<p><img src="https://emacsnotes.files.wordpress.com/2018/09/screenshot-from-2018-09-23-22-33-24.png" alt="screenshot-from-2018-09-23-22-33-24.png" />
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orge928f41" class="outline-2">
+<h2 id="concluding-words"><a id="orge928f41"></a>结束的话</h2>
+<div class="outline-text-2" id="text-concluding-words">
+<p>
+你可以向Emacs的资深用户提出前面那个问题。每个用户都有自己的解决建议。
+大多数用户会建议使用rectangle命令<a href="https://www.gnu.org/software/emacs/manual/html_node/emacs/Rectangles.html">1</a>。某些用户会建议你使用 <code>org-table-convert-region</code> <a href="https://github.com/emacs-mirror/emacs/blob/d0e2a341dd9a9a365fd311748df024ecb25b70ec/lisp/org/org-table.el#L579">1</a> 来将原始表格转换为 <code>Org</code> 格式的表，再通过  <code>orgtbl-to-generic</code> <a href="https://github.com/emacs-mirror/emacs/blob/d0e2a341dd9a9a365fd311748df024ecb25b70ec/lisp/org/org-table.el#L4798">1</a> 创建临时代码(我敢打赌没有人会建议使用 <code>delim-col</code> 因为这个包没有在手册上介绍过).
+你听到的这些解决方案都不具有 <code>delimi-col</code> 那样的简单性和快速性. 在我看来, <code>delimi-col</code> 是工具箱中非常有用的工具。
+</p>
+</div>
+</div>
+
+<div id="outline-container-org4a953b2" class="outline-2">
+<h2 id="appendix"><a id="org4a953b2"></a>附录</h2>
+<div class="outline-text-2" id="text-appendix">
+<p>
+这篇关于 <code>delim-col</code> 的文章是为了帮助我的一个朋友<a href="https://www.reddit.com/r/emacs/comments/9i2o7r/quoting_two_columns_of_text_using_macros/">1</a>, 她时一个Emacs新手,想把从web <a href="https://useast.ensembl.org/info/genome/stable_ids/prefixes.html">1</a> 中提取的表转换成Python字典 <a href="https://docs.python.org/3/tutorial/datastructures.html#dictionaries">1</a>.
+</p>
+
+<p>
+具体来说，她想要将一个像这样的HTML表
+</p>
+
+<p>
+<a href="https://emacsnotes.files.wordpress.com/2018/09/screenshot-2018-9-23-ensembl-stable-id-prefixes.png?w=740">https://emacsnotes.files.wordpress.com/2018/09/screenshot-2018-9-23-ensembl-stable-id-prefixes.png?w=740</a>
+</p>
+
+<p>
+转换成一个像这样的 <code>python</code> 字典中
+</p>
+
+<p>
+<a href="https://emacsnotes.files.wordpress.com/2018/09/screenshot-from-2018-09-24-00-04-58.png?w=740">https://emacsnotes.files.wordpress.com/2018/09/screenshot-from-2018-09-24-00-04-58.png?w=740</a>
+</p>
+
+<p>
+只要有点想象力，就很容易看出她如何使用 <code>delimo-col</code> 来实现的。
+</p>
+
+<p>
+我听到有人问我 “如果你朋友表中的第二列恰好是数字,而她不希望是的字段被引用怎么办呢……”。在这种情况下，我想 <code>delimi-col</code> 不能直接完成该任务，恐怕我这朋友需要使用其他方法了。
+</p>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2018-10-22</span>
+            <span title="last modification date" class="post-info">2020-02-01</span>
+            <span title="tags" class="post-info">:<a href="../../../../../tags/emacs-common">emacs-common</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-32c3830d-6a4b-47b3-8e95-75c443a29928">lujun9972</a></span>
+        </div>
+    <script src="../../../../../media/js/jquery-2.1.3.min.js"></script>
+    <script src="../../../../../media/js/md5.min.js"></script>
+        <section>
+            <div id="gitalk-container"></div>
+            <script type="text/javascript">
+             var gitalk = new Gitalk({
+                 clientID: 'fdcb5d9da3f4acb4862c',
+                 clientSecret: 'dd0a16312a206782cb7669dcec5e96874ab48170',
+                 repo: 'lujun9972.github.com',
+                 owner: 'lujun9972',
+                 admin: ['lujun9972'],
+                 id: md5(location.pathname),      // Ensure uniqueness and length less than 50
+                 distractionFreeMode: false  // Facebook-like distraction free mode
+             })
+             gitalk.render('gitalk-container')
+            </script>
+        </section>
+    <script src="../../../../../media/js/main.js"></script>
+        <script>
+         var _hmt = _hmt || [];
+         (function() {
+             var hm = document.createElement("script");
+             hm.src = "https://hm.baidu.com/hm.js?7bac4fd0247f69c27887e0d4e3aee41e";
+             var s = document.getElementsByTagName("script")[0]; 
+             s.parentNode.insertBefore(hm, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-32c3830d-6a4b-47b3-8e95-75c443a29928">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="../../../../../instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>
