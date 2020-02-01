@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Emacs专业技巧 - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="emacs-common" />
+  <!-- <link rel="stylesheet" href="../../../../../media/css/main.css" type="text/css"/>
+       <link rel="stylesheet" href="../../../../../media/css/comment.css" type="text/css"/> -->
+  <link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/kognise/water.css@latest/dist/dark.css'>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="../../../../../">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <ul class="trigger">
+        <li><a href="../../../../../years/">Years</a></li>
+        <li><a href="../../../../../authors/">Authors</a></li>
+        <li><a href="../../../../../tags/">Tags</a></li>
+        <li><a href="../../../../../about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="../../../../../rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="https://www.bing.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">Emacs专业技巧</h1>
+<div id="table-of-contents">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#org629126e">Emacs 客户端和 Emacs 服务器（守护程序）</a></li>
+<li><a href="#orgac72560">初始化文件的架构</a>
+<ul>
+<li><a href="#orge771a4c">Major-modes 配置</a></li>
+<li><a href="#org045ab4c">包管理</a></li>
+</ul>
+</li>
+<li><a href="#org777b16a">Helm</a></li>
+<li><a href="#org4e15ba0">更新到最新的Emacs版本</a></li>
+<li><a href="#org661635e">缓存文件夹</a></li>
+<li><a href="#org0a3e227">简化缩进</a></li>
+<li><a href="#orgdd00133">Elisp中 “跳转到定义”</a></li>
+<li><a href="#orgd3983ca">智能编译</a></li>
+<li><a href="#org67905c0">C 的易读格式</a></li>
+<li><a href="#orgcaa21f2">Magit</a></li>
+<li><a href="#orgb468b2e">Multiple cursors</a></li>
+<li><a href="#org7966e81">Org Mode</a></li>
+<li><a href="#org48f03b1">引用</a></li>
+</ul>
+</div>
+</div>
+<p>
+Emacs是一只需要一段时间才能驯服的野兽。阅读官方文档，学习Elisp，寻找最好的第三方包，并向其他用户学习。
+</p>
+
+<p>
+下面是设置Emacs的一些最佳小实践，以及我最喜欢的Emacs特性。请参阅我的<a href="https://gitlab.com/ambrevar/dotfiles">dotfiles</a>以获得完整的配置。
+</p>
+
+<p>
+另请参阅 <a href="https://ambrevar.xyz/emacs2/index.html">后续文章</a>。
+</p>
+
+<div id="outline-container-org28345f6" class="outline-2">
+<h2 id="org629126e"><a id="org28345f6"></a>Emacs 客户端和 Emacs 服务器（守护程序）</h2>
+<div class="outline-text-2" id="text-org629126e">
+<p>
+随着时间的推移，配置与之增长，Emacs可能需要花费一段时间来加载，特别是使用了大量包的时候。
+</p>
+
+<p>
+运行守护进程将使Emacs只加载一次启动文件。这允许我们立即打开Emacs实例，同时还可以在各实例之间共享状态。
+</p>
+
+<p>
+启动守护进程(如果还没有启动)和实例的最简单方法是将您的编辑器设置为这个脚本:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">emacsclient -c -a <span style="font-style: italic;">""</span> <span style="font-style: italic;">"$@"</span>
+</pre>
+</div>
+
+<p>
+这里 <code>-a ""</code> 选项让 Emacs 在没有启动守护进程的时候启动守护进程。该命令会生成一个新的Emacs frame并立即返回，这通常符合我们的要求。
+</p>
+
+<p>
+然而，这也有一些缺点。虽然在后台fork Emacs通常是一个好主意，但有时需要等待编辑完成(填写git提交消息或web浏览器字段时)，有时则应该fork后立即返回。
+我们可以创建脚本链接，并根据脚本名称对等待行为进行参数化。这就有了下面的脚本: <code>em</code> fork后不直接返回，而 <code>emw</code> 和 <code>emc</code> 链接(分别是窗口版和控制台版)fork后直接返回调用者。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell"><span style="font-weight: bold;">if</span> [ <span style="font-style: italic;">"${0##*/}"</span> = <span style="font-style: italic;">"emc"</span> ]; <span style="font-weight: bold;">then</span>
+    <span style="font-weight: bold; font-style: italic;">## </span><span style="font-weight: bold; font-style: italic;">Force terminal mode</span>
+    <span style="font-weight: bold; font-style: italic;">param</span>=<span style="font-style: italic;">"-t"</span>
+<span style="font-weight: bold;">else</span>
+    <span style="font-weight: bold; font-style: italic;">## </span><span style="font-weight: bold; font-style: italic;">If Emacs cannot start in graphical mode, -c will act just like -t.</span>
+    <span style="font-weight: bold; font-style: italic;">param</span>=<span style="font-style: italic;">"-c"</span>
+    <span style="font-weight: bold;">if</span> [ <span style="font-style: italic;">"${0##*/}"</span> != <span style="font-style: italic;">"emw"</span> ] &amp;&amp; [ -n <span style="font-style: italic;">"$DISPLAY"</span> ] &amp;&amp; [ <span style="font-style: italic;">"$(</span><span style="font-weight: bold;">emacs</span><span style="font-style: italic;"> --batch -Q --eval='(message (if (fboundp '"'"'tool-bar-mode) "X" "TTY"))' 2&gt;&amp;1)"</span> = X ]; <span style="font-weight: bold;">then</span>
+        <span style="font-weight: bold; font-style: italic;">## </span><span style="font-weight: bold; font-style: italic;">Don't wait if not called with "emw" and if Emacs can start in graphical mode.</span>
+        <span style="font-weight: bold; font-style: italic;">## </span><span style="font-weight: bold; font-style: italic;">The Emacs batch test checks whether it was compiled with GUI suppport.</span>
+        <span style="font-weight: bold; font-style: italic;">param</span>=<span style="font-style: italic;">"$param -n"</span>
+    <span style="font-weight: bold;">fi</span>
+<span style="font-weight: bold;">fi</span>
+
+emacsclient <span style="font-style: italic;">"$param"</span> -a <span style="font-style: italic;">""</span> <span style="font-style: italic;">"$@"</span>
+</pre>
+</div>
+
+<p>
+窗口版本的Emacs不受任何终端限制;而控制台版本的优势在于当在控制台中运行时不会生成新窗口。
+</p>
+
+<p>
+然后，您可以根据自己的喜好设置环境，例如export <code>EDITOR=em</code> 和 <code>VISUAL=emw</code>: 有些程序使用 <code>VISUAL</code> 变量并等待它返回，而另一些程序使用 <code>EDITOR</code> 变量并且不需要等待。这只是一个惯例，有些应用程序需要因地制宜的修改。
+</p>
+
+<p>
+For instance, say you want to use <code>--no-site-file</code> to enforce a vanilla setting on invasive distributions, you can write the following wrapper:
+如果希望向Emacs传递额外的参数，请创建一个 <code>Emacs</code> 的封装，并将其放在 <code>PATH</code> 的开头位置。
+例如，假设您想要使用 <code>--no-site-file</code> 来强制让激进的发行版使用普通的设置，你可以编写以下包装:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell"><span style="font-weight: bold; font-style: italic;">#</span><span style="font-weight: bold; font-style: italic;">!/bin/</span><span style="font-weight: bold;">sh</span>
+<span style="font-weight: bold;">exec</span> /usr/bin/emacs --no-site-file <span style="font-style: italic;">"$@"</span>
+</pre>
+</div>
+
+<p>
+这对守护进程和独立实例的情况都适合。
+</p>
+</div>
+</div>
+
+<div id="outline-container-org78d497b" class="outline-2">
+<h2 id="orgac72560"><a id="org78d497b"></a>初始化文件的架构</h2>
+<div class="outline-text-2" id="text-orgac72560">
+<p>
+启动非守护进程的Emacs实例时(例如，出于开发目的)将加载时间减少到最低也是明智的。
+</p>
+
+<p>
+构建Emacs初始化文件的方法并不唯一，但是肯定有一些好的实践。我的个人设计原则是:
+</p>
+
+<ul class="org-ul">
+<li>最小化Emacs启动时间。</li>
+<li>保持简单。</li>
+<li>不使用配置框架。</li>
+</ul>
+
+<p>
+有些人喜欢依赖第三方包来为他们处理配置。我认为它增加了一层复杂性(以及不可避免的bug)，降低了灵活性。
+</p>
+
+<p>
+为了最小化启动时间，我们需要根据运行模式来延迟加载配置。不属于全局配置的所有内容都可以根据条件进行加载。
+</p>
+</div>
+
+<div id="outline-container-org1ba57b5" class="outline-3">
+<h3 id="orge771a4c"><a id="org1ba57b5"></a>Major-modes 配置</h3>
+<div class="outline-text-3" id="text-orge771a4c">
+<p>
+每个major模式相关的配置都可以移动到自己的配置文件中，在符合下面条件时进行加载:
+</p>
+
+<ul class="org-ul">
+<li>当需要用到时再加载, 借助 <code>with-eval-after-load</code>,</li>
+<li>以及只加载 <i>一次</i>,借助 <code>require</code> 函数.</li>
+</ul>
+
+<p>
+In practice, it boils down to a simple line in <code>init.el</code>, e.g. for the C mode:
+实际上，它可以归结为 <code>init.el</code> 中简单的一句话，例如对于C mode:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">with-eval-after-load</span> 'cc-mode (<span style="font-weight: bold;">require</span> '<span style="font-weight: bold; text-decoration: underline;">init-cc</span>))
+</pre>
+</div>
+
+<p>
+第一次创建C缓冲区时, <code>c-mode</code> 这一autoload函数调用 <code>require</code> 加载 <code>cc-mode.el</code> 文件。
+当文件加载后, <code>with-eval-after-load</code> 开始工作,调用 <code>require</code> 加载我们附加的 <code>init-cc</code>.
+每次加载C缓冲区时，都要对 <code>with-eval-after-load</code> 语句进行求值，因此使用 <code>require</code> 而不是 <code>load</code> 很重要，这样我们只需加载配置一次即可。
+</p>
+
+<p>
+<code>init-cc.el</code> 文件应该只包含c相关的全局配置:变量，函数定义，框架，等等。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">setq</span> semanticdb-default-save-directory (concat emacs-cache-folder <span style="font-style: italic;">"semanticdb"</span>))
+(semantic-mode 1)
+(local-set-key (kbd <span style="font-style: italic;">"&lt;f6&gt;"</span>) (recompile))
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">&#8230;</span>
+
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Need to end with `</span><span style="font-weight: bold; font-style: italic; text-decoration: underline;">provide</span><span style="font-weight: bold; font-style: italic;">' so that `</span><span style="font-weight: bold; font-style: italic; text-decoration: underline;">require</span><span style="font-weight: bold; font-style: italic;">' does not load the file twice.</span>
+(<span style="font-weight: bold;">provide</span> '<span style="font-weight: bold; text-decoration: underline;">init-cc</span>)
+</pre>
+</div>
+
+<p>
+注意, <code>local-set-key</code> 通常用于全局性地设置模式快捷键，而 <i>不是</i> 局限在缓冲区中的。
+如果快捷键设置局限在缓冲区中，则意味着该模式没有使用标准模式API，或者没有调用 <code>use-local-map</code>. 你应该向上游报告这个问题。
+</p>
+
+<p>
+你的某些配置可能需要局限在缓冲区自身，在这种情况下，您必须将其添加到模式钩子中。混乱的钩子会减慢缓冲区的创建速度，并可能带来混乱，因此建议只保留必要钩子的操作。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">go-setup</span> ()
+  (<span style="font-weight: bold;">setq</span> indent-tabs-mode t)
+  (set (make-local-variable 'compile-command) (concat <span style="font-style: italic;">"go run "</span> (shell-quote-argument buffer-file-name)))
+  (add-hook 'before-save-hook #'gofmt-before-save nil t))
+(add-hook 'go-mode-hook #'go-setup)
+</pre>
+</div>
+
+<p>
+最后一个例子展示了钩子的三种作用:
+</p>
+
+<ul class="org-ul">
+<li>设置一个缓冲区局部变量。(那些文档显示“Automatically becomes buffer-local when set.”的变量，比如 <code>indent-tab -mode</code>)。如果没有把这句添加到挂钩上，那么更改将只应用于当前缓冲区。可以使用 <code>make-variable-buffer-local</code> 命令将全局变量永久地设置为缓冲区局部变量。</li>
+<li>仅为本mode设置一个变量为缓冲区局部本地，并设置其值. <code>compile-command</code> 在默认情况下是全局的:在mode钩子中将其设置为缓冲区局部变量，这样就允许在该mode下为各种缓冲区设置不同的编译命令，而其他模式将继续使用全局编译命令。</li>
+<li>借助 <code>add-hook</code> 函数的 <code>LOCAL</code> 参数，对钩子做一个缓冲区局部的更改。对该钩子的更改将应用于此模式下的所有缓冲区，而对其他模式保持不变。</li>
+</ul>
+
+<p>
+最后，不要在钩子中使用匿名函数:它使文档和意图更难理解，而且如果你需要不断修改钩子的话，还会使 <code>remove-hook</code> 函数的使用变得更加复杂。
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgda744a8" class="outline-3">
+<h3 id="org045ab4c"><a id="orgda744a8"></a>包管理</h3>
+<div class="outline-text-3" id="text-org045ab4c">
+<p>
+第三方包(无论是否major模式)可以根据其可用性以类似方式加载:如果包没有安装，就不需要解析其配置。过程都是一样的:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">with-eval-after-load</span> 'lua-mode (<span style="font-weight: bold;">require</span> '<span style="font-weight: bold; text-decoration: underline;">init-lua</span>))
+</pre>
+</div>
+
+<p>
+如果你想让一个模式在启动时立即可用:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">when</span> (<span style="font-weight: bold;">require</span> '<span style="font-weight: bold; text-decoration: underline;">helm-config</span> nil t) (<span style="font-weight: bold;">require</span> '<span style="font-weight: bold; text-decoration: underline;">init-helm</span>))
+</pre>
+</div>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org2be33e6" class="outline-2">
+<h2 id="org777b16a"><a id="org2be33e6"></a>Helm</h2>
+<div class="outline-text-2" id="text-org777b16a">
+<p>
+<a href="https://emacs-helm.github.io/helm/">Helm</a> 是一场用户界面革命:它为一切都加上了模糊搜索的功能!
+</p>
+
+<p>
+它的理念是:以其列出可选项让你选择，不如在随着你的输入列出匹配项并不断缩小范围，同时根据最相关的结果有限排序。
+此外，搜索可能是模糊匹配，这使它能在你不知道确切名字的时候找到实际的东西。
+</p>
+
+<p>
+您可以查找缓冲区、命令、文档、文件等: 几乎所有需要 <i>查找</i> 的内容。更细致的展示参见这篇 <a href="https://tuhdo.github.io/helm-intro.html">文章</a>
+</p>
+
+<p>
+helm的一个杀手级特性是在整个项目或文件树中搜索文本的能力。Helm自带了一些 <i>搜索器</i>: 除了grep本身，它也支持在当前版本控制仓库中grep(例如=git grep=)以及其他工具，例如 <a href="http://geoff.greer.fm/ag/">ag</a> 和 <a href="https://github.com/monochromegane/the_platinum_searcher">pt</a>.
+</p>
+
+<p>
+I have set the bindings to use the VCS grepper first and to fallback to <code>ag</code> when no file in the current folder is versioned:
+VCS grep工具r通常比 <code>grep</code> 更快。我已经设置了快捷键有限使用VC grepper,在当前目录没有文件被纳入版本控制的情况下才退而求其次使用 <code>ag</code>:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">call-process-to-string</span> (program <span style="font-weight: bold; text-decoration: underline;">&amp;rest</span> args)
+  <span style="font-style: italic;">"Call PROGRAM with ARGS and return output."</span>
+  (<span style="font-weight: bold;">with-output-to-string</span>
+    (<span style="font-weight: bold;">with-current-buffer</span>
+        standard-output
+      (apply 'call-process program nil t nil args))))
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">helm-grep-git-or-ag</span> (arg)
+  <span style="font-style: italic;">"Run `</span><span style="font-weight: bold; font-style: italic; text-decoration: underline;">helm-grep-do-git-grep</span><span style="font-style: italic;">' if possible; fallback to `</span><span style="font-weight: bold; font-style: italic; text-decoration: underline;">helm-do-grep-ag</span><span style="font-style: italic;">' otherwise."</span>
+  (<span style="font-weight: bold;">interactive</span> <span style="font-style: italic;">"P"</span>)
+  (<span style="font-weight: bold;">require</span> '<span style="font-weight: bold; text-decoration: underline;">vc</span>)
+  (<span style="font-weight: bold;">if</span> (<span style="font-weight: bold;">and</span> (vc-find-root default-directory <span style="font-style: italic;">".git"</span>)
+           (<span style="font-weight: bold;">or</span> arg (split-string (call-process-to-string <span style="font-style: italic;">"git"</span> <span style="font-style: italic;">"ls-files"</span> <span style="font-style: italic;">"-z"</span>) <span style="font-style: italic;">"0"</span> t)))
+      (helm-grep-do-git-grep arg)
+    (helm-do-grep-ag arg)))
+
+(global-set-key (kbd <span style="font-style: italic;">"C-x G"</span>) #'helm-grep-git-or-ag)
+</pre>
+</div>
+
+<p>
+Helm的其他特点包括:
+</p>
+
+<ul class="org-ul">
+<li>通过 <code>helm-semantic-or-imenu</code> 在当前buffer中查找全局变量和函数，或通过 <code>helm-imenu-in-all-buffers</code> 在所有缓冲区中查找全局变量和函数。</li>
+<li>将set <code>helm-findutil-search-full-path</code> 设置为非nil可以在递归查找文件时启用适当的模糊查找(<code>helm-find</code>)，。</li>
+<li>使用第三方的 <code>helm-ls-git</code> 在Git项目中查找文件。</li>
+
+<li>调用 <code>yank</code> 查找最后一个区域。</li>
+<li>使用universal参数扩展你的查询范围(例如，子文件夹)。</li>
+
+<li>使用 <code>C-c C-f</code> 来激活follow模式，并在结果中导航以显示完整的上下文。</li>
+<li>用 <code>C-x C-s</code> 保存helm会话，以便重用。使用 <code>wgrep</code> 编辑 <code>grep</code> buffer 并同时应用所有更改。</li>
+<li>或使用 <code>C-x C-b</code> 恢复上一个helm会话。</li>
+<li>我喜欢使用 <code>helm-occur</code> 替换 <code>M-s o=， 使用 =helm-all-mark-rings</code> 替换 <code>C-x C-x=， 使用 =helm-show-kill-ring</code> 替换 <code>M-y</code> ，等等。</li>
+<li>使用=helm-company= 查询补全建议。</li>
+<li>Browse Man page sections with <code>helm-imenu</code>.</li>
+<li>使用=helm-imenu= 浏览man页各章节。</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-orgd2c8782" class="outline-2">
+<h2 id="org4e15ba0"><a id="orgd2c8782"></a>更新到最新的Emacs版本</h2>
+<div class="outline-text-2" id="text-org4e15ba0">
+<p>
+您可能非常喜欢Emacs，希望它无处不在。然而，有时你却不得不使用一个过时的、蹩脚的系统，在这个系统上你没有管理特权。
+</p>
+
+<p>
+我不建议坚持使用过时的版本:太多的基本特性和包依赖于最新的Emacs。
+</p>
+
+<p>
+幸运的是，由于其高度的可移植性，编译最新的Emacs非常容易，并且可以安装在用户的HOME文件夹中。
+</p>
+</div>
+</div>
+
+<div id="outline-container-org1002236" class="outline-2">
+<h2 id="org661635e"><a id="org1002236"></a>缓存文件夹</h2>
+<div class="outline-text-2" id="text-org661635e">
+<p>
+(又名如何保持你的配置文件夹整洁。)
+</p>
+
+<p>
+许多模式将缓存文件存储在 <code>~/.emacs.d</code> 中。我倾向于将这些临时文件保存在 <code>~/.cache/emacs</code> 中。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">setq</span> user-emacs-directory <span style="font-style: italic;">"~/.cache/emacs/"</span>)
+(<span style="font-weight: bold;">if</span> (not (file-directory-p user-cache-directory))
+    (make-directory user-cache-directory t))
+
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Some files need to be forced to the cache folder.</span>
+(<span style="font-weight: bold;">setq</span> geiser-repl-history-filename (expand-file-name <span style="font-style: italic;">"geiser_history"</span> user-emacs-directory))
+(<span style="font-weight: bold;">setq</span> elfeed-db-directory (expand-file-name <span style="font-style: italic;">"elfeed"</span> user-emacs-directory))
+
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Place backup files in specific directory.</span>
+(<span style="font-weight: bold;">setq</span> backup-directory-alist
+      `((<span style="font-style: italic;">"."</span> . ,(expand-file-name <span style="font-style: italic;">"backups"</span> user-emacs-directory))))
+</pre>
+</div>
+
+<p>
+如果使用Semantic，请确保它是在更改缓存文件夹 <i>之后</i> 启动的，因为它的数据库存储在那里。
+</p>
+</div>
+</div>
+
+<div id="outline-container-org61ff1ee" class="outline-2">
+<h2 id="org0a3e227"><a id="org61ff1ee"></a>简化缩进</h2>
+<div class="outline-text-2" id="text-org0a3e227">
+<p>
+我认为Emacs有太多的缩进选项。由于我强烈 <a href="https://ambrevar.xyz/indentation/index.html">支持总是使用TAB进行缩进</a>(除了Lisp),我使用 <code>defvaralias</code> 将各个模式的缩进级别重定向到一个名为 <code>tab-width</code> 的变量。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defvaralias</span> '<span style="font-weight: bold; font-style: italic;">standard-indent</span> 'tab-width)
+(<span style="font-weight: bold;">setq-default</span> indent-tabs-mode t)
+
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Lisp should not use tabs.</span>
+(mapcar
+ (<span style="font-weight: bold;">lambda</span> (hook)
+   (add-hook
+    hook
+    (<span style="font-weight: bold;">lambda</span> () (<span style="font-weight: bold;">setq</span> indent-tabs-mode nil))))
+ '(lisp-mode-hook emacs-lisp-mode-hook))
+
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">This needs to be set globally since they are defined as local variables and</span>
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Emacs does not know how to set an alias on a local variable.</span>
+(<span style="font-weight: bold;">defvaralias</span> '<span style="font-weight: bold; font-style: italic;">c-basic-offset</span> 'tab-width)
+(<span style="font-weight: bold;">defvaralias</span> '<span style="font-weight: bold; font-style: italic;">sh-basic-offset</span> 'tab-width)
+</pre>
+</div>
+
+<p>
+添加以下内容到 <code>sh-mode-hook</code>:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defvaralias</span> '<span style="font-weight: bold; font-style: italic;">sh-indentation</span> 'sh-basic-offset)
+
+</pre>
+</div>
+
+<p>
+由于历史原因，/C/ 和 <i>sh</i> 的情况很特殊。其他模态的修正可以通过以下配置进行修正:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defvaralias</span> '<span style="font-weight: bold; font-style: italic;">js-indent-level</span> 'tab-width)
+(<span style="font-weight: bold;">defvaralias</span> '<span style="font-weight: bold; font-style: italic;">lua-indent-level</span> 'tab-width)
+(<span style="font-weight: bold;">defvaralias</span> '<span style="font-weight: bold; font-style: italic;">perl-indent-level</span> 'tab-width)
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgea33cb0" class="outline-2">
+<h2 id="orgdd00133"><a id="orgea33cb0"></a>Elisp中 “跳转到定义”</h2>
+<div class="outline-text-2" id="text-orgdd00133">
+<p>
+Elisp有 <code>find-variable-at-point</code> 和 <code>find-function-at-point</code> 函数，但却没有一个合适的 <code>跳转到定义的</code> 命令。我们很快就能写出这个命令:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">find-symbol-at-point</span> ()
+  <span style="font-style: italic;">"Find the symbol at point, i.e. go to definition."</span>
+  (<span style="font-weight: bold;">interactive</span>)
+  (<span style="font-weight: bold;">let</span> ((sym (symbol-at-point)))
+    (<span style="font-weight: bold;">if</span> (boundp sym)
+        (find-variable sym)
+      (find-function sym))))
+
+(define-key lisp-mode-shared-map (kbd <span style="font-style: italic;">"M-."</span>) 'find-symbol-at-point)
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org61e1c41" class="outline-2">
+<h2 id="orgd3983ca"><a id="org61e1c41"></a>智能编译</h2>
+<div class="outline-text-2" id="text-orgd3983ca">
+<p>
+Emacs有一种编译模式，可以非常方便地在缓冲区上运行任意命令，并根据错误信息导航回源代码。
+</p>
+
+<p>
+它不仅对编译器有用，而且对浏览自己程序的调试消息、linter等也有用。
+</p>
+
+<p>
+Emacs的标准行为是将最后使用的编译命令存储在全局变量 <code>compile-command</code> 中。
+类似地, <code>compile-history</code> 会记住全局使用的所有编译命令。
+如果你总在不同缓冲区之间进行切换，但想在不用切换会特定缓冲区就能在项目中运行相同的编译命令，那么这是非常有用的。
+</p>
+
+<p>
+另一种方法是使 <code>compile-command</code> 变成缓冲区局部变量。你必须在特定的缓冲区中才能运行所需的命令。
+实际上，我发现自己经常需要为项目运行几个与缓冲区相关的命令(编写文档、linting、构建库、构建可执行文件等)。
+</p>
+
+<p>
+要使用缓冲区局部方法，请将下面内容添加到你初始化文件中，放在模式配置之前:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(eval-after-load 'compile (make-variable-buffer-local 'compile-command))
+</pre>
+</div>
+
+<p>
+我们可以根据要求对每个缓冲区设置各自的compile命令。如果你使用 <code>desktop</code> 模式保存会话，那么每个缓冲区的命令也可以恢复:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(add-to-list 'desktop-locals-to-save 'compile-command)
+</pre>
+</div>
+
+<p>
+Emacs提供了两个编译命令:
+</p>
+
+<ul class="org-ul">
+<li><code>(compile COMMAND &amp;optional COMINT)</code> 当以交互方式调用该命令时会提示输入运行命令。可以通过 <code>(call-interactively 'compile)</code> 来运行用户自定义命令。若要临时运行命令，则可以将 <code>compile-command</code> 的作用于局限在函数内。</li>
+<li><code>(recompile &amp;optional EDIT-COMMAND)</code> 可以方便地在不提示用户的情况下调用上一条命令。当使用 <code>compile-command</code> 作用域为buffer时，这种方法有一些缺陷。
+
+<ul class="org-ul">
+<li><code>compile-history</code> 会保持不变，除非我们手工登记.</li>
+<li>该命令使用全局的 <code>compilation-directory</code>, 因此若在另一buffer上调用 <code>recompile</code>,而该buffer的目标文件又处于另一个目录，那么改命令可能会失败.我们也可以将 <code>compliation-directory</code> 变量作用域局限在buffer中，但这只有在从未使用 <code>compile</code> 的情况下才会起作用。这时, <code>compile-history</code> 尚未被使用。</li>
+</ul></li>
+</ul>
+
+<p>
+简而言之:当 <code>compile-command</code> 作用于局限于buffer时，我们最好坚持使用 <code>compile</code> 而将 <code>recompile</code> 放在一边。
+</p>
+
+<p>
+为了方便，我们添加一些快捷键:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">compile-last-command</span> () (<span style="font-weight: bold;">interactive</span>) (compile compile-command))
+(global-set-key (kbd <span style="font-style: italic;">"C-&lt;f6&gt;"</span>) #'compile)
+(global-set-key (kbd <span style="font-style: italic;">"&lt;f6&gt;"</span>) #'compile-last-command)
+</pre>
+</div>
+
+<p>
+The linker flags are configurable on a per-buffer basis thanks to the buffer-local <code>cc-ldlibs</code> and <code>cc-ldflags</code> variables.
+下面是一个关于C的完整示例:它将在父文件夹中查找最近的 <code>Makefile</code>,并将命令设置为 <code>make -C /path/to/ Makefile</code>, 或者根据语言(C或c++)和环境(GCC、Clang等)动态生成预设值。
+由于 <code>cc-ldlibs</code> 和 <code>cc-ldflags</code> 是buffer局部变量,因此每个buffer都能有自己的链接器标志。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defvar-local</span> <span style="font-weight: bold; font-style: italic;">cc-ldlibs</span> <span style="font-style: italic;">"-lm -pthread"</span>
+  <span style="font-style: italic;">"Custom linker flags for C/C++ linkage."</span>)
+
+(<span style="font-weight: bold;">defvar-local</span> <span style="font-weight: bold; font-style: italic;">cc-ldflags</span> <span style="font-style: italic;">""</span>
+  <span style="font-style: italic;">"Custom linker libs for C/C++ linkage."</span>)
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">cc-set-compiler</span> (<span style="font-weight: bold; text-decoration: underline;">&amp;optional</span> nomakefile)
+  <span style="font-style: italic;">"Set compile command to be nearest Makefile or a generic command.</span>
+<span style="font-style: italic;">The Makefile is looked up in parent folders. If no Makefile is</span>
+<span style="font-style: italic;">found (or if NOMAKEFILE is non-nil or if function was called with</span>
+<span style="font-style: italic;">universal argument), then a configurable commandline is</span>
+<span style="font-style: italic;">provided."</span>
+  (<span style="font-weight: bold;">interactive</span> <span style="font-style: italic;">"P"</span>)
+  (hack-local-variables)
+  <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Alternatively, if a Makefile is found, we could change default directory</span>
+  <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">and leave the compile command to "make". Changing `</span><span style="font-weight: bold; font-style: italic; text-decoration: underline;">default-directory</span><span style="font-weight: bold; font-style: italic;">'</span>
+  <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">could have side effects though.</span>
+  (<span style="font-weight: bold;">let</span> ((makefile-dir (locate-dominating-file <span style="font-style: italic;">"."</span> <span style="font-style: italic;">"Makefile"</span>)))
+    (<span style="font-weight: bold;">if</span> (<span style="font-weight: bold;">and</span> makefile-dir (not nomakefile))
+        (<span style="font-weight: bold;">setq</span> compile-command (concat <span style="font-style: italic;">"make -k -C "</span> (shell-quote-argument (file-name-directory makefile-dir))))
+      (<span style="font-weight: bold;">setq</span> compile-command
+            (<span style="font-weight: bold;">let</span>
+                ((c++-p (eq major-mode 'c++-mode))
+                 (file (file-name-nondirectory buffer-file-name)))
+              (format <span style="font-style: italic;">"%s %s -o '%s' %s %s %s"</span>
+                      (<span style="font-weight: bold;">if</span> c++-p
+                          (<span style="font-weight: bold;">or</span> (getenv <span style="font-style: italic;">"CXX"</span>) <span style="font-style: italic;">"g++"</span>)
+                        (<span style="font-weight: bold;">or</span> (getenv <span style="font-style: italic;">"CC"</span>) <span style="font-style: italic;">"gcc"</span>))
+                      (shell-quote-argument file)
+                      (shell-quote-argument (file-name-sans-extension file))
+                      (<span style="font-weight: bold;">if</span> c++-p
+                          (<span style="font-weight: bold;">or</span> (getenv <span style="font-style: italic;">"CXXFLAGS"</span>) <span style="font-style: italic;">"-Wall -Wextra -Wshadow -DDEBUG=9 -g3 -O0"</span>)
+                        (<span style="font-weight: bold;">or</span> (getenv <span style="font-style: italic;">"CFLAGS"</span>) <span style="font-style: italic;">"-ansi -pedantic -std=c11 -Wall -Wextra -Wshadow -DDEBUG=9 -g3 -O0"</span>))
+                      (<span style="font-weight: bold;">or</span> (getenv <span style="font-style: italic;">"LDFLAGS"</span>) cc-ldflags)
+                      (<span style="font-weight: bold;">or</span> (getenv <span style="font-style: italic;">"LDLIBS"</span>) cc-ldlibs)))))))
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">cc-clean</span> ()
+  <span style="font-style: italic;">"Find Makefile and call the `</span><span style="font-weight: bold; font-style: italic; text-decoration: underline;">clean</span><span style="font-style: italic;">' rule. If no Makefile is</span>
+<span style="font-style: italic;">found, no action is taken. The previous `</span><span style="font-weight: bold; font-style: italic; text-decoration: underline;">compile</span><span style="font-style: italic;">' command is</span>
+<span style="font-style: italic;">restored."</span>
+  (<span style="font-weight: bold;">interactive</span>)
+  (<span style="font-weight: bold;">let</span> (compile-command
+        (makefile-dir (locate-dominating-file <span style="font-style: italic;">"."</span> <span style="font-style: italic;">"Makefile"</span>)))
+    (<span style="font-weight: bold;">when</span> makefile-dir
+      (compile (format <span style="font-style: italic;">"make -k -C %s clean"</span> (shell-quote-argument makefile-dir))))))
+
+(<span style="font-weight: bold;">dolist</span> (map (list c-mode-map c++-mode-map))
+  (define-key map <span style="font-style: italic;">"&lt;f5&gt;"</span> #'cc-clean))
+
+(<span style="font-weight: bold;">dolist</span> (hook '(c-mode-hook c++-mode-hook))
+  (add-hook hook #'cc-set-compiler))
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org102805e" class="outline-2">
+<h2 id="org67905c0"><a id="org102805e"></a>C 的易读格式</h2>
+<div class="outline-text-2" id="text-org67905c0">
+<p>
+我使用 <a href="http://uncrustify.sourceforge.net/">uncrustify</a> 自动格式化C代码。参见我的 <a href="https://ambrevar.xyz/indentation/index.html">缩进原理</a>.
+</p>
+
+<p>
+通过下面命令，我可以在Emacs对C代码进行格式化:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">cc-fmt</span> ()
+  <span style="font-style: italic;">"Run uncrustify(1) on current buffer or region."</span>
+  (<span style="font-weight: bold;">interactive</span>)
+  (<span style="font-weight: bold;">let</span> ((formatbuf (get-buffer-create <span style="font-style: italic;">"*C format buffer*"</span>))
+        status start end)
+    (<span style="font-weight: bold;">if</span> (use-region-p)
+        (<span style="font-weight: bold;">setq</span> start (region-beginning) end (region-end))
+      (<span style="font-weight: bold;">setq</span> start (point-min) end (point-max)))
+    (<span style="font-weight: bold;">setq</span> status
+          (call-process-region start end <span style="font-style: italic;">"uncrustify"</span> nil formatbuf nil <span style="font-style: italic;">"-lc"</span> <span style="font-style: italic;">"-q"</span> <span style="font-style: italic;">"-c"</span>
+                               (concat (getenv <span style="font-style: italic;">"HOME"</span>) <span style="font-style: italic;">"/.uncrustify.cfg"</span>)))
+    (<span style="font-weight: bold;">if</span> (/= status 0)
+        (<span style="font-weight: bold;">error</span> <span style="font-style: italic;">"error running uncrustify"</span>)
+      (delete-region start end)
+      (insert-buffer formatbuf)
+      (kill-buffer formatbuf))))
+</pre>
+</div>
+
+<p>
+将其添加到 <code>before-save-hook</code> 中可以一直自动格式化我的代码，但是在使用不同的格式化规则处理源代码时，实践起来很糟糕。
+</p>
+</div>
+</div>
+
+<div id="outline-container-org0218053" class="outline-2">
+<h2 id="orgcaa21f2"><a id="org0218053"></a>Magit</h2>
+<div class="outline-text-2" id="text-orgcaa21f2">
+<p>
+<a href="https://magit.vc/">Magit</a> 时Git管理的福音. 最显著的g功能是在分段提交代码时很容易选择要提交的块。这个简单的功能和其他功能将对您的工作流程产生巨大的变化。
+</p>
+</div>
+</div>
+
+<div id="outline-container-org13daaf0" class="outline-2">
+<h2 id="orgb468b2e"><a id="org13daaf0"></a>Multiple cursors</h2>
+<div class="outline-text-2" id="text-orgb468b2e">
+<p>
+这个<a href="http://emacsrocks.com/e13.html">视频</a>简单介绍这个强大异常的编辑框架。
+</p>
+
+<p>
+2016年9月后，multiple cursors不再支持搜索，因此我使用 <code>phi-search</code> 来为其添加支持。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">when</span> (<span style="font-weight: bold;">require</span> '<span style="font-weight: bold; text-decoration: underline;">multiple-cursors</span> nil t)
+  (<span style="font-weight: bold;">setq</span> mc/list-file (concat emacs-cache-folder <span style="font-style: italic;">"mc-lists.el"</span>))
+  <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Load the file at the new location.</span>
+  (load mc/list-file t)
+  (global-unset-key (kbd <span style="font-style: italic;">"C-&lt;down-mouse-1&gt;"</span>))
+  (global-set-key (kbd <span style="font-style: italic;">"C-&lt;mouse-1&gt;"</span>) #'mc/add-cursor-on-click)
+  (global-set-key (kbd <span style="font-style: italic;">"C-x M-r"</span>) #'mc/edit-lines)
+  (global-set-key (kbd <span style="font-style: italic;">"C-x M-m"</span>) #'mc/mark-more-like-this-extended)
+  (global-set-key (kbd <span style="font-style: italic;">"C-x M-l"</span>) #'mc/mark-all-like-this-dwim)
+  <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">mc-compatible with search.</span>
+  (<span style="font-weight: bold;">require</span> '<span style="font-weight: bold; text-decoration: underline;">phi-search</span> nil t))
+</pre>
+</div>
+
+<p>
+如果你是Evil的用户，则 <code>multiple-cursors</code> 会工作失常. 你需要使用专用的 <code>evil-mc</code>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org2b8a048" class="outline-2">
+<h2 id="org7966e81"><a id="org2b8a048"></a>Org Mode</h2>
+<div class="outline-text-2" id="text-org7966e81">
+<p>
+最后时著名的<a href="http://orgmode.org/">Org模式</a>。它提供了一些令人印象深刻的功能，比如无缝的表操作(通过快捷键交换列等…)和公式计算。下面这段摘录自手册:
+</p>
+
+<pre class="example">
+Finally, just to whet your appetite for what can be done with the
+fantastic `calc.el' package, here is a table that computes the Taylor
+series of degree `n' at location `x' for a couple of functions.
+
+|---+-------------+---+-----+--------------------------------------|
+|   | Func | n | x | Result |
+|---+-------------+---+-----+--------------------------------------|
+| # | exp(x) | 1 | x | 1 + x |
+| # | exp(x) | 2 | x | 1 + x + x^2 / 2 |
+| # | exp(x) | 3 | x | 1 + x + x^2 / 2 + x^3 / 6 |
+| # | x^2+sqrt(x) | 2 | x=0 | x*(0.5 / 0) + x^2 (2 - 0.25 / 0) / 2 |
+| # | x^2+sqrt(x) | 2 | x=1 | 2 + 2.5 x - 2.5 + 0.875 (x - 1)^2 |
+| * | tan(x) | 3 | x | 0.0175 x + 1.77e-6 x^3 |
+|---+-------------+---+-----+--------------------------------------|
+#+TBLFM: $5=taylor($2,$4,$3);n3
+</pre>
+
+<p>
+注意最后一列是自动计算出来的的!可以使用Calc模式，Elisp，甚至外部程序，如R或PARI/GP进行公式计算。可能性是无限的。
+</p>
+
+<p>
+最后，你可以将最终结果导出成LaTeX、HTML等格式。
+</p>
+</div>
+</div>
+
+<div id="outline-container-org14aa8c9" class="outline-2">
+<h2 id="org48f03b1"><a id="org14aa8c9"></a>引用</h2>
+<div class="outline-text-2" id="text-org48f03b1">
+<p>
+聚合维基:
+</p>
+
+<ul class="org-ul">
+<li><a href="https://github.com/emacs-tw/awesome-emacs">https://github.com/emacs-tw/awesome-emacs</a></li>
+<li><a href="https://github.com/pierre-lecocq/emacs4developers">https://github.com/pierre-lecocq/emacs4developers</a></li>
+</ul>
+
+<p>
+用户配置:
+</p>
+
+<ul class="org-ul">
+<li><a href="https://github.com/wasamasa/dotemacs/">https://github.com/wasamasa/dotemacs/</a></li>
+<li><a href="https://writequit.org/org/">https://writequit.org/org/</a></li>
+<li><a href="http://doc.rix.si/cce/cce.html">http://doc.rix.si/cce/cce.html</a></li>
+<li><a href="https://github.com/larstvei/dot-emacs/blob/master/init.org">https://github.com/larstvei/dot-emacs/blob/master/init.org</a></li>
+<li><a href="https://github.com/hlissner/.emacs.d">https://github.com/hlissner/.emacs.d</a></li>
+<li><a href="https://github.com/howardabrams/dot-files">https://github.com/howardabrams/dot-files</a></li>
+<li><a href="https://github.com/purcell/emacs.d/">https://github.com/purcell/emacs.d/</a></li>
+<li><a href="http://pages.sachachua.com/.emacs.d/">http://pages.sachachua.com/.emacs.d/</a></li>
+</ul>
+
+<p>
+博客和其他资源:
+</p>
+
+<ul class="org-ul">
+<li><a href="http://planet.emacsen.org/">http://planet.emacsen.org/</a></li>
+<li><a href="https://www.reddit.com/r/emacs/">https://www.reddit.com/r/emacs/</a></li>
+<li><a href="https://emacs.stackexchange.com/">https://emacs.stackexchange.com/</a></li>
+<li><a href="http://emacslife.com/">http://emacslife.com/</a> and <a href="http://sachachua.com/blog/">http://sachachua.com/blog/</a></li>
+</ul>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2018-10-23</span>
+            <span title="last modification date" class="post-info">2020-02-01</span>
+            <span title="tags" class="post-info">:<a href="../../../../../tags/emacs-common">emacs-common</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-3dd0a733-ab78-44ad-b9a2-59cac6984bce">lujun9972</a></span>
+        </div>
+    <script src="../../../../../media/js/jquery-2.1.3.min.js"></script>
+    <script src="../../../../../media/js/md5.min.js"></script>
+        <section>
+            <div id="gitalk-container"></div>
+            <script type="text/javascript">
+             var gitalk = new Gitalk({
+                 clientID: 'fdcb5d9da3f4acb4862c',
+                 clientSecret: 'dd0a16312a206782cb7669dcec5e96874ab48170',
+                 repo: 'lujun9972.github.com',
+                 owner: 'lujun9972',
+                 admin: ['lujun9972'],
+                 id: md5(location.pathname),      // Ensure uniqueness and length less than 50
+                 distractionFreeMode: false  // Facebook-like distraction free mode
+             })
+             gitalk.render('gitalk-container')
+            </script>
+        </section>
+    <script src="../../../../../media/js/main.js"></script>
+        <script>
+         var _hmt = _hmt || [];
+         (function() {
+             var hm = document.createElement("script");
+             hm.src = "https://hm.baidu.com/hm.js?7bac4fd0247f69c27887e0d4e3aee41e";
+             var s = document.getElementsByTagName("script")[0]; 
+             s.parentNode.insertBefore(hm, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-3dd0a733-ab78-44ad-b9a2-59cac6984bce">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="../../../../../instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>
