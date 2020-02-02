@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>ZSH, tmux, Emacs 以及 SSH: 一个关于粘帖复制的故事 - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="emacs-common" />
+  <!-- <link rel="stylesheet" href="../../../../../media/css/main.css" type="text/css"/>
+       <link rel="stylesheet" href="../../../../../media/css/comment.css" type="text/css"/> -->
+  <link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/kognise/water.css@latest/dist/dark.css'>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="../../../../../">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <ul class="trigger">
+        <li><a href="../../../../../years/">Years</a></li>
+        <li><a href="../../../../../authors/">Authors</a></li>
+        <li><a href="../../../../../tags/">Tags</a></li>
+        <li><a href="../../../../../about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="../../../../../rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="https://www.bing.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">ZSH, tmux, Emacs 以及 SSH: 一个关于粘帖复制的故事</h1>
+<div id="table-of-contents">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#org7acbd90">共享函数</a></li>
+<li><a href="#org41175b2">问题:粘贴的文本在终端中逐字解释</a></li>
+<li><a href="#org74b37b7">问题:终端Emacs无法访问剪贴板</a></li>
+<li><a href="#org22a8106">问题:tmux使用paste buffer而不是剪贴板</a></li>
+<li><a href="#org4700e37">问题:macOS下的tmux无法访问剪贴板</a></li>
+<li><a href="#orga3ac8e2">问题:远程SSH sesssions无法通过剪贴板访问本地会话</a></li>
+<li><a href="#org6e0f726">配置文件中的最新代码</a></li>
+<li><a href="#orgedd7683">文献</a></li>
+</ul>
+</div>
+</div>
+<p>
+如何在尽可能多的终端应用程序中启用复制-粘贴支持的说明和代码。包括完整的GUI <code>$DISPLAY</code>, 通过SSH登录，同时支持macOS和Linux上，并在ZSH, tmux和Emacs之间相互复制。
+</p>
+
+<p>
+tl;dr: 请参见我 <a href="https://github.com/jschaf/dotfiles/blob/master/bin/clipboard-copy">dotfiles</a>  中的配置，包括 <a href="https://github.com/jschaf/dotfiles/blob/master/bin/clipboard-copy">剪贴板复制</a>, <a href="https://github.com/jschaf/dotfiles/blob/master/bin/clipboard-paste">剪贴板粘帖</a>, <a href="https://github.com/jschaf/dotfiles/blob/d5b0b75423a681bb39d42a88336fd9ab44744849/layers/joe/config.el#L828">Emacs整合</a> 和 <a href="https://github.com/jschaf/dotfiles/blob/d5b0b75423a681bb39d42a88336fd9ab44744849/tmux.conf#L66">tmux整合</a>.
+</p>
+
+<p>
+在多个环境中实现复制粘贴是 <i>极度</i> 困难的。下面的任何一个原因都会使问题复杂化，而且综合起来，难度会上升到前所未见过的复杂程度。
+</p>
+
+<ul class="org-ul">
+<li>粘贴到终端的内容会被逐字解析，这意味着攻击者可以在复制外表无害的HTML命令时通过CSS诡计隐藏 <code>;sudo do $really_evil_thing;</code>. 因此，我们不能盲目地将文本粘贴到终端中。</li>
+<li>在终端中，Emacs不能访问剪贴板。</li>
+<li>Emacs有自己独立的剪贴板概念，叫做<a href="https://www.gnu.org/software/emacs/manual/html_node/emacs/Kill-Ring.html">kill ring</a>。</li>
+<li>tmux有自己独立的剪贴板概念，称为 <code>paste buffers</code>.</li>
+<li>zsh有自己独立的剪贴板概念，也叫<a href="http://zsh.sourceforge.net/doc/release/zsh-lineeditor.html">kill ring</a>。</li>
+<li>在远程SSH会话中没有剪贴板，因为剪贴板是一个窗口系统的概念。</li>
+<li>在X11中有3个独立的“剪贴板”，primary selection，clipboard selection，以及过时的cut buffers。</li>
+<li>macOS中的tmux在默认情况下不能访问剪贴板。</li>
+</ul>
+
+<p>
+我们将逐个处理各个问题，制定统一的解决方案。
+</p>
+
+<div id="outline-container-orgc99283b" class="outline-2">
+<h2 id="org7acbd90"><a id="orgc99283b"></a>共享函数</h2>
+<div class="outline-text-2" id="text-org7acbd90">
+<p>
+我们需要几个函数来跨macOS和Linux统一复制-粘贴处理。 我这里只包含了最核心的几个函数。其余的辅助函数可以在我的<a href="https://github.com/jschaf/dotfiles/blob/master/bin/clipboard-copy">dotfiles</a>中找到，在<a href="https://github.com/jschaf/dotfiles/tree/master/zsh/functions">zsh/functions</a>下。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell"><span style="font-weight: bold; font-style: italic;">#</span><span style="font-weight: bold; font-style: italic;">!/bin/</span><span style="font-weight: bold;">zsh</span>
+
+<span style="font-weight: bold; font-style: italic;"># </span><span style="font-weight: bold; font-style: italic;">Copies data to clipboard from stdin.</span>
+<span style="font-weight: bold;">function</span> <span style="font-weight: bold;">clipboard-copy</span>() {
+    emulate -L zsh
+
+    <span style="font-weight: bold;">local</span> <span style="font-weight: bold; font-style: italic;">clipper_port</span>=8377
+    <span style="font-weight: bold;">local</span> <span style="font-weight: bold; font-style: italic;">fake_clipboard</span>=/tmp/clipboard-data.txt
+    <span style="font-weight: bold;">if</span> is-ssh &amp;&amp; is-port-in-use $<span style="font-weight: bold; font-style: italic;">clipper_port</span>; <span style="font-weight: bold;">then</span>
+        <span style="font-weight: bold; font-style: italic;"># </span><span style="font-weight: bold; font-style: italic;">Pipe to the clipper instance and the fake clipboard.</span>
+        tee &gt;(nc localhost $<span style="font-weight: bold; font-style: italic;">clipper_port</span>) <span style="font-style: italic;">"$fake_clipboard"</span>
+        <span style="font-weight: bold;">return</span>
+    <span style="font-weight: bold;">fi</span>
+
+    <span style="font-weight: bold;">if</span> ! has-display; <span style="font-weight: bold;">then</span>
+        <span style="font-weight: bold; font-style: italic;"># </span><span style="font-weight: bold; font-style: italic;">Copy to fake_clipboard.</span>
+        &gt; fake_clipboard
+        <span style="font-weight: bold;">return</span>
+    <span style="font-weight: bold;">fi</span>
+
+    <span style="font-weight: bold;">if</span> is-darwin; <span style="font-weight: bold;">then</span>
+        pbcopy
+    <span style="font-weight: bold;">elif</span> is-cygwin; <span style="font-weight: bold;">then</span>
+        cat &gt; /dev/clipboard
+    <span style="font-weight: bold;">else</span>
+        <span style="font-weight: bold;">if</span> command-exists xclip; <span style="font-weight: bold;">then</span>
+            xclip -in -selection clipboard
+        <span style="font-weight: bold;">elif</span> command-exists xsel; <span style="font-weight: bold;">then</span>
+            xsel --clipboard --input
+        <span style="font-weight: bold;">else</span>
+            <span style="font-weight: bold;">local</span> <span style="font-weight: bold; font-style: italic;">message</span>=<span style="font-style: italic;">"clipboard-copy: Platform $(</span><span style="font-weight: bold;">uname</span><span style="font-style: italic;"> -s) not supported or "</span>
+            <span style="font-weight: bold; font-style: italic;">message</span>+=<span style="font-style: italic;">"xclip/xsel not installed"</span>
+            print message &gt;&amp;2
+            <span style="font-weight: bold;">return</span> 1
+        <span style="font-weight: bold;">fi</span>
+    <span style="font-weight: bold;">fi</span>
+}
+
+clipboard-copy $<span style="font-weight: bold; font-style: italic;">@</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-shell"><span style="font-weight: bold; font-style: italic;">#</span><span style="font-weight: bold; font-style: italic;">!/bin/</span><span style="font-weight: bold;">zsh</span>
+
+<span style="font-weight: bold; font-style: italic;"># </span><span style="font-weight: bold; font-style: italic;">Pastes data from the clipboard to stdout</span>
+<span style="font-weight: bold;">function</span> <span style="font-weight: bold;">clipboard-paste</span>() {
+    emulate -L zsh
+    <span style="font-weight: bold; font-style: italic;"># </span><span style="font-weight: bold; font-style: italic;">If there's no X11 display, then fallback to our hacky reimplementation.  The</span>
+    <span style="font-weight: bold; font-style: italic;"># </span><span style="font-weight: bold; font-style: italic;">data is populated by clipboard-copy.</span>
+    <span style="font-weight: bold;">if</span> ! has-display; <span style="font-weight: bold;">then</span>
+        <span style="font-weight: bold;">local</span> <span style="font-weight: bold; font-style: italic;">fake_clipboard</span>=/tmp/clipboard-data.txt
+        [[ -e $<span style="font-weight: bold; font-style: italic;">fake_clipboard</span> ]] &amp;&amp; cat $<span style="font-weight: bold; font-style: italic;">fake_clipboard</span>
+        <span style="font-weight: bold;">return</span>
+    <span style="font-weight: bold;">fi</span>
+
+    <span style="font-weight: bold;">if</span> is-darwin; <span style="font-weight: bold;">then</span>
+        pbpaste
+    <span style="font-weight: bold;">elif</span> is-cygwin; <span style="font-weight: bold;">then</span>
+        cat /dev/clipboard
+    <span style="font-weight: bold;">else</span>
+        <span style="font-weight: bold;">if</span> command-exists xclip; <span style="font-weight: bold;">then</span>
+            xclip -out -selection clipboard
+        <span style="font-weight: bold;">elif</span> command-exists xsel; <span style="font-weight: bold;">then</span>
+            xsel --clipboard --output
+        <span style="font-weight: bold;">else</span>
+            <span style="font-weight: bold; font-style: italic;">message</span>=<span style="font-style: italic;">"clipboard-paste: Platform $GRML_OSTYPE not supported "</span>
+            <span style="font-weight: bold; font-style: italic;">message</span>+=<span style="font-style: italic;">"or xclip/xsel not installed"</span>
+            print $<span style="font-weight: bold; font-style: italic;">message</span> &gt;&amp;2
+            <span style="font-weight: bold;">return</span> 1
+        <span style="font-weight: bold;">fi</span>
+    <span style="font-weight: bold;">fi</span>
+}
+
+clipboard-paste $<span style="font-weight: bold; font-style: italic;">@</span>
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgc3146fb" class="outline-2">
+<h2 id="org41175b2"><a id="orgc3146fb"></a>问题:粘贴的文本在终端中逐字解释</h2>
+<div class="outline-text-2" id="text-org41175b2">
+<p>
+当终端中粘贴内容时，终端将与输入命令序列相同的方式解释您所粘贴的内容。
+参见<a href="https://thejh.net/misc/website-terminal-copy-paste">本网站</a>了解定位剪贴板攻击的示例。由此产生的<a href="https://news.ycombinator.com/item?id=5508225">Hacker News</a>和<a href="https://www.reddit.com/r/netsec/comments/1bv359/dont_copypaste_from_website_to_terminal_demo/">Reddit</a>的讨论也值得一看。
+</p>
+
+<p>
+我们希望能够在不执行命令的情况下整合粘贴的内容。ZSH可以使用<a href="http://zsh.sourceforge.net/doc/release/zsh-lineeditor.html">ZSH line editor</a> (ZLE)和  <a href="http://zsh.sourceforge.net/Doc/Release/Zsh-Line-Editor.html#Zle-Widgets">widgets</a> 来编辑多行文本。
+因此，我们可以将粘贴的文本转储到编辑缓冲区中，同时保证它不会被执行。
+</p>
+
+<p>
+注意: 启用 Bracketed paste mode 后似乎没有必要使用本方法，但我不能100%肯定能防范所有剪贴板攻击。
+</p>
+
+<p>
+widget-paste-from-clipboard
+</p>
+<div class="org-src-container">
+<pre class="src src-shell"><span style="font-weight: bold; font-style: italic;">#</span><span style="font-weight: bold; font-style: italic;">!/bin/</span><span style="font-weight: bold;">zsh</span>
+
+<span style="font-weight: bold; font-style: italic;"># </span><span style="font-weight: bold; font-style: italic;">Pastes the current clipboard and adds it to the kill ring.</span>
+<span style="font-weight: bold;">function</span> <span style="font-weight: bold;">widget-paste-from-clipboard</span>() {
+    <span style="font-weight: bold;">local</span> <span style="font-weight: bold; font-style: italic;">paste_data</span>=$(<span style="font-weight: bold;">clipboard-paste</span> <span style="font-style: italic;">\</span>
+                           | remove-trailing-empty-lines <span style="font-style: italic;">\</span>
+                           | remove-leading-empty-lines)
+    zle copy-region-as-kill <span style="font-style: italic;">"$paste_data"</span>
+    <span style="font-weight: bold; font-style: italic;">LBUFFER</span>=${<span style="font-weight: bold; font-style: italic;">LBUFFER</span>}${<span style="font-weight: bold; font-style: italic;">paste_data</span>}
+}
+</pre>
+</div>
+
+
+<p>
+然后，我们在ZSH中绑定这个函数。
+</p>
+
+<pre class="example">
+# Gotta catch them all.
+bindkey -M emacs 'C-y' widget-paste-from-clipboard
+bindkey -M viins 'C-y' widget-paste-from-clipboard
+bindkey -M vicmd 'C-y' widget-paste-from-clipboard
+</pre>
+</div>
+</div>
+
+<div id="outline-container-org47e821a" class="outline-2">
+<h2 id="org74b37b7"><a id="org47e821a"></a>问题:终端Emacs无法访问剪贴板</h2>
+<div class="outline-text-2" id="text-org74b37b7">
+<p>
+在GUI Emacs中，一切都很好地集成在一起。在终端模式，即 <code>emacs -nw</code>, <a href="http://stackoverflow.com/questions/4580835">emacs没有链接</a> 到任何X11库。
+因此，在终端模式下，Emacs不知道如何从剪切板读取数据或将数据放到剪贴板上。我们可以通过两个步骤为终端Emacs启用剪贴板访问。
+</p>
+
+<ol class="org-ol">
+<li>通过tmux识别我们什么时候粘贴到Emacs。</li>
+<li>使用emacsclient调用带有粘贴数据的函数。</li>
+</ol>
+
+<p>
+注意:这里假定Emacs始终在tmux会话中运行。
+</p>
+
+<p>
+第一步，我们需要 <code>$PATH</code> 包含以下shell函数。
+</p>
+
+<p>
+~/bin/tmux-smart-paste
+</p>
+<div class="org-src-container">
+<pre class="src src-shell"><span style="font-weight: bold; font-style: italic;">#</span><span style="font-weight: bold; font-style: italic;">!/bin/</span><span style="font-weight: bold;">zsh</span>
+
+<span style="font-weight: bold; font-style: italic;"># </span><span style="font-weight: bold; font-style: italic;">Paste specially into programs that know how to handle paste events.</span>
+<span style="font-weight: bold;">function</span> <span style="font-weight: bold;">tmux-smart-paste</span>() {
+    <span style="font-weight: bold; font-style: italic;"># </span><span style="font-weight: bold; font-style: italic;">display-message -p prints to stdout.</span>
+    <span style="font-weight: bold;">local</span> <span style="font-weight: bold; font-style: italic;">current_program</span>=$(<span style="font-weight: bold;">tmux</span> display-message -p <span style="font-style: italic;">'#{window_name}'</span>)
+    <span style="font-weight: bold;">if</span> [[ $<span style="font-weight: bold; font-style: italic;">current_program</span> == <span style="font-style: italic;">'zsh'</span> ]]; <span style="font-weight: bold;">then</span>
+        <span style="font-weight: bold; font-style: italic;"># </span><span style="font-weight: bold; font-style: italic;">ZSH must have C-y bound to a smart paste for this to work.</span>
+        tmux send-keys <span style="font-style: italic;">'C-y'</span>
+    <span style="font-weight: bold;">elif</span> [[ ${<span style="font-weight: bold; font-style: italic;">current_program</span>:l} == <span style="font-style: italic;">'emacs'</span> ]]; <span style="font-weight: bold;">then</span>
+        emacsclient --no-wait --alternate-editor=false --quiet <span style="font-style: italic;">\</span>
+                    --eval <span style="font-style: italic;">"(my:paste-from-emacs-client)"</span> <span style="font-style: italic;">\</span>
+                    2&gt;&amp;1 &gt; /dev/null
+    <span style="font-weight: bold;">else</span>
+        tmux set-buffer <span style="font-style: italic;">"$(</span><span style="font-weight: bold;">clipboard-paste</span><span style="font-style: italic;">)"</span>
+        tmux paste-buffer
+    <span style="font-weight: bold;">fi</span>
+}
+tmux-smart-paste
+</pre>
+</div>
+
+
+<p>
+Next, we bind <code>tmux-smart-paste</code> in tmux.conf to <code>C-y</code>.
+接下来，我们在tmux.conf中绑定 <code>tmux-smart-paste</code> 为 <code>C-y</code>.
+</p>
+
+<pre class="example">
+bind-key -T root C-y run-shell "tmux-smart-paste"
+</pre>
+
+<p>
+第二步，我们需要以下emacs-lisp函数。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">my:paste-from-emacs-client</span> ()
+  <span style="font-style: italic;">"Paste into a terminal Emacs."</span>
+  (<span style="font-weight: bold;">if</span> window-system
+      (<span style="font-weight: bold;">error</span> <span style="font-style: italic;">"Trying to paste into GUI emacs."</span>)
+    (<span style="font-weight: bold;">let</span> ((paste-data (s-trim (shell-command-to-string <span style="font-style: italic;">"clipboard-paste"</span>))))
+
+
+      (<span style="font-weight: bold;">with-current-buffer</span> (window-buffer)
+        (insert paste-data))
+
+      (kill-new paste-data))))
+</pre>
+</div>
+
+<p>
+注意:终端Emacs必须运行<a href="https://www.gnu.org/software/emacs/manual/html_node/emacs/Emacs-Server.html">服务端</a>才能工作。
+</p>
+</div>
+</div>
+
+<div id="outline-container-org9dc7c98" class="outline-2">
+<h2 id="org22a8106"><a id="org9dc7c98"></a>问题:tmux使用paste buffer而不是剪贴板</h2>
+<div class="outline-text-2" id="text-org22a8106">
+<p>
+较新的tmux版本中的 <code>copy-pipe-and-cancel</code> 正是我们所需要的。它只在visual selection 模式下使用 <code>y</code> 粘帖所选内容。
+</p>
+
+<pre class="example">
+bind-key -T copy-mode-vi 'y' send-keys -X copy-pipe-and-cancel "clipboard-copy"
+</pre>
+</div>
+</div>
+
+<div id="outline-container-orgbdfc0a5" class="outline-2">
+<h2 id="org4700e37"><a id="orgbdfc0a5"></a>问题:macOS下的tmux无法访问剪贴板</h2>
+<div class="outline-text-2" id="text-org4700e37">
+<p>
+关于tmux和macOS整合的权威参考文献是ChrisJohnsen的<a href="https://github.com/ChrisJohnsen/tmux-MacOSX-pasteboard">tmux-macosx-pasteboard</a> 仓库。
+这里的问题是 <code>pbpaste</code> 和 <code>pbcopy</code> 在tmux下不起作用。这个问题可以通过某个没有写入文档的函数来解决。
+</p>
+
+<ol class="org-ol">
+<li><p>
+安装 <code>reattach-to-user-namespace</code>.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell">brew install reattach-to-user-namespace
+</pre>
+</div></li>
+
+<li><p>
+将tmux配置为使用 <code>reattachto-user-namespace</code> 来调用shell。
+</p>
+
+<p>
+tmux.conf - load Darwin conf
+</p>
+<div class="org-src-container">
+<pre class="src src-shell"><span style="font-weight: bold; font-style: italic;"># </span><span style="font-weight: bold; font-style: italic;">NOTE: tmux runs commands with 'sh', so the command must be POSIX compliant.</span>
+<span style="font-weight: bold; font-style: italic;"># </span><span style="font-weight: bold; font-style: italic;">That means no ZSH functions. Use executables on PATH instead.</span>
+if-shell <span style="font-style: italic;">'[ "$(</span><span style="font-weight: bold;">uname</span><span style="font-style: italic;"> -s)" = "Darwin" ]'</span> <span style="font-style: italic;">'source-file ~/.config/tmux/osx.conf'</span>
+</pre>
+</div>
+
+<p>
+~/.config/tmux/osx.conf
+</p>
+<div class="org-src-container">
+<pre class="src src-shell"><span style="font-weight: bold; font-style: italic;"># </span><span style="font-weight: bold; font-style: italic;">Tmux options for OSX.</span>
+
+<span style="font-weight: bold; font-style: italic;"># </span><span style="font-weight: bold; font-style: italic;">Hack to enable pbcopy and pbpaste to work in Tmux.  See</span>
+<span style="font-weight: bold; font-style: italic;"># </span><span style="font-weight: bold; font-style: italic;">https://github.com/ChrisJohnsen/tmux-MacOSX-pasteboard.</span>
+set-option -g default-command <span style="font-style: italic;">'reattach-to-user-namespace -l zsh'</span>
+</pre>
+</div></li>
+</ol>
+</div>
+</div>
+
+<div id="outline-container-org83031ac" class="outline-2">
+<h2 id="orga3ac8e2"><a id="org83031ac"></a>问题:远程SSH sesssions无法通过剪贴板访问本地会话</h2>
+<div class="outline-text-2" id="text-orga3ac8e2">
+<p>
+当你通过SSH登录远程计算机时，若能在终端复制文本在本地计算机用那就太好了. 通常，人们的实现方法是通过鼠标选择文本然后在终端模拟器(例如 <i>iterm2</i>)上调用复制 。
+</p>
+
+<p>
+我们希望能够使用普通的tmux命令从远程SSH会话复制文本，并将其放在本地剪贴板上。
+<a href="https://github.com/wincent/clipper">Clipper</a>就是为这个使用场景量身定制的，因为它提供了“供本地和远程tmux会话访问的剪贴板”。
+clipper在远程服务器和本地运行后，我们就可以通过修改 <code>clipboard-copy</code> 函数向它发送数据了。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-shell"><span style="font-weight: bold;">function</span> <span style="font-weight: bold;">clipboard-copy</span>() {
+    <span style="font-weight: bold;">local</span> <span style="font-weight: bold; font-style: italic;">clipper_port</span>=8377
+    <span style="font-weight: bold;">if</span> is-ssh &amp;&amp; is-port-in-use $<span style="font-weight: bold; font-style: italic;">clipper_port</span>; <span style="font-weight: bold;">then</span>
+
+        nc localhost $<span style="font-weight: bold; font-style: italic;">clipper_port</span>
+        <span style="font-weight: bold;">return</span>
+    <span style="font-weight: bold;">fi</span>
+
+}
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orga71bb26" class="outline-2">
+<h2 id="org6e0f726"><a id="orga71bb26"></a>配置文件中的最新代码</h2>
+<div class="outline-text-2" id="text-org6e0f726">
+<p>
+最新代码在我的 <a href="https://github.com/jschaf/dotfiles/blob/master/bin/clipboard-copy">dotfiles</a> 仓库中。有意思的部分包括 <a href="https://github.com/jschaf/dotfiles/blob/master/bin/clipboard-copy">clipboard-copy</a>, <a href="https://github.com/jschaf/dotfiles/blob/master/bin/clipboard-paste">clipboard-paste</a>, <a href="https://github.com/jschaf/dotfiles/blob/master/layers/joe/config.el#L828">Emacs整合</a> 以及 <a href="https://github.com/jschaf/dotfiles/blob/master/tmux.conf#L66">tmux整合</a>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org97f7f8c" class="outline-2">
+<h2 id="orgedd7683"><a id="org97f7f8c"></a>文献</h2>
+<div class="outline-text-2" id="text-orgedd7683">
+<p>
+<a href="https://en.wikipedia.org/w/index.php?title=X_Window_selection&amp;oldid=744898565">X Window Selection</a>
+</p>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2018-05-31</span>
+            <span title="last modification date" class="post-info">2020-02-02</span>
+            <span title="tags" class="post-info">:<a href="../../../../../tags/emacs-common">emacs-common</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-b695368b-52d1-4dd8-b9c6-27514690c9f9">lujun9972</a></span>
+        </div>
+    <script src="../../../../../media/js/jquery-2.1.3.min.js"></script>
+    <script src="../../../../../media/js/md5.min.js"></script>
+        <section>
+            <div id="gitalk-container"></div>
+            <script type="text/javascript">
+             var gitalk = new Gitalk({
+                 clientID: 'fdcb5d9da3f4acb4862c',
+                 clientSecret: 'dd0a16312a206782cb7669dcec5e96874ab48170',
+                 repo: 'lujun9972.github.com',
+                 owner: 'lujun9972',
+                 admin: ['lujun9972'],
+                 id: md5(location.pathname),      // Ensure uniqueness and length less than 50
+                 distractionFreeMode: false  // Facebook-like distraction free mode
+             })
+             gitalk.render('gitalk-container')
+            </script>
+        </section>
+    <script src="../../../../../media/js/main.js"></script>
+        <script>
+         var _hmt = _hmt || [];
+         (function() {
+             var hm = document.createElement("script");
+             hm.src = "https://hm.baidu.com/hm.js?7bac4fd0247f69c27887e0d4e3aee41e";
+             var s = document.getElementsByTagName("script")[0]; 
+             s.parentNode.insertBefore(hm, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-b695368b-52d1-4dd8-b9c6-27514690c9f9">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="../../../../../instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>
