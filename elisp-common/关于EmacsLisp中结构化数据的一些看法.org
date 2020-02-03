@@ -1,0 +1,248 @@
+#+TITLE: 关于EmacsLisp中结构化数据的一些看法
+#+URL: http://nullprogram.com/blog/2018/02/14/
+#+AUTHOR: lujun9972
+#+TAGS: elisp-common
+#+DATE: [2018年 03月 22日 星期四 17:04:48 CST]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+那么，你的Emacs包已经超过了十几行代码，并且它使用了结构化和异构的数据。 简单的列表，莫名其妙的lisp代码，已经不能再这样继续下去了。
+你真的需要清晰对结构进行抽象，这既为了组织，也为了阅读代码的人。
+
+使用列表作为结构时，您可能会经常问这样的问题，“‘name’槽是存储在第三个列表元素中，还是存储在第四个元素中?”
+plist和alist可以帮助解决这个问题，但它们更适合不规范的,外部环境提供的数据，而不适合具有固定插槽的内部结构。
+偶尔有人建议使用散列表作为结构，但是Emacs Lisp的散列表太重了。散列表更适合于当键本身是数据时使用。
+
+* 从零开始定义数据结构
+:PROPERTIES:
+:CUSTOM_ID: defining-a-data-structure-from-scratch
+:END:
+
+想象一个冰箱,在冰箱中装着食物。食物可以被构造成一个普通列表，在特定的位置放特定的东西。
+
+#+begin_src emacs-lisp
+  (defun fridge-item-create (name expiry weight)
+    (list name expiry weight))
+#+end_src
+
+计算食品平均重量的函数可能是这样的:
+
+#+begin_src emacs-lisp
+  (defun fridge-mean-weight (items)
+    (if (null items)
+        0.0
+      (let ((sum 0.0)
+            (count 0))
+        (dolist (item items (/ sum count))
+          (setf count (1+ count)
+                sum (+ sum (nth 2 item)))))))
+#+end_src
+
+注意最后使用了 =(nth 2 item)= 来获得该物品的重量。 这个神奇的数字2很容易让人困惑。更糟糕的是，如果大量代码以这种方式访问“重量”，那么未来的扩展将受到限制。定义一些访问函数可以解决这个问题。
+
+#+begin_src emacs-lisp
+  (defsubst fridge-item-name (item)
+    (nth 0 item))
+
+  (defsubst fridge-item-expiry (item)
+    (nth 1 item))
+
+  (defsubst fridge-item-weight (item)
+    (nth 2 item))
+#+end_src
+
+=defsubst= 定义了一个内联函数，因此与直接 =nth= 相比，这些访问函数实际上没有额外的运行时成本。
+由于这些函数只用来获取属性值，因此我们还应该使用内置的gv(通用变量)包定义一些setter。
+
+#+begin_src emacs-lisp
+  (require 'gv)
+
+  (gv-define-setter fridge-item-name (value item)
+    `(setf (nth 0 ,item) ,value))
+
+  (gv-define-setter fridge-item-expiry (value item)
+    `(setf (nth 1 ,item) ,value))
+
+  (gv-define-setter fridge-item-weight (value item)
+    `(setf (nth 2 ,item) ,value))
+#+end_src
+
+这使每个属性可通过setf进行赋值。通用变量对于简化api非常有用，因为不如不这样就需要定义相同数量的setter函数了 (=fridg-item-set-name=,等等)。
+通用变量能够提供相同的入口点:
+
+#+begin_src emacs-lisp
+  (setf (fridge-item-name item) "Eggs")
+#+end_src
+
+这里有两个更重要的改进。
+
+1. 就Emacs Lisp而言，这些list不是一个真正的类型。它的类型只是由包的约定虚构的。很容易错将其他列表传递给这些 =frige-item= 函数，且只要该list至少有三个项目，就不会发现错误。一种常见的解决方案是添加类型标记:在结构的开头添加标识它的符号。
+
+2. 它仍然是一个链表，并且 =nth= 必须遍历该链表(即 =O(n)= )来检索项。使用向量会更有效，把它变成一个有效的 =O(1)= 运算。
+
+下面代码同时解决这两个问题:
+
+#+begin_src emacs-lisp
+  (defun fridge-item-create (name expiry weight)
+    (vector 'fridge-item name expiry weight))
+
+  (defsubst fridge-item-p (object)
+    (and (vectorp object)
+         (= (length object) 4)
+         (eq 'fridge-item (aref object 0))))
+
+  (defsubst fridge-item-name (item)
+    (unless (fridge-item-p item)
+      (signal 'wrong-type-argument (list 'fridge-item item)))
+    (aref item 1))
+
+  (defsubst fridge-item-name--set (item value)
+    (unless (fridge-item-p item)
+      (signal 'wrong-type-argument (list 'fridge-item item)))
+    (setf (aref item 1) value))
+
+  (gv-define-setter fridge-item-name (value item)
+    `(fridge-item-name--set ,item ,value))
+
+  ;; And so on for expiry and weight...
+#+end_src
+
+只要 =fridg-mean-weight= 使用 =fridg-item-weight= 访问器，它就可以在数据结构改变时本身也无需修改。
+但是，唷，这要为包中的每个数据结构编写和维护大量的样板! 用宏能够完美解决样板代码生成的问题。幸运的是，Emacs已经定义了一个宏来生成所有这些代码: =cl-defstruct=.
+
+#+begin_src emacs-lisp
+  (require 'cl)
+
+  (cl-defstruct fridge-item
+    name expiry weight)
+#+end_src
+
+在Emacs 25和更早的版本中，这个看起来很简单的定义会扩展为上面所列的所有代码。
+它生成的代码以对应版本Emacs的[[http://nullprogram.com/blog/2017/01/30/][最优形式]]表达，并通过使用 =side-effect-free= 和 =error-free= 等函数声明来进行多重优化。
+它也是可配置的，允许去除类型标记(=:named=)——丢弃所有类型检查——或者使用列表而不是向量作为底层结构(=:type=)。
+它甚至支持简单的结构继承，允许直接嵌入其他结构(=:include=)。
+
+** 两个陷阱
+:PROPERTIES:
+:CUSTOM_ID: two-pitfalls
+:END:
+
+不过，这里有几个陷阱。首先，由于历史原因, *宏会定义两个没有名称空间的函数: =make-NAME= 和 =copy-NAME= .*  
+我总是重载这些函数，更倾向于对构造函数在结尾加 =-create= 的约定，且不定义copy函数，因为它要么毫无用处，要么在语义上是错误的。
+
+#+begin_src emacs-lisp
+  (cl-defstruct (fridge-item (:constructor fridge-item-create)
+                             (:copier nil))
+    name expiry weight)
+#+end_src
+
+如果构造函数不仅仅只是设置初值，通常会定义一个“私有”的构造函数(名称带双破折号)，并用一个具有附加行为的“公有”构造函数包装它。
+
+#+begin_src emacs-lisp
+  (cl-defstruct (fridge-item (:constructor fridge-item--create)
+                             (:copier nil))
+    name expiry weight entry-time)
+
+  (cl-defun fridge-item-create (&rest args)
+    (apply #'fridge-item--create :entry-time (float-time) args))
+#+end_src
+
+另一个陷阱与打印有关。在Emacs 25和更早的版本中，由 =cl-defstruct= 定义的类型仍然只是约定的虚拟类型.
+就Emacs Lisp而言，它们实际上只是向量。这样做的一个好处是[[http://nullprogram.com/blog/2013/12/30/][print和read]]这些结构是“无需定义的”，因为向量本身是可以打印的。
+序列化 =cl-defstruct= 结构到文件也很简单。参见[[http://nullprogram.com/blog/2013/09/09/][Elfeed数据库是如何工作的]]。
+
+问题是, *一旦结构被序列化后，就不会再修改 =cl-defstruct= 的定义了.* 它现在是一个文件格式定义，所以属性位置被锁定了,直到永远。
+
+Emacs 26给这一切带来了麻烦，尽管从长远来看是值得的。
+Emacs 26中有一个新的基本类型，它有自己的reader语法:recorder。
+它类似于散列表[[http://nullprogram.com/blog/2010/06/07/][在Emacs 23.2中有了自己的reader]]。在Emacs 26中, =cl-defstruct= 使用recorder而不是向量。
+
+#+begin_src emacs-lisp
+  ;; Emacs 25:
+  (fridge-item-create :name "Eggs" :weight 11.1)
+  ;; => [cl-struct-fridge-item "Eggs" nil 11.1]
+
+  ;; Emacs 26:
+  (fridge-item-create :name "Eggs" :weight 11.1)
+  ;; => #s(fridge-item "Eggs" nil 11.1)
+#+end_src
+
+到目前为止，属性仍然使用 =aref= 访问，所有类型检查仍然在Emacs Lisp中进行。惟一实际的更改是在分配结构时使用 =record= 函数代替 =vector=函数.但它确实为未来更有趣的事情的出现铺平了道路。
+
+主要的短期缺点是它破坏了Emacs 25/26之间打印的兼容性. =cl-old-struct-compat-mode= 函数可以实现某种程度的向后兼容性，但不能用于向前兼容性。
+Emacs 26可以读取和使用Emacs 25及更早版本打印的结构，但是反过来就不行了。
+这个问题最初是[[https://debbugs.gnu.org/cgi/bugreport.cgi?bug=27617][影响到了Emacs的内置包]]，当Emacs 26发布时，我们将在外部包中看到更多这样的问题。
+
+* 动态分派
+:PROPERTIES:
+:CUSTOM_ID: dynamic-dispatch
+:END:
+
+在Emacs 25之前，主要实现动态分派的内置包(专门针对其参数的运行时类型的函数)是EIEIO，尽管它只支持单分派(只针对某个参数进行分派)。EIEIO将许多公共Lisp对象系统(CLOS)的功能引入了Emacs Lisp，包括类和方法。
+
+Emacs 25引入了一个更复杂的动态分派包，称为cl-generic.
+它只关注动态分派，支持多分派，完全替代了EIEIO的动态分派功能.
+由于 =cl-defstruct= 实现继承，而cl-generic实现动态分派，所以EIEIO就没有什么可做的了——除了像多重继承和方法组合这样的坏主意。
+
+除了这两个包，在 =cl-defstruct= 上构建单分派的最直接方法是[[http://nullprogram.com/blog/2014/10/21/][将一个函数放到某个属性中]]。那么“方法”就是调用这个函数的包装器。
+
+#+begin_src emacs-lisp
+  ;; Base "class"
+
+  (cl-defstruct greeter
+    greeting)
+
+  (defun greet (thing)
+    (funcall (greeter-greeting thing) thing))
+
+  ;; Cow "class"
+
+  (cl-defstruct (cow (:include greeter)
+                     (:constructor cow--create)))
+
+  (defun cow-create ()
+    (cow--create :greeting (lambda (_) "Moo!")))
+
+  ;; Bird "class"
+
+  (cl-defstruct (bird (:include greeter)
+                      (:constructor bird--create)))
+
+  (defun bird-create ()
+    (bird--create :greeting (lambda (_) "Chirp!")))
+
+  ;; Usage:
+
+  (greet (cow-create))
+  ;; => "Moo!"
+
+  (greet (bird-create))
+  ;; => "Chirp!"
+#+end_src
+
+因为cl-generic知道由 =cl-defstruct= 创建的类型，所以函数可以对它们进行定制化，就像它们是原生类型一样。
+让cl-generic来完成所有的工作要简单得多。读你代码的人也会喜欢:
+
+#+begin_src emacs-lisp
+  (require 'cl-generic)
+
+  (cl-defgeneric greet (greeter))
+
+  (cl-defstruct cow)
+
+  (cl-defmethod greet ((_ cow))
+    "Moo!")
+
+  (cl-defstruct bird)
+
+  (cl-defmethod greet ((_ bird))
+    "Chirp!")
+
+  (greet (make-cow))
+  ;; => "Moo!"
+
+  (greet (make-bird))
+  ;; => "Chirp!"
+#+end_src
+
+大多数情况下，简单的 =cl-defstruct= 就能满足你的需要.只要记住构造函数和复制器名称的问题,它的使用就应该和定义函数一样自然。
