@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>关于EmacsLisp中结构化数据的一些看法 - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="elisp-common" />
+  <!-- <link rel="stylesheet" href="../../../../../media/css/main.css" type="text/css"/>
+       <link rel="stylesheet" href="../../../../../media/css/comment.css" type="text/css"/> -->
+  <link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/kognise/water.css@latest/dist/dark.css'>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="../../../../../">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <ul class="trigger">
+        <li><a href="../../../../../years/">Years</a></li>
+        <li><a href="../../../../../authors/">Authors</a></li>
+        <li><a href="../../../../../tags/">Tags</a></li>
+        <li><a href="../../../../../about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="../../../../../rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="https://www.bing.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">关于EmacsLisp中结构化数据的一些看法</h1>
+<div id="table-of-contents">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#defining-a-data-structure-from-scratch">从零开始定义数据结构</a>
+<ul>
+<li><a href="#two-pitfalls">两个陷阱</a></li>
+</ul>
+</li>
+<li><a href="#dynamic-dispatch">动态分派</a></li>
+</ul>
+</div>
+</div>
+<p>
+那么，你的Emacs包已经超过了十几行代码，并且它使用了结构化和异构的数据。 简单的列表，莫名其妙的lisp代码，已经不能再这样继续下去了。
+你真的需要清晰对结构进行抽象，这既为了组织，也为了阅读代码的人。
+</p>
+
+<p>
+使用列表作为结构时，您可能会经常问这样的问题，“‘name’槽是存储在第三个列表元素中，还是存储在第四个元素中?”
+plist和alist可以帮助解决这个问题，但它们更适合不规范的,外部环境提供的数据，而不适合具有固定插槽的内部结构。
+偶尔有人建议使用散列表作为结构，但是Emacs Lisp的散列表太重了。散列表更适合于当键本身是数据时使用。
+</p>
+
+<div id="outline-container-orgb451300" class="outline-2">
+<h2 id="defining-a-data-structure-from-scratch"><a id="orgb451300"></a>从零开始定义数据结构</h2>
+<div class="outline-text-2" id="text-defining-a-data-structure-from-scratch">
+<p>
+想象一个冰箱,在冰箱中装着食物。食物可以被构造成一个普通列表，在特定的位置放特定的东西。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">fridge-item-create</span> (name expiry weight)
+  (list name expiry weight))
+</pre>
+</div>
+
+<p>
+计算食品平均重量的函数可能是这样的:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">fridge-mean-weight</span> (items)
+  (<span style="font-weight: bold;">if</span> (null items)
+      0.0
+    (<span style="font-weight: bold;">let</span> ((sum 0.0)
+          (count 0))
+      (<span style="font-weight: bold;">dolist</span> (item items (/ sum count))
+        (<span style="font-weight: bold;">setf</span> count (1+ count)
+              sum (+ sum (nth 2 item)))))))
+</pre>
+</div>
+
+<p>
+注意最后使用了 <code>(nth 2 item)</code> 来获得该物品的重量。 这个神奇的数字2很容易让人困惑。更糟糕的是，如果大量代码以这种方式访问“重量”，那么未来的扩展将受到限制。定义一些访问函数可以解决这个问题。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defsubst</span> <span style="font-weight: bold;">fridge-item-name</span> (item)
+  (nth 0 item))
+
+(<span style="font-weight: bold;">defsubst</span> <span style="font-weight: bold;">fridge-item-expiry</span> (item)
+  (nth 1 item))
+
+(<span style="font-weight: bold;">defsubst</span> <span style="font-weight: bold;">fridge-item-weight</span> (item)
+  (nth 2 item))
+</pre>
+</div>
+
+<p>
+<code>defsubst</code> 定义了一个内联函数，因此与直接 <code>nth</code> 相比，这些访问函数实际上没有额外的运行时成本。
+由于这些函数只用来获取属性值，因此我们还应该使用内置的gv(通用变量)包定义一些setter。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">require</span> '<span style="font-weight: bold; text-decoration: underline;">gv</span>)
+
+(<span style="font-weight: bold;">gv-define-setter</span> fridge-item-name (value item)
+  `(<span style="font-weight: bold;">setf</span> (nth 0 ,item) ,value))
+
+(<span style="font-weight: bold;">gv-define-setter</span> fridge-item-expiry (value item)
+  `(<span style="font-weight: bold;">setf</span> (nth 1 ,item) ,value))
+
+(<span style="font-weight: bold;">gv-define-setter</span> fridge-item-weight (value item)
+  `(<span style="font-weight: bold;">setf</span> (nth 2 ,item) ,value))
+</pre>
+</div>
+
+<p>
+这使每个属性可通过setf进行赋值。通用变量对于简化api非常有用，因为不如不这样就需要定义相同数量的setter函数了 (<code>fridg-item-set-name</code>,等等)。
+通用变量能够提供相同的入口点:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">setf</span> (fridge-item-name item) <span style="font-style: italic;">"Eggs"</span>)
+</pre>
+</div>
+
+<p>
+这里有两个更重要的改进。
+</p>
+
+<ol class="org-ol">
+<li>就Emacs Lisp而言，这些list不是一个真正的类型。它的类型只是由包的约定虚构的。很容易错将其他列表传递给这些 <code>frige-item</code> 函数，且只要该list至少有三个项目，就不会发现错误。一种常见的解决方案是添加类型标记:在结构的开头添加标识它的符号。</li>
+
+<li>它仍然是一个链表，并且 <code>nth</code> 必须遍历该链表(即 <code>O(n)</code> )来检索项。使用向量会更有效，把它变成一个有效的 <code>O(1)</code> 运算。</li>
+</ol>
+
+<p>
+下面代码同时解决这两个问题:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">fridge-item-create</span> (name expiry weight)
+  (vector 'fridge-item name expiry weight))
+
+(<span style="font-weight: bold;">defsubst</span> <span style="font-weight: bold;">fridge-item-p</span> (object)
+  (<span style="font-weight: bold;">and</span> (vectorp object)
+       (= (length object) 4)
+       (eq 'fridge-item (aref object 0))))
+
+(<span style="font-weight: bold;">defsubst</span> <span style="font-weight: bold;">fridge-item-name</span> (item)
+  (<span style="font-weight: bold;">unless</span> (fridge-item-p item)
+    (<span style="font-weight: bold;">signal</span> 'wrong-type-argument (list 'fridge-item item)))
+  (aref item 1))
+
+(<span style="font-weight: bold;">defsubst</span> <span style="font-weight: bold;">fridge-item-name--set</span> (item value)
+  (<span style="font-weight: bold;">unless</span> (fridge-item-p item)
+    (<span style="font-weight: bold;">signal</span> 'wrong-type-argument (list 'fridge-item item)))
+  (<span style="font-weight: bold;">setf</span> (aref item 1) value))
+
+(<span style="font-weight: bold;">gv-define-setter</span> fridge-item-name (value item)
+  `(fridge-item-name--set ,item ,value))
+
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">And so on for expiry and weight...</span>
+</pre>
+</div>
+
+<p>
+只要 <code>fridg-mean-weight</code> 使用 <code>fridg-item-weight</code> 访问器，它就可以在数据结构改变时本身也无需修改。
+但是，唷，这要为包中的每个数据结构编写和维护大量的样板! 用宏能够完美解决样板代码生成的问题。幸运的是，Emacs已经定义了一个宏来生成所有这些代码: <code>cl-defstruct</code>.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">require</span> '<span style="font-weight: bold; text-decoration: underline;">cl</span>)
+
+(<span style="font-weight: bold;">cl-defstruct</span> <span style="font-weight: bold; text-decoration: underline;">fridge-item</span>
+  name expiry weight)
+</pre>
+</div>
+
+<p>
+在Emacs 25和更早的版本中，这个看起来很简单的定义会扩展为上面所列的所有代码。
+它生成的代码以对应版本Emacs的<a href="http://nullprogram.com/blog/2017/01/30/">最优形式</a>表达，并通过使用 <code>side-effect-free</code> 和 <code>error-free</code> 等函数声明来进行多重优化。
+它也是可配置的，允许去除类型标记(<code>:named</code>)——丢弃所有类型检查——或者使用列表而不是向量作为底层结构(<code>:type</code>)。
+它甚至支持简单的结构继承，允许直接嵌入其他结构(<code>:include</code>)。
+</p>
+</div>
+
+<div id="outline-container-org1c36d5b" class="outline-3">
+<h3 id="two-pitfalls"><a id="org1c36d5b"></a>两个陷阱</h3>
+<div class="outline-text-3" id="text-two-pitfalls">
+<p>
+不过，这里有几个陷阱。首先，由于历史原因, <b>宏会定义两个没有名称空间的函数: <code>make-NAME</code> 和 <code>copy-NAME</code> .</b>  
+我总是重载这些函数，更倾向于对构造函数在结尾加 <code>-create</code> 的约定，且不定义copy函数，因为它要么毫无用处，要么在语义上是错误的。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">cl-defstruct</span> (<span style="font-weight: bold; text-decoration: underline;">fridge-item</span> (<span style="font-weight: bold;">:constructor</span> fridge-item-create)
+                           (<span style="font-weight: bold;">:copier</span> nil))
+  name expiry weight)
+</pre>
+</div>
+
+<p>
+如果构造函数不仅仅只是设置初值，通常会定义一个“私有”的构造函数(名称带双破折号)，并用一个具有附加行为的“公有”构造函数包装它。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">cl-defstruct</span> (<span style="font-weight: bold; text-decoration: underline;">fridge-item</span> (<span style="font-weight: bold;">:constructor</span> fridge-item--create)
+                           (<span style="font-weight: bold;">:copier</span> nil))
+  name expiry weight entry-time)
+
+(<span style="font-weight: bold;">cl-defun</span> <span style="font-weight: bold;">fridge-item-create</span> (<span style="font-weight: bold; text-decoration: underline;">&amp;rest</span> args)
+  (apply #'fridge-item--create <span style="font-weight: bold;">:entry-time</span> (float-time) args))
+</pre>
+</div>
+
+<p>
+另一个陷阱与打印有关。在Emacs 25和更早的版本中，由 <code>cl-defstruct</code> 定义的类型仍然只是约定的虚拟类型.
+就Emacs Lisp而言，它们实际上只是向量。这样做的一个好处是<a href="http://nullprogram.com/blog/2013/12/30/">print和read</a>这些结构是“无需定义的”，因为向量本身是可以打印的。
+序列化 <code>cl-defstruct</code> 结构到文件也很简单。参见<a href="http://nullprogram.com/blog/2013/09/09/">Elfeed数据库是如何工作的</a>。
+</p>
+
+<p>
+问题是, <b>一旦结构被序列化后，就不会再修改 <code>cl-defstruct</code> 的定义了.</b> 它现在是一个文件格式定义，所以属性位置被锁定了,直到永远。
+</p>
+
+<p>
+Emacs 26给这一切带来了麻烦，尽管从长远来看是值得的。
+Emacs 26中有一个新的基本类型，它有自己的reader语法:recorder。
+它类似于散列表<a href="http://nullprogram.com/blog/2010/06/07/">在Emacs 23.2中有了自己的reader</a>。在Emacs 26中, <code>cl-defstruct</code> 使用recorder而不是向量。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp"><span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Emacs 25:</span>
+(fridge-item-create <span style="font-weight: bold;">:name</span> <span style="font-style: italic;">"Eggs"</span> <span style="font-weight: bold;">:weight</span> 11.1)
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">=&gt; [cl-struct-fridge-item "Eggs" nil 11.1]</span>
+
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Emacs 26:</span>
+(fridge-item-create <span style="font-weight: bold;">:name</span> <span style="font-style: italic;">"Eggs"</span> <span style="font-weight: bold;">:weight</span> 11.1)
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">=&gt; #s(fridge-item "Eggs" nil 11.1)</span>
+</pre>
+</div>
+
+<p>
+到目前为止，属性仍然使用 <code>aref</code> 访问，所有类型检查仍然在Emacs Lisp中进行。惟一实际的更改是在分配结构时使用 <code>record</code> 函数代替 =vector=函数.但它确实为未来更有趣的事情的出现铺平了道路。
+</p>
+
+<p>
+主要的短期缺点是它破坏了Emacs 25/26之间打印的兼容性. <code>cl-old-struct-compat-mode</code> 函数可以实现某种程度的向后兼容性，但不能用于向前兼容性。
+Emacs 26可以读取和使用Emacs 25及更早版本打印的结构，但是反过来就不行了。
+这个问题最初是<a href="https://debbugs.gnu.org/cgi/bugreport.cgi?bug=27617">影响到了Emacs的内置包</a>，当Emacs 26发布时，我们将在外部包中看到更多这样的问题。
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org5676f24" class="outline-2">
+<h2 id="dynamic-dispatch"><a id="org5676f24"></a>动态分派</h2>
+<div class="outline-text-2" id="text-dynamic-dispatch">
+<p>
+在Emacs 25之前，主要实现动态分派的内置包(专门针对其参数的运行时类型的函数)是EIEIO，尽管它只支持单分派(只针对某个参数进行分派)。EIEIO将许多公共Lisp对象系统(CLOS)的功能引入了Emacs Lisp，包括类和方法。
+</p>
+
+<p>
+Emacs 25引入了一个更复杂的动态分派包，称为cl-generic.
+它只关注动态分派，支持多分派，完全替代了EIEIO的动态分派功能.
+由于 <code>cl-defstruct</code> 实现继承，而cl-generic实现动态分派，所以EIEIO就没有什么可做的了——除了像多重继承和方法组合这样的坏主意。
+</p>
+
+<p>
+除了这两个包，在 <code>cl-defstruct</code> 上构建单分派的最直接方法是<a href="http://nullprogram.com/blog/2014/10/21/">将一个函数放到某个属性中</a>。那么“方法”就是调用这个函数的包装器。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp"><span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Base "class"</span>
+
+(<span style="font-weight: bold;">cl-defstruct</span> <span style="font-weight: bold; text-decoration: underline;">greeter</span>
+  greeting)
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">greet</span> (thing)
+  (funcall (greeter-greeting thing) thing))
+
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Cow "class"</span>
+
+(<span style="font-weight: bold;">cl-defstruct</span> (<span style="font-weight: bold; text-decoration: underline;">cow</span> (<span style="font-weight: bold;">:include</span> greeter)
+                   (<span style="font-weight: bold;">:constructor</span> cow--create)))
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">cow-create</span> ()
+  (cow--create <span style="font-weight: bold;">:greeting</span> (<span style="font-weight: bold;">lambda</span> (_) <span style="font-style: italic;">"Moo!"</span>)))
+
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Bird "class"</span>
+
+(<span style="font-weight: bold;">cl-defstruct</span> (<span style="font-weight: bold; text-decoration: underline;">bird</span> (<span style="font-weight: bold;">:include</span> greeter)
+                    (<span style="font-weight: bold;">:constructor</span> bird--create)))
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">bird-create</span> ()
+  (bird--create <span style="font-weight: bold;">:greeting</span> (<span style="font-weight: bold;">lambda</span> (_) <span style="font-style: italic;">"Chirp!"</span>)))
+
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Usage:</span>
+
+(greet (cow-create))
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">=&gt; "Moo!"</span>
+
+(greet (bird-create))
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">=&gt; "Chirp!"</span>
+</pre>
+</div>
+
+<p>
+因为cl-generic知道由 <code>cl-defstruct</code> 创建的类型，所以函数可以对它们进行定制化，就像它们是原生类型一样。
+让cl-generic来完成所有的工作要简单得多。读你代码的人也会喜欢:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">require</span> '<span style="font-weight: bold; text-decoration: underline;">cl-generic</span>)
+
+(<span style="font-weight: bold;">cl-defgeneric</span> <span style="font-weight: bold;">greet</span> (greeter))
+
+(<span style="font-weight: bold;">cl-defstruct</span> <span style="font-weight: bold; text-decoration: underline;">cow</span>)
+
+(<span style="font-weight: bold;">cl-defmethod</span> <span style="font-weight: bold;">greet</span> ((_ cow))
+  <span style="font-style: italic;">"Moo!"</span>)
+
+(<span style="font-weight: bold;">cl-defstruct</span> <span style="font-weight: bold; text-decoration: underline;">bird</span>)
+
+(<span style="font-weight: bold;">cl-defmethod</span> <span style="font-weight: bold;">greet</span> ((_ bird))
+  <span style="font-style: italic;">"Chirp!"</span>)
+
+(greet (make-cow))
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">=&gt; "Moo!"</span>
+
+(greet (make-bird))
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">=&gt; "Chirp!"</span>
+</pre>
+</div>
+
+<p>
+大多数情况下，简单的 <code>cl-defstruct</code> 就能满足你的需要.只要记住构造函数和复制器名称的问题,它的使用就应该和定义函数一样自然。
+</p>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2018-03-22</span>
+            <span title="last modification date" class="post-info">2020-02-03</span>
+            <span title="tags" class="post-info">:<a href="../../../../../tags/elisp-common">elisp-common</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-58aa46e3-ba18-401e-815e-7a46c6467a0f">lujun9972</a></span>
+        </div>
+    <script src="../../../../../media/js/jquery-2.1.3.min.js"></script>
+    <script src="../../../../../media/js/md5.min.js"></script>
+        <section>
+            <div id="gitalk-container"></div>
+            <script type="text/javascript">
+             var gitalk = new Gitalk({
+                 clientID: 'fdcb5d9da3f4acb4862c',
+                 clientSecret: 'dd0a16312a206782cb7669dcec5e96874ab48170',
+                 repo: 'lujun9972.github.com',
+                 owner: 'lujun9972',
+                 admin: ['lujun9972'],
+                 id: md5(location.pathname),      // Ensure uniqueness and length less than 50
+                 distractionFreeMode: false  // Facebook-like distraction free mode
+             })
+             gitalk.render('gitalk-container')
+            </script>
+        </section>
+    <script src="../../../../../media/js/main.js"></script>
+        <script>
+         var _hmt = _hmt || [];
+         (function() {
+             var hm = document.createElement("script");
+             hm.src = "https://hm.baidu.com/hm.js?7bac4fd0247f69c27887e0d4e3aee41e";
+             var s = document.getElementsByTagName("script")[0]; 
+             s.parentNode.insertBefore(hm, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-58aa46e3-ba18-401e-815e-7a46c6467a0f">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="../../../../../instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>
