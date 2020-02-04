@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Comint:编写你自己的命令解释器 - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="elisp-common" />
+  <!-- <link rel="stylesheet" href="../../../../../media/css/main.css" type="text/css"/>
+       <link rel="stylesheet" href="../../../../../media/css/comment.css" type="text/css"/> -->
+  <link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/kognise/water.css@latest/dist/dark.css'>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="../../../../../">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <ul class="trigger">
+        <li><a href="../../../../../years/">Years</a></li>
+        <li><a href="../../../../../authors/">Authors</a></li>
+        <li><a href="../../../../../tags/">Tags</a></li>
+        <li><a href="../../../../../about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="../../../../../rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="https://www.bing.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">Comint:编写你自己的命令解释器</h1>
+<div id="table-of-contents">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#the-theory">原理</a></li>
+<li><a href="#writing-a-comint-mode">编写Comint模式</a>
+<ul>
+<li><a href="#the-comint-template">Comint模板</a></li>
+<li><a href="#extending-cassandra-mode">扩展Cassandra模式</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+<p>
+Emacs的特点之一是它能够与外部进程交互，并使用Emacs的全部功能(如语法突出显示、宏、命令历史记录等)增加用户体验。
+这种功能在Emacs中由来已久，但很少有人在Emacs中创建自己的命令解释器(也称为comint)，因为他们担心这可能非常困难或根本不可能。
+</p>
+
+<p>
+考虑到这种功能的文档是多么少，人们有这种感觉并不奇怪; 对comint “mode”的零星资料中透露的信息很少，作为一个黑客，你不得不使用源代码，卢克(天行者)。
+</p>
+
+<div id="outline-container-org8ab3f24" class="outline-2">
+<h2 id="the-theory"><a id="org8ab3f24"></a>原理</h2>
+<div class="outline-text-2" id="text-the-theory">
+<p>
+在我演示如何使用comint之前，先简要介绍一下它的工作原理——但是我省略了一些无聊的步骤，所以比较粗略。
+</p>
+
+<p>
+其核心是派生一个进程，并将其stdin、stdout和stderr通过管道重定向到Emacs或者伪终端。
+是重定向到Emacs还是伪终端选择由 <code>process-connection-type</code> 控制，但你不太可能希望手动更改它。
+</p>
+
+<p>
+与流程交互的基础是 <code>start-process</code> (用于异步流程调用)和 =call-process=(用于同步进程调用)。
+</p>
+
+<p>
+再往上一层，我们就有了简单的基本解释器框架. 这就是诸如 <code>M-x shell</code> 和各种REPL模式(如Python)的基础。
+comint可以处理所有的细节，比如输入/输出;命令历史记录;基本输入/输出过滤器hook;等等。
+换句话说，如果你想要一些交互性的东西，但又不满足于comint所能提供的东西，那么它就是你的完美基础。
+使用comint非常简单: <code>comint-run</code> 只接受一个参数 <code>PROGRAM</code>,再没其他内容了; 输入程序的文件路径就可以看着它飞行了。
+更多的配置，可以使用 <code>make-comint-in-buffer</code>.
+</p>
+
+<p>
+<b>关于管道重定向的重要警告:</b> 通常情况下，程序会检测到你将管道重定向到哑终端或文件然后禁用shell提示符;
+这是令人非常沮丧，因为并不是所有的程序都通过查找Emacs设置的签名环境变量(<code>Emacs</code> 和 <code>INSIDE_EMACS</code>)来检测它是否在Emacs内部运行.
+如果发生这种情况，您也许能够幸运地找到一个可以强制设置让它以“交互”模式运行的标志—例如，在Python中的 <code>-i</code>.
+</p>
+
+<p>
+再往上一次，我们可以得到类似 <code>M-x shell</code> 的东西，我之前在 <code>Running Shells in Emacs: An Overview</code> 时提到过。
+</p>
+
+<p>
+最后，你可以通过键入 <code>M-x list-processes</code> 来列出所有正在运行/打开的进程。
+</p>
+</div>
+</div>
+
+<div id="outline-container-org2ae34f0" class="outline-2">
+<h2 id="writing-a-comint-mode"><a id="org2ae34f0"></a>编写Comint模式</h2>
+<div class="outline-text-2" id="text-writing-a-comint-mode">
+<p>
+解决了这个问题之后，让我们来写一点代码。我一直在折腾<a href="http://cassandra.apache.org/">Cassandra</a>数据库，和所有值得尊敬的数据库一样，它有一个很好的命令行界面——但没有Emacs模式!噢,不!
+</p>
+
+<p>
+编写comint模式最重要的一点是记住，获得80%的成功很容易，但是剩下的20%才是真正困难的部分!我在这里只做80% !
+</p>
+
+<p>
+让我们来写一个对应的comint mode. 运行程序 <code>Cassandra-cli</code> 启动Cassandra CLI，得到的输出如下:
+</p>
+
+<pre class="example">
+$ ./cassandra-cli
+Connected to: "Test Cluster" on 127.0.0.1/9160
+Welcome to Cassandra CLI version 1.2.8
+
+Type 'help;' or '?' for help.
+Type 'quit;' or 'exit;' to quit.
+
+[default@unknown]
+</pre>
+
+<p>
+如果通过 <code>comint-run</code> 来运行 <code>cassandra-cli</code> 那就以经有一个可用的交互式进程了。
+它只包含基础功能而且非常简陋，但拥有合理的默认值，并且工作得足够好。如果您想要扩展它，就必须围绕 <code>make-com-in-buffer</code> 来编写自己的包装器函数，并编写相应的major模式。我们来做一下。
+</p>
+</div>
+
+<div id="outline-container-org9398d8a" class="outline-3">
+<h3 id="the-comint-template"><a id="org9398d8a"></a>Comint模板</h3>
+<div class="outline-text-3" id="text-the-comint-template">
+<div class="org-src-container">
+<pre class="src src-lisp">(<span style="font-weight: bold;">defvar</span> <span style="font-weight: bold; font-style: italic;">cassandra-cli-file-path</span> <span style="font-style: italic;">"/opt/cassandra/bin/cassandra-cli"</span>
+  <span style="font-style: italic;">"Path to the program used by `</span><span style="font-weight: bold; font-style: italic; text-decoration: underline;">run-cassandra</span><span style="font-style: italic;">'"</span>)
+
+(<span style="font-weight: bold;">defvar</span> <span style="font-weight: bold; font-style: italic;">cassandra-cli-arguments</span> '()
+  <span style="font-style: italic;">"Commandline arguments to pass to `</span><span style="font-weight: bold; font-style: italic; text-decoration: underline;">cassandra-cli</span><span style="font-style: italic;">'"</span>)
+
+(<span style="font-weight: bold;">defvar</span> <span style="font-weight: bold; font-style: italic;">cassandra-mode-map</span>
+  (<span style="font-weight: bold;">let</span> ((map (nconc (make-sparse-keymap) comint-mode-map)))
+    <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">example definition</span>
+    (define-key map <span style="font-style: italic;">"\t"</span> 'completion-at-point)
+    map)
+  <span style="font-style: italic;">"Basic mode map for `</span><span style="font-weight: bold; font-style: italic; text-decoration: underline;">run-cassandra</span><span style="font-style: italic;">'"</span>)
+
+(<span style="font-weight: bold;">defvar</span> <span style="font-weight: bold; font-style: italic;">cassandra-prompt-regexp</span> <span style="font-style: italic;">"^\\(?:\\[[</span><span style="font-style: italic;">^</span><span style="font-style: italic;">@]+@[</span><span style="font-style: italic;">^</span><span style="font-style: italic;">@]+\\]\\)"</span>
+  <span style="font-style: italic;">"Prompt for `</span><span style="font-weight: bold; font-style: italic; text-decoration: underline;">run-cassandra</span><span style="font-style: italic;">'."</span>)
+</pre>
+</div>
+
+<p>
+我们需要做的第一件事是声明一些合理的变量，这样用户就可以在不编辑代码的情况下更改设置。第一个变量很明显:我们需要存储 <code>cassandra-cli</code> 的路径，这是我们想要运行的程序。
+</p>
+
+<p>
+下一个变量是 <code>cassandra-clil-arguments</code> 用来保存命令行参数列表(空)。
+</p>
+
+<p>
+第三个是一个空的模式映射，用于存储我们自定义的快捷键。它继承自 <code>comint-mode-map</code>,因此拥有与 <code>comint-mode</code> 相同的快捷键。
+</p>
+
+<p>
+最后，我们用 <code>cassandra-prompt-regexp</code> 来存储一个匹配Cassandra的提示样式的正则表达式。
+它的默认值已经可以正常工作了，但有备无患嘛，而且最好是一个只匹配所需内容的正则表达式。
+此外，由于你需要使用这些代码来创建自己的 comint 派生模式，所以无论如何你都是要修改它的。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">run-cassandra</span> ()
+  <span style="font-style: italic;">"Run an inferior instance of `</span><span style="font-weight: bold; font-style: italic; text-decoration: underline;">cassandra-cli</span><span style="font-style: italic;">' inside Emacs."</span>
+  (interactive)
+  (<span style="font-weight: bold;">let*</span> ((cassandra-program cassandra-cli-file-path)
+         (buffer (comint-check-proc <span style="font-style: italic;">"Cassandra"</span>)))
+    <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">pop to the "*Cassandra*" buffer if the process is dead, the</span>
+    <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">buffer is missing or it's got the wrong mode.</span>
+    (pop-to-buffer-same-window
+     (<span style="font-weight: bold;">if</span> (or buffer (not (derived-mode-p 'cassandra-mode))
+             (comint-check-proc (current-buffer)))
+         (get-buffer-create (or buffer <span style="font-style: italic;">"*Cassandra*"</span>))
+       (current-buffer)))
+    <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">create the comint process if there is no buffer.</span>
+    (<span style="font-weight: bold;">unless</span> buffer
+      (apply 'make-comint-in-buffer <span style="font-style: italic;">"Cassandra"</span> buffer
+             cassandra-program cassandra-cli-arguments)
+      (cassandra-mode))))
+</pre>
+</div>
+
+<p>
+这堆乱七八糟代码做了一些基本的整理工作，比如重启Cassandra进程(如果已经在缓冲区中)，或者创建缓冲区(如果缓冲区不存在)。
+是不是觉得太麻烦了，遗憾的是，在 comint 库中缺少相应的宏来减少需要编写的样板代码。
+本函数的主要要点是通过 <code>apply</code> 来调用 <code>make-com-in-buffer</code> 函数。坦白地说，直接调用 <code>make-com-in-buffer</code> 也是可以的，但是你会丢失一些细节，比如可重启的进程等等(译者注：丢失细节这部分没看懂什么意思？);
+但是如果你写的这个comint派生模式仅供个人使用，也不同太关注这些东西。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">cassandra--initialize</span> ()
+  <span style="font-style: italic;">"Helper function to initialize Cassandra"</span>
+  (<span style="font-weight: bold;">setq</span> comint-process-echoes t)
+  (<span style="font-weight: bold;">setq</span> comint-use-prompt-regexp t))
+
+(<span style="font-weight: bold;">define-derived-mode</span> <span style="font-weight: bold;">cassandra-mode</span> comint-mode <span style="font-style: italic;">"Cassandra"</span>
+  <span style="font-style: italic;">"Major mode for `</span><span style="font-weight: bold; font-style: italic; text-decoration: underline;">run-cassandra</span><span style="font-style: italic;">'.</span>
+
+<span style="font-style: italic;">\\&lt;cassandra-mode-map&gt;"</span>
+  nil <span style="font-style: italic;">"Cassandra"</span>
+  <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">this sets up the prompt so it matches things like: [foo@bar]</span>
+  (<span style="font-weight: bold;">setq</span> comint-prompt-regexp cassandra-prompt-regexp)
+  <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">this makes it read only; a contentious subject as some prefer the</span>
+  <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">buffer to be overwritable.</span>
+  (<span style="font-weight: bold;">setq</span> comint-prompt-read-only t)
+  <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">this makes it so commands like M-{ and M-} work.</span>
+  (set (make-local-variable 'paragraph-separate) <span style="font-style: italic;">"\\'"</span>)
+  (set (make-local-variable 'font-lock-defaults) '(cassandra-font-lock-keywords t))
+  (set (make-local-variable 'paragraph-start) cassandra-prompt-regexp))
+
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">this has to be done in a hook. grumble grumble.</span>
+(add-hook 'cassandra-mode-hook 'cassandra--initialize)
+</pre>
+</div>
+
+<p>
+最后，我们终于定义好了自己的major mode。注意到这个模式是从 <code>comint-mode</code> 派生出来的。我用自己的方法覆盖了默认的 <code>comint-prompt-regexp</code>,并且我强制要求提示符是只读的。
+我还添加了一个模式钩子并在其中设置 <code>com-process-echo</code> 为 <code>t=，以避免重复显示我们在屏幕上写入的内容。
+最后，我调整了段落设置，这样您就可以在每个提示符之间使用 =M-{</code> 和 <code>M-}</code> 进行导航了。
+</p>
+
+<p>
+这差不多就是模板的全部内容了。你可以很容易根据需要进行调整，这是一个很好的开始。
+</p>
+
+<p>
+再来让我们在cassandra模式中添加一些很酷的功能:基本语法高亮显示。
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgcf46c96" class="outline-3">
+<h3 id="extending-cassandra-mode"><a id="orgcf46c96"></a>扩展Cassandra模式</h3>
+<div class="outline-text-3" id="text-extending-cassandra-mode">
+<p>
+我要做的第一件事是为运行 <code>help;</code> 获得的命令帮助添加简单的语法高亮显示。
+</p>
+
+<p>
+我们需要想出一些简单的高亮规则。其难点在于:为非正则语言设计正则表达式几乎是不可能的; 特别是当您为一个能输出各种内容的命令行应用程序设计正则时.
+</p>
+
+<p>
+不过，在此之前，让我们先扩展该major模式来支持语法高亮显示(实际上在Emacs术语中称为font locking)。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-lisp">(set (make-local-variable 'font-lock-defaults) '(cassandra-font-lock-keywords t))
+</pre>
+</div>
+
+<p>
+将此语句添加到major模式的主体中区(与现有的setq调用相邻)，然后将以下语句添加到文件的顶部，以存储高亮规则:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-lisp">(defconst cassandra-keywords
+  '(<span style="font-style: italic;">"assume"</span> <span style="font-style: italic;">"connect"</span> <span style="font-style: italic;">"consistencylevel"</span> <span style="font-style: italic;">"count"</span> <span style="font-style: italic;">"create column family"</span>
+    <span style="font-style: italic;">"create keyspace"</span> <span style="font-style: italic;">"del"</span> <span style="font-style: italic;">"decr"</span> <span style="font-style: italic;">"describe cluster"</span> <span style="font-style: italic;">"describe"</span>
+    <span style="font-style: italic;">"drop column family"</span> <span style="font-style: italic;">"drop keyspace"</span> <span style="font-style: italic;">"drop index"</span> <span style="font-style: italic;">"get"</span> <span style="font-style: italic;">"incr"</span> <span style="font-style: italic;">"list"</span>
+    <span style="font-style: italic;">"set"</span> <span style="font-style: italic;">"show api version"</span> <span style="font-style: italic;">"show cluster name"</span> <span style="font-style: italic;">"show keyspaces"</span>
+    <span style="font-style: italic;">"show schema"</span> <span style="font-style: italic;">"truncate"</span> <span style="font-style: italic;">"update column family"</span> <span style="font-style: italic;">"update keyspace"</span> <span style="font-style: italic;">"use"</span>))
+
+(<span style="font-weight: bold;">defvar</span> <span style="font-weight: bold; font-style: italic;">cassandra-font-lock-keywords</span>
+  (list
+   <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">highlight all the reserved commands.</span>
+   `(,(concat <span style="font-style: italic;">"\\_&lt;"</span> (regexp-opt cassandra-keywords) <span style="font-style: italic;">"\\_&gt;"</span>) . font-lock-keyword-face))
+  <span style="font-style: italic;">"Additional expressions to highlight in `</span><span style="font-weight: bold; font-style: italic; text-decoration: underline;">cassandra-mode</span><span style="font-style: italic;">'."</span>)
+</pre>
+</div>
+
+<p>
+这是一个高亮规则:它高亮我从 <code>help;</code> 命令中提取的所有关键字。
+</p>
+
+<p>
+comint exposes a set of filter function variables that're triggered and run (in order, it's a list) when certain conditions are met:
+comint 提供了一组过滤器函数变量，这些变量在满足某些条件时被触发并运行(是列表的化，则按列表顺序执行):
+</p>
+
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-left" />
+
+<col  class="org-left" />
+</colgroup>
+<thead>
+<tr>
+<th scope="col" class="org-left"><b>变量名称</b></th>
+<th scope="col" class="org-left"><b>目的</b></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="org-left"><code>comint-dynamic-complete-functions</code></td>
+<td class="org-left">执行完成后调用的函数列表。</td>
+</tr>
+
+<tr>
+<td class="org-left"><code>comint-input-filter-functions</code></td>
+<td class="org-left">在将输入发送到进程之前调用的异常钩子。</td>
+</tr>
+
+<tr>
+<td class="org-left"><code>comint-output-filter-functions</code></td>
+<td class="org-left">将输出插入buffer后要调用的函数。</td>
+</tr>
+
+<tr>
+<td class="org-left"><code>comint-preoutput-filter-functions</code></td>
+<td class="org-left">将Comint输出插入缓冲区之前要调用的函数列表。</td>
+</tr>
+
+<tr>
+<td class="org-left"><code>comint-redirect-filter-functions</code></td>
+<td class="org-left">插入重定向的进程输出之前要调用的函数列表。</td>
+</tr>
+
+<tr>
+<td class="org-left"><code>comint-redirect-original-filter-function</code></td>
+<td class="org-left">重定向开始时的进程过滤器</td>
+</tr>
+</tbody>
+</table>
+
+<p>
+另一个有用的变量是 <code>com-input-sender</code>,它允许你修改输入流中的字符。令人恼火的是，它的命名方式与上面的过滤器函数不一致。
+</p>
+
+<p>
+您可以使用这些变量来控制如何处理输入和输出以及如何解释中间流。
+</p>
+
+<p>
+这就完成了:一个Emacs中简单的、允许 comint 的 Cassandra CLI。
+</p>
+</div>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2018-10-24</span>
+            <span title="last modification date" class="post-info">2020-02-04</span>
+            <span title="tags" class="post-info">:<a href="../../../../../tags/elisp-common">elisp-common</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-7f2d53c8-f0a1-4cee-aa73-811bb7b89f91">lujun9972</a></span>
+        </div>
+    <script src="../../../../../media/js/jquery-2.1.3.min.js"></script>
+    <script src="../../../../../media/js/md5.min.js"></script>
+        <section>
+            <div id="gitalk-container"></div>
+            <script type="text/javascript">
+             var gitalk = new Gitalk({
+                 clientID: 'fdcb5d9da3f4acb4862c',
+                 clientSecret: 'dd0a16312a206782cb7669dcec5e96874ab48170',
+                 repo: 'lujun9972.github.com',
+                 owner: 'lujun9972',
+                 admin: ['lujun9972'],
+                 id: md5(location.pathname),      // Ensure uniqueness and length less than 50
+                 distractionFreeMode: false  // Facebook-like distraction free mode
+             })
+             gitalk.render('gitalk-container')
+            </script>
+        </section>
+    <script src="../../../../../media/js/main.js"></script>
+        <script>
+         var _hmt = _hmt || [];
+         (function() {
+             var hm = document.createElement("script");
+             hm.src = "https://hm.baidu.com/hm.js?7bac4fd0247f69c27887e0d4e3aee41e";
+             var s = document.getElementsByTagName("script")[0]; 
+             s.parentNode.insertBefore(hm, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-7f2d53c8-f0a1-4cee-aa73-811bb7b89f91">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="../../../../../instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>
