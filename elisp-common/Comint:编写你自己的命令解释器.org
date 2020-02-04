@@ -1,0 +1,206 @@
+#+TITLE: Comint:编写你自己的命令解释器
+#+URL: https://www.masteringemacs.org/article/comint-writing-command-interpreter
+#+AUTHOR: lujun9972
+#+TAGS: elisp-common
+#+DATE: [2018年 10月 24日 星期三 11:25:58 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+Emacs的特点之一是它能够与外部进程交互，并使用Emacs的全部功能(如语法突出显示、宏、命令历史记录等)增加用户体验。
+这种功能在Emacs中由来已久，但很少有人在Emacs中创建自己的命令解释器(也称为comint)，因为他们担心这可能非常困难或根本不可能。
+
+考虑到这种功能的文档是多么少，人们有这种感觉并不奇怪; 对comint “mode”的零星资料中透露的信息很少，作为一个黑客，你不得不使用源代码，卢克(天行者)。
+
+* 原理
+:PROPERTIES:
+:CUSTOM_ID: the-theory
+:END:
+
+在我演示如何使用comint之前，先简要介绍一下它的工作原理——但是我省略了一些无聊的步骤，所以比较粗略。
+
+其核心是派生一个进程，并将其stdin、stdout和stderr通过管道重定向到Emacs或者伪终端。
+是重定向到Emacs还是伪终端选择由 =process-connection-type= 控制，但你不太可能希望手动更改它。
+
+与流程交互的基础是 =start-process= (用于异步流程调用)和 =call-process=(用于同步进程调用)。
+
+再往上一层，我们就有了简单的基本解释器框架. 这就是诸如 =M-x shell= 和各种REPL模式(如Python)的基础。
+comint可以处理所有的细节，比如输入/输出;命令历史记录;基本输入/输出过滤器hook;等等。
+换句话说，如果你想要一些交互性的东西，但又不满足于comint所能提供的东西，那么它就是你的完美基础。
+使用comint非常简单: =comint-run= 只接受一个参数 =PROGRAM=,再没其他内容了; 输入程序的文件路径就可以看着它飞行了。
+更多的配置，可以使用 =make-comint-in-buffer=.
+
+*关于管道重定向的重要警告:* 通常情况下，程序会检测到你将管道重定向到哑终端或文件然后禁用shell提示符;
+这是令人非常沮丧，因为并不是所有的程序都通过查找Emacs设置的签名环境变量(=Emacs= 和 =INSIDE_EMACS=)来检测它是否在Emacs内部运行.
+如果发生这种情况，您也许能够幸运地找到一个可以强制设置让它以“交互”模式运行的标志—例如，在Python中的 =-i=.
+
+再往上一次，我们可以得到类似 =M-x shell= 的东西，我之前在 =Running Shells in Emacs: An Overview= 时提到过。
+
+最后，你可以通过键入 =M-x list-processes= 来列出所有正在运行/打开的进程。
+
+* 编写Comint模式
+:PROPERTIES:
+:CUSTOM_ID: writing-a-comint-mode
+:END:
+
+解决了这个问题之后，让我们来写一点代码。我一直在折腾[[http://cassandra.apache.org/][Cassandra]]数据库，和所有值得尊敬的数据库一样，它有一个很好的命令行界面——但没有Emacs模式!噢,不!
+
+编写comint模式最重要的一点是记住，获得80%的成功很容易，但是剩下的20%才是真正困难的部分!我在这里只做80% !
+
+让我们来写一个对应的comint mode. 运行程序 =Cassandra-cli= 启动Cassandra CLI，得到的输出如下:
+
+#+BEGIN_EXAMPLE
+$ ./cassandra-cli
+Connected to: "Test Cluster" on 127.0.0.1/9160
+Welcome to Cassandra CLI version 1.2.8
+
+Type 'help;' or '?' for help.
+Type 'quit;' or 'exit;' to quit.
+
+[default@unknown]
+#+END_EXAMPLE
+
+如果通过 =comint-run= 来运行 =cassandra-cli= 那就以经有一个可用的交互式进程了。
+它只包含基础功能而且非常简陋，但拥有合理的默认值，并且工作得足够好。如果您想要扩展它，就必须围绕 =make-com-in-buffer= 来编写自己的包装器函数，并编写相应的major模式。我们来做一下。
+
+** Comint模板
+:PROPERTIES:
+:CUSTOM_ID: the-comint-template
+:END:
+
+#+BEGIN_SRC lisp
+  (defvar cassandra-cli-file-path "/opt/cassandra/bin/cassandra-cli"
+    "Path to the program used by `run-cassandra'")
+
+  (defvar cassandra-cli-arguments '()
+    "Commandline arguments to pass to `cassandra-cli'")
+
+  (defvar cassandra-mode-map
+    (let ((map (nconc (make-sparse-keymap) comint-mode-map)))
+      ;; example definition
+      (define-key map "\t" 'completion-at-point)
+      map)
+    "Basic mode map for `run-cassandra'")
+
+  (defvar cassandra-prompt-regexp "^\\(?:\\[[^@]+@[^@]+\\]\\)"
+    "Prompt for `run-cassandra'.")
+#+END_SRC
+
+我们需要做的第一件事是声明一些合理的变量，这样用户就可以在不编辑代码的情况下更改设置。第一个变量很明显:我们需要存储 =cassandra-cli= 的路径，这是我们想要运行的程序。
+
+下一个变量是 =cassandra-clil-arguments= 用来保存命令行参数列表(空)。
+
+第三个是一个空的模式映射，用于存储我们自定义的快捷键。它继承自 =comint-mode-map=,因此拥有与 =comint-mode= 相同的快捷键。
+
+最后，我们用 =cassandra-prompt-regexp= 来存储一个匹配Cassandra的提示样式的正则表达式。
+它的默认值已经可以正常工作了，但有备无患嘛，而且最好是一个只匹配所需内容的正则表达式。
+此外，由于你需要使用这些代码来创建自己的 comint 派生模式，所以无论如何你都是要修改它的。
+
+#+BEGIN_SRC lisp
+  (defun run-cassandra ()
+    "Run an inferior instance of `cassandra-cli' inside Emacs."
+    (interactive)
+    (let* ((cassandra-program cassandra-cli-file-path)
+           (buffer (comint-check-proc "Cassandra")))
+      ;; pop to the "*Cassandra*" buffer if the process is dead, the
+      ;; buffer is missing or it's got the wrong mode.
+      (pop-to-buffer-same-window
+       (if (or buffer (not (derived-mode-p 'cassandra-mode))
+               (comint-check-proc (current-buffer)))
+           (get-buffer-create (or buffer "*Cassandra*"))
+         (current-buffer)))
+      ;; create the comint process if there is no buffer.
+      (unless buffer
+        (apply 'make-comint-in-buffer "Cassandra" buffer
+               cassandra-program cassandra-cli-arguments)
+        (cassandra-mode))))
+#+END_SRC
+
+这堆乱七八糟代码做了一些基本的整理工作，比如重启Cassandra进程(如果已经在缓冲区中)，或者创建缓冲区(如果缓冲区不存在)。
+是不是觉得太麻烦了，遗憾的是，在 comint 库中缺少相应的宏来减少需要编写的样板代码。
+本函数的主要要点是通过 =apply= 来调用 =make-com-in-buffer= 函数。坦白地说，直接调用 =make-com-in-buffer= 也是可以的，但是你会丢失一些细节，比如可重启的进程等等(译者注：丢失细节这部分没看懂什么意思？);
+但是如果你写的这个comint派生模式仅供个人使用，也不同太关注这些东西。
+
+#+BEGIN_SRC emacs-lisp
+  (defun cassandra--initialize ()
+    "Helper function to initialize Cassandra"
+    (setq comint-process-echoes t)
+    (setq comint-use-prompt-regexp t))
+
+  (define-derived-mode cassandra-mode comint-mode "Cassandra"
+    "Major mode for `run-cassandra'.
+
+  \\<cassandra-mode-map>"
+    nil "Cassandra"
+    ;; this sets up the prompt so it matches things like: [foo@bar]
+    (setq comint-prompt-regexp cassandra-prompt-regexp)
+    ;; this makes it read only; a contentious subject as some prefer the
+    ;; buffer to be overwritable.
+    (setq comint-prompt-read-only t)
+    ;; this makes it so commands like M-{ and M-} work.
+    (set (make-local-variable 'paragraph-separate) "\\'")
+    (set (make-local-variable 'font-lock-defaults) '(cassandra-font-lock-keywords t))
+    (set (make-local-variable 'paragraph-start) cassandra-prompt-regexp))
+
+  ;; this has to be done in a hook. grumble grumble.
+  (add-hook 'cassandra-mode-hook 'cassandra--initialize)
+#+END_SRC
+
+最后，我们终于定义好了自己的major mode。注意到这个模式是从 =comint-mode= 派生出来的。我用自己的方法覆盖了默认的 =comint-prompt-regexp=,并且我强制要求提示符是只读的。
+我还添加了一个模式钩子并在其中设置 =com-process-echo= 为 =t=，以避免重复显示我们在屏幕上写入的内容。
+最后，我调整了段落设置，这样您就可以在每个提示符之间使用 =M-{= 和 =M-}= 进行导航了。
+
+这差不多就是模板的全部内容了。你可以很容易根据需要进行调整，这是一个很好的开始。
+
+再来让我们在cassandra模式中添加一些很酷的功能:基本语法高亮显示。
+
+** 扩展Cassandra模式
+:PROPERTIES:
+:CUSTOM_ID: extending-cassandra-mode
+:END:
+
+我要做的第一件事是为运行 =help;= 获得的命令帮助添加简单的语法高亮显示。
+
+我们需要想出一些简单的高亮规则。其难点在于:为非正则语言设计正则表达式几乎是不可能的; 特别是当您为一个能输出各种内容的命令行应用程序设计正则时.
+
+不过，在此之前，让我们先扩展该major模式来支持语法高亮显示(实际上在Emacs术语中称为font locking)。
+
+#+BEGIN_SRC lisp
+(set (make-local-variable 'font-lock-defaults) '(cassandra-font-lock-keywords t))
+#+END_SRC
+
+将此语句添加到major模式的主体中区(与现有的setq调用相邻)，然后将以下语句添加到文件的顶部，以存储高亮规则:
+
+#+BEGIN_SRC lisp
+  (defconst cassandra-keywords
+    '("assume" "connect" "consistencylevel" "count" "create column family"
+      "create keyspace" "del" "decr" "describe cluster" "describe"
+      "drop column family" "drop keyspace" "drop index" "get" "incr" "list"
+      "set" "show api version" "show cluster name" "show keyspaces"
+      "show schema" "truncate" "update column family" "update keyspace" "use"))
+
+  (defvar cassandra-font-lock-keywords
+    (list
+     ;; highlight all the reserved commands.
+     `(,(concat "\\_<" (regexp-opt cassandra-keywords) "\\_>") . font-lock-keyword-face))
+    "Additional expressions to highlight in `cassandra-mode'.")
+#+END_SRC
+
+这是一个高亮规则:它高亮我从 =help;= 命令中提取的所有关键字。
+
+comint exposes a set of filter function variables that're triggered and run (in order, it's a list) when certain conditions are met:
+comint 提供了一组过滤器函数变量，这些变量在满足某些条件时被触发并运行(是列表的化，则按列表顺序执行):
+
+| *变量名称*                                 | *目的*                                       |
+|--------------------------------------------+----------------------------------------------|
+| =comint-dynamic-complete-functions=        | 执行完成后调用的函数列表。                   |
+| =comint-input-filter-functions=            | 在将输入发送到进程之前调用的异常钩子。       |
+| =comint-output-filter-functions=           | 将输出插入buffer后要调用的函数。             |
+| =comint-preoutput-filter-functions=        | 将Comint输出插入缓冲区之前要调用的函数列表。 |
+| =comint-redirect-filter-functions=         | 插入重定向的进程输出之前要调用的函数列表。   |
+| =comint-redirect-original-filter-function= | 重定向开始时的进程过滤器                     |
+
+另一个有用的变量是 =com-input-sender=,它允许你修改输入流中的字符。令人恼火的是，它的命名方式与上面的过滤器函数不一致。
+
+您可以使用这些变量来控制如何处理输入和输出以及如何解释中间流。
+
+这就完成了:一个Emacs中简单的、允许 comint 的 Cassandra CLI。
