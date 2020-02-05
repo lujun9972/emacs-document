@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>使用Emacs，Org mode，anki-editor等插件启动Anki - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="emacs-common" />
+  <!-- <link rel="stylesheet" href="../../../../../media/css/main.css" type="text/css"/>
+       <link rel="stylesheet" href="../../../../../media/css/comment.css" type="text/css"/> -->
+  <link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/kognise/water.css@latest/dist/dark.css'>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="../../../../../">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <ul class="trigger">
+        <li><a href="../../../../../years/">Years</a></li>
+        <li><a href="../../../../../authors/">Authors</a></li>
+        <li><a href="../../../../../tags/">Tags</a></li>
+        <li><a href="../../../../../about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="../../../../../rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="https://www.bing.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">使用Emacs，Org mode，anki-editor等插件启动Anki</h1>
+<div id="table-of-contents">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#emacs-org-mode-as-editor-to-anki">使用emacs的org-mode作为Anki的编辑器</a></li>
+<li><a href="#org-capture-swiftly-create-cards">Org-capture: 快速创建卡</a></li>
+<li><a href="#org-download-flameshot-add-image-too">org-download + Flameshot: 再添加图像</a></li>
+<li><a href="#conclusion">结论</a></li>
+</ul>
+</div>
+</div>
+<p>
+距离上一篇文章已经有一段时间了，原因之一是在过去的几个月里，我一直被 <a href="https://apps.ankiweb.net/">Anki</a> 所吸引(一个间隔重复记忆卡片程序)。
+如果你还没有用过，我强烈推荐你去试试。(<a href="http://augmentingcognition.com/ltm.html">为什么?可以看看迈克尔·尼尔森的文章</a>)
+</p>
+
+<p>
+在Anki社区中反复出现的一个问题,是如何快速生成卡片。有三种常见的方法:
+</p>
+
+<ol class="org-ol">
+<li>使用Anki的“导入”功能读取csv/tsv文件</li>
+<li>使用  <a href="https://github.com/kerrickstaley/genanki">genanki</a> 编写Python脚本生成 <code>.apkg</code> 文件以便导入 Anki</li>
+<li>使用支持 <a href="https://ankiweb.net/shared/info/2055492159">AnkiConnect</a> 的第三方浏览器插件（例如 <a href="https://foosoft.net/projects/yomichan/">Yomichan</a>）</li>
+</ol>
+
+<p>
+虽然这些都是可行的方法而且通常功能强大，但对于使用者来说，它们通常不具备灵活的可定制性(更改列和字段的匹配、特殊编辑、公式/高亮/表/等支持)。此外编程经验也是许多人的另一个入门障碍。
+</p>
+
+<p>
+在这篇文章中，我将尝试演示一些在Emacs中使用<a href="https://github.com/louietan/anki-editor">anki-editor</a>创建卡片的工作流程，anki-editor 用于连接Emacs的org-mode和AnkiConnect。
+结合 <code>anki-editor</code> 的连接能力、Emacs的自定义能力以及org-mode丰富的格式化和导出支持，可以轻松地应付一些卡片生成场景:
+</p>
+
+<ul class="org-ul">
+<li>应用强大的卡片编辑功能</li>
+<li>当你遇到有趣的内容时，用最少的干扰来捕捉想法</li>
+<li>自定义快捷键和工作流，最小化鼠标操作</li>
+<li>等等…</li>
+</ul>
+
+<p>
+<b>第一次听说Org-mode的Anki用户请注意</b>:看看 <a href="https://www.youtube.com/watch?v=fgizHHd7nOo">John Kitchin - org mode太棒了</a> 一瞥org的能力。 (找一支铅笔把日期记下来，以后可能会有纪念意义:))。
+如果你已经知道Org可以编辑大纲结构，有标签系统和丰富的导出支持，你应该能够很好地读懂本文的内容。
+</p>
+
+<p>
+<b>安装注意事项</b>:大多数安装是在Linux下使用Emacs的配置语言(Emacs Lisp)完成的。
+我将指出我认为需要引用细节的地方，并在文章的最后提供下载。但和往常一样，各个平台实际情况不一样。如果你不确定如何配置，请在下面留言，看看<a href="https://github.com/yiufung/dot-emacs/blob/master/init.el">我的配置信息</a>或者访问友好的 <a href="https://www.reddit.com/r/emacs/">r/emacs</a> 和 <a href="https://www.reddit.com/r/orgmode/">r/orgmode</a>，然后举手提问。
+</p>
+
+<div id="outline-container-org8f2f608" class="outline-2">
+<h2 id="emacs-org-mode-as-editor-to-anki"><a id="org8f2f608"></a>使用emacs的org-mode作为Anki的编辑器</h2>
+<div class="outline-text-2" id="text-emacs-org-mode-as-editor-to-anki">
+<p>
+带有 <code>ANKI_NOTE_TYPE</code> <a href="https://orgmode.org/manual/propersyntax.html#property-syntax">属性</a> 的Org条目为一个Anki笔记。条目的每个子标题对应Anki中的每个 <code>域名=。 [[https://orgmode.org/manual/Tags.html][标签]] 也能一起同步到Anki中. =anki-editor</code> 使用属性值 <code>ANKI_NOTE_ID</code> Ankh。
+</p>
+
+<p>
+<video preload='metadata' controls='controls'><source type='video/mp4' src='https://yiufung.net/ox-hugo/anki-org-01-basic.mp4' /></video>
+</p>
+
+<p>
+推送内容到Anki时, <code>anki-editor</code> 会把Org树导出为与Anki兼容的HTML。但如果若没有合适的CSS文件，结果看起来仍然很一般。
+因此，我们可以替换CSS为 <a href="https://github.com/gongzhitaao/orgcss">gongzhitaao/orgcss</a>，这是一个用于org导出HTML的简单样式表，可以为源代码块、列表、表等内容提供合适的样式。
+</p>
+
+<p>
+<video preload='metadata' controls='controls'><source type='video/mp4' src='https://yiufung.net/ox-hugo/anki-org-02-update-css.mp4' /></video>
+</p>
+
+<p>
+除了“Basic”之外，另一种常用的笔记类型是Cloze Deletion。
+</p>
+
+<p>
+<video preload='metadata' controls='controls'><source type='video/mp4' src='https://yiufung.net/ox-hugo/anki-org-03-clozing-shortcuts.mp4' /></video>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(use-package anki-editor
+  <span style="font-weight: bold;">:after</span> org
+  <span style="font-weight: bold;">:bind</span> (<span style="font-weight: bold;">:map</span> org-mode-map
+              (<span style="font-style: italic;">"&lt;f12&gt;"</span> . anki-editor-cloze-region-auto-incr)
+              (<span style="font-style: italic;">"&lt;f11&gt;"</span> . anki-editor-cloze-region-dont-incr)
+              (<span style="font-style: italic;">"&lt;f10&gt;"</span> . anki-editor-reset-cloze-number)
+              (<span style="font-style: italic;">"&lt;f9&gt;"</span> . anki-editor-push-tree))
+  <span style="font-weight: bold;">:config</span>
+  (<span style="font-weight: bold;">setq</span> anki-editor-create-decks t <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Allow anki-editor to create a new deck if it doesn't exist</span>
+        anki-editor-org-tags-as-anki-tags t)
+
+  (<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">anki-editor-cloze-region-auto-incr</span> (<span style="font-weight: bold; text-decoration: underline;">&amp;optional</span> arg)
+    <span style="font-style: italic;">"Cloze region without hint and increase card number."</span>
+    (<span style="font-weight: bold;">interactive</span>)
+    (anki-editor-cloze-region my-anki-editor-cloze-number <span style="font-style: italic;">""</span>)
+    (<span style="font-weight: bold;">setq</span> my-anki-editor-cloze-number (1+ my-anki-editor-cloze-number))
+    (forward-sexp))
+  (<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">anki-editor-cloze-region-dont-incr</span> (<span style="font-weight: bold; text-decoration: underline;">&amp;optional</span> arg)
+    <span style="font-style: italic;">"Cloze region without hint using the previous card number."</span>
+    (<span style="font-weight: bold;">interactive</span>)
+    (anki-editor-cloze-region (1- my-anki-editor-cloze-number) <span style="font-style: italic;">""</span>)
+    (forward-sexp))
+  (<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">anki-editor-reset-cloze-number</span> (<span style="font-weight: bold; text-decoration: underline;">&amp;optional</span> arg)
+    <span style="font-style: italic;">"Reset cloze number to ARG or 1"</span>
+    (<span style="font-weight: bold;">interactive</span>)
+    (<span style="font-weight: bold;">setq</span> my-anki-editor-cloze-number (<span style="font-weight: bold;">or</span> arg 1)))
+  (<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">anki-editor-push-tree</span> ()
+    <span style="font-style: italic;">"Push all notes under a tree."</span>
+    (<span style="font-weight: bold;">interactive</span>)
+    (anki-editor-push-notes '(4))
+    (anki-editor-reset-cloze-number))
+  <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Initialize</span>
+  (anki-editor-reset-cloze-number)
+  )
+</pre>
+</div>
+
+<ul class="org-ul">
+<li>默认情况下 <code>anki-editor-cloze-{dwim,region}</code> 总是提示要求输入卡号。我不太需要提示，通常希望卡号增加就好，因此编写了两个助手函数 <code>anki-editor-cloze-region-{auto-incr,don-incr}</code> 来跳过这些行为。(注意:这种自定义在Emacs社区中无处不在，用户不必等待上游实现所需的新特性。这与Anki社区有很大的不同，在Anki社区，版本更新经常会打断现有的附加组件，让最终用户束手无策，或者由于难以理解代码库的技术而推迟新特性的发布。</li>
+<li>默认情况下 <code>anki-editor-push-notes</code> 将推送整个文件到Anki。当文件包含实际上不需要更改的旧条目时，速度会很慢。在我的工作流程中，我将所有未完成的笔记保存在 <code>Dispatch Shelf</code> 子树下，并在我感觉准备好了的时候推送整个子树(使用=&lt;f9&gt;=)。一旦推送完成，我就会<a href="https://orgmode.org/manual/Refile-and-copy.html#refile-and-copy">把他们重定位到</a>在 <code>Exportd</code> 子树中。为此我添加了 <code>anki-editor-push-tree</code> 函数。</li>
+<li>按需设置快捷键(本例中设置为 <code>&lt;f9&gt;-&lt;f12&gt;</code>)。</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-org78ba2fc" class="outline-2">
+<h2 id="org-capture-swiftly-create-cards"><a id="org78ba2fc"></a>Org-capture: 快速创建卡</h2>
+<div class="outline-text-2" id="text-org-capture-swiftly-create-cards">
+<p>
+现在我们知道了Anki笔记在 Org-mode中的样子，我们可以定义一个模板，并使用 <code>org-capture</code> 在web上遇到不同的材料时快速创建卡片。
+</p>
+
+<p>
+<video preload='metadata' controls='controls'><source type='video/mp4' src='https://yiufung.net/ox-hugo/anki-org-04-capture-basic.mp4' /></video>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp"><span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Org-capture templates</span>
+(<span style="font-weight: bold;">setq</span> org-my-anki-file <span style="font-style: italic;">"/path/to/your/anki.org"</span>)
+(add-to-list 'org-capture-templates
+             (<span style="font-style: italic;">"a"</span> <span style="font-style: italic;">"Anki basic"</span>
+              entry
+              (file+headline org-my-anki-file <span style="font-style: italic;">"Dispatch Shelf"</span>)
+              <span style="font-style: italic;">"* %&lt;%H:%M&gt;   %^g\n:PROPERTIES:\n:ANKI_NOTE_TYPE: Basic\n:ANKI_DECK: Mega\n:END:\n** Front\n%?\n** Back\n%x\n"</span>))
+(add-to-list 'org-capture-templates
+             (<span style="font-style: italic;">"A"</span> <span style="font-style: italic;">"Anki cloze"</span>
+              entry
+              (file+headline org-my-anki-file <span style="font-style: italic;">"Dispatch Shelf"</span>)
+              <span style="font-style: italic;">"* %&lt;%H:%M&gt;   %^g\n:PROPERTIES:\n:ANKI_NOTE_TYPE: Cloze\n:ANKI_DECK: Mega\n:END:\n** Text\n%x\n** Extra\n"</span>))
+
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Allow Emacs to access content from clipboard.</span>
+(<span style="font-weight: bold;">setq</span> x-select-enable-clipboard t
+      x-select-enable-primary t)
+</pre>
+</div>
+
+
+
+<ul class="org-ul">
+<li><a href="https://youtu.be/fgizHHd7nOo?t=203">什么是org-capture?</a></li>
+<li>注意 <code>org-capture-templates</code> 中的 <code>%x</code>: 这意味着我们希望在捕获时填充X剪贴板的内容。对于Cloze类的笔记，这将在存放在 <code>Text</code> 域内。而对于Basic类笔记，我通常喜欢将它们放在 <code>Back</code> 中，然后在 <code>Front</code> 域中设置一个好问题。</li>
+<li>尽可能懒的关键是让Emacs不仅读取显式复制/粘贴的内容(通过 <code>C-c</code> / <code>C-v</code>, 操作 <code>CLIPBOARD</code> selection)，而且读取 <b>当前选择的文本</b> (操作 <code>PRIMPARY</code> selection)。如此，在用鼠标高亮文本后，我可以立即在Emacs中调用 <code>org-capture (C-c c)</code> 抓捕内容。参见<a href="https://wiki.archlinux.org/index.php/Clipboard">Clipboard - ArchWiki</a>了解详细信息。</li>
+<li>标题在 <code>anki-editor</code> 中并不重要,我随便选了个 <code>%H:%M</code>.</li>
+<li>根据Michael Nielson的建议 (<a href="http://augmentingcognition.com/ltm.html">搜索 “Use one big deck”</a>，我把大部分的笔记放在了一个名为 <code>Mega</code> 的deck里。这对我很有帮助。如果您有许多deck /note类型，那就创建多个捕获模板，或者编写一些elisp函数来减少输入。</li>
+</ul>
+
+<p>
+启用X剪贴板支持使Emacs支持其他任何应用程序的文本输入。对我来说，这些文本主要是来自Firefox的网络文章，有时是PDF.js的书籍…或者说，当我可以在Emacs中最好的PDF阅读器 <a href="https://github.com/politza/pdftools"><code>pdftools</code></a> 中阅读书籍时，我真的需要PDF.js吗?
+</p>
+
+<p>
+<video preload='metadata' controls='controls'><source type='video/mp4' src='https://yiufung.net/ox-hugo/anki-org-05-pdf-tools-clozing.mp4' /></video>
+</p>
+
+<p>
+Emacs命令 <code>fill-paragraph (M-q)</code> 有嗯鱼对齐从PDF复制的不规则文本时非常方便。
+</p>
+</div>
+</div>
+
+<div id="outline-container-org63fdf4b" class="outline-2">
+<h2 id="org-download-flameshot-add-image-too"><a id="org63fdf4b"></a>org-download + Flameshot: 再添加图像</h2>
+<div class="outline-text-2" id="text-org-download-flameshot-add-image-too">
+<p>
+最后，使用屏幕裁剪作为笔记内容也很好。值得庆幸的是 <code>anki-editor</code> 也支持这一点，我们只需要找到一种方便的方式在Emacs中下载图像即可。
+</p>
+
+<p>
+<video preload='metadata' controls='controls'><source type='video/mp4' src='https://yiufung.net/ox-hugo/anki-org-06-screenshot.mp4' /></video>
+</p>
+
+<p>
+有许多用于向Emacs添加图像或屏幕快照的包。我选择了<a href="https://github.com/abo-abo/org-download">abo-abo/org-download</a>和<a href="https://github.com/lupoDharkael/flameshot">Flameshot</a>的组合。虽然Flameshot允许我添加初步的注释，但要让它正常工作有点困难。如果你好奇，可以在 <a href="https://github.com/yiufung/dot-emacs/blob/master/init.el">我的配置</a> 中搜索“flameshot”来获得详细信息。
+</p>
+</div>
+</div>
+
+<div id="outline-container-org4f9380c" class="outline-2">
+<h2 id="conclusion"><a id="org4f9380c"></a>结论</h2>
+<div class="outline-text-2" id="text-conclusion">
+<p>
+在过去的几个月里，该配置让我受益匪浅。在白天，当我在Emacs中编写代码或浏览web文章时，我可以捕获代码片段或有趣的信息，而不需要切换到Anki桌面进行大量的鼠标操作。晚上，我会润色笔记(修正打字错误，添加上下文/图像)，一锤定音，然后结束一天的工作。
+</p>
+
+<p>
+可能性还不止于此。考虑到Org的功能，我肯定还有更有趣的应用场景。以下是我想到的:
+</p>
+
+<ul class="org-ul">
+<li><a href="https://orgmode.org/worg/org-contrib/babel/">Org Babel</a> 运行指定代码块, 将 <b>代码与输出</b> (纯文本, 图片, 表格) 发送到Anki中: <a href="https://github.com/mjago/ob-lilypond"><code>ob-lilypond</code></a>, <a href="https://orgmode.org/worg/org-contrib/babel/languages/ob-doc-dot.html"><code>ob-dot</code></a>, <a href="https://orgmode.org/worg/org-contrib/babel/languages/ob-doc-R.html">ob-R</a></li>
+<li>使用 <a href="https://www.youtube.com/watch?v=JfZ9fCHzkJw">键盘洪</a> 批量快速地创建卡片</li>
+<li>一个以纯文本/PDF/EPUB(<a href="https://github.com/wasamasa/nov.el">nov.el</a>) 文本处理为基础构建的 <a href="https://en.wikipedia.org/wiki/Incremental_reading">增量阅读</a> 系统， 并结合 <a href="https://github.com/weirdNox/org-noter"><code>org-noter</code></a> (<code>pdf-tools</code> 的笔记工具), <a href="https://github.com/jkitchin/org-ref"><code>org-ref</code></a> (学术论文管理), <code>org-capture</code> (内容捕获), <a href="https://www.google.com/search?q=org-agenda"><code>org-agenda</code></a> (预设/截止日期提醒, 进度追踪)...</li>
+<li>一个专门为Anki社区的用户平滑学习曲线而设计的Emacs发行版，就像Spacemacs对于Vimmers一样，包含了上述默认值合理的功能</li>
+<li>等等…</li>
+</ul>
+
+<p>
+希望它对Anki和Emacs的用户会有用，我相信将来会有一些大胆的、富有想象力的设计，它们来源于两者的交集。下次再见，快乐黑客，开心地学习和生活!
+</p>
+
+<p>
+本文使用的下载文件
+</p>
+
+<ul class="org-ul">
+<li><a href="https://yiufung.net/ox-hugo/anki-cards.el">anki-cards.el</a>: 本文中的配置代码</li>
+<li><a href="https://yiufung.net/ox-hugo/anki-basic.css">anki-basic.css</a>: basic 卡片的 css 模板. 它只是简单地将  <a href="https://github.com/gongzhitaao/orgcss/">gongzhitaao/orgcss</a> 中的 <code>org.css</code>, <code>htmlize.css</code> 和 <code>normalize.css</code> 整合在一起</li>
+<li><a href="https://yiufung.net/ox-hugo/anki-org-sample.org">anki-org-sample.org</a>: 演示使用文件局部标记和选项的org文件示例</li>
+</ul>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2020-01-14</span>
+            <span title="last modification date" class="post-info">2020-02-05</span>
+            <span title="tags" class="post-info">:<a href="../../../../../tags/emacs-common">emacs-common</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-4c8b2dfa-e540-4405-8df4-03506f328783">lujun9972</a></span>
+        </div>
+    <script src="../../../../../media/js/jquery-2.1.3.min.js"></script>
+    <script src="../../../../../media/js/md5.min.js"></script>
+        <section>
+            <div id="gitalk-container"></div>
+            <script type="text/javascript">
+             var gitalk = new Gitalk({
+                 clientID: 'fdcb5d9da3f4acb4862c',
+                 clientSecret: 'dd0a16312a206782cb7669dcec5e96874ab48170',
+                 repo: 'lujun9972.github.com',
+                 owner: 'lujun9972',
+                 admin: ['lujun9972'],
+                 id: md5(location.pathname),      // Ensure uniqueness and length less than 50
+                 distractionFreeMode: false  // Facebook-like distraction free mode
+             })
+             gitalk.render('gitalk-container')
+            </script>
+        </section>
+    <script src="../../../../../media/js/main.js"></script>
+        <script>
+         var _hmt = _hmt || [];
+         (function() {
+             var hm = document.createElement("script");
+             hm.src = "https://hm.baidu.com/hm.js?7bac4fd0247f69c27887e0d4e3aee41e";
+             var s = document.getElementsByTagName("script")[0]; 
+             s.parentNode.insertBefore(hm, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-4c8b2dfa-e540-4405-8df4-03506f328783">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="../../../../../instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>
