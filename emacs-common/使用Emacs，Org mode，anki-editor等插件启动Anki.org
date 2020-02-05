@@ -1,0 +1,167 @@
+#+TITLE: 使用Emacs，Org mode，anki-editor等插件启动Anki
+#+URL: https://yiufung.net/post/anki-org/
+#+AUTHOR: lujun9972
+#+TAGS: emacs-common
+#+DATE: [2020年 01月 14日 星期二 19:36:56 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+距离上一篇文章已经有一段时间了，原因之一是在过去的几个月里，我一直被 [[https://apps.ankiweb.net/][Anki]] 所吸引(一个间隔重复记忆卡片程序)。
+如果你还没有用过，我强烈推荐你去试试。([[http://augmentingcognition.com/ltm.html][为什么?可以看看迈克尔·尼尔森的文章]])
+
+在Anki社区中反复出现的一个问题,是如何快速生成卡片。有三种常见的方法:
+
+1. 使用Anki的“导入”功能读取csv/tsv文件
+2. 使用  [[https://github.com/kerrickstaley/genanki][genanki]] 编写Python脚本生成 =.apkg= 文件以便导入 Anki
+3. 使用支持 [[https://ankiweb.net/shared/info/2055492159][AnkiConnect]] 的第三方浏览器插件（例如 [[https://foosoft.net/projects/yomichan/][Yomichan]]）
+
+虽然这些都是可行的方法而且通常功能强大，但对于使用者来说，它们通常不具备灵活的可定制性(更改列和字段的匹配、特殊编辑、公式/高亮/表/等支持)。此外编程经验也是许多人的另一个入门障碍。
+
+在这篇文章中，我将尝试演示一些在Emacs中使用[[https://github.com/louietan/anki-editor][anki-editor]]创建卡片的工作流程，anki-editor 用于连接Emacs的org-mode和AnkiConnect。
+结合 =anki-editor= 的连接能力、Emacs的自定义能力以及org-mode丰富的格式化和导出支持，可以轻松地应付一些卡片生成场景:
+
+- 应用强大的卡片编辑功能
+- 当你遇到有趣的内容时，用最少的干扰来捕捉想法
+- 自定义快捷键和工作流，最小化鼠标操作
+- 等等…
+
+*第一次听说Org-mode的Anki用户请注意*:看看 [[https://www.youtube.com/watch?v=fgizHHd7nOo][John Kitchin - org mode太棒了]] 一瞥org的能力。 (找一支铅笔把日期记下来，以后可能会有纪念意义:))。
+如果你已经知道Org可以编辑大纲结构，有标签系统和丰富的导出支持，你应该能够很好地读懂本文的内容。
+
+*安装注意事项*:大多数安装是在Linux下使用Emacs的配置语言(Emacs Lisp)完成的。
+我将指出我认为需要引用细节的地方，并在文章的最后提供下载。但和往常一样，各个平台实际情况不一样。如果你不确定如何配置，请在下面留言，看看[[https://github.com/yiufung/dot-emacs/blob/master/init.el][我的配置信息]]或者访问友好的 [[https://www.reddit.com/r/emacs/][r/emacs]] 和 [[https://www.reddit.com/r/orgmode/][r/orgmode]]，然后举手提问。
+
+** 使用emacs的org-mode作为Anki的编辑器
+:PROPERTIES:
+:CUSTOM_ID: emacs-org-mode-as-editor-to-anki
+:END:
+
+带有 =ANKI_NOTE_TYPE= [[https://orgmode.org/manual/propersyntax.html#property-syntax][属性]] 的Org条目为一个Anki笔记。条目的每个子标题对应Anki中的每个 =域名=。 [[https://orgmode.org/manual/Tags.html][标签]] 也能一起同步到Anki中. =anki-editor= 使用属性值 =ANKI_NOTE_ID= Ankh。
+
+[[video:https://yiufung.net/ox-hugo/anki-org-01-basic.mp4]]
+
+推送内容到Anki时, =anki-editor= 会把Org树导出为与Anki兼容的HTML。但如果若没有合适的CSS文件，结果看起来仍然很一般。
+因此，我们可以替换CSS为 [[https://github.com/gongzhitaao/orgcss][gongzhitaao/orgcss]]，这是一个用于org导出HTML的简单样式表，可以为源代码块、列表、表等内容提供合适的样式。
+
+[[video:https://yiufung.net/ox-hugo/anki-org-02-update-css.mp4]]
+
+除了“Basic”之外，另一种常用的笔记类型是Cloze Deletion。
+
+[[video:https://yiufung.net/ox-hugo/anki-org-03-clozing-shortcuts.mp4]]
+
+#+begin_src emacs-lisp
+  (use-package anki-editor
+    :after org
+    :bind (:map org-mode-map
+                ("<f12>" . anki-editor-cloze-region-auto-incr)
+                ("<f11>" . anki-editor-cloze-region-dont-incr)
+                ("<f10>" . anki-editor-reset-cloze-number)
+                ("<f9>" . anki-editor-push-tree))
+    :config
+    (setq anki-editor-create-decks t ;; Allow anki-editor to create a new deck if it doesn't exist
+          anki-editor-org-tags-as-anki-tags t)
+
+    (defun anki-editor-cloze-region-auto-incr (&optional arg)
+      "Cloze region without hint and increase card number."
+      (interactive)
+      (anki-editor-cloze-region my-anki-editor-cloze-number "")
+      (setq my-anki-editor-cloze-number (1+ my-anki-editor-cloze-number))
+      (forward-sexp))
+    (defun anki-editor-cloze-region-dont-incr (&optional arg)
+      "Cloze region without hint using the previous card number."
+      (interactive)
+      (anki-editor-cloze-region (1- my-anki-editor-cloze-number) "")
+      (forward-sexp))
+    (defun anki-editor-reset-cloze-number (&optional arg)
+      "Reset cloze number to ARG or 1"
+      (interactive)
+      (setq my-anki-editor-cloze-number (or arg 1)))
+    (defun anki-editor-push-tree ()
+      "Push all notes under a tree."
+      (interactive)
+      (anki-editor-push-notes '(4))
+      (anki-editor-reset-cloze-number))
+    ;; Initialize
+    (anki-editor-reset-cloze-number)
+    )
+#+end_src
+
+- 默认情况下 =anki-editor-cloze-{dwim,region}= 总是提示要求输入卡号。我不太需要提示，通常希望卡号增加就好，因此编写了两个助手函数 =anki-editor-cloze-region-{auto-incr,don-incr}= 来跳过这些行为。(注意:这种自定义在Emacs社区中无处不在，用户不必等待上游实现所需的新特性。这与Anki社区有很大的不同，在Anki社区，版本更新经常会打断现有的附加组件，让最终用户束手无策，或者由于难以理解代码库的技术而推迟新特性的发布。
+- 默认情况下 =anki-editor-push-notes= 将推送整个文件到Anki。当文件包含实际上不需要更改的旧条目时，速度会很慢。在我的工作流程中，我将所有未完成的笔记保存在 =Dispatch Shelf= 子树下，并在我感觉准备好了的时候推送整个子树(使用=<f9>=)。一旦推送完成，我就会[[https://orgmode.org/manual/Refile-and-copy.html#refile-and-copy][把他们重定位到]]在 =Exportd= 子树中。为此我添加了 =anki-editor-push-tree= 函数。
+- 按需设置快捷键(本例中设置为 =<f9>-<f12>=)。
+
+** Org-capture: 快速创建卡
+:PROPERTIES:
+:CUSTOM_ID: org-capture-swiftly-create-cards
+:END:
+
+现在我们知道了Anki笔记在 Org-mode中的样子，我们可以定义一个模板，并使用 =org-capture= 在web上遇到不同的材料时快速创建卡片。
+
+[[video:https://yiufung.net/ox-hugo/anki-org-04-capture-basic.mp4]]
+
+#+begin_src emacs-lisp
+  ;; Org-capture templates
+  (setq org-my-anki-file "/path/to/your/anki.org")
+  (add-to-list 'org-capture-templates
+               ("a" "Anki basic"
+                entry
+                (file+headline org-my-anki-file "Dispatch Shelf")
+                "* %<%H:%M>   %^g\n:PROPERTIES:\n:ANKI_NOTE_TYPE: Basic\n:ANKI_DECK: Mega\n:END:\n** Front\n%?\n** Back\n%x\n"))
+  (add-to-list 'org-capture-templates
+               ("A" "Anki cloze"
+                entry
+                (file+headline org-my-anki-file "Dispatch Shelf")
+                "* %<%H:%M>   %^g\n:PROPERTIES:\n:ANKI_NOTE_TYPE: Cloze\n:ANKI_DECK: Mega\n:END:\n** Text\n%x\n** Extra\n"))
+
+  ;; Allow Emacs to access content from clipboard.
+  (setq x-select-enable-clipboard t
+        x-select-enable-primary t)
+#+end_src
+
+
+
+- [[https://youtu.be/fgizHHd7nOo?t=203][什么是org-capture?]]
+- 注意 =org-capture-templates= 中的 =%x=: 这意味着我们希望在捕获时填充X剪贴板的内容。对于Cloze类的笔记，这将在存放在 =Text= 域内。而对于Basic类笔记，我通常喜欢将它们放在 =Back= 中，然后在 =Front= 域中设置一个好问题。
+- 尽可能懒的关键是让Emacs不仅读取显式复制/粘贴的内容(通过 =C-c= / =C-v=, 操作 =CLIPBOARD= selection)，而且读取 *当前选择的文本* (操作 =PRIMPARY= selection)。如此，在用鼠标高亮文本后，我可以立即在Emacs中调用 =org-capture (C-c c)= 抓捕内容。参见[[https://wiki.archlinux.org/index.php/Clipboard][Clipboard - ArchWiki]]了解详细信息。
+- 标题在 =anki-editor= 中并不重要,我随便选了个 =%H:%M=.
+- 根据Michael Nielson的建议 ([[http://augmentingcognition.com/ltm.html][搜索 “Use one big deck”]]，我把大部分的笔记放在了一个名为 =Mega= 的deck里。这对我很有帮助。如果您有许多deck /note类型，那就创建多个捕获模板，或者编写一些elisp函数来减少输入。
+
+启用X剪贴板支持使Emacs支持其他任何应用程序的文本输入。对我来说，这些文本主要是来自Firefox的网络文章，有时是PDF.js的书籍…或者说，当我可以在Emacs中最好的PDF阅读器 [[https://github.com/politza/pdftools][=pdftools=]] 中阅读书籍时，我真的需要PDF.js吗?
+
+[[video:https://yiufung.net/ox-hugo/anki-org-05-pdf-tools-clozing.mp4]]
+
+Emacs命令 =fill-paragraph (M-q)= 有嗯鱼对齐从PDF复制的不规则文本时非常方便。
+
+** org-download + Flameshot: 再添加图像
+:PROPERTIES:
+:CUSTOM_ID: org-download-flameshot-add-image-too
+:END:
+
+最后，使用屏幕裁剪作为笔记内容也很好。值得庆幸的是 =anki-editor= 也支持这一点，我们只需要找到一种方便的方式在Emacs中下载图像即可。
+
+[[video:https://yiufung.net/ox-hugo/anki-org-06-screenshot.mp4]]
+
+有许多用于向Emacs添加图像或屏幕快照的包。我选择了[[https://github.com/abo-abo/org-download][abo-abo/org-download]]和[[https://github.com/lupoDharkael/flameshot][Flameshot]]的组合。虽然Flameshot允许我添加初步的注释，但要让它正常工作有点困难。如果你好奇，可以在 [[https://github.com/yiufung/dot-emacs/blob/master/init.el][我的配置]] 中搜索“flameshot”来获得详细信息。
+
+** 结论
+:PROPERTIES:
+:CUSTOM_ID: conclusion
+:END:
+
+在过去的几个月里，该配置让我受益匪浅。在白天，当我在Emacs中编写代码或浏览web文章时，我可以捕获代码片段或有趣的信息，而不需要切换到Anki桌面进行大量的鼠标操作。晚上，我会润色笔记(修正打字错误，添加上下文/图像)，一锤定音，然后结束一天的工作。
+
+可能性还不止于此。考虑到Org的功能，我肯定还有更有趣的应用场景。以下是我想到的:
+
+- [[https://orgmode.org/worg/org-contrib/babel/][Org Babel]] 运行指定代码块, 将 *代码与输出* (纯文本, 图片, 表格) 发送到Anki中: [[https://github.com/mjago/ob-lilypond][=ob-lilypond=]], [[https://orgmode.org/worg/org-contrib/babel/languages/ob-doc-dot.html][=ob-dot=]], [[https://orgmode.org/worg/org-contrib/babel/languages/ob-doc-R.html][ob-R]]
+- 使用 [[https://www.youtube.com/watch?v=JfZ9fCHzkJw][键盘洪]] 批量快速地创建卡片
+- 一个以纯文本/PDF/EPUB([[https://github.com/wasamasa/nov.el][nov.el]]) 文本处理为基础构建的 [[https://en.wikipedia.org/wiki/Incremental%5Freading][增量阅读]] 系统， 并结合 [[https://github.com/weirdNox/org-noter][=org-noter=]] (=pdf-tools= 的笔记工具), [[https://github.com/jkitchin/org-ref][=org-ref=]] (学术论文管理), =org-capture= (内容捕获), [[https://www.google.com/search?q=org-agenda][=org-agenda=]] (预设/截止日期提醒, 进度追踪)...
+- 一个专门为Anki社区的用户平滑学习曲线而设计的Emacs发行版，就像Spacemacs对于Vimmers一样，包含了上述默认值合理的功能
+- 等等…
+
+希望它对Anki和Emacs的用户会有用，我相信将来会有一些大胆的、富有想象力的设计，它们来源于两者的交集。下次再见，快乐黑客，开心地学习和生活!
+
+本文使用的下载文件
+
+- [[https://yiufung.net/ox-hugo/anki-cards.el][anki-cards.el]]: 本文中的配置代码
+- [[https://yiufung.net/ox-hugo/anki-basic.css][anki-basic.css]]: basic 卡片的 css 模板. 它只是简单地将  [[https://github.com/gongzhitaao/orgcss/][gongzhitaao/orgcss]] 中的 =org.css=, =htmlize.css= 和 =normalize.css= 整合在一起
+- [[https://yiufung.net/ox-hugo/anki-org-sample.org][anki-org-sample.org]]: 演示使用文件局部标记和选项的org文件示例 
