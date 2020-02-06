@@ -13,7 +13,7 @@ done
 shift $(( OPTIND - 1 ))
 OPTIND=1
 
-cd $(get-lctt-path)
+cd $(get-project-path)
 current_branch=$(git-get-current-branch)
 if [[ "${current_branch}" == "master" ]];then
     warn "Project is under the master branch! Exiting"
