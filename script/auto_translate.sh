@@ -39,12 +39,22 @@ function do_translate()
             fi
         fi
 
-        if [[ "${position}" != "引用" && "${line}" == '#+BEGIN_EXAMPLE' ]];then
+        if [[ "${position}" != "属性" && "${line}" == *([ \t])':PROPERTIES:' ]];then
+            position="属性"
+            continue
+        fi
+
+        if [[ "${position}" == "属性" && "${line}" == *([ \t])':END:' ]];then
+            position="正文"
+            continue
+        fi
+
+        if [[ "${position}" != "引用" && "${line}" == *([ \t])'#+BEGIN_EXAMPLE' ]];then
                 position="引用"
                 continue
         fi
 
-        if [[ "${position}" == "引用" && "${line}" == '#+END_EXAMPLE' ]];then
+        if [[ "${position}" == "引用" && "${line}" == *([ \t])'#+END_EXAMPLE' ]];then
             position="正文"
             continue
         fi
