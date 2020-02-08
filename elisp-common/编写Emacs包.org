@@ -1,0 +1,190 @@
+#+TITLE: 编写Emacs包
+#+URL: https://blog.aaronbieber.com/2015/08/04/authoring-emacs-packages.html
+#+AUTHOR: lujun9972
+#+TAGS: elisp-common
+#+DATE: [2018年 09月 28日 星期五 11:36:42 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+您是否以一种新颖的方式扩展了Emacs? 您想与广大的Emacs用户共享您的创建吗?那么，您将需要学习如何创建Emacs包。
+
+创建Emacs包通常非常简单，并且不管是在Emacs内部还是在Internet上都有很多可用的助力。不过，有几件事是特别麻烦的，很难找到帮助，所以我决定为你记录下来。
+
+跟我一起学习如何从头开始创建Emacs包。
+
+最简单的Emacs包只是一个Elisp文件。在很长一段时间里，作者只是通过网站或FTP站点分发".el"文件. 你需要自己下载他们，把他们放在你的本地磁盘的某个地方，并让Emacs可以找到他们。
+
+但这已经不是今天的做法了。现在我们在Emacs中内置了交互式包管理工具。感谢Tom Tromey，最初是他编写了 =package.el= 及其标准. 目前该标准已被广泛采用。才有了今天我写这篇文章……
+
+* 包仓库
+:PROPERTIES:
+:CUSTOM_ID: package-repositories
+:END:
+
+如果您已经了解了存储库，并希望深入了解它，请跳过本节。
+
+如果您现在想要为Emacs构建一个包，那么你需要先确定这个包放在哪个流行的Emacs包仓库上。
+“官方”仓库是ELPA (Emacs Lisp包归档)，但是为ELPA做贡献需要你签署自由软件基金会的版权分配文档，还需要您的软件遵守FSF的版权和许可规则。
+如果你编写的内容非常受欢迎，并最终要打包在Emacs中，那么你就必须经过这一步。在到达那个阶段之前，你还有其他选择。
+
+另外两个最受欢迎的储存库是MELPA和Marmalade。我将简要地解释它们之间的区别。
+
+MELPA，或这说 “Milkypostman's Emacs Lisp Package Archive”，是由Donald Curtis (Github或者其他地方上的网名为Milkypostman)创建的，但也由Steve Purcell维护。
+MELPA的最大好处是所有提交的文件都要经过Steve或Donald的审核，并且在合并之前必须满足一些最低的打包标准。我已经向MELPA提交了两个包，我觉得这个经历很有帮助，甚至很愉快。
+
+Marmalade是由Nic Ferrier创立的，它更像是狂野的西部;你只需在网站上注册一个账号，就可以上传软件包了。只要你的包满足某些格式要求(我将在下面解释)就行了。
+
+我想你可以把Marmalade想象成一个自助仓库，把MELPA想象成一个精心策划的收藏馆。MELPA努力提供不重叠的包，并为Emacs提供有意义和有用的功能。
+Marmalade是一种基础设施，为那些不想通过ELPA法律程序的作者集中分发软件包所用。
+
+* 剖析包结构
+:PROPERTIES:
+:CUSTOM_ID: anatomy-of-a-package
+:END:
+
+正如我在开始时所说的，最简单的Emacs包就是单个Elisp文件，以文件扩展名 =.el= 结尾。
+然而，在现代社会，分发单个Elisp文件是不礼貌的;你至少应该包括:
+
+1. 一个或多个Elisp文件(我的两个包都是单个文件)。
+2. 一个README文件;如果你使用Github，这是也你的Github项目首页内容。
+3. 一个 Info 手册。
+
+当然,如果你的包很简单,你可以选择不要手册或者带上一个完整的信息手册,但是如何以Info格式编写和分发我的包格我遇到的最令人沮丧的经历之一,所以我将介绍如何进行操作。
+
+在此之前，我们先讨论一下基本的打包要求。
+
+* 包格式
+:PROPERTIES:
+:CUSTOM_ID: package-formatting
+:END:
+
+包中包含的Elisp脚本有一些注释需求。这些需求(主要涉及文件顶部的注释)在Emacs Info文档的Packaging章节中进行了描述。
+你可以通过按下 =C-h i= 来打开Info阅读器并导航到“Elisp”手册，然后在其中的“Packaging”章节找到它。对于非常懒惰的人，您还可以[[http://www.gnu.org/software/emacs/manual/html_node/elisp/Packaging.html][在线阅读手册]]
+
+Emacs文档中的实例很少。为了节省你解密标准要求的时间，下面是你需要添加到脚本文件中的最简注释，摘自我的Octopress包:
+
+#+begin_src emacs-lisp
+  ;;; octopress.el --- A lightweight wrapper for Jekyll and Octopress.
+
+  ;; Copyright (C) 2015 Aaron Bieber
+
+  ;; Author: Aaron Bieber <aaron@aaronbieber.com>
+  ;; Version: 1.0
+  ;; Package-Requires ((cl-lib "0.5"))
+  ;; Keywords: octopress, blog
+  ;; URL: https://github.com/aaronbieber/octopress.el
+
+  ;;; Commentary:
+
+  ;; Octopress.el is a lightweight wrapper script to help you interact
+  ;; with Octopress blog site and the related Jekyll programs. This
+  ;; package is designed to be unobtrusive and to defer to Octopress and
+  ;; Jekyll as often as possible.
+
+  ;; This package was built with the assumption of Octopress 3.0 and
+  ;; will probably not work with previous (non-gem) versions of
+  ;; Octopress. Specifically, it expects to be able to use commands like
+  ;; `octopress new post` rather than the old-style `rake new_post[]`.
+
+  ;; Full documentation is available as an Info manual.
+
+  ;;; Code:
+#+end_src
+
+通常，包作者在这个序言中包含一个许可。在本例中，我只做了版权声明，稍后将添加特定的许可文本。
+如果您向MELPA提交包，构建系统将从这个头部信息中提取一些内容，并在melpa.org上创建包的登录页面。
+URL和“Commentary”部分在这方面很重要。
+
+Here is what this looks like [[http://melpa.org/#/octopress][on melpa.org]]. (NB: I might have changed the actual file since this post was written, but you can always read the real source code.)
+这是它的样子[[http://melpa.org/#/octopress][在melpa.org]]。(注:我可能已经改变了实际的文件，因为这篇文章是写的，但你总是可以阅读真正的源代码。)
+
+最后，文件的最后一行应该是:
+
+#+begin_src emacs-lisp
+  ;;; octopress.el ends here
+#+end_src
+
+当然，这里的 “octopress.el” 需要与第一行匹配。
+
+** 获取帮助
+:PROPERTIES:
+:CUSTOM_ID: getting-help
+:END:
+
+你在实际的Elisp代码中应该遵循更多这样的样式约定;样式太多了以至于无法在这里描述。
+要确保您的包能很好地适应Emacs生态，最简单的方法是同时安装“flycheck”和“flycheck-package”，前者是实时语法检查器，后者供Elisp包作者使用的检查器。
+激活“flycheck-mode”并配置“flycheck-package”后，当有错误发生时，脚本文件中会实时出现警告。
+
+* Read Me
+:PROPERTIES:
+:CUSTOM_ID: read-me
+:END:
+
+尽管保持多个文档版本的同步有点令人恼火，但每个版本都很重要。“Commentary”块给Emacs本身以及打包系统和仓库使用;README文件当然是由Github使用的;Info手册(在下一节中描述)给人阅读。
+
+If you use Github, as it seems safe to presume that you do, the README is parsed and displayed on the landing page of your project.
+在发布的源代码中包含README文件是一种礼貌的做法。README已经成为一种根深蒂固的习惯，以至于Neal Stephenson甚至写了一本书对这个概念进行了嘲讽，书名是《Reamde》。
+如果您使用Github，那么可以确定的是，README将被解析并显示在项目的登录页面上。
+
+如果你不使用Github，或者不关心你的Github登陆页面的样子，你可以跳过README文件。
+历史上的Emacs包仅在其源文件的“Commentary”部分中记录了文档，这在我看来已经足够了。
+
+当然，如果您确实提供了一个README文件供Github使用，您可以使用类似“.md” 或“.markdown”的文件扩展名来提示它的格式。
+这样Github就可以把文件解析成富HTML，让你的访客享受实际格式的乐趣。
+
+* 生成文档
+:PROPERTIES:
+:CUSTOM_ID: building-documentation
+:END:
+
+Emacs包(以及Emacs本身，基本上每一个其他的GNU包)的标准格式是Info。你可以在[[http://www.gnu.org/software/texinfo/manual/info.stnd/info.stnd.html#Top][独立的GNU Info]]手册页上阅读有关Info格式的信息。
+
+** 什么是Info?
+:PROPERTIES:
+:CUSTOM_ID: what-is-info
+:END:
+
+Info本身是一种基于文本的格式，提供了交叉引用、层次结构和其他一些特性。要创建Info格式的手册，您需要以Texinfo格式编写它，并使用 =makeinfo= 程序将其转换为Info。
+Texinfo被设计成产生多种格式，由此附加的好处是您可以使用 =makeinfo= 来制作HTML格式的手册。
+
+我在线链接所有GNU手册页都是原始Texinfo文档的HTML版本，可以在Emacs中直接读取，也可以在使用独立 =info= 阅读器读取。
+
+** 创建您的第一个手册
+:PROPERTIES:
+:CUSTOM_ID: creating-your-first-manual
+:END:
+
+如前所述，手册是以Info格式分发的，但是将手册交到最终用户手中的最佳方法是在Emacs Info页面中插入一个目录条目(通过 =C-h i= 能到达的页面)。
+要做到这一点需要一点技巧，但是如果您只是简单地将您的手册包含在Texinfo格式中,那么MELPA构建系统会为你解决这个问题，。
+
+我的建议是针对MELPA进行分发，并将手册包含在Texinfo格式中。这里有两个主要优势:
+
+- 对你来说，分配变得更容易;MELPA的构建系统会将你的Texinfo手册转换为Info格式，并生成Emacs在安装包时查找的目录stub(存根)文件。
+- 对于做作的终端用户，它允许你在源码控制仓库中包括原始的文本信息文件;任何人都可以使用它为自己构建其他格式的文件，如果他们对如何阅读文档有偏好的话。
+
+另外，在我看来，在源代码控制中包含生成的文件也是一种不好的做法，尤其是当发行版的目标平台具有必须的构建机制时。
+Emacs附带了 =makeinfo=,因此没有理由自己进行转换并打包其输出。
+
+好吧，那么你如何创建这个“.texi”文件呢? 简单，只要学习一下Texinfo格式就行了!不要担心，尽管它的前缀跟LaTex的很相似，但Texinfo比LaTeX要简单得多，您只需要一些样板文件就可以很好地转换成Info或HTML格式。
+
+** Texinfo速成班
+:PROPERTIES:
+:CUSTOM_ID: texinfo-crash-course
+:END:
+
+Texinfo格式提供以“@”符号开头的特殊关键字。这些关键字可以是单个标识符，如 =@settitle=,它用来设置文档的标题;或者是一对的，如 =@titlepage= / =@end titlepage=, 其开始和结束符号之间的内容有一些特殊的含义。
+
+要为包编写Texinfo手册，先在包的根目录中创建一个扩展名为“.texi”的新文件。它习惯上与包的名称相同。
+例如，如果你的包名为“superfrobnicator”，则对应的手册就是“superfrobnicator.texi”。
+
+很好，那你要在这个文件里放什么呢?关于Texinfo格式的详细描述参见[[http://www.gnu.org/software/texinfo/manual/texinfo/texinfo.html][其在线手册]]。其中重点的是“Beginning a Texinfo File”这一章节。
+
+我推荐你在Emacs中编写Texinfo文件，你可以使用“Texinfo模式”，它为您提供了一些方便的快捷键。
+如果您的路径中有 =makeinfo= 程序,那你可以按 =C-c C-m C-b= 来根据整个缓冲区的内容生成文档。
+该命令通过 =makeinfo= 加上一个Info格式的目标运行当前缓冲区的内容，并在Emacs新缓冲区中打开生成的Info文档。您可以校对、导航并查看最终用户的体验。
+
+一旦你对结果感到满意，就可以提交 “.texi”文件到源代码控制中了，这样一来包中就包含了该文件并可以让MELPA和MELPA的建设过程完成剩下的事情!
+从MELPA安装包的用户将能在Emacs Info页面看到链到文档的链接了。
+
+这里有一些关于整合的警告，请确保按照MELPA README中“Contributing to MELPA”章节所述运行本地的MELPA构建，这样你就能看到构建过程可能抛出的任何警告或错误。
+特别是，对于像 =@dircategory= 和 =@direntry= 这样的标记，有特定要求值和特定格式。所有内容都在Texinfo文档中有所描述。
