@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>编写Emacs包 - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="elisp-common" />
+  <!-- <link rel="stylesheet" href="../../../../../media/css/main.css" type="text/css"/>
+       <link rel="stylesheet" href="../../../../../media/css/comment.css" type="text/css"/> -->
+  <link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/kognise/water.css@latest/dist/dark.css'>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="../../../../../">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <ul class="trigger">
+        <li><a href="../../../../../years/">Years</a></li>
+        <li><a href="../../../../../authors/">Authors</a></li>
+        <li><a href="../../../../../tags/">Tags</a></li>
+        <li><a href="../../../../../about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="../../../../../rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="https://www.bing.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">编写Emacs包</h1>
+<div id="table-of-contents">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#package-repositories">包仓库</a></li>
+<li><a href="#anatomy-of-a-package">剖析包结构</a></li>
+<li><a href="#package-formatting">包格式</a>
+<ul>
+<li><a href="#getting-help">获取帮助</a></li>
+</ul>
+</li>
+<li><a href="#read-me">Read Me</a></li>
+<li><a href="#building-documentation">生成文档</a>
+<ul>
+<li><a href="#what-is-info">什么是Info?</a></li>
+<li><a href="#creating-your-first-manual">创建您的第一个手册</a></li>
+<li><a href="#texinfo-crash-course">Texinfo速成班</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+<p>
+您是否以一种新颖的方式扩展了Emacs? 您想与广大的Emacs用户共享您的创建吗?那么，您将需要学习如何创建Emacs包。
+</p>
+
+<p>
+创建Emacs包通常非常简单，并且不管是在Emacs内部还是在Internet上都有很多可用的助力。不过，有几件事是特别麻烦的，很难找到帮助，所以我决定为你记录下来。
+</p>
+
+<p>
+跟我一起学习如何从头开始创建Emacs包。
+</p>
+
+<p>
+最简单的Emacs包只是一个Elisp文件。在很长一段时间里，作者只是通过网站或FTP站点分发".el"文件. 你需要自己下载他们，把他们放在你的本地磁盘的某个地方，并让Emacs可以找到他们。
+</p>
+
+<p>
+但这已经不是今天的做法了。现在我们在Emacs中内置了交互式包管理工具。感谢Tom Tromey，最初是他编写了 <code>package.el</code> 及其标准. 目前该标准已被广泛采用。才有了今天我写这篇文章……
+</p>
+
+<div id="outline-container-org5549208" class="outline-2">
+<h2 id="package-repositories"><a id="org5549208"></a>包仓库</h2>
+<div class="outline-text-2" id="text-package-repositories">
+<p>
+如果您已经了解了存储库，并希望深入了解它，请跳过本节。
+</p>
+
+<p>
+如果您现在想要为Emacs构建一个包，那么你需要先确定这个包放在哪个流行的Emacs包仓库上。
+“官方”仓库是ELPA (Emacs Lisp包归档)，但是为ELPA做贡献需要你签署自由软件基金会的版权分配文档，还需要您的软件遵守FSF的版权和许可规则。
+如果你编写的内容非常受欢迎，并最终要打包在Emacs中，那么你就必须经过这一步。在到达那个阶段之前，你还有其他选择。
+</p>
+
+<p>
+另外两个最受欢迎的储存库是MELPA和Marmalade。我将简要地解释它们之间的区别。
+</p>
+
+<p>
+MELPA，或这说 “Milkypostman's Emacs Lisp Package Archive”，是由Donald Curtis (Github或者其他地方上的网名为Milkypostman)创建的，但也由Steve Purcell维护。
+MELPA的最大好处是所有提交的文件都要经过Steve或Donald的审核，并且在合并之前必须满足一些最低的打包标准。我已经向MELPA提交了两个包，我觉得这个经历很有帮助，甚至很愉快。
+</p>
+
+<p>
+Marmalade是由Nic Ferrier创立的，它更像是狂野的西部;你只需在网站上注册一个账号，就可以上传软件包了。只要你的包满足某些格式要求(我将在下面解释)就行了。
+</p>
+
+<p>
+我想你可以把Marmalade想象成一个自助仓库，把MELPA想象成一个精心策划的收藏馆。MELPA努力提供不重叠的包，并为Emacs提供有意义和有用的功能。
+Marmalade是一种基础设施，为那些不想通过ELPA法律程序的作者集中分发软件包所用。
+</p>
+</div>
+</div>
+
+<div id="outline-container-org4d875f3" class="outline-2">
+<h2 id="anatomy-of-a-package"><a id="org4d875f3"></a>剖析包结构</h2>
+<div class="outline-text-2" id="text-anatomy-of-a-package">
+<p>
+正如我在开始时所说的，最简单的Emacs包就是单个Elisp文件，以文件扩展名 <code>.el</code> 结尾。
+然而，在现代社会，分发单个Elisp文件是不礼貌的;你至少应该包括:
+</p>
+
+<ol class="org-ol">
+<li>一个或多个Elisp文件(我的两个包都是单个文件)。</li>
+<li>一个README文件;如果你使用Github，这是也你的Github项目首页内容。</li>
+<li>一个 Info 手册。</li>
+</ol>
+
+<p>
+当然,如果你的包很简单,你可以选择不要手册或者带上一个完整的信息手册,但是如何以Info格式编写和分发我的包格我遇到的最令人沮丧的经历之一,所以我将介绍如何进行操作。
+</p>
+
+<p>
+在此之前，我们先讨论一下基本的打包要求。
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgaf9774a" class="outline-2">
+<h2 id="package-formatting"><a id="orgaf9774a"></a>包格式</h2>
+<div class="outline-text-2" id="text-package-formatting">
+<p>
+包中包含的Elisp脚本有一些注释需求。这些需求(主要涉及文件顶部的注释)在Emacs Info文档的Packaging章节中进行了描述。
+你可以通过按下 <code>C-h i</code> 来打开Info阅读器并导航到“Elisp”手册，然后在其中的“Packaging”章节找到它。对于非常懒惰的人，您还可以<a href="http://www.gnu.org/software/emacs/manual/html_node/elisp/Packaging.html">在线阅读手册</a>
+</p>
+
+<p>
+Emacs文档中的实例很少。为了节省你解密标准要求的时间，下面是你需要添加到脚本文件中的最简注释，摘自我的Octopress包:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp"><span style="font-weight: bold; font-style: italic;">;;; </span><span style="font-weight: bold; font-style: italic;">octopress.el --- A lightweight wrapper for Jekyll and Octopress.</span>
+
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Copyright (C) 2015 Aaron Bieber</span>
+
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Author: Aaron Bieber <a href="mailto:aaron%40aaronbieber.com">&lt;aaron@aaronbieber.com&gt;</a></span>
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Version: 1.0</span>
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Package-Requires ((cl-lib "0.5"))</span>
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Keywords: octopress, blog</span>
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">URL: https://github.com/aaronbieber/octopress.el</span>
+
+<span style="font-weight: bold; font-style: italic;">;;; </span><span style="font-weight: bold; font-style: italic;">Commentary:</span>
+
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Octopress.el is a lightweight wrapper script to help you interact</span>
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">with Octopress blog site and the related Jekyll programs. This</span>
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">package is designed to be unobtrusive and to defer to Octopress and</span>
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Jekyll as often as possible.</span>
+
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">This package was built with the assumption of Octopress 3.0 and</span>
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">will probably not work with previous (non-gem) versions of</span>
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Octopress. Specifically, it expects to be able to use commands like</span>
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">`octopress new post` rather than the old-style `rake new_post[]`.</span>
+
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Full documentation is available as an Info manual.</span>
+
+<span style="font-weight: bold; font-style: italic;">;;; </span><span style="font-weight: bold; font-style: italic;">Code:</span>
+</pre>
+</div>
+
+<p>
+通常，包作者在这个序言中包含一个许可。在本例中，我只做了版权声明，稍后将添加特定的许可文本。
+如果您向MELPA提交包，构建系统将从这个头部信息中提取一些内容，并在melpa.org上创建包的登录页面。
+URL和“Commentary”部分在这方面很重要。
+</p>
+
+<p>
+Here is what this looks like <a href="http://melpa.org/#/octopress">on melpa.org</a>. (NB: I might have changed the actual file since this post was written, but you can always read the real source code.)
+这是它的样子<a href="http://melpa.org/#/octopress">在melpa.org</a>。(注:我可能已经改变了实际的文件，因为这篇文章是写的，但你总是可以阅读真正的源代码。)
+</p>
+
+<p>
+最后，文件的最后一行应该是:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp"><span style="font-weight: bold; font-style: italic;">;;; </span><span style="font-weight: bold; font-style: italic;">octopress.el ends here</span>
+</pre>
+</div>
+
+<p>
+当然，这里的 “octopress.el” 需要与第一行匹配。
+</p>
+</div>
+
+<div id="outline-container-orgeb0cd80" class="outline-3">
+<h3 id="getting-help"><a id="orgeb0cd80"></a>获取帮助</h3>
+<div class="outline-text-3" id="text-getting-help">
+<p>
+你在实际的Elisp代码中应该遵循更多这样的样式约定;样式太多了以至于无法在这里描述。
+要确保您的包能很好地适应Emacs生态，最简单的方法是同时安装“flycheck”和“flycheck-package”，前者是实时语法检查器，后者供Elisp包作者使用的检查器。
+激活“flycheck-mode”并配置“flycheck-package”后，当有错误发生时，脚本文件中会实时出现警告。
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org2ba6a30" class="outline-2">
+<h2 id="read-me"><a id="org2ba6a30"></a>Read Me</h2>
+<div class="outline-text-2" id="text-read-me">
+<p>
+尽管保持多个文档版本的同步有点令人恼火，但每个版本都很重要。“Commentary”块给Emacs本身以及打包系统和仓库使用;README文件当然是由Github使用的;Info手册(在下一节中描述)给人阅读。
+</p>
+
+<p>
+If you use Github, as it seems safe to presume that you do, the README is parsed and displayed on the landing page of your project.
+在发布的源代码中包含README文件是一种礼貌的做法。README已经成为一种根深蒂固的习惯，以至于Neal Stephenson甚至写了一本书对这个概念进行了嘲讽，书名是《Reamde》。
+如果您使用Github，那么可以确定的是，README将被解析并显示在项目的登录页面上。
+</p>
+
+<p>
+如果你不使用Github，或者不关心你的Github登陆页面的样子，你可以跳过README文件。
+历史上的Emacs包仅在其源文件的“Commentary”部分中记录了文档，这在我看来已经足够了。
+</p>
+
+<p>
+当然，如果您确实提供了一个README文件供Github使用，您可以使用类似“.md” 或“.markdown”的文件扩展名来提示它的格式。
+这样Github就可以把文件解析成富HTML，让你的访客享受实际格式的乐趣。
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgca095e8" class="outline-2">
+<h2 id="building-documentation"><a id="orgca095e8"></a>生成文档</h2>
+<div class="outline-text-2" id="text-building-documentation">
+<p>
+Emacs包(以及Emacs本身，基本上每一个其他的GNU包)的标准格式是Info。你可以在<a href="http://www.gnu.org/software/texinfo/manual/info.stnd/info.stnd.html#Top">独立的GNU Info</a>手册页上阅读有关Info格式的信息。
+</p>
+</div>
+
+<div id="outline-container-orgc17eb26" class="outline-3">
+<h3 id="what-is-info"><a id="orgc17eb26"></a>什么是Info?</h3>
+<div class="outline-text-3" id="text-what-is-info">
+<p>
+Info本身是一种基于文本的格式，提供了交叉引用、层次结构和其他一些特性。要创建Info格式的手册，您需要以Texinfo格式编写它，并使用 <code>makeinfo</code> 程序将其转换为Info。
+Texinfo被设计成产生多种格式，由此附加的好处是您可以使用 <code>makeinfo</code> 来制作HTML格式的手册。
+</p>
+
+<p>
+我在线链接所有GNU手册页都是原始Texinfo文档的HTML版本，可以在Emacs中直接读取，也可以在使用独立 <code>info</code> 阅读器读取。
+</p>
+</div>
+</div>
+
+<div id="outline-container-org9c45096" class="outline-3">
+<h3 id="creating-your-first-manual"><a id="org9c45096"></a>创建您的第一个手册</h3>
+<div class="outline-text-3" id="text-creating-your-first-manual">
+<p>
+如前所述，手册是以Info格式分发的，但是将手册交到最终用户手中的最佳方法是在Emacs Info页面中插入一个目录条目(通过 <code>C-h i</code> 能到达的页面)。
+要做到这一点需要一点技巧，但是如果您只是简单地将您的手册包含在Texinfo格式中,那么MELPA构建系统会为你解决这个问题，。
+</p>
+
+<p>
+我的建议是针对MELPA进行分发，并将手册包含在Texinfo格式中。这里有两个主要优势:
+</p>
+
+<ul class="org-ul">
+<li>对你来说，分配变得更容易;MELPA的构建系统会将你的Texinfo手册转换为Info格式，并生成Emacs在安装包时查找的目录stub(存根)文件。</li>
+<li>对于做作的终端用户，它允许你在源码控制仓库中包括原始的文本信息文件;任何人都可以使用它为自己构建其他格式的文件，如果他们对如何阅读文档有偏好的话。</li>
+</ul>
+
+<p>
+另外，在我看来，在源代码控制中包含生成的文件也是一种不好的做法，尤其是当发行版的目标平台具有必须的构建机制时。
+Emacs附带了 <code>makeinfo</code>,因此没有理由自己进行转换并打包其输出。
+</p>
+
+<p>
+好吧，那么你如何创建这个“.texi”文件呢? 简单，只要学习一下Texinfo格式就行了!不要担心，尽管它的前缀跟LaTex的很相似，但Texinfo比LaTeX要简单得多，您只需要一些样板文件就可以很好地转换成Info或HTML格式。
+</p>
+</div>
+</div>
+
+<div id="outline-container-org9728b77" class="outline-3">
+<h3 id="texinfo-crash-course"><a id="org9728b77"></a>Texinfo速成班</h3>
+<div class="outline-text-3" id="text-texinfo-crash-course">
+<p>
+Texinfo格式提供以“@”符号开头的特殊关键字。这些关键字可以是单个标识符，如 <code>@settitle</code>,它用来设置文档的标题;或者是一对的，如 <code>@titlepage</code> / <code>@end titlepage</code>, 其开始和结束符号之间的内容有一些特殊的含义。
+</p>
+
+<p>
+要为包编写Texinfo手册，先在包的根目录中创建一个扩展名为“.texi”的新文件。它习惯上与包的名称相同。
+例如，如果你的包名为“superfrobnicator”，则对应的手册就是“superfrobnicator.texi”。
+</p>
+
+<p>
+很好，那你要在这个文件里放什么呢?关于Texinfo格式的详细描述参见<a href="http://www.gnu.org/software/texinfo/manual/texinfo/texinfo.html">其在线手册</a>。其中重点的是“Beginning a Texinfo File”这一章节。
+</p>
+
+<p>
+我推荐你在Emacs中编写Texinfo文件，你可以使用“Texinfo模式”，它为您提供了一些方便的快捷键。
+如果您的路径中有 <code>makeinfo</code> 程序,那你可以按 <code>C-c C-m C-b</code> 来根据整个缓冲区的内容生成文档。
+该命令通过 <code>makeinfo</code> 加上一个Info格式的目标运行当前缓冲区的内容，并在Emacs新缓冲区中打开生成的Info文档。您可以校对、导航并查看最终用户的体验。
+</p>
+
+<p>
+一旦你对结果感到满意，就可以提交 “.texi”文件到源代码控制中了，这样一来包中就包含了该文件并可以让MELPA和MELPA的建设过程完成剩下的事情!
+从MELPA安装包的用户将能在Emacs Info页面看到链到文档的链接了。
+</p>
+
+<p>
+这里有一些关于整合的警告，请确保按照MELPA README中“Contributing to MELPA”章节所述运行本地的MELPA构建，这样你就能看到构建过程可能抛出的任何警告或错误。
+特别是，对于像 <code>@dircategory</code> 和 <code>@direntry</code> 这样的标记，有特定要求值和特定格式。所有内容都在Texinfo文档中有所描述。
+</p>
+</div>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2018-09-28</span>
+            <span title="last modification date" class="post-info">2020-02-08</span>
+            <span title="tags" class="post-info">:<a href="../../../../../tags/elisp-common">elisp-common</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-b2834156-eb71-44da-8404-f898267ed173">lujun9972</a></span>
+        </div>
+    <script src="../../../../../media/js/jquery-2.1.3.min.js"></script>
+    <script src="../../../../../media/js/md5.min.js"></script>
+        <section>
+            <div id="gitalk-container"></div>
+            <script type="text/javascript">
+             var gitalk = new Gitalk({
+                 clientID: 'fdcb5d9da3f4acb4862c',
+                 clientSecret: 'dd0a16312a206782cb7669dcec5e96874ab48170',
+                 repo: 'lujun9972.github.com',
+                 owner: 'lujun9972',
+                 admin: ['lujun9972'],
+                 id: md5(location.pathname),      // Ensure uniqueness and length less than 50
+                 distractionFreeMode: false  // Facebook-like distraction free mode
+             })
+             gitalk.render('gitalk-container')
+            </script>
+        </section>
+    <script src="../../../../../media/js/main.js"></script>
+        <script>
+         var _hmt = _hmt || [];
+         (function() {
+             var hm = document.createElement("script");
+             hm.src = "https://hm.baidu.com/hm.js?7bac4fd0247f69c27887e0d4e3aee41e";
+             var s = document.getElementsByTagName("script")[0]; 
+             s.parentNode.insertBefore(hm, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-b2834156-eb71-44da-8404-f898267ed173">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="../../../../../instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>
