@@ -1,0 +1,180 @@
+#+TITLE: 调试Emacs--我是如何学会停止焦虑并爱上DTrace的
+#+URL: http://nullprogram.com/blog/2018/01/17/
+#+AUTHOR: lujun9972
+#+TAGS: elisp-common
+#+DATE: [2018年 02月 14日 星期三 10:28:22 CST]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+* [[http://nullprogram.com/blog/2018/01/17/][调试Emacs--我是如何学会停止焦虑并爱上DTrace的]]
+:PROPERTIES:
+:CUSTOM_ID: debugging-emacs-or-how-i-learned-to-stop-worrying-and-love-dtrace
+:END:
+
+
+有一段时间[[https://github.com/skeeto/elfeed][Elfeed]]出现了一个奇怪的、虚假的失败。用户在更新feed时经常[[https://github.com/skeeto/elfeed/issues/248][看到一个错误]](剧透警告) “error in process sentinel: Search failed”.
+如果你使用Elfeed，可能自己也遇到过。
+表面上看很明显是curl(其任务是[[http://nullprogram.com/blog/2016/06/16/][负责下载feed数据]])运行成功但输出并不完整。
+由于运行是成功的，因此Elfeed假设数据已经全部在curl的输出缓冲区中了，但是结果不是这样，所以出现了严重的错误。
+
+不幸的是，这个问题无法重现。在Emacs之外手动运行curl不会发现任何问题。 让Elfeed重新获取feed也完全没问题的。只有当Elfeed在压力下同时获取多个feed时，这个问题才会随机出现。
+而且在报错误之前，curl进程就已经退出了，重要的调试信息已经丢失了。这看起来像是Emacs本身的一个bug，并没有可靠的方法能从Emacs Lisp中捕获必要的调试信息。
+而且，的确，后来被证明事实就是如此。
+
+一种快速而粗糙的变通方法是使用 =condition-case= 捕获并吞下抛出的错误。
+当出现这一奇怪的问题时，Elfeed不会在用户面前显示为严重的错误，而是会尝试吞下这个错误(如果它可以可靠地被检测到的话),并将其视为简单的失败。
+这个变通方案让我很不舒服。 Elfeed已经对错误进行了详尽的检查。肯定有那个地方部队，总有一天我会当场找出原因。
+
+我只需要在自己机器上见证这个bug就行了。Elfeed是我日常生活的一部分，所以我有一天肯定也会遇到这个问题。
+我的计划是，如果那一天到来了的话，就运行一个修改过的Elfeed，用来捕获额外的数据。我还会在GDB下定期运行Emacs，以便更深入地检查故障。
+
+现在我只能等到[[https://www.youtube.com/watch?v=fE2KDzZaxvE][时机成熟]]。
+
+** Bryan Cantrill, DTrace和FreeBSD
+:PROPERTIES:
+:CUSTOM_ID: bryan-cantrill-dtrace-and-freebsd
+:END:
+
+Besides what I've already linked in this article, here are a couple more great presentations:
+在假期间，我重新发现了[[https://en.wikipedia.org/wiki/Bryan_Cantrill][Bryan Cantrill]]，他是一名系统软件工程师，曾在1996年至2010年间为Sun工作，其最出名的作品就是[[http://dtrace.org/blogs/about/][DTrace]]。
+我第一次见到他是在2015年的一个 [[https://www.youtube.com/watch?v=l6XQUciI-Sc][BSD Now访谈上]]年。我重看了那次访谈，觉得自己还有很多东西要向他学习。他成了我心目中的英雄。所以我在网上搜索了[[http://dtrace.org/blogs/bmc/2018/02/03/talks/][更多他的写作和演讲]]。
+除了本文提到的，这里还有一些很棒的演讲:
+
+- [[https://www.youtube.com/watch?v=4PaWFYm0kEw][软件工程中的口头传统]]
+- [[https://www.youtube.com/watch?v=-zRN7XLCRhc][Fork Yeah! illumos的兴起与发展]]
+
+你还可以[[http://dtrace.org/blogs/bmc/][在他的DTrace博客中]]找到一些文章。
+
+在Sun的最后15年左右的时间里，一些有趣的操作系统技术诞生了——最著名的就是DTrace和ZFS——Bryan对此充满激情。
+幸运的是，由于Sun在最后一刻以开放源码的形式发布了这些技术，使得大部分技术都在甲骨文的收购中幸存了下来。否则这些技术将会永远地失去了。
+四散的前Sun员工们仍然对之前在Sun的工作充满热情，他们与一些老客户一起，收集了这些技术碎片，并组建了[[https://illumos.org/][illumos]]社区,就像一个开源舰队一样。
+
+自然，我想亲自尝试一下。真的像他们说的那么好吗? 通常我坚持使用Linux，但它(通常)没有这些Sun技术。主要原因是许可证不兼容。Sun发布的代码是[[https://opensource.org/licenses/CDDL-1.0][CDDL]]，与GPL不兼容。
+Ubuntu /确实/ [[https://insights.ubuntu.com/2016/02/18/zfs-licensingandlinux/][以包含ZFS而臭名昭著]]，但其他发行版不愿意冒这个风险。移植DTrace是一项艰巨的任务，因为它涉及整个内核，这也使得许可问题变得更加复杂。
+
+Linux以“Not Invented Here”(NIH)综合症而闻名，许可问题肯定是造成这种情况的原因之一。
+它们不采纳ZFS和DTrace，而是从零开始重新设计:用btrfs代替ZFS，用[[http://www.brendangregg.com/blog/2015-07-08/choosing-a-linuxtracer.html][大量其他工具]]代替DTrace。
+通常，我对系统调用跟踪最感兴趣，我对标的是[[https://en.wikipedia.org/wiki/Strace][strace]]，当然它有其局限性——比如在Emacs下调试curl的这种情况。
+NIH的另一个著名的例子是Linux的[[http://man7.org/linux/man-pages/man7/epoll.7.html][=epoll(2)=]],它是BSD [[https://www.freebsd.org/cgi/man.cgi?query=kqueue&sektion=2][=kqueue(2)=]] 的 [[https://idea.popcount.org/2017-02-20-epoll-is-fundamentally-broken-12/][简陋]] [[https://idea.popcount.org/2017-03-20-epoll-is-fundamentally-broken-22/][版本]] 
+
+所以，如果我想自己尝试这些技术，就需要安装一个不同的操作系统。我已经入手了[[https://omnios.omniti.com/][OmniOS]]，一个建立在illumos上的操作系统.我用它在虚拟机中搭建了一个陌生的环境来测试一些自己的软件(例如[[/blog/2017/03/12/][enchive]])。
+OmniOS有一种哲学叫做[[https://omnios.omniti.com/wiki.php/KYSTY][Keep Your Software To Yourself]](KYSTY)，实际上就是只编码不打包。
+说实话，你不能怪他们，因为[[https://utcc.utoronto.ca/~cks/space/blog/solaris/IllumosSupportLimits][他们是一个小社区]]。
+最好的解决方案可能就是使用[[https://www.pkgsrc.org/][pkgsrc]]，它本质上是一个通用的打包系统。否则[[http://nullprogram.com/blog/2017/06/19/][你就得靠自己了]]。
+
+还有[[https://www.openindiana.org/][openindiana]]，这是一个更友好的面向桌面的illumos发行版。
+总之，当事情不顺利的时候，你只能靠自己。
+这种情况就像几十年前运行Linux一样，那时跑Linux十分困难。
+
+如果您有兴趣尝试DTrace，那么目前最简单的方法恐怕就是[[https://www.freebsd.org/][FreeBSD]]了。它有一个庞大的、活跃的社区、完整的文档和大量的包选择。它的许可证(/BSD许可证/)与CDDL兼容，因此ZFS和DTrace都已移植到FreeBSD了。
+
+** DTrace 是啥?
+:PROPERTIES:
+:CUSTOM_ID: what-is-dtrace
+:END:
+
+讲了这么多，但是还没有说[[https://wiki.freebsd.org/DTrace/Tutorial][DTrace到底是什么]]。我不会再写一份教程，但会提供足够的信息来源供你学习。
+DTrace是一个用于 /实时/ 调试生产系统内核和应用程序的跟踪框架。这里的“生产系统”意味着它非常稳定和安全的——使用DTrace不会将您的系统置于崩溃或损坏数据的风险中。“实时”意味着它对性能的影响很小。
+您可以在实时、活动的系统上使用DTrace，而且对其影响很小。这两个核心设计原则对于解决那些只在生产中出现的棘手bug非常重要。
+
+DTrace的 /探针/ 分散在整个系统中: 在系统调用中、调度器事件中、网络事件中、进程事件中、信号中、虚拟内存事件等。
+它使用一种称为D的专门语言(与通用编程语言D无关)，您可以在这些指令点动态地添加行为。
+这些行为通常用来捕获信息，但是它也可以操作正在跟踪的事件。
+
+每个探针由冒号分隔的4元标识组成:提供者、模块、函数和探测名称。
+空元素表示通配符。例如, =syscall::open:entry= 是位于 =open(2)= 入口的探针(即“entry”). =syscall:::entry= 则匹配所有系统调用的入口探测。
+
+与Linux上监视特定进程的strace不同，DTrace应用于整个系统。
+要在Emacs的strace下运行curl，就必须修改Emacs的行为。而用DTrace，我可以测量每个curl 进程，不需要对Emacs做任何更改，且对Emacs的影响可以忽略不计。这很重要。
+
+因此，就这个Elfeed问题，更适合在FreeBSD中调试这个问题。 我所要做的就是当场抓住它。然而，距离那个bug报告已经过去几个月了，我还不明所以。我只希望最终能找到一个可以应用DTrace的有趣问题。
+
+** 树莓Pi 2上的FreeBSD
+:PROPERTIES:
+:CUSTOM_ID: freebsd-on-a-raspberry-pi-2
+:END:
+
+因此我选择了在FreeBSD运行这些技术，我要做的就是决定在哪里运行FreeBSD而已。我可以在虚拟机中跑，但是在真正的硬件上尝试总是更有趣。
+[[https://wiki.freebsd.org/FreeBSD/arm/Raspberry%20Pi][FreeBSD支持树莓派2]]，我有一个树莓派2在那做灰，所以我把他用起来了。
+
+我把镜像写到SD卡上，这几天来我一直在折腾这个新系统。我克隆了几十个自己的git仓库，对其进行构建和测试，并掌握了一些门道。
+我第一次试用了ports系统，主要是为了确定低功耗的Raspberry Pi 2需要几天时间来构建那些我想要尝试的包。
+
+我[[http://nullprogram.com/blog/2017/04/01/][这些天主要用Vim编程]]，所以前几天我并没有我配置Emacs。最后，我确实构建了Emacs，克隆了我的配置，启动它，并给尝试了一下Elfeed。
+
+这时“搜索失败”的bug就来了!不是一次，而是几十次。完美! 这个低功耗的平台简直就是转为这个bug而生的，它总是会触发这个bug。考虑到我已经有了DTrace，它真是调试这个BUG的完美场所。有些东西在对Elfeed撒谎，DTrace将扮演法官。
+
+在开始之前，我觉得有三种可能性:
+
+1. curl运行成功，但是截断了输出。
+2. Emacs悄悄地截断了curl的输出。
+3. Emacs搞错了curl的退出状态。
+
+使用Dtrace，我可以观察每个curl进程向Emacs写入的内容，还可以重新检查curl的退出状态。我使用了以下(新手)DTrace脚本:
+
+#+begin_src awk
+  syscall::write:entry
+  /execname == "curl"/
+    {
+     printf("%d WRITE %d "%s"n",
+            pid, arg2, stringof(copyin(arg1, arg2)));
+    }
+
+  syscall::exit:entry
+  /execname == "curl"/
+    {
+     printf("%d EXIT %dn", pid, arg0);
+    }
+#+end_src
+
+=/execname == "curl"/= 是一个判断条件，它的作用是(显然)只触发curl进程的行为。第一个探针为curl中的每个 =write(2)= 打印一行信息。
+=arg0=, =arg1=, =arg2= 对应的 =write(2)=: 的fd, buf, count 参数.
+它记录写入的进程ID (pid)、写入的长度和实际写入的内容。请记住，这些curl进程是由Emacs并行运行的，因此进程id可以让我将独立的写和退出状态关联起来。
+
+第二个探针输出pid和退出状态(=exit(2)= 的第一个参数)。
+
+我也想比较一下，当curl退出时，究竟送了什么到Elfeed,所以我修改[[http://www.gnu.org/software/emacs/manual/html_node/elisp/Sentinels.html][process sentinel]] ------子进程退出时的回调函数——在退出前调用 =write-file=.我可以将这些缓冲区转储与DTrace生成的日志进行比较。
+
+结果有两个重要的发现。
+
+首先，当“搜索失败”bug发生时，缓冲区完全是空的(95%的情况下)，或者HTTP头文件末尾的空白行被截断(5%的情况下)。
+DTrace表明curl已经充分完成了工作，所以Emacs才是说谎者。它并没有将curl的所有数据传递给Elfeed。这很麻烦。
+
+其次, *curl对行进行了缓冲*.每一行都是独立的 =write(2)=.我肯定 /没/ 想到会这样。
+通常，C库只在输出为终端时进行行缓冲。这是因为它猜测用户可能正在观看，期望一次输出一行。
+
+下面是它在日志中的样子:
+
+#+BEGIN_EXAMPLE
+88188 WRITE 32 "Server: Apache/2.4.18 (Ubuntu)
+"
+88188 WRITE 46 "Location: https://blog.plover.com/index.atom
+"
+88188 WRITE 21 "Content-Length: 299
+"
+88188 WRITE 45 "Content-Type: text/html; charset=iso-8859-1
+"
+88188 WRITE 2 "
+"
+#+END_EXAMPLE
+
+curl为什么会认为Emacs是终端呢?
+
+/哦/ 对了。 /[[http://nullprogram.com/blog/2014/02/06/][这就是我四年前写EmacSQL时遇到的问题]]/。
+默认情况下，Emacs通过一个伪终端(pty)连接到子进程。我当时认为这是Emacs中的一个错误，现在我仍然坚持这个说法。pty会导致一些奇怪的、烦人的问题，而且意义不大:
+
+- 它会解释控制字符。希望你没有传输二进制数据!
+- 子进程通常会进行行缓冲。这使它们变慢，尽管在某些情况你可能就想这样。
+- Stdout和stderr混合在一起。(至Emacs 25之后，该特性变成可选的了。)
+- /新!/ Emacs中有一个bug，当大量并行使用ptys时会导致截断。
+
+仅仅通过观察DTrace日志，我就知道该怎么做了:将pty转储到管道中。这是由 =process-connection-type= 变量控制的，并[[https://github.com/skeeto/elfeed/commit/945765a57d2f27996b643bc62e803dc167d1547][只用一行代码就修复了它]]。
+
+这不仅完全解决了截断问题，而且Elfeed在所有机器上获取feed的速度也明显更快。它不再一次一行地接收大量XML，而是像用吸管吸布丁一样。
+现在它甚至在我的树莓派2上也很顺畅，以前从未有过这种情况(再没有“搜索失败”的bug)。即使您从未受到此bug的影响，您也将从这一修复中获益。
+
+我还没有正式将其报告为Emacs bug，因为可重现性仍然是一个问题。上报BUG需要比“用树莓派在互联网上并行地发出一堆HTTP请求”更好的内容。
+
+这个解决方案让我想起了 [[https://www.buzzmaven.com/old-engineer-hammer-2/][“老锅炉工”的故事]]:挥起锤子就要收一大笔钱。一旦问题出现, *DTrace就迅速帮助确定用锤子攻击Emacs的位置*.
+
+/最后，非常感谢alphapapa几个月前花时间报告这个bug/
