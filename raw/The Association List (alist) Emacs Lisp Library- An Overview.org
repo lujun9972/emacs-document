@@ -1,0 +1,413 @@
+#+TITLE: The Association List (alist) Emacs Lisp Library: An Overview
+#+URL: https://opensourceforu.com/2019/12/the-association-list-alist-emacs-lisp-library-an-overview/
+#+AUTHOR: lujun9972
+#+TAGS: raw
+#+DATE: [2020年 02月 10日 星期一 10:35:47 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+The Association List Emacs Lisp library provides a comprehensive API to work with alists. It has been written by Troy Pracy and the latest release is 0.6.1. This eighth article in the GNU Emacs series explores the regular and anaphoric function variants for creating, retrieving and updating alists. It also reviews the constructs for mapping, filtering, folding and looping of alists.
+
+The source code featured in this article is available at https://github.com/troyp/asoc.el and released under the GNU General Public License v2.
+
+*Installation*\\
+The asoc.el source file can be obtained from https://github.com/troyp/asoc.el and added to your Emacs init configuration file so that it gets loaded on startup.\\
+You can then use the library with the following Emacs Lisp code snippet:
+
+#+BEGIN_EXAMPLE
+  (require ‘asoc)
+#+END_EXAMPLE
+
+*Usage*\\
+We will begin with the constructor API available in asoc.el for creating association lists.
+
+*Constructors*\\
+The asoc-make function takes a set of keys and returns an association list. If you give a default value, then all the keys are initialised with this value, as shown below:
+
+#+BEGIN_EXAMPLE
+  (asoc-make &optional keys default) ;; Syntax
+  
+  (asoc-make ‘(a b c d e))
+  ((a) (b) (c) (d) (e))
+  
+  (asoc-make ‘(a b c d e) ‘(0))
+  ((a 0) (b 0) (c 0) (d 0) (e 0))
+#+END_EXAMPLE
+
+The asoc-copy function returns a shallow copy of an alist that is passed to it as an argument. For example:
+
+#+BEGIN_EXAMPLE
+  (asoc-copy alist) ;; Syntax
+  
+  (let ((foo (asoc-copy ‘((a 1) (b 2) (c 3) (d 4) (e 5)))))
+  foo)
+  ((a 1) (b 2) (c 3) (d 4) (e 5))
+#+END_EXAMPLE
+
+You can combine keys and values together to create an association list using the asoc-zip API. If there are more keys than values, then these additional keys have a nil value. A couple of examples are given below:
+
+#+BEGIN_EXAMPLE
+  (asoc-zip keys values) ;; Syntax
+  
+  (asoc-zip ‘(a b c) ‘(1 2 3))
+  ((a . 1) (b . 2) (c . 3))
+  
+  (asoc-zip ‘(a b c d e) ‘(1 2 3))
+  ((a . 1) (b . 2) (c . 3) (d) (e))
+#+END_EXAMPLE
+
+If you want to return an alist with the duplicate keys removed, you can use the asoc-uniq function. In the following example, only the first value for the key b is returned.
+
+#+BEGIN_EXAMPLE
+  (asoc-uniq alist) ;; Syntax
+  
+  (asoc-uniq ‘((a 1) (b 2) (b 3) (c 4) (d 5)))
+  ((a 1) (b 2) (c 4) (d 5))
+#+END_EXAMPLE
+
+The asoc-merge function helps you to merge multiple alists. If the same keys are present in multiple lists, the key in the latter alist takes precedence. If identical keys are present in the same alist, then the first occurrence is given the preference. A few examples are shown below:
+
+#+BEGIN_EXAMPLE
+  (asoc-merge alists) ;; Syntax
+  
+  (asoc-merge ‘((a 1) (b 2)) ‘((c 3) (d 4)))
+  ((c 3) (d 4) (a 1) (b 2))
+  
+  (asoc-merge ‘((a 1) (b 2)) ‘((b 3) (c 3)))
+  ((b 3) (c 3) (a 1))
+  
+  (asoc-merge ‘((a 1) (b 2) (a 3)) ‘((c 3) (d 4)))
+  ((c 3) (d 4) (a 1) (b 2))
+#+END_EXAMPLE
+
+You can use the asoc-sort-keys function to return a list with the elements sorted by the keys. For example:
+
+#+BEGIN_EXAMPLE
+  (asoc-sort-keys alist) ;; Syntax
+  
+  (let ((alphabets ‘((b . 2) (a . 1) (e . 5) (d . 4) (c . 3))))
+  (asoc-sort-keys alphabets))
+  ((a . 1) (b . 2) (c . 3) (d . 4) (e . 5))
+#+END_EXAMPLE
+
+*Filters*\\
+The asoc-filter function takes a predicate function and an alist. It returns an alist with those elements that only satisfy the predicate function. In the following example, all elements whose values are less than three are returned.
+
+#+BEGIN_EXAMPLE
+  (asoc-filter predicate alist) ;; Syntax
+  
+  (let ((alphabets ‘((b . 2) (a . 1) (e . 5) (d . 4) (c . 3))))
+  (asoc-filter (lambda (k v) (< v 3)) alphabets))
+  ((b . 2) (a . 1))
+#+END_EXAMPLE
+
+The anaphoric variant of the asoc-filter function is asoc--filter. It returns alist elements for which the form is true. An example written using asoc--filter is given below:
+
+#+BEGIN_EXAMPLE
+  (asoc--filter form alist) ;; Syntax
+  
+  (asoc--filter (< value 3)
+  `((b . 2) (a . 1) (e . 5) (d . 4) (c . 3)))
+  ((b . 2) (a . 1))
+#+END_EXAMPLE
+
+You can apply a predicate function to the keys using the asoc-filter-keys function. The alist elements whose keys satisfy the predicate function alone are returned. For example:
+
+#+BEGIN_EXAMPLE
+  (asoc-filter-keys predicate alist) ;; Syntax
+  
+  (let ((alphabets `((b . 2) (a . 1) (e . 5) (d . 4) (c . 3))))
+  (asoc-filter-keys (lambda (k) (eq k ‘a)) alphabets))
+  ((a . 1))
+#+END_EXAMPLE
+
+The asoc-filter-values function, on the other hand, applies the predicate function to the values of the alist elements. In the following example, only the alist elements whose values are greater than three are returned.
+
+#+BEGIN_EXAMPLE
+  (asoc-filter-values predicate alist) ;; Syntax
+  
+  (let ((alphabets `((b . 2) (a . 1) (e . 5) (d . 4) (c . 3))))
+  (asoc-filter-values (lambda (v) (> v 3)) alphabets))
+  ((e . 5) (d . 4))
+#+END_EXAMPLE
+
+The asoc-remove function removes the elements that satisfy the predicate function and returns the rest of the alist elements. For example:
+
+#+BEGIN_EXAMPLE
+  (asoc-remove predicate alist) ;; Syntax
+  
+  (let ((alphabets `((b . 2) (a . 1) (e . 5) (d . 4) (c . 3))))
+  (asoc-remove (lambda (k v) (< v 3)) alphabets))
+  ((e . 5) (d . 4) (c . 3))
+#+END_EXAMPLE
+
+Similar to the asoc-filter-keys and asoc-filter-values functions, you have the asoc-remove-keys and asoc-remove-values functions that perform the inverse operation. Examples of the syntax and usage of these functions are given below:
+
+#+BEGIN_EXAMPLE
+  (asoc-remove-keys predicate alist) ;; Syntax
+  (asoc-remove-values predicate alist) ;; Syntax
+  
+  (let ((alphabets `((b . 2) (a . 1) (e . 5) (d . 4) (c . 3))))
+  (asoc-remove-keys (lambda (k) (eq k ‘b)) alphabets))
+  ((a . 1) (e . 5) (d . 4) (c . 3))
+  
+  (let ((alphabets `((b . 2) (a . 1) (e . 5) (d . 4) (c . 3))))
+  (asoc-remove-values (lambda (v) (> v 3)) alphabets))
+  ((b . 2) (a . 1) (c . 3))
+#+END_EXAMPLE
+
+The asoc-partition function can take a flattened association list that has keys and values, and return an alist. For example:
+
+#+BEGIN_EXAMPLE
+  (asoc-partition flatlist) ;; Syntax
+  (asoc-partition `(a 1 b 2 c 3 d 4 e 5 f 6))
+  ((a . 1) (b . 2) (c . 3) (d . 4) (e . 5) (f . 6))
+#+END_EXAMPLE
+
+*Predicates*\\
+The asoc-contains-key? API accepts two arguments --- an alist and a key --- and returns a Boolean value. It returns True if the key is present in the alist and nil otherwise. A couple of examples are shown below:
+
+#+BEGIN_EXAMPLE
+  (asoc-contains-key? alist key) ;; Syntax
+  
+  (asoc-contains-key? `((a 1) (b 2) (c 3)) ‘a)
+  t
+  (asoc-contains-key? `((a 1) (b 2) (c 3)) ‘d)
+  nil
+#+END_EXAMPLE
+
+You can use the asoc-contains-pair? function that ascertains if a key-value pair exists in the given alist. It returns True if the key-value pair exists and nil otherwise. For example:
+
+#+BEGIN_EXAMPLE
+  (asoc-contains-pair? alist key value) ;; Syntax
+  
+  (asoc-contains-pair? ‘((a . 1) (b . 2) (c . 3)) ‘a 1)
+  t
+  (asoc-contains-pair? ‘((a . 1) (b . 2) (c . 3)) ‘a 2)
+  nil
+#+END_EXAMPLE
+
+*Access functions*\\
+The asoc-get function retrieves a key from an alist. If the key is not found, nil is returned. A couple of examples are shown below:
+
+#+BEGIN_EXAMPLE
+  (asoc-get alist key) ;; Syntax
+  
+  (asoc-get `((b . 2) (a . 1) (e . 5) (d . 4) (c . 3)) ‘a)
+  1
+  (asoc-get `((b . 2) (a . 1) (e . 5) (d . 4) (c . 3)) ‘f)
+  nil
+#+END_EXAMPLE
+
+If you want to exclude a list of keys and return an alist, you can use the asoc-dissoc function. For example:
+
+#+BEGIN_EXAMPLE
+  (asoc-dissoc alist keys) ;; Syntax
+  
+  (asoc-dissoc `((b . 2) (a . 1) (e . 5) (d . 4) (c . 3)) ‘a ‘b)
+  ((e . 5) (d . 4) (c . 3))
+#+END_EXAMPLE
+
+You can add a key to an existing list using the asoc-put! function, which accepts an alist, a key and a value as arguments. If the key already exists and replace is true, then the old entries are replaced. If replace is nil, then the new entry is added to the front of the alist. A few examples are given below:
+
+#+BEGIN_EXAMPLE
+  (asoc-put! alist key value &optional replace) ;; Syntax
+  
+  (let ((alphabets (list (cons ‘a 1) (cons ‘b 2))))
+  (asoc-put! alphabets ‘c 3)
+  alphabets)
+  ((c . 3) (a . 1) (b . 2))
+  
+  (let ((alphabets (list (cons ‘a 1) (cons ‘b 2))))
+  (asoc-put! alphabets ‘b 3 nil)
+  alphabets)
+  ((b . 3) (a . 1) (b . 2))
+  
+  (let ((alphabets (list (cons ‘a 1) (cons ‘b 2))))
+  (asoc-put! alphabets ‘b 3 t)
+  alphabets)
+  ((b . 3) (a . 1))
+#+END_EXAMPLE
+
+The asoc-pop! function removes a key from an alist and returns the same as illustrated below:
+
+#+BEGIN_EXAMPLE
+  (asoc-pop! alist key) ;; Syntax
+  
+  (let ((alphabets (list (cons ‘a 1) (cons ‘b 2))))
+  (asoc-pop! alphabets ‘b))
+  (b . 2)
+#+END_EXAMPLE
+
+The asoc-find API returns the first element in a given alist that satisfies the predicate function. For example:
+
+#+BEGIN_EXAMPLE
+  (asoc-find predicate alist) ;; Syntax
+  (asoc-find (lambda (k v) (< v 3)) `((b . 2) (a . 1) (e . 5) (d . 4) (c . 3)))
+  (b . 2)
+#+END_EXAMPLE
+
+The anaphoric variant of the asoc-find function is the asoc--find function, which is demonstrated below:
+
+#+BEGIN_EXAMPLE
+  (asoc--find form alist) ;; Syntax
+  
+  (asoc--find (lambda (k v) (< v 3)) `((b . 2) (a . 1) (e . 5) (d . 4) (c . 3)))
+  (b . 2)
+#+END_EXAMPLE
+
+The asoc-find-key function takes two arguments --- a key and an alist. It returns the first alist element that matches the key, or nil otherwise. For example:
+
+#+BEGIN_EXAMPLE
+  (asoc-find-key key alist) ;; Syntax
+  
+  (asoc-find-key ‘c `((b . 2) (a . 1) (e . 5) (d . 4) (c . 3)))
+  (c . 3)
+  (asoc-find-key ‘f `((b . 2) (a . 1) (e . 5) (d . 4) (c . 3)))
+  nil
+#+END_EXAMPLE
+
+If you want the list of unique keys in an alist, you can use the asoc-keys function as illustrated below:
+
+#+BEGIN_EXAMPLE
+  (asoc-keys alist) ;; Syntax
+  
+  (asoc-keys `((b . 2) (a . 1) (e . 5) (d . 4) (c . 3)))
+  (b a e d c)
+  (asoc-keys `((b . 2) (a . 1) (e . 5) (d . 4) (c . 3) (a . 2) (b . 6)))
+  (b a e d c)
+#+END_EXAMPLE
+
+On the other hand, if you want the list of unique values in an alist, you can use the asoc-values function. A couple of examples are shown below:
+
+#+BEGIN_EXAMPLE
+  (asoc-values alist) ;; Syntax
+  
+  (asoc-values `((b . 2) (a . 1) (e . 5) (d . 4) (c . 3)))
+  (2 1 5 4 3)
+  (asoc-values `((b . 2) (a . 1) (e . 5) (d . 4) (c . 3) (a . 2) (b . 6)))
+  (2 1 5 4 3 6)
+#+END_EXAMPLE
+
+The asoc-unzip function performs the reverse operation of asoc-zip. It returns all the keys and values from an alist. An example is provided below:
+
+#+BEGIN_EXAMPLE
+  (asoc-unzip alist) ;; Syntax
+  
+  (asoc-unzip `((a . 1) (b . 2) (c . 3)))
+  ((a b c) (1 2 3))
+#+END_EXAMPLE
+
+*Loops*\\
+The following section addresses a couple of looping constructs possible with asoc.el. You can use the asoc-do construct to loop through each key-value pair in an alist and execute a body of code. In the following example, the sum of all the values is computed and returned as the result.
+
+#+BEGIN_EXAMPLE
+  (asoc-do ((key value) alist [result] body ...)) ;; Syntax
+  
+  (let ((sum 0)
+  (alphabets `((b . 2) (a . 1) (e . 5) (d . 4) (c . 3))))
+  (asoc-do ((key value) alphabets sum)
+  (when (symbolp key)
+  (setf sum (+ sum value))))
+  sum)
+  15
+#+END_EXAMPLE
+
+The anaphoric variant of the asoc-do function is the asoc--do construct and is illustrated below:
+
+#+BEGIN_EXAMPLE
+  (asoc--do (alist &rest body)) ;; Syntax
+  
+  (let ((alphabets ‘((b . 2) (a . 1) (e . 5) (d . 4) (c . 3))))
+  (asoc--do alphabets
+  
+  (when (symbolp key)
+  (setf result (+ (or result 0) value)))))
+  15
+#+END_EXAMPLE
+
+*Mapping functions*\\
+The asoc-map function takes two arguments --- a function and an alist. It applies the function to each and every element in the alist. In the following example, the key of every element in the alist is checked to see if it is a symbol and then its value is returned.
+
+#+BEGIN_EXAMPLE
+  (asoc-map function alist) ;; Syntax
+  
+  (asoc-map (lambda (k v) (when (symbolp k) v))
+  ‘((b . 2) (a . 1) (e . 5) (d . 4) (c . 3)))
+  (2 1 5 4 3)
+#+END_EXAMPLE
+
+The anaphoric variant of the asoc-map function is the asoc--map function and is demonstrated below with an example:
+
+#+BEGIN_EXAMPLE
+  (asoc--map form alist) ;; Syntax
+  
+  (asoc--map (format “%s=%d;” key value)
+  ‘((b . 2) (a . 1) (e . 5) (d . 4) (c . 3)))
+  (“b=2;” “a=1;” “e=5;” “d=4;” “c=3;”)
+#+END_EXAMPLE
+
+You can make a transformation on the keys on the given alist using the asoc-map-keys function. The keys are converted into strings in the following example:
+
+#+BEGIN_EXAMPLE
+  (asoc-map-keys function alist) ;; Syntax
+  
+  (asoc-map-keys #’symbol-name ‘((b . 2) (a . 1) (e . 5) (d . 4) (c . 3)))
+  ((“b” . 2) (“a” . 1) (“e” . 5) (“d” . 4) (“c” . 3))
+#+END_EXAMPLE
+
+If you want to make transformations on the values, you can use the ‘asoc-map-values' function as shown below:
+
+#+BEGIN_EXAMPLE
+  (asoc-map-values function alist) ;; Syntax
+  
+  (let ((alphabets '((b . 2) (a . 1) (e . 5) (d . 4) (c . 3))))
+  (asoc-map-values #'list alphabets))
+  ((b 2) (a 1) (e 5) (d 4) (c 3))
+#+END_EXAMPLE
+
+*Folds*\\
+The fold operation is a reduction on an association list. The asoc-fold function takes three arguments --- a reduction function, an alist and an initial value (accumulator). In the following example, the values are added to the accumulator and the sum of the values is returned.
+
+#+BEGIN_EXAMPLE
+  (asoc-fold function alist init) ;; Syntax
+  
+  (let ((alphabets ‘((b . 2) (a . 1) (e . 5) (d . 4) (c . 3))))
+  (asoc-fold (lambda (k v acc) (+ v acc))
+  alphabets 0))
+  15
+#+END_EXAMPLE
+
+The anaphoric variant of the asoc-fold function is the asoc--fold function. Its syntax and usage are demonstrated with the following example:
+
+#+BEGIN_EXAMPLE
+  (asoc--fold form alist init) ;; Syntax
+  
+  (let ((alphabets ‘((b . 2) (a . 1) (e . 5) (d . 4) (c . 3))))
+  (asoc--fold (+ value acc) alphabets 0))
+  15
+#+END_EXAMPLE
+
+You can merge multiple alists using the ‘asoc-merge-values' function. For example:
+
+#+BEGIN_EXAMPLE
+  (asoc-merge-values alists) ;; Syntax
+  
+  (let ( (vowels `((a . 1) (e . 5) (i . 9)))
+  (consonants `((b . 2) (c . 3) (d . 4))))
+  (asoc-merge-values vowels consonants))
+  ((a 1) (e 5) (i 9) (b 2) (c 3) (d 4))
+#+END_EXAMPLE
+
+If you have duplicate keys, then you can use the asoc-merge-values-no-dups function, which will merge multiple unique values for each key to a single alist. An example is shown below:
+
+#+BEGIN_EXAMPLE
+  (asoc-merge-values-no-dups alists) ;; Syntax
+  
+  (let ( (vowels `((a . 1) (e . 5) (i . 9) (a . 1)))
+  
+  (consonants `((b . 2) (c . 3) (d . 4) (d . 4))))
+  (asoc-merge-values-no-dups vowels consonants))
+  ((a 1) (e 5) (i 9) (b 2) (c 3) (d 4))
+#+END_EXAMPLE
+
+Do explore the README at https://github.com/troyp/asoc.el to learn more about the association list functions given above and their usage.
