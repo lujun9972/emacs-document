@@ -1,0 +1,206 @@
+#+TITLE: Part 4: 动画
+#+URL: http://dantorop.info/project/emacs-animation/lisp4.html
+#+AUTHOR: lujun9972
+#+TAGS: elisp-common
+#+DATE: [2020年 02月 10日 星期一 10:08:38 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+所有这些示例都定义了在屏幕上绘画的函数。在 =ielm= 模式下定义了这样一个函数后，你需要在一个空白缓冲区中测试它。要
+在另一个窗口中创建新缓冲区，输入 =C-x 5 b= 然后为新缓冲区指定一个名称(例如 =test= )，然后按下 =回车=. 
+之后你就能看到两个缓冲区了，每个缓冲区都在自己的窗口中: 旧的 =ielm= 一个缓冲区,新的 =test= 一个缓冲区。
+你可以在 =test= 缓冲区中尝试所有 =defuns= 的函数。
+要用键盘在这两个窗口之间切换，可以输入=C-x 5 o =。或者使用90年代风格的鼠标。顺便说一下，Emacs将通常意义上的“窗口”称为“frame”。
+
+=test= 缓冲区中，输入 =M-:= 会在窗口底部得到一个Lisp提示符(应该是 =Eval:=)。
+然后就可以运行一个你已经在 =ielm= 中defun的函数。
+例如，假设您创建了一个名为 =wave= 的函数，那么在=Eval:=提示符处输入 =(wave)=.
+
+* 沿屏幕向下移动的线
+:PROPERTIES:
+:CUSTOM_ID: a-line-moving-down-the-screen
+:END:
+
+#+begin_src emacs-lisp
+  (defun line-down ()
+    (dotimes (line 10)
+      (erase-buffer)
+      (dotimes (y line) (newline))
+      (insert "----------------") 
+      (sit-for 0.2)))
+#+end_src
+
+
+* 这一行在屏幕上向下移动十次
+:PROPERTIES:
+:CUSTOM_ID: that-line-moving-down-the-screen-ten-times
+:END:
+
+#+begin_src emacs-lisp
+  (defun line-down-repeat ()
+    (dotimes (many-times 10)
+      (dotimes (line 10)
+        (erase-buffer)
+        (dotimes (y line) (newline))
+        (insert "----------------")
+        (sit-for 0.2))))
+#+end_src
+
+#+RESULTS:
+: line-down-repeat
+
+如果你厌倦了看它重复移动，按下 =C-g= 停止程序。
+
+* 两条线相互分离的线
+:PROPERTIES:
+:CUSTOM_ID: two-lines-moving-apart-from-each-other
+:END:
+
+#+begin_src emacs-lisp
+  (defun two-apart ()
+    (dotimes (line 10)
+      (erase-buffer)
+      (dotimes (y line) (newline))
+      (insert "------------------------")
+      (dotimes (y line) (newline))
+      (insert "+=======================+")
+      (sit-for 0.2)))
+#+end_src
+
+#+RESULTS:
+: two-apart
+
+* 顶线移动，底线静止
+:PROPERTIES:
+:CUSTOM_ID: top-line-moving-bottom-line-static
+:END:
+
+#+begin_src emacs-lisp
+  (defun top-move-bottom-static ()
+    (dotimes (line 10)
+      (erase-buffer)
+      (newline (+ 1 line))
+      (insert "------------------------")
+      (newline (- 10 line))
+      (insert "+=======================+")
+      (sit-for 0.2)))
+#+end_src
+
+#+RESULTS:
+: top-move-bottom-static
+
+* 一行追着另一行
+:PROPERTIES:
+:CUSTOM_ID: one-line-chasing-another
+:END:
+
+#+begin_src emacs-lisp
+  (defun chase ()
+    (dotimes (y 30)
+      (erase-buffer)
+      (newline (+ 1 y))
+      (insert "------------------------")
+      (newline (- 16 (/ y 2)))
+      (insert "+=======================+")
+      (sit-for 0.1)))
+#+end_src
+
+#+RESULTS:
+: chase
+
+* 两行追逐,最后相撞
+:PROPERTIES:
+:CUSTOM_ID: chase-with-final-collision
+:END:
+
+#+begin_src emacs-lisp
+  (defun chase2 ()
+    (dotimes (y 30)
+      (erase-buffer)
+      (newline (+ 1 y))
+      (insert "------------------------")
+      (newline (- 16 (/ y 2)))
+      (insert "+=======================+")
+      (sit-for 0.1))
+    (erase-buffer)
+    (newline 32)
+    (insert "************!!!!!***********"))
+#+end_src
+
+#+RESULTS:
+: chase2
+
+* 移动到一边的线
+:PROPERTIES:
+:CUSTOM_ID: a-line-moving-to-the-side
+:END:
+
+#+begin_src emacs-lisp
+  (defun sideways ()
+    (dotimes (x 11)
+      (erase-buffer)
+      (dotimes (move-over x)
+        (insert " "))
+      (insert "---*--------")
+      (sit-for 0.1)))
+#+end_src
+
+* 向相反方向移动的两条直线
+:PROPERTIES:
+:CUSTOM_ID: two-lines-moving-sideways-in-opposite-directions
+:END:
+
+#+begin_src emacs-lisp
+  (defun two-ships ()
+    (dotimes (y 16)
+      (erase-buffer)
+      (dotimes (move-over y)
+        (insert " "))
+      (insert "---*--------")
+      (newline)
+      (dotimes (move-over (- 16 y))
+        (insert " "))
+      (insert "---------*---")
+      (sit-for 0.1)))
+#+end_src
+
+#+RESULTS:
+: two-ships
+
+* 使用正弦波上下移动一条线
+:PROPERTIES:
+:CUSTOM_ID: using-a-sine-wave-to-move-a-line-up-and-down
+:END:
+
+#+begin_src emacs-lisp
+  (defun up-down ()
+    (dotimes (y 50)
+      (erase-buffer)
+      (newline (round (+ 11 (* 10 (sin (/ y 7.0))))))
+      (insert "----------------")
+      (sit-for 0.2)))
+#+end_src
+
+#+RESULTS:
+: up-down
+
+再一次，如果您厌倦了看这个运行过程，输入 =C-g= 来停止它。如果增加/减少数字 =7.0=,则线将移动得更慢或更快。
+
+* 跟随正弦波路径(上下左右移动)
+:PROPERTIES:
+:CUSTOM_ID: following-the-path-of-a-sine-wave-moving-updown-and-right
+:END:
+
+#+begin_src emacs-lisp
+  (defun follow-sine ()
+    (dotimes (y 70)
+      (erase-buffer)
+      (newline (round (+ 11 (* 10 (sin (/ y 10.0))))))
+      (dotimes (over y)
+        (insert " "))
+      (insert "*")
+      (sit-for 0.1)))
+#+end_src
+
+#+RESULTS:
+: follow-sine
