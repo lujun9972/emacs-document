@@ -1,0 +1,389 @@
+#+TITLE: Part 7: 移动,醉鬼漫步,键盘控制
+#+URL: http://dantorop.info/project/emacs-animation/lisp7.html
+#+AUTHOR: lujun9972
+#+TAGS: raw
+#+DATE: [2020年 02月 10日 星期一 10:10:13 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+* 文件处理
+:PROPERTIES:
+:CUSTOM_ID: file-handling
+:END:
+
+要开始编写代码，需要先创建一个编辑文件的emacs缓冲区。比如你可以输入 =c-x c-f ~/Desktop/motion.el=.
+=~/Desktop/= 导航到您的桌面(在OS X上)，然后 =motion.el= 是文件名。你可以选择任何名称，但是得以 =.el= 结尾好让Emacs知道这是一个Emacs Lisp程序。
+
+第一次使用 =c-x c-f= 导航到该文件时，Emacs将创建该文件。然后通过 =c-x c-s= 保存工作。
+下次启动Emacs时，执行 =c-x c-f ~/Desktop/motion.el= (或其他名称)将加载该文件。
+
+在指定文件名或目录时,按下 =TAB= Emacs将补完目录/文件名。如果没有找到补全内容，按 =TAB= 2此就会显示所有可能的补全项。
+要在闪存上编辑文件，请使用类似 =/volume/=drivename=/filename= 这样的路径名(在OS X上)。
+
+| 快捷键    | 意义                  |
+| =c-x c-f= | 查找文件              |
+| =c-x c-s= | 保存文件              |
+| =TAB=     | 尝试补全目录/文件名称 |
+
+* Test 缓冲区
+:PROPERTIES:
+:CUSTOM_ID: test-buffers
+:END:
+
+要在相同Emacs窗口中显示代码和test缓冲区，输入 =c-x 3= 来分割Emacs窗口。然后就可以通过 =c-x o= 在左右窗格之间切换光标。
+在右侧窗格中，输入 =c-x b test <return>= 创建一个test缓冲区。然后=c-x o=返回左窗格并编辑代码。将窗口加宽，以便有足够的空间来查看左边的代码和右边的测试缓冲区。
+
+[[http://dantorop.info/project/emacs-animation/emacs-two-pane.jpg]]
+
+Now in the left pane, you can type =m-x eval-buffer <return>= to load your Lisp code into Emacs. Then type =c-x o= to move to the right pane (test buffer), and type =m-: (=defunname=)= to run a defun you've created. If you need to quit your defun (because it is looping forever), type =c-g=. Then =c-x o= will bring you back to you Emacs code in the left pane.
+现在在左侧窗格中，可以键入=m-x eval-buffer <return>=将Lisp代码加载到Emacs中。然后type =c-x o=移动到右边的窗格(测试缓冲区)，type =m-:(=defunname=)=运行您创建的defun。如果需要退出defun(因为它会一直循环下去)，输入=c-g=。然后=c-x o=将带您回到左窗格中的Emacs代码。
+
+If you accidentally run your Lisp program in the same buffer as you Lisp code, it'll probably overwrite your code. To get your program back, type =c-/= which performs an undo. If the Lisp code has hidden the cursor, typing =m-: (setq cursor-type t) <return>= will bring back the cursor.
+如果您不小心在与Lisp代码相同的缓冲区中运行Lisp程序，它可能会覆盖您的代码。要取回程序，键入=c-/=执行撤消操作。如果Lisp代码隐藏了光标，那么键入=m-:(setq指针类型t) <return>=将返回光标。
+
+key command meaning
+关键命令的意思
+=c-x 3=
+= 3 cx =
+split window horizontally
+水平分割窗口
+=c-x o=
+= cx o =
+move cursor to other pane
+将光标移到其他窗格
+=c-x b=
+= cx b =
+switch to buffer
+切换到缓冲区
+=m-x eval-buffer=
+= m x eval-buffer =
+load the Lisp code in the current buffer
+在当前缓冲区中加载Lisp代码
+=m-:=
+m - = = = =
+prompt for and evaluate a Lisp expression
+提示并计算Lisp表达式
+=c-g=
+= c g =
+abort running Lisp program (or pretty much anything else)
+中止运行Lisp程序(或其他任何程序)
+=c-/=
+c - / = = = =
+undo
+撤销
+=m-: (setq cursor-type t)=
+=m-:(setq指针型t)=
+bring back cursor
+让光标
+
+* 注释
+:PROPERTIES:
+:CUSTOM_ID: comments
+:END:
+
+Lisp会忽略一行中分号(=;=)后面所有内容。这允许您用非lisp语言对代码进行注释。习惯上，整行注释以两个分号(=;;=)开头:
+
+#+begin_src emacs-lisp
+  ;; set some variables
+  (setq i 23)
+  (setq j "hello")
+#+end_src
+#+BEGIN_EXAMPLE
+#+END_EXAMPLE
+
+* 辅助函数和全局变量
+:PROPERTIES:
+:CUSTOM_ID: helper-routines-and-global-variables
+:END:
+
+我们将设置此页中的代码为全局变量(在 defun 之外的通过 =setq= 进行赋值，这样所有函数都可以看到它们),并以此来绘制网格大小和背景。
+然后我们将创建函数来绘制网格、绘制字符和清除字符。需要运行这段代码，才能使其他代码正常工作。
+
+#+begin_src emacs-lisp
+  ;; global variables
+
+  (setq width 50)
+  (setq height 35)
+  (setq background-char ?.)
+
+  ;; helper routines (little elves)
+
+  (defun make-grid ()
+    (erase-buffer)
+    (dotimes (i height)
+      (insert-char background-char width)
+      (newline)))
+
+  (defun draw-char (x y char)
+    (goto-char (+ x (* (1- y) (1+ width))))
+    (delete-char 1)
+    (insert-char char 1))
+
+  (defun clear-char (x y)
+    (draw-char x y background-char))
+#+end_src
+
+=1+= 返回比它的参数多1的值, =1-= 返回少1的值。因此 =(1+ width)= 是 =(+ 1 width)= 的缩写，而 =(1- y)= 是 =(- y 1)= 的缩写。
+
+注意, =clear-char= 是一个函数，它使用了另一个函数 =draw-char= 来完成工作，同时引用了全局变量 =background-char=.(就像 =draw-char= 使用了Emacs内置函数  =goto-char=, =delete-char= 和 =insert-char= 来完成工作一样。)
+
+* 让字符向右下方移动
+:PROPERTIES:
+:CUSTOM_ID: animate-a-character-down-and-to-right
+:END:
+
+#+begin_src emacs-lisp
+  (defun move-char ()
+    (make-grid)
+    (let ((x 1) (y 1))
+      (dotimes (i 30)
+        (draw-char x y ?*)
+        (sit-for 0.2)
+        (clear-char x y)
+        (setq x (+ x (random 3))
+              y (+ y (random 3))))))
+#+end_src
+
+=let= 设置 =x= 和 =y= 来跟踪字符的位置.
+=(random 3)= 返回0、1或2。因此, =setq= 设置的 =x= 和 =y= 值是随机的，他们要么相同，要么多一点。
+注意,=setq= 可以设置多个变量。
+
+* 两个字符的动画
+:PROPERTIES:
+:CUSTOM_ID: animate-two-characters
+:END:
+
+#+begin_src emacs-lisp
+  (defun move-two-chars ()
+    (make-grid)
+    (let ((x1 1) (y1 1)
+          (x2 1) (y2 1))
+      (dotimes (i 30)
+        (draw-char x1 y1 ?*)
+        (draw-char x2 y2 ?o)
+        (sit-for 0.2)
+        (clear-char x1 y1)
+        (clear-char x2 y2)
+        (setq x1 (+ x1 (random 3))
+              y1 (+ y1 (random 3))
+              x2 (+ x2 (random 4))
+              y2 (+ y2 (random 2))))))
+#+end_src
+
+这是一个很有特色的动画代码. =let= 设置两个字符。每次循环，代码首先绘制字符，然后暂停以便这两个字符显示出来，然后清除该字符，再更新它们的位置，然后重复。 (在slicker的代码中，计算机可以在暂停期间更新字符位置数据，以节省时间并消除闪烁。)
+
+* 醉鬼漫步
+:PROPERTIES:
+:CUSTOM_ID: drunkards-walk
+:END:
+
+#+begin_src emacs-lisp
+  (defun drunkard ()
+    (setq cursor-type nil)
+    (make-grid)
+    (let ((x (/ width 2))
+          (y (/ height 2)))
+      (while t
+        (draw-char x y ?*)
+        (sit-for 0.2)
+        (clear-char x y)
+        (setq x (+ x (1- (random 3)))
+              y (+ y (1- (random 3)))))))
+#+end_src
+
+字符[[http://en.wikipedia.org/wiki/Random_walk][交错]]出现在屏幕上. =(setq cursor-type nil)= 会隐藏光标。=(1- (random 3))= 返回-1、0或1。 =while t= 表示酒鬼将永远游荡(实际上不是永远，当角色离开网格时，此代码将中断)。
+
+* 两个醉鬼
+:PROPERTIES:
+:CUSTOM_ID: two-drunkards
+:END:
+
+#+begin_src emacs-lisp
+  (defun two-drunks ()
+    (setq cursor-type nil)
+    (make-grid)
+    (let ((x1 (/ width 2)) (y1 (/ height 2))
+          (x2 (/ width 2)) (y2 (/ height 2)))
+      (while t
+        (draw-char x1 y1 ?\*)
+        (draw-char x2 y2 ?\#)
+        (sit-for 0.2)
+        (make-grid)
+        (setq x1 (+ x1 (1- (random 3)))
+              y1 (+ y1 (1- (random 3)))
+              x2 (+ x2 (1- (random 3)))
+              y2 (+ y2 (1- (random 3)))))))
+#+end_src
+
+相似 =move-two-chars=.
+
+一个带有辅助功能来确定交错方向的版本:
+
+#+begin_src emacs-lisp
+  (defun delta ()
+    (1- (random 3)))
+
+  (defun two-drunks2 ()
+    (setq cursor-type nil)
+    (make-grid)
+    (let ((x1 (/ width 2)) (y1 (/ height 2))
+          (x2 (/ width 2)) (y2 (/ height 2)))
+      (while t
+        (draw-char x1 y1 ?*)
+        (draw-char x2 y2 ?#)
+        (sit-for 0.2)
+        (make-grid)
+        (setq x1 (+ x1 (delta))
+              y1 (+ y1 (delta))
+              x2 (+ x2 (delta))
+              y2 (+ y2 (delta))))))
+#+end_src
+
+注意 =delta= 是一个函数，它返回一个值，这个值是函数中最后一个(在本例中也仅有这一个)表达式的结果。这个值可以是- 1,0，也可以是1，每次调用它的时候都会变化，因为它调用了 =random=.
+
+* 一个永远流的醉鬼
+:PROPERTIES:
+:CUSTOM_ID: a-drunkard-who-can-wander-forever
+:END:
+
+#+begin_src emacs-lisp
+  (defun circular-drunkard ()
+    (setq cursor-type nil)
+    (make-grid)
+    (let ((x (/ width 2))
+          (y (/ height 2)))
+      (while t
+        (draw-char x y ?*)
+        (sit-for 0.05)
+        (clear-char x y)
+        (setq x (+ x (1- (random 3)))
+              y (+ y (1- (random 3))))
+        ;; like pac-man, edges of screen connect
+        (if (< x 1) (setq x width))
+        (if (> x width) (setq x 1))
+        (if (< y 1) (setq y height))
+        (if (> y height) (setq y 1)))))
+#+end_src
+
+最后的 =if= 从句处理离开网格的字符。
+
+* 受键盘控制的行者
+:PROPERTIES:
+:CUSTOM_ID: keyboard-controlled-walker
+:END:
+
+#+begin_src emacs-lisp
+  (defun walker ()
+    (setq cursor-type nil)
+    (make-grid)
+    (let ((x 1) (y 1))
+      (while t
+        (draw-char x y ?*)
+        (let ((key (read-event)))
+          (clear-char x y)
+          (cond
+           ((eq key 'left)
+            (setq x (1- x)))
+           ((eq key 'right)
+            (setq x (1+ x)))
+           ((eq key 'up)
+            (setq y (1- y)))
+           ((eq key 'down)
+            (setq y (1+ y)))))
+        ;; stop at edges of screen
+        (setq x (min x width)
+              y (min y height)
+              x (max x 1)
+              y (max y 1)))))
+#+end_src
+
+就像一个醉汉走路一样，只是现在能用键盘控制角色走路的方向.
+=(read-event)= 等待一个按键，然后返回它. =cond= (condition的缩写)函数是一种执行多个 =if= 而不需要每次都写 =if= 的方法。
+通过 =let= 命令将 =(read-event)= 的结果临时存储在变量 =key= 中，让 =cond= 将相同的按键与所有四个箭头键进行比较。
+在 =left=, =right=, =up=, =down= 之前的撇号(='=)是必须的，否则Lisp会认为我们指的是一个名为 =left= (或其他)的变量。
+
+=min= 和 =max= 函数分别返回它们的参数中的最小值和最大i值。
+这是一种确保x总是小于等于 =width=, y总是小于等于 =height=,并且x和y都大于等于1简洁的方法。
+
+* 按一次键，角色就会一直移动
+:PROPERTIES:
+:CUSTOM_ID: the-character-keeps-moving-once-directed-by-keypress
+:END:
+
+#+begin_src emacs-lisp
+  (defun runner ()
+    (setq cursor-type nil)
+    (make-grid)
+    (let ((x 1) (y 1)
+          (dx 0) (dy 0))
+      (while (and (>= x 1) (<= x width))
+        (draw-char x y ?*)
+        (let ((key (read-event nil nil 0.1)))
+          (cond
+           ((eq key 'left)
+            (setq dx -1))
+           ((eq key 'right)
+            (setq dx 1))
+           ((eq key 'up)
+            (setq dy -1))
+           ((eq key 'down)
+            (setq dy 1))))
+        (clear-char x y)
+        (setq x (+ x dx)
+              y (+ y dy))
+        ;; bounce off edges
+        (if (or (< x 1) (> x width))
+            (setq dx (- dx)))
+        (if (or (< y 1) (> y height))
+            (setq dy (- dy)))
+        ;; stop at edges of screen
+        (setq x (min x width)
+              y (min y height)
+              x (max x 1)
+              y (max y 1)))))
+#+end_src
+
+变量 =dx= 和 =dy= 代表x和y的偏差，描述x和y的变化率。
+
+=(read-event nil nil 0.1)= 等待击键十分之一秒，并返回击键(如果有的话)，或者 =nil= 如果当时没有击键。
+这是检查输入的一种好方法，但是会在没有输入的情况下，继续执行操作。因为它需要等待一段时间，所以我们不再需要 =(sit-for 0.1)=,在 =read-event= 中的等待做同样的事情。
+
+=(setq dx (- dx))= 设置 =dx= 为负的 =dx=,以反转字符的左右移动。 类似地, =(setq dy (- dy))= 反转字符的上下运动方向。
+这(在 =if= 测试中)使角色走的太远的情况下在屏幕边缘反弹。这是一大段代码让字符在屏幕边缘弹回，也受到其约束…
+
+* 字符会从网格的顶部/底部弹起，但会从两侧掉下去
+:PROPERTIES:
+:CUSTOM_ID: the-character-bounces-off-of-topbottom-of-grid-but-falls-off-the-sides
+:END:
+
+#+begin_src emacs-lisp
+  (defun runner-with-boundaries ()
+    (setq cursor-type nil)
+    (make-grid)
+    (let ((x 1) (y 1)
+          (dx 0) (dy 0))
+      (while (and (>= x 1) (<= x width))
+        (draw-char x y ?*)
+        (let ((key (read-event nil nil 0.1)))
+          (cond
+           ((eq key 'left)
+            (setq dx -1))
+           ((eq key 'right)
+            (setq dx 1))
+           ((eq key 'up)
+            (setq dy -1))
+           ((eq key 'down)
+            (setq dy 1))))
+        (clear-char x y)
+        (setq x (+ x dx)
+              y (+ y dy))
+        ;; bounce off top/bottom edges
+        (if (or (< y 1) (> y height))
+            (setq dy (- dy)))
+        ;; stop at edges of screen
+        (setq y (min y height)
+              y (max y 1)))
+      (insert "Game over")))
+#+end_src
+
+现在 =while= 循环不会一直循环下去，除非字符保持在左/右网格边界内。最后的“Game over”是有点粗糙，但这开始让我们更像Pong游戏了!
