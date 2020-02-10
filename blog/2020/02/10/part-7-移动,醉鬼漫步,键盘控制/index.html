@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Part 7: 移动,醉鬼漫步,键盘控制 - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="raw" />
+  <!-- <link rel="stylesheet" href="../../../../../media/css/main.css" type="text/css"/>
+       <link rel="stylesheet" href="../../../../../media/css/comment.css" type="text/css"/> -->
+  <link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/kognise/water.css@latest/dist/dark.css'>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="../../../../../">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <ul class="trigger">
+        <li><a href="../../../../../years/">Years</a></li>
+        <li><a href="../../../../../authors/">Authors</a></li>
+        <li><a href="../../../../../tags/">Tags</a></li>
+        <li><a href="../../../../../about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="../../../../../rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="https://www.bing.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">Part 7: 移动,醉鬼漫步,键盘控制</h1>
+<div id="table-of-contents">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#file-handling">文件处理</a></li>
+<li><a href="#test-buffers">Test 缓冲区</a></li>
+<li><a href="#comments">注释</a></li>
+<li><a href="#helper-routines-and-global-variables">辅助函数和全局变量</a></li>
+<li><a href="#animate-a-character-down-and-to-right">让字符向右下方移动</a></li>
+<li><a href="#animate-two-characters">两个字符的动画</a></li>
+<li><a href="#drunkards-walk">醉鬼漫步</a></li>
+<li><a href="#two-drunkards">两个醉鬼</a></li>
+<li><a href="#a-drunkard-who-can-wander-forever">一个永远流的醉鬼</a></li>
+<li><a href="#keyboard-controlled-walker">受键盘控制的行者</a></li>
+<li><a href="#the-character-keeps-moving-once-directed-by-keypress">按一次键，角色就会一直移动</a></li>
+<li><a href="#the-character-bounces-off-of-topbottom-of-grid-but-falls-off-the-sides">字符会从网格的顶部/底部弹起，但会从两侧掉下去</a></li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-org81f6150" class="outline-2">
+<h2 id="file-handling"><a id="org81f6150"></a>文件处理</h2>
+<div class="outline-text-2" id="text-file-handling">
+<p>
+要开始编写代码，需要先创建一个编辑文件的emacs缓冲区。比如你可以输入 <code>c-x c-f ~/Desktop/motion.el</code>.
+<code>~/Desktop/</code> 导航到您的桌面(在OS X上)，然后 <code>motion.el</code> 是文件名。你可以选择任何名称，但是得以 <code>.el</code> 结尾好让Emacs知道这是一个Emacs Lisp程序。
+</p>
+
+<p>
+第一次使用 <code>c-x c-f</code> 导航到该文件时，Emacs将创建该文件。然后通过 <code>c-x c-s</code> 保存工作。
+下次启动Emacs时，执行 <code>c-x c-f ~/Desktop/motion.el</code> (或其他名称)将加载该文件。
+</p>
+
+<p>
+在指定文件名或目录时,按下 <code>TAB</code> Emacs将补完目录/文件名。如果没有找到补全内容，按 <code>TAB</code> 2此就会显示所有可能的补全项。
+要在闪存上编辑文件，请使用类似 <code>/volume/=drivename=/filename</code> 这样的路径名(在OS X上)。
+</p>
+
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-left" />
+
+<col  class="org-left" />
+</colgroup>
+<tbody>
+<tr>
+<td class="org-left">快捷键</td>
+<td class="org-left">意义</td>
+</tr>
+
+<tr>
+<td class="org-left"><code>c-x c-f</code></td>
+<td class="org-left">查找文件</td>
+</tr>
+
+<tr>
+<td class="org-left"><code>c-x c-s</code></td>
+<td class="org-left">保存文件</td>
+</tr>
+
+<tr>
+<td class="org-left"><code>TAB</code></td>
+<td class="org-left">尝试补全目录/文件名称</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+
+<div id="outline-container-orgab7c551" class="outline-2">
+<h2 id="test-buffers"><a id="orgab7c551"></a>Test 缓冲区</h2>
+<div class="outline-text-2" id="text-test-buffers">
+<p>
+要在相同Emacs窗口中显示代码和test缓冲区，输入 <code>c-x 3</code> 来分割Emacs窗口。然后就可以通过 <code>c-x o</code> 在左右窗格之间切换光标。
+在右侧窗格中，输入 <code>c-x b test &lt;return&gt;</code> 创建一个test缓冲区。然后=c-x o=返回左窗格并编辑代码。将窗口加宽，以便有足够的空间来查看左边的代码和右边的测试缓冲区。
+</p>
+
+
+<div class="figure">
+<p><img src="http://dantorop.info/project/emacs-animation/emacs-two-pane.jpg" alt="emacs-two-pane.jpg" />
+</p>
+</div>
+
+<p>
+Now in the left pane, you can type <code>m-x eval-buffer &lt;return&gt;</code> to load your Lisp code into Emacs. Then type <code>c-x o</code> to move to the right pane (test buffer), and type <code>m-: (=defunname</code>)= to run a defun you've created. If you need to quit your defun (because it is looping forever), type <code>c-g</code>. Then <code>c-x o</code> will bring you back to you Emacs code in the left pane.
+现在在左侧窗格中，可以键入=m-x eval-buffer &lt;return&gt;=将Lisp代码加载到Emacs中。然后type <code>c-x o=移动到右边的窗格(测试缓冲区)，type =m-:(=defunname</code>)=运行您创建的defun。如果需要退出defun(因为它会一直循环下去)，输入=c-g=。然后=c-x o=将带您回到左窗格中的Emacs代码。
+</p>
+
+<p>
+If you accidentally run your Lisp program in the same buffer as you Lisp code, it'll probably overwrite your code. To get your program back, type <code>c-/</code> which performs an undo. If the Lisp code has hidden the cursor, typing <code>m-: (setq cursor-type t) &lt;return&gt;</code> will bring back the cursor.
+如果您不小心在与Lisp代码相同的缓冲区中运行Lisp程序，它可能会覆盖您的代码。要取回程序，键入=c-/=执行撤消操作。如果Lisp代码隐藏了光标，那么键入=m-:(setq指针类型t) &lt;return&gt;=将返回光标。
+</p>
+
+<p>
+key command meaning
+关键命令的意思
+<code>c-x 3</code>
+= 3 cx =
+split window horizontally
+水平分割窗口
+<code>c-x o</code>
+= cx o =
+move cursor to other pane
+将光标移到其他窗格
+<code>c-x b</code>
+= cx b =
+switch to buffer
+切换到缓冲区
+<code>m-x eval-buffer</code>
+= m x eval-buffer =
+load the Lisp code in the current buffer
+在当前缓冲区中加载Lisp代码
+<code>m-:</code>
+m - = = = =
+prompt for and evaluate a Lisp expression
+提示并计算Lisp表达式
+<code>c-g</code>
+= c g =
+abort running Lisp program (or pretty much anything else)
+中止运行Lisp程序(或其他任何程序)
+<code>c-/</code>
+c - / = = = =
+undo
+撤销
+<code>m-: (setq cursor-type t)</code>
+<code>m-:(setq指针型t)</code>
+bring back cursor
+让光标
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgd582a67" class="outline-2">
+<h2 id="comments"><a id="orgd582a67"></a>注释</h2>
+<div class="outline-text-2" id="text-comments">
+<p>
+Lisp会忽略一行中分号(<code>;</code>)后面所有内容。这允许您用非lisp语言对代码进行注释。习惯上，整行注释以两个分号(<code>;;</code>)开头:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp"><span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">set some variables</span>
+(<span style="font-weight: bold;">setq</span> i 23)
+(<span style="font-weight: bold;">setq</span> j <span style="font-style: italic;">"hello"</span>)
+</pre>
+</div>
+<pre class="example">
+
+</pre>
+</div>
+</div>
+
+<div id="outline-container-org73d4c1b" class="outline-2">
+<h2 id="helper-routines-and-global-variables"><a id="org73d4c1b"></a>辅助函数和全局变量</h2>
+<div class="outline-text-2" id="text-helper-routines-and-global-variables">
+<p>
+我们将设置此页中的代码为全局变量(在 defun 之外的通过 <code>setq</code> 进行赋值，这样所有函数都可以看到它们),并以此来绘制网格大小和背景。
+然后我们将创建函数来绘制网格、绘制字符和清除字符。需要运行这段代码，才能使其他代码正常工作。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp"><span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">global variables</span>
+
+(<span style="font-weight: bold;">setq</span> width 50)
+(<span style="font-weight: bold;">setq</span> height 35)
+(<span style="font-weight: bold;">setq</span> background-char ?.)
+
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">helper routines (little elves)</span>
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">make-grid</span> ()
+  (erase-buffer)
+  (<span style="font-weight: bold;">dotimes</span> (i height)
+    (insert-char background-char width)
+    (newline)))
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">draw-char</span> (x y char)
+  (goto-char (+ x (* (1- y) (1+ width))))
+  (delete-char 1)
+  (insert-char char 1))
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">clear-char</span> (x y)
+  (draw-char x y background-char))
+</pre>
+</div>
+
+<p>
+<code>1+</code> 返回比它的参数多1的值, <code>1-</code> 返回少1的值。因此 <code>(1+ width)</code> 是 <code>(+ 1 width)</code> 的缩写，而 <code>(1- y)</code> 是 <code>(- y 1)</code> 的缩写。
+</p>
+
+<p>
+注意, <code>clear-char</code> 是一个函数，它使用了另一个函数 <code>draw-char</code> 来完成工作，同时引用了全局变量 <code>background-char</code>.(就像 <code>draw-char</code> 使用了Emacs内置函数  <code>goto-char</code>, <code>delete-char</code> 和 <code>insert-char</code> 来完成工作一样。)
+</p>
+</div>
+</div>
+
+<div id="outline-container-org68ad2a4" class="outline-2">
+<h2 id="animate-a-character-down-and-to-right"><a id="org68ad2a4"></a>让字符向右下方移动</h2>
+<div class="outline-text-2" id="text-animate-a-character-down-and-to-right">
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">move-char</span> ()
+  (make-grid)
+  (<span style="font-weight: bold;">let</span> ((x 1) (y 1))
+    (<span style="font-weight: bold;">dotimes</span> (i 30)
+      (draw-char x y ?*)
+      (sit-for 0.2)
+      (clear-char x y)
+      (<span style="font-weight: bold;">setq</span> x (+ x (random 3))
+            y (+ y (random 3))))))
+</pre>
+</div>
+
+<p>
+<code>let</code> 设置 <code>x</code> 和 <code>y</code> 来跟踪字符的位置.
+<code>(random 3)</code> 返回0、1或2。因此, <code>setq</code> 设置的 <code>x</code> 和 <code>y</code> 值是随机的，他们要么相同，要么多一点。
+注意,=setq= 可以设置多个变量。
+</p>
+</div>
+</div>
+
+<div id="outline-container-org9dc9799" class="outline-2">
+<h2 id="animate-two-characters"><a id="org9dc9799"></a>两个字符的动画</h2>
+<div class="outline-text-2" id="text-animate-two-characters">
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">move-two-chars</span> ()
+  (make-grid)
+  (<span style="font-weight: bold;">let</span> ((x1 1) (y1 1)
+        (x2 1) (y2 1))
+    (<span style="font-weight: bold;">dotimes</span> (i 30)
+      (draw-char x1 y1 ?*)
+      (draw-char x2 y2 ?o)
+      (sit-for 0.2)
+      (clear-char x1 y1)
+      (clear-char x2 y2)
+      (<span style="font-weight: bold;">setq</span> x1 (+ x1 (random 3))
+            y1 (+ y1 (random 3))
+            x2 (+ x2 (random 4))
+            y2 (+ y2 (random 2))))))
+</pre>
+</div>
+
+<p>
+这是一个很有特色的动画代码. <code>let</code> 设置两个字符。每次循环，代码首先绘制字符，然后暂停以便这两个字符显示出来，然后清除该字符，再更新它们的位置，然后重复。 (在slicker的代码中，计算机可以在暂停期间更新字符位置数据，以节省时间并消除闪烁。)
+</p>
+</div>
+</div>
+
+<div id="outline-container-org1e99454" class="outline-2">
+<h2 id="drunkards-walk"><a id="org1e99454"></a>醉鬼漫步</h2>
+<div class="outline-text-2" id="text-drunkards-walk">
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">drunkard</span> ()
+  (<span style="font-weight: bold;">setq</span> cursor-type nil)
+  (make-grid)
+  (<span style="font-weight: bold;">let</span> ((x (/ width 2))
+        (y (/ height 2)))
+    (<span style="font-weight: bold;">while</span> t
+      (draw-char x y ?*)
+      (sit-for 0.2)
+      (clear-char x y)
+      (<span style="font-weight: bold;">setq</span> x (+ x (1- (random 3)))
+            y (+ y (1- (random 3)))))))
+</pre>
+</div>
+
+<p>
+字符<a href="http://en.wikipedia.org/wiki/Random_walk">交错</a>出现在屏幕上. <code>(setq cursor-type nil)</code> 会隐藏光标。=(1- (random 3))= 返回-1、0或1。 <code>while t</code> 表示酒鬼将永远游荡(实际上不是永远，当角色离开网格时，此代码将中断)。
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgd5e5af5" class="outline-2">
+<h2 id="two-drunkards"><a id="orgd5e5af5"></a>两个醉鬼</h2>
+<div class="outline-text-2" id="text-two-drunkards">
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">two-drunks</span> ()
+  (<span style="font-weight: bold;">setq</span> cursor-type nil)
+  (make-grid)
+  (<span style="font-weight: bold;">let</span> ((x1 (/ width 2)) (y1 (/ height 2))
+        (x2 (/ width 2)) (y2 (/ height 2)))
+    (<span style="font-weight: bold;">while</span> t
+      (draw-char x1 y1 ?\*)
+      (draw-char x2 y2 ?\#)
+      (sit-for 0.2)
+      (make-grid)
+      (<span style="font-weight: bold;">setq</span> x1 (+ x1 (1- (random 3)))
+            y1 (+ y1 (1- (random 3)))
+            x2 (+ x2 (1- (random 3)))
+            y2 (+ y2 (1- (random 3)))))))
+</pre>
+</div>
+
+<p>
+相似 <code>move-two-chars</code>.
+</p>
+
+<p>
+一个带有辅助功能来确定交错方向的版本:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">delta</span> ()
+  (1- (random 3)))
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">two-drunks2</span> ()
+  (<span style="font-weight: bold;">setq</span> cursor-type nil)
+  (make-grid)
+  (<span style="font-weight: bold;">let</span> ((x1 (/ width 2)) (y1 (/ height 2))
+        (x2 (/ width 2)) (y2 (/ height 2)))
+    (<span style="font-weight: bold;">while</span> t
+      (draw-char x1 y1 ?*)
+      (draw-char x2 y2 ?#)
+      (sit-for 0.2)
+      (make-grid)
+      (<span style="font-weight: bold;">setq</span> x1 (+ x1 (delta))
+            y1 (+ y1 (delta))
+            x2 (+ x2 (delta))
+            y2 (+ y2 (delta))))))
+</pre>
+</div>
+
+<p>
+注意 <code>delta</code> 是一个函数，它返回一个值，这个值是函数中最后一个(在本例中也仅有这一个)表达式的结果。这个值可以是- 1,0，也可以是1，每次调用它的时候都会变化，因为它调用了 <code>random</code>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org0eea339" class="outline-2">
+<h2 id="a-drunkard-who-can-wander-forever"><a id="org0eea339"></a>一个永远流的醉鬼</h2>
+<div class="outline-text-2" id="text-a-drunkard-who-can-wander-forever">
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">circular-drunkard</span> ()
+  (<span style="font-weight: bold;">setq</span> cursor-type nil)
+  (make-grid)
+  (<span style="font-weight: bold;">let</span> ((x (/ width 2))
+        (y (/ height 2)))
+    (<span style="font-weight: bold;">while</span> t
+      (draw-char x y ?*)
+      (sit-for 0.05)
+      (clear-char x y)
+      (<span style="font-weight: bold;">setq</span> x (+ x (1- (random 3)))
+            y (+ y (1- (random 3))))
+      <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">like pac-man, edges of screen connect</span>
+      (<span style="font-weight: bold;">if</span> (&lt; x 1) (<span style="font-weight: bold;">setq</span> x width))
+      (<span style="font-weight: bold;">if</span> (&gt; x width) (<span style="font-weight: bold;">setq</span> x 1))
+      (<span style="font-weight: bold;">if</span> (&lt; y 1) (<span style="font-weight: bold;">setq</span> y height))
+      (<span style="font-weight: bold;">if</span> (&gt; y height) (<span style="font-weight: bold;">setq</span> y 1)))))
+</pre>
+</div>
+
+<p>
+最后的 <code>if</code> 从句处理离开网格的字符。
+</p>
+</div>
+</div>
+
+<div id="outline-container-orga5366ba" class="outline-2">
+<h2 id="keyboard-controlled-walker"><a id="orga5366ba"></a>受键盘控制的行者</h2>
+<div class="outline-text-2" id="text-keyboard-controlled-walker">
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">walker</span> ()
+  (<span style="font-weight: bold;">setq</span> cursor-type nil)
+  (make-grid)
+  (<span style="font-weight: bold;">let</span> ((x 1) (y 1))
+    (<span style="font-weight: bold;">while</span> t
+      (draw-char x y ?*)
+      (<span style="font-weight: bold;">let</span> ((key (read-event)))
+        (clear-char x y)
+        (<span style="font-weight: bold;">cond</span>
+         ((eq key 'left)
+          (<span style="font-weight: bold;">setq</span> x (1- x)))
+         ((eq key 'right)
+          (<span style="font-weight: bold;">setq</span> x (1+ x)))
+         ((eq key 'up)
+          (<span style="font-weight: bold;">setq</span> y (1- y)))
+         ((eq key 'down)
+          (<span style="font-weight: bold;">setq</span> y (1+ y)))))
+      <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">stop at edges of screen</span>
+      (<span style="font-weight: bold;">setq</span> x (min x width)
+            y (min y height)
+            x (max x 1)
+            y (max y 1)))))
+</pre>
+</div>
+
+<p>
+就像一个醉汉走路一样，只是现在能用键盘控制角色走路的方向.
+<code>(read-event)</code> 等待一个按键，然后返回它. <code>cond</code> (condition的缩写)函数是一种执行多个 <code>if</code> 而不需要每次都写 <code>if</code> 的方法。
+通过 <code>let</code> 命令将 <code>(read-event)</code> 的结果临时存储在变量 <code>key</code> 中，让 <code>cond</code> 将相同的按键与所有四个箭头键进行比较。
+在 <code>left</code>, <code>right</code>, <code>up</code>, <code>down</code> 之前的撇号(<code>'</code>)是必须的，否则Lisp会认为我们指的是一个名为 <code>left</code> (或其他)的变量。
+</p>
+
+<p>
+<code>min</code> 和 <code>max</code> 函数分别返回它们的参数中的最小值和最大i值。
+这是一种确保x总是小于等于 <code>width</code>, y总是小于等于 <code>height</code>,并且x和y都大于等于1简洁的方法。
+</p>
+</div>
+</div>
+
+<div id="outline-container-orga26465a" class="outline-2">
+<h2 id="the-character-keeps-moving-once-directed-by-keypress"><a id="orga26465a"></a>按一次键，角色就会一直移动</h2>
+<div class="outline-text-2" id="text-the-character-keeps-moving-once-directed-by-keypress">
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">runner</span> ()
+  (<span style="font-weight: bold;">setq</span> cursor-type nil)
+  (make-grid)
+  (<span style="font-weight: bold;">let</span> ((x 1) (y 1)
+        (dx 0) (dy 0))
+    (<span style="font-weight: bold;">while</span> (<span style="font-weight: bold;">and</span> (&gt;= x 1) (&lt;= x width))
+      (draw-char x y ?*)
+      (<span style="font-weight: bold;">let</span> ((key (read-event nil nil 0.1)))
+        (<span style="font-weight: bold;">cond</span>
+         ((eq key 'left)
+          (<span style="font-weight: bold;">setq</span> dx -1))
+         ((eq key 'right)
+          (<span style="font-weight: bold;">setq</span> dx 1))
+         ((eq key 'up)
+          (<span style="font-weight: bold;">setq</span> dy -1))
+         ((eq key 'down)
+          (<span style="font-weight: bold;">setq</span> dy 1))))
+      (clear-char x y)
+      (<span style="font-weight: bold;">setq</span> x (+ x dx)
+            y (+ y dy))
+      <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">bounce off edges</span>
+      (<span style="font-weight: bold;">if</span> (<span style="font-weight: bold;">or</span> (&lt; x 1) (&gt; x width))
+          (<span style="font-weight: bold;">setq</span> dx (- dx)))
+      (<span style="font-weight: bold;">if</span> (<span style="font-weight: bold;">or</span> (&lt; y 1) (&gt; y height))
+          (<span style="font-weight: bold;">setq</span> dy (- dy)))
+      <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">stop at edges of screen</span>
+      (<span style="font-weight: bold;">setq</span> x (min x width)
+            y (min y height)
+            x (max x 1)
+            y (max y 1)))))
+</pre>
+</div>
+
+<p>
+变量 <code>dx</code> 和 <code>dy</code> 代表x和y的偏差，描述x和y的变化率。
+</p>
+
+<p>
+<code>(read-event nil nil 0.1)</code> 等待击键十分之一秒，并返回击键(如果有的话)，或者 <code>nil</code> 如果当时没有击键。
+这是检查输入的一种好方法，但是会在没有输入的情况下，继续执行操作。因为它需要等待一段时间，所以我们不再需要 <code>(sit-for 0.1)</code>,在 <code>read-event</code> 中的等待做同样的事情。
+</p>
+
+<p>
+<code>(setq dx (- dx))</code> 设置 <code>dx</code> 为负的 <code>dx</code>,以反转字符的左右移动。 类似地, <code>(setq dy (- dy))</code> 反转字符的上下运动方向。
+这(在 <code>if</code> 测试中)使角色走的太远的情况下在屏幕边缘反弹。这是一大段代码让字符在屏幕边缘弹回，也受到其约束…
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgb602e02" class="outline-2">
+<h2 id="the-character-bounces-off-of-topbottom-of-grid-but-falls-off-the-sides"><a id="orgb602e02"></a>字符会从网格的顶部/底部弹起，但会从两侧掉下去</h2>
+<div class="outline-text-2" id="text-the-character-bounces-off-of-topbottom-of-grid-but-falls-off-the-sides">
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">runner-with-boundaries</span> ()
+  (<span style="font-weight: bold;">setq</span> cursor-type nil)
+  (make-grid)
+  (<span style="font-weight: bold;">let</span> ((x 1) (y 1)
+        (dx 0) (dy 0))
+    (<span style="font-weight: bold;">while</span> (<span style="font-weight: bold;">and</span> (&gt;= x 1) (&lt;= x width))
+      (draw-char x y ?*)
+      (<span style="font-weight: bold;">let</span> ((key (read-event nil nil 0.1)))
+        (<span style="font-weight: bold;">cond</span>
+         ((eq key 'left)
+          (<span style="font-weight: bold;">setq</span> dx -1))
+         ((eq key 'right)
+          (<span style="font-weight: bold;">setq</span> dx 1))
+         ((eq key 'up)
+          (<span style="font-weight: bold;">setq</span> dy -1))
+         ((eq key 'down)
+          (<span style="font-weight: bold;">setq</span> dy 1))))
+      (clear-char x y)
+      (<span style="font-weight: bold;">setq</span> x (+ x dx)
+            y (+ y dy))
+      <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">bounce off top/bottom edges</span>
+      (<span style="font-weight: bold;">if</span> (<span style="font-weight: bold;">or</span> (&lt; y 1) (&gt; y height))
+          (<span style="font-weight: bold;">setq</span> dy (- dy)))
+      <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">stop at edges of screen</span>
+      (<span style="font-weight: bold;">setq</span> y (min y height)
+            y (max y 1)))
+    (insert <span style="font-style: italic;">"Game over"</span>)))
+</pre>
+</div>
+
+<p>
+现在 <code>while</code> 循环不会一直循环下去，除非字符保持在左/右网格边界内。最后的“Game over”是有点粗糙，但这开始让我们更像Pong游戏了!
+</p>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2020-02-10</span>
+            <span title="last modification date" class="post-info">2020-02-10</span>
+            <span title="tags" class="post-info">:<a href="../../../../../tags/raw">raw</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-a634f927-1cbc-4cfa-a5d9-8b3bf40d89f5">lujun9972</a></span>
+        </div>
+    <script src="../../../../../media/js/jquery-2.1.3.min.js"></script>
+    <script src="../../../../../media/js/md5.min.js"></script>
+        <section>
+            <div id="gitalk-container"></div>
+            <script type="text/javascript">
+             var gitalk = new Gitalk({
+                 clientID: 'fdcb5d9da3f4acb4862c',
+                 clientSecret: 'dd0a16312a206782cb7669dcec5e96874ab48170',
+                 repo: 'lujun9972.github.com',
+                 owner: 'lujun9972',
+                 admin: ['lujun9972'],
+                 id: md5(location.pathname),      // Ensure uniqueness and length less than 50
+                 distractionFreeMode: false  // Facebook-like distraction free mode
+             })
+             gitalk.render('gitalk-container')
+            </script>
+        </section>
+    <script src="../../../../../media/js/main.js"></script>
+        <script>
+         var _hmt = _hmt || [];
+         (function() {
+             var hm = document.createElement("script");
+             hm.src = "https://hm.baidu.com/hm.js?7bac4fd0247f69c27887e0d4e3aee41e";
+             var s = document.getElementsByTagName("script")[0]; 
+             s.parentNode.insertBefore(hm, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-a634f927-1cbc-4cfa-a5d9-8b3bf40d89f5">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="../../../../../instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>
