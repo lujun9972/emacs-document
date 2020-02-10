@@ -1,0 +1,157 @@
+#+TITLE: Better TRAMP autologin
+#+URL: https://www.eigenbahn.com/2020/01/15/tramp-autologin-insanity
+#+AUTHOR: lujun9972
+#+TAGS: raw
+#+DATE: [2020年 02月 10日 星期一 10:23:30 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+** Introduction
+   :PROPERTIES:
+   :CUSTOM_ID: introduction
+   :END:
+
+For those not in the know, [[https://www.gnu.org/software/tramp/][TRAMP]] is one of Emacs' killer apps. It's a package that allows to interact with remote systems through a [[https://www.gnu.org/software/tramp/#Inline-methods][variety]] [[https://www.gnu.org/software/tramp/#External-methods][of]] [[https://www.gnu.org/software/tramp/#GVFS-based-methods][protocols]].
+
+Such interactions include opening shells and browsing remote file trees as if they were locally mounted. You can even bounce across several machines like if it was nothing (it's called [[https://www.gnu.org/software/emacs/manual/html_node/tramp/Ad_002dhoc-multi_002dhops.html][multi-hops]]).
+
+But there is one thing can break these otherwise seamless interactions: login prompts.
+
+** The Authinfo way
+   :PROPERTIES:
+   :CUSTOM_ID: the-authinfo-way
+   :END:
+
+To get rid of them, emacs offers native support for Gnus Authinfo and .netrc files via its =auth-source= package:
+
+#+BEGIN_EXAMPLE
+  (require 'dash)
+
+  (use-package auth-source
+   :demand
+   :no-require t
+   :config
+   (setq auth-sources (-filter #'file-exists-p '("~/.authinfo.gpg" "~/.authinfo" "~/.netrc"))))
+#+END_EXAMPLE
+
+Now you can just create a =~/.authinfo= like this:
+
+#+BEGIN_EXAMPLE
+  machine raspi login pi password raspberry
+#+END_EXAMPLE
+
+And then =C-x f /ssh:pi@raspi:/= and it will connect automatically, yey!
+
+...Except that sucks.
+
+** SSH keys to the rescue
+   :PROPERTIES:
+   :CUSTOM_ID: ssh-keys-to-the-rescue
+   :END:
+
+Indeed passwords suck. Big time. Even more so when you have a gazillion of remote hosts to connect to.
+
+SSH keys (aka identity files, aka certificates) are a way smarter (and in most cases safer) way to proceed.
+
+Given you have a master key for connecting to all of your machines, just have to drop into your =~/.ssh/config=:
+
+#+BEGIN_EXAMPLE
+  Host *
+   User eigen
+   IdentityFile ~/.ssh/eigen-identity
+#+END_EXAMPLE
+
+And you could connect to any server for which this key is known for user =eigen=.
+
+** The PuTTY dilemma
+   :PROPERTIES:
+   :CUSTOM_ID: the-putty-dilemma
+   :END:
+
+If you're on Windows, you're most likely using PuTTY/plink as an SSH alternative.
+
+TRAMP, in all its glory, supports PuTTY (use the =/pscp:= method, that's the one you're looking for).
+
+PuTTY has an equivalent way to set a default key, via a [[https://the.earth.li/~sgtatham/putty/0.73/htmldoc/Chapter4.html#config-saving][Default Setting]] or through [[https://the.earth.li/~sgtatham/putty/0.73/htmldoc/Chapter9.html][Pageant]].
+
+The former only works if you're saving each and every of your hosts as a connection profile and access it with =/plinkx:<PROFILE>:=.
+
+The latter only seems to load when launching putty.exe (GUI interface).
+
+So here comes time for adventure insanity.
+
+** Insanity (or elisp-bind all the things)
+   :PROPERTIES:
+   :CUSTOM_ID: insanity-or-elisp-bind-all-the-things
+   :END:
+
+Another cross-platform solution is to do this in pure elisp.
+
+The trick is to enrich =tramp-methods= with an additional args corresponding to the identity file option (=-i=).
+
+Thus we need some utils to alter those method definitions.
+
+#+BEGIN_EXAMPLE
+  ;; ------------------------------------------------------------------------
+  ;; DEPS
+
+  (require 'tramp)
+  (require 'dash)
+
+  ;; ------------------------------------------------------------------------
+  ;; TRAMP METHODS ARGS
+
+  (defun prf/tramp/method/def/some-args/with-cert (some-args cert-arg cert)
+   "Returns enriched tramp def SOME-ARGS with certificate arg.
+  SOME-ARGS can be of type `tramp-login-args' or `tramp-copy-args'"
+   (let ((args-type (car some-args))
+   (args (car (cdr some-args))))
+   (add-to-list 'args `(,cert-arg ,(concat "\"" cert "\"")))
+   `(,args-type ,args)))
+
+  (defun prf/tramp/method/def/with-cert-in-some-args (tramp-method-def args-type cert-arg cert)
+   "Returns copy of TRAMP-METHOD-DEF with certificate arg added to ARGS-TYPE.
+  ARGS-TYPE can be `tramp-login-args' or `tramp-copy-args'."
+   (let ((method-name (car tramp-method-def))
+   (method-def-args (cdr tramp-method-def)))
+   (cons method-name
+   (-map-when
+   (lambda (e) (equal (car e) args-type))
+   (lambda (e) (prf/tramp/method/def/args/with-cert e cert-arg cert))
+   method-def-args))))
+
+  ;; ------------------------------------------------------------------------
+  ;; TRAMP METHODS
+
+  (defun prf/tramp/method/def/with-cert-in-args (tramp-method-def cert-arg cert)
+   "Returns copy of TRAMP-METHOD-DEF enriched with certificate arg.
+  Certificate arg gets added to both 'tramp-login-args and 'tramp-copy-args."
+   (-> tramp-method-def
+   (prf/tramp/method/def/with-cert-in-some-args 'tramp-login-args cert-arg cert)
+   (prf/tramp/method/def/with-cert-in-some-args 'tramp-copy-args cert-arg cert)))
+#+END_EXAMPLE
+
+Then we can override the method definitions:
+
+#+BEGIN_EXAMPLE
+  ;; PuTTY
+  (let ((cert-path "~/my-cert.ppk")
+   (putty-methods '("pscp" "plink" "plinkx" "psftp")))
+   (setq tramp-methods
+   (-map-when
+   (lambda (e) (member (car e) putty-methods))
+   (lambda (e) (prf/tramp/method/def/with-cert-in-args e "-i" cert-path))
+   tramp-methods)))
+
+  ;; SSH
+  (let ((cert-path "~/.ssh/id_dsa")
+   (ssh-methods '("ssh" "sshx")))
+   (setq tramp-methods
+   (-map-when
+   (lambda (e) (member (car e) ssh-methods))
+   (lambda (e) (prf/tramp/method/def/with-cert-in-args e "-i" cert-path))
+   tramp-methods)))
+#+END_EXAMPLE
+
+The beauty of this is that if your key is not known to the remote host, it would still prompt you for a password without failing.
+
+The code can be found in package [[https://github.com/p3r7/prf-tramp/blob/master/prf-tramp-method.el][prf-tramp-method]].
