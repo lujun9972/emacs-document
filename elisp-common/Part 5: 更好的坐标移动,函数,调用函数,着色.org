@@ -1,0 +1,131 @@
+#+TITLE: Part 5: 更好的坐标移动,函数,调用函数,着色
+#+URL: http://dantorop.info/project/emacs-animation/lisp5.html
+#+AUTHOR: lujun9972
+#+TAGS: elisp-common
+#+DATE: [2020年 02月 10日 星期一 10:05:24 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+要在自己的缓冲区中编辑Lisp代码，请创建一个缓冲区，并将其命名为 =mycode.el=. 要确保Emacs意识到您正在编辑Lisp，您可以输入=M-x lisp-mode=.
+您现在应该在屏幕底部的状态行上看到 =(Lisp)= 了.现在输入代码。满意后，输入 =M-x eval-buffer= 将代码在Emacs中运行。
+然后创建另一个测试缓冲区(就如 [[http://dantorop.info/project/emacs-animation/lisp4.html][上一个例子中]] 开头所说的，输入 =C-x 5 b=)，在其中运行代码。
+在测试缓冲区中，键入 =M-:= 可以在窗口底部得到Lisp提示符，然后通过在括号中键入函数名称来运行。
+
+* 在给定屏幕位置绘制的辅助函数
+:PROPERTIES:
+:CUSTOM_ID: a-helper-routine-to-draw-at-a-given-screen-position
+:END:
+
+#+begin_src emacs-lisp
+  (defun drawxy (x y sprite)
+    (erase-buffer)
+    (dotimes (j y)
+      (newline))
+    (dotimes (i x)
+      (insert " "))
+    (insert sprite))
+#+end_src
+
+#+RESULTS:
+: drawxy
+
+=sprite= 是要绘制的文本。
+
+* 使用辅助函数绘图
+:PROPERTIES:
+:CUSTOM_ID: using-the-helper-function-to-draw
+:END:
+
+#+begin_src emacs-lisp
+  (defun liner ()
+    (dotimes (x 20)
+      (drawxy x x "!")
+      (sit-for 0.1)))
+#+end_src
+
+#+RESULTS:
+: liner
+
+* 根据Peter代码绘制的更精细的图
+:PROPERTIES:
+:CUSTOM_ID: more-elaborate-drawing-based-on-peters-code
+:END:
+
+#+begin_src emacs-lisp
+  (defun oVeR-sine ()
+    (dotimes (y 777)
+      (erase-buffer)
+      (drawxy (round (+ 10 (* 10 (sin (/ y 10.0)))))
+              (round (+ 10 (* 10 (sin (/ y 13.0)))))
+              "--->)")
+      (sit-for 0.1)))
+#+end_src
+
+#+RESULTS:
+: oVeR-sine
+
+* 创建背景网格
+:PROPERTIES:
+:CUSTOM_ID: make-a-background-grid
+:END:
+
+#+begin_src emacs-lisp
+  (defun background (width height)
+    (erase-buffer)
+    (dotimes (i height)
+      (dotimes (j width)
+        (insert "."))
+      (newline)))
+#+end_src
+
+#+RESULTS:
+: background
+
+* 使用经过修订的 =drawxy= 来在网格上绘画
+:PROPERTIES:
+:CUSTOM_ID: revised-drawxy-to-draw-on-the-grid
+:END:
+
+#+begin_src emacs-lisp
+  (defun drawxy2 (x y sprite)
+    (goto-char (point-min))
+    (forward-line y)
+    (forward-char x)
+    (delete-region (point) (+ (point) (length sprite)))
+    (insert sprite))
+#+end_src
+
+#+RESULTS:
+: drawxy2
+
+* 在网格上同时画两条线
+:PROPERTIES:
+:CUSTOM_ID: draw-two-lines-on-grid-at-same-time
+:END:
+
+#+begin_src emacs-lisp
+  (defun liner2 ()
+    (background 80 40)
+    (dotimes (x 20)
+      (drawxy2 x x "&")
+      (drawxy2 (- 20 x) x "*")
+      (sit-for 0.1)))
+#+end_src
+
+#+RESULTS:
+: liner2
+
+* 使用颜色:
+:PROPERTIES:
+:CUSTOM_ID: using-color
+:END:
+
+#+BEGIN_EXAMPLE
+(insert (propertize "foreground color test" 'face '(:foreground "red")))
+(insert (propertize "gray background test" 'face '(:background "gray30")))
+(insert (propertize "color with hex code" 'face '(:foreground "#33AAFF")))
+(insert (propertize "lots of color" 'face '(:foreground "orange" :background "purple")))
+#+END_EXAMPLE
+
+要在 =ielm= 上着色，首先输入 =M-x font-lock-mode=. 你应该在屏幕底部看到一条消息 =Font-Lock mode disabled= (如果它说的是 =enabled=, 那么再输入一次 =M-x Font-Lock -mode= )。
+或者你在创建test试缓冲区中工作就好了。
