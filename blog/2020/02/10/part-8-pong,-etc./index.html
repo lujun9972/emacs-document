@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Part 8: pong, etc. - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="raw" />
+  <!-- <link rel="stylesheet" href="../../../../../media/css/main.css" type="text/css"/>
+       <link rel="stylesheet" href="../../../../../media/css/comment.css" type="text/css"/> -->
+  <link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/kognise/water.css@latest/dist/dark.css'>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="../../../../../">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <ul class="trigger">
+        <li><a href="../../../../../years/">Years</a></li>
+        <li><a href="../../../../../authors/">Authors</a></li>
+        <li><a href="../../../../../tags/">Tags</a></li>
+        <li><a href="../../../../../about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="../../../../../rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="https://www.bing.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">Part 8: pong, etc.</h1>
+<div id="table-of-contents">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#multi-player-moving-character-game">Multi-player moving-character game</a></li>
+<li><a href="#basic-pong">Basic pong</a></li>
+<li><a href="#pretty-clean-multiplayer-pong-code">Pretty clean multiplayer pong code</a></li>
+<li><a href="#multiplayer-pong-elaborate">Multiplayer pong, elaborate...</a></li>
+<li><a href="#pong-against-the-computer">Pong against the computer</a></li>
+<li><a href="#tools-for-drawing-colored-stripes">Tools for drawing colored stripes</a></li>
+</ul>
+</div>
+</div>
+<p>
+Continued from <a href="file:///project/emacs-animation/lisp7.html">Emacs Lisp programming pt. 7</a>.
+</p>
+
+<div id="outline-container-orge396b57" class="outline-2">
+<h2 id="multi-player-moving-character-game"><a id="orge396b57"></a>Multi-player moving-character game</h2>
+<div class="outline-text-2" id="text-multi-player-moving-character-game">
+<p>
+Based on on Travis' code.
+</p>
+
+<pre class="example">
+;; global variables 
+
+(setq width 50)
+(setq height 25)
+(setq background-char ?\-)
+
+;; helper routines (foundations)
+
+(defun make-grid ()
+ (erase-buffer)
+ (dotimes (i height)
+ (insert-char background-char width)
+ (newline)))
+
+(defun draw-char (x y char)
+ (goto-char (+ x (* (1- y) (1+ width))))
+ (delete-char 1)
+ (insert-char char 1))
+
+(defun clear-char (x y)
+ (draw-char x y background-char))
+
+;;main programs
+
+(defun move-char ()
+ (make-grid)
+ (let ((x 1 ) (y 1))
+ (dotimes (i 30)
+ (draw-char x y ?\o)
+ (sit-for 0.1)
+ (clear-char x y)
+ (setq x (+ x (random 3))
+     y (+ y (random 3))))))
+
+(defun running-man ()
+ (setq cursor-type nil)
+ (make-grid)
+ (let ((ax 1) (ay 1)
+    (dax 0) (day 0)
+    (bx width) (by height)
+    (dbx 0) (dby 0))
+ (while (and (&gt;= ax 1) (&lt;= ax width)
+        (&gt;= bx 1) (&lt;= bx width))
+ ;; draw characters
+ (draw-char ax ay ?o)
+ (draw-char bx by ?*)
+ ;; check input
+ (let ((key (read-event nil nil 0.05)))
+    (cond 
+     ((eq key ?a)           ;character a
+     (setq dax -1))
+     ((eq key ?s)
+     (setq dax 1))
+     ((eq key ?w)
+     (setq day -1))
+     ((eq key '?z)
+     (setq day 1))
+     ((eq key 'left)        ;character b
+     (setq dbx -1))
+     ((eq key 'right)
+     (setq dbx 1))
+     ((eq key 'up)
+     (setq dby -1))
+     ((eq key 'down)
+     (setq dby 1))))
+ ;; clear characters
+ (clear-char ax ay)
+ (clear-char bx by)
+ ;; move characters
+ (setq ax (+ ax dax)
+     ay (+ ay day)
+     bx (+ bx dbx)
+     by (+ by dby))
+ ;;bounce of top/bottom edges
+ (if (or (&lt; ay 1) (&gt; ay height))
+     (setq day (- day)))
+ (if (or (&lt; by 1) (&gt; by height))
+     (setq dby (- dby)))
+ ;;stop at edges of screen
+ (setq ay (min ay height)
+     ay (max ay 1))
+ (setq by (min by height)
+     by (max by 1)))
+ (if (and (&gt;= ax 1) (&lt;= ax width))
+    (insert "Congratulations, o won!"))
+ (if (and (&gt;= bx 1) (&lt;= bx width))
+    (insert "Congratulations, 0_sync_master.sh 1_add_new_article_manual.sh 1_add_new_article_newspaper.sh 2_start_translating.sh 3_continue_the_work.sh 4_finish.sh 5_pause.sh auto_translate.sh base.sh env parse_url_by_manual.sh parse_url_by_newspaper.py parse_url_by_newspaper.sh project.cfg reformat.sh texput.log urls_checker.sh youdao.sh win!"))))
+</pre>
+</div>
+</div>
+
+<div id="outline-container-orgb2b9273" class="outline-2">
+<h2 id="basic-pong"><a id="orgb2b9273"></a>Basic pong</h2>
+<div class="outline-text-2" id="text-basic-pong">
+<p>
+One character wide paddle.
+</p>
+
+<pre class="example">
+;; global variables 
+
+(setq width 50)
+(setq height 25)
+(setq background-char ?\:)
+
+;; helper routines (foundations)
+
+(defun make-grid ()
+ (erase-buffer)
+ (dotimes (i height)
+ (insert-char background-char width)
+ (newline)))
+
+(defun draw-char (x y char)
+ (goto-char (+ x (* (1- y) (1+ width))))
+ (delete-char 1)
+ (insert-char char 1))
+
+(defun clear-char (x y)
+ (draw-char x y background-char))
+
+;;main programs
+
+(defun pong1 ()
+ (setq cursor-type nil)
+ (let ((pongx (/ width 2)) (pongy (/ height 2))
+    (dpongx -1) (dpongy 0)
+    (left-paddle-y (/ height 2))
+    (right-paddle-y (/ height 2)))
+ (while (and (&gt;= pongx 1) (&lt;= pongx width))
+ ;; draw characters
+ (make-grid)
+ (draw-char pongx pongy ?o)
+ (draw-char 1 left-paddle-y ?#)
+ (draw-char width right-paddle-y ?#)
+ ;; check input
+ (let ((key (read-event nil nil 0.05)))
+    (cond 
+     ((eq key ?a)
+     (setq left-paddle-y (1- left-paddle-y))
+     (if (&lt;= left-paddle-y 1)
+     (setq left-paddle-y 1)))
+     ((eq key '?z)
+     (setq left-paddle-y (1+ left-paddle-y))
+     (if (&gt;= left-paddle-y height)
+     (setq left-paddle-y height)))
+     ((eq key 'up)
+     (setq right-paddle-y (1- right-paddle-y))
+     (if (&lt;= right-paddle-y 1)
+     (setq right-paddle-y 1)))
+     ((eq key 'down)
+     (setq right-paddle-y (1+ right-paddle-y))
+     (if (&gt;= right-paddle-y height)
+     (setq right-paddle-y height)))))
+ ;; move characters
+ (setq pongx (+ pongx dpongx)
+     pongy (+ pongy dpongy))
+ ;; bounce off paddles
+ (if (and (= pongx 2) (= pongy left-paddle-y))
+     (setq dpongx 1))
+ (if (and (= pongx (1- width)) (= pongy right-paddle-y))
+     (setq dpongx -1))
+ ;;bounce of top/bottom edges
+ (if (or (&lt; pongy 1) (&gt; pongy height))
+     (setq dpongy (- dpongy)))
+ ;;stop at edges of screen
+ (setq pongy (min pongy height)
+     pongy (max pongy 1)))
+ (if (&lt; pongx 1)
+    (insert "Game over. Right player won!"))
+ (if (&gt; pongx width)
+    (insert "Game over. Left player win!"))))
+</pre>
+</div>
+</div>
+
+<div id="outline-container-org2eb42b6" class="outline-2">
+<h2 id="pretty-clean-multiplayer-pong-code"><a id="org2eb42b6"></a>Pretty clean multiplayer pong code</h2>
+<div class="outline-text-2" id="text-pretty-clean-multiplayer-pong-code">
+<pre class="example">
+(defun draw-paddle (x y)
+ (draw-char x y ?\#)
+ (draw-char x (1- y) ?\#)
+ (draw-char x (1+ y) ?\#))
+
+(defun keep-in-range (num min-num max-num)
+ (min (max num min-num) max-num))
+
+(defun move-paddle (paddle-y dir)
+ (keep-in-range (+ paddle-y dir) 2 (1- height)))
+
+(defun distance (a b)
+ (abs (- a b)))
+
+(defun bounce-paddle (paddle-x paddle-y bounce-dir)
+ (if (and (= x (+ paddle-x bounce-dir))
+ (/= dx bounce-dir)
+ (or (&lt;= (distance y paddle-y) 1)
+ (and (= (distance y paddle-y) 2)
+ (= (distance (+ y dy) paddle-y) 1))))
+ (setq dx bounce-dir
+ dy (- y paddle-y))))
+
+(defun pong3a ()
+ (buffer-disable-undo)
+ (setq cursor-type nil)
+ (while t
+ (let ((x (/ width 2)) (y (/ height 2))
+ (dx -1) (dy 0)
+ (left-paddle-x 2)
+ (left-paddle-y (/ height 2))
+ (right-paddle-x (1- width))
+ (right-paddle-y (/ height 2)))
+ (while (and (&gt;= x 1) (&lt;= x width))
+ ;; draw scene
+ (make-grid)
+ (draw-char x y ?\*)
+ (draw-paddle left-paddle-x left-paddle-y)
+ (draw-paddle right-paddle-x right-paddle-y)
+ ;; handle input
+ (let ((key (read-event nil nil 0.1)))
+ (cond
+ ((eq key 'left)
+ (setq right-paddle-y (move-paddle right-paddle-y -1)))
+ ((eq key 'right)
+ (setq right-paddle-y (move-paddle right-paddle-y 1)))
+ ((eq key 'up)
+ (setq left-paddle-y (move-paddle left-paddle-y -1)))
+ ((eq key 'down)
+ (setq left-paddle-y (move-paddle left-paddle-y 1)))))
+ ;; update ball
+ (setq x (+ x dx)
+ y (+ y dy))
+ (if (or (&lt;= y 1) (&gt;= y height))
+ (setq dy (- dy)))
+ (if (= y 0) (setq y 2))
+ (if (= y (1+ height)) (setq y (1- height)))
+ ;; bounce off paddles
+ (bounce-paddle left-paddle-x left-paddle-y 1)
+ (bounce-paddle right-paddle-x right-paddle-y -1)))
+ (sit-for 1)))
+</pre>
+</div>
+</div>
+
+<div id="outline-container-org7e58e56" class="outline-2">
+<h2 id="multiplayer-pong-elaborate"><a id="org7e58e56"></a>Multiplayer pong, elaborate...</h2>
+<div class="outline-text-2" id="text-multiplayer-pong-elaborate">
+<pre class="example">
+;; global variables 
+
+(setq width 55)
+(setq height 25)
+(setq background-char ?\:)
+
+;; helper routines (foundations)
+
+(defun make-grid ()
+ (erase-buffer)
+ (dotimes (i height)
+ (insert-char background-char width)
+ (newline)))
+
+(defun draw-char (x y char)
+ (goto-char (+ x (* (1- y) (1+ width))))
+ (delete-char 1)
+ (insert-char char 1))
+
+(defun draw-paddle (x y)
+ (draw-char x y ?#)
+ (draw-char x (1- y) ?#)
+ (draw-char x (1+ y) ?#))
+
+(defun distance (a b)
+ (abs (- a b)))
+
+(defun clamp (num min-num max-num)
+ (min (max num min-num) max-num))
+
+(defun move-paddle (paddle-y dir)
+ (clamp (+ paddle-y dir) 2 (1- height)))
+
+;;main programs
+
+(defun pong3 ()
+ (setq cursor-type nil)
+ (let ((pongx (/ width 2)) (pongy (/ height 2))
+    (dpongx -1) (dpongy 0)
+    (left-paddle-y (/ height 2))
+    (d-left-paddle 0)
+    (right-paddle-y (/ height 2))
+    (d-right-paddle 0))
+ (while (and (&gt;= pongx 1) (&lt;= pongx width))
+ ;; draw characters
+ (make-grid)
+ (draw-char pongx pongy ?O)
+ (draw-paddle 1 left-paddle-y)
+ (draw-paddle width right-paddle-y)
+ ;; check input
+ (let ((key (read-event nil nil 0.05)))
+    (cond 
+     ((eq key ?q) (setq d-left-paddle -1))
+     ((eq key ?a) (setq d-left-paddle 0))
+     ((eq key ?z) (setq d-left-paddle 1))
+     ((eq key ?p) (setq d-right-paddle -1))
+     ((eq key ?\;) (setq d-right-paddle 0))
+     ((eq key ?/) (setq d-right-paddle 1))))
+ ;; update pong &amp; paddles
+ (setq pongx (+ pongx dpongx)
+     pongy (+ pongy dpongy))
+ (setq left-paddle-y
+     (move-paddle left-paddle-y d-left-paddle))
+ (setq right-paddle-y
+     (move-paddle right-paddle-y d-right-paddle))
+ ;; bounce off paddles
+ (if (and (= pongx 2)
+     (&lt;= (distance pongy left-paddle-y) 1))
+     (setq dpongx 1
+        dpongy (- pongy left-paddle-y)))
+ (if (and (= pongx (1- width))
+     (&lt;= (distance pongy right-paddle-y) 1))
+     (setq dpongx -1
+        dpongy (- pongy right-paddle-y)))
+ ;;bounce of top/bottom edges
+ (if (or (&lt; pongy 1) (&gt; pongy height))
+     (setq dpongy (- dpongy)))
+ ;;stop at edges of screen
+ (setq pongy (min pongy height)
+     pongy (max pongy 1)))
+ (if (&lt; pongx 1)
+    (insert "Game over. Right player won!"))
+ (if (&gt; pongx width)
+    (insert "Game over. Left player win!"))))
+</pre>
+</div>
+</div>
+
+<div id="outline-container-orge896f01" class="outline-2">
+<h2 id="pong-against-the-computer"><a id="orge896f01"></a>Pong against the computer</h2>
+<div class="outline-text-2" id="text-pong-against-the-computer">
+<pre class="example">
+;; global variables 
+
+(setq width 55)
+(setq height 25)
+(setq background-char ?\:)
+
+;; helper routines (foundations)
+
+(defun make-grid ()
+ (erase-buffer)
+ (dotimes (i height)
+ (insert-char background-char width)
+ (newline)))
+
+(defun draw-char (x y char)
+ (goto-char (+ x (* (1- y) (1+ width))))
+ (delete-char 1)
+ (insert-char char 1))
+
+(defun draw-score ()
+ (goto-char (point-max))
+ (newline)
+ (newline)
+ (insert (format "Your score: %d Emacs score: %d"
+         score-player-1 score-player-2)))
+
+(defun draw-paddle (x y)
+ (draw-char x y ?#)
+ (draw-char x (1- y) ?#)
+ (draw-char x (- y 2) ?#)
+ (draw-char x (1+ y) ?#)
+ (draw-char x (+ y 2) ?#))
+
+(defun distance (a b)
+ (abs (- a b)))
+
+(defun clamp (num min-num max-num)
+ (min (max num min-num) max-num))
+
+(defun move-paddle (paddle-y dir)
+ (clamp (+ paddle-y dir) 3 (- height 2)))
+
+;; actual game
+
+(defun pong-game ()
+ (let ((pongx (/ width 2)) (pongy (/ height 2))
+    (dpongx -1) (dpongy 0)
+    (left-paddle-y (/ height 2))
+    (d-left-paddle 0)
+    (right-paddle-y (/ height 2))
+    (d-right-paddle 0))
+ (while (and (&gt;= pongx 1) (&lt;= pongx width))
+ ;; draw characters
+ (make-grid)
+ (draw-char pongx pongy ?O)
+ (draw-paddle 1 (round left-paddle-y))
+ (draw-paddle width (round right-paddle-y))
+ (draw-score)
+ ;; check input
+ (let ((key (read-event nil nil 0.05)))
+    (cond 
+     ((eq key ?q) (setq d-left-paddle -0.7))
+     ((eq key ?a) (setq d-left-paddle 0))
+     ((eq key ?z) (setq d-left-paddle 0.7))))
+ ;; computer opponent
+ (cond
+ ((&gt; right-paddle-y pongy)
+    (setq d-right-paddle -0.9))
+ ((&lt; right-paddle-y pongy)
+    (setq d-right-paddle 0.9))
+ (t
+    (setq d-right-paddle 0)))
+ ;; update pong &amp; paddles
+ (setq pongx (+ pongx dpongx)
+     pongy (+ pongy dpongy))
+ (setq left-paddle-y
+     (move-paddle left-paddle-y d-left-paddle))
+ (setq right-paddle-y
+     (move-paddle right-paddle-y d-right-paddle))
+ ;; bounce off paddles
+ (if (and (= pongx 2)
+     (&lt;= (distance pongy (round left-paddle-y)) 2))
+     (setq dpongx 1
+        dpongy (- pongy (round left-paddle-y))))
+ (if (and (= pongx (1- width))
+     (&lt;= (distance pongy (round right-paddle-y)) 2))
+     (setq dpongx -1
+        dpongy (- pongy (round right-paddle-y))))
+ ;;bounce of top/bottom edges
+ (if (or (&lt; pongy 1) (&gt; pongy height))
+     (setq dpongy (- dpongy)))
+ ;;stop at edges of screen
+ (setq pongy (min pongy height)
+     pongy (max pongy 1)))
+ (if (&lt; pongx 1) 2 1)))
+
+;;main program
+
+(defun pong5 ()
+ (pop-to-buffer "pong-game")
+ (setq cursor-type nil)
+ (buffer-disable-undo)
+ (let ((score-player-1 0)
+    (score-player-2 0))
+ (while t
+ (let ((winner (pong-game)))
+    (if (= winner 1)
+     (setq score-player-1 (1+ score-player-1)))
+    (if (= winner 2)
+     (setq score-player-2 (1+ score-player-2))))
+ (sit-for 1))))
+</pre>
+</div>
+</div>
+
+<div id="outline-container-org18f3069" class="outline-2">
+<h2 id="tools-for-drawing-colored-stripes"><a id="org18f3069"></a>Tools for drawing colored stripes</h2>
+<div class="outline-text-2" id="text-tools-for-drawing-colored-stripes">
+<pre class="example">
+;; global variables
+
+(setq bkgd-width 40
+ bkgd-height 25
+ bkgd-char ?\.
+ stripe-char ?\s)
+
+;; helper routines
+
+(defun make-grid ()
+ (erase-buffer)
+ (dotimes (i bkgd-height)
+ (insert-char bkgd-char bkgd-width)
+ (newline)))
+
+(defun gotoxy (x y)
+ (goto-char (+ x (* (1- y) (1+ bkgd-width)))))
+
+(defun draw-a-stripe (x y width color)
+ (gotoxy x y)
+ (let ((actual-width (min width
+             (1+ (- bkgd-width x)))))
+ (delete-char actual-width)
+ (insert (propertize (make-string actual-width stripe-char)
+            'face `(:background ,color)))))
+
+;; main program
+
+(defun stripe-drawing ()
+ (dotimes (i 100)
+ (make-grid)
+ (dotimes (j 10)
+ (draw-a-stripe j j j "green"))
+ (sit-for 0.1)
+ (dotimes (j 20)
+ (draw-a-stripe (+ j 5) (+ j 3) j "orange"))
+ (sit-for 0.1)))
+</pre>
+
+<p>
+Continued in <a href="file:///project/emacs-animation/lisp9.html">Emacs Lisp programming pt. 9</a>.
+</p>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2020-02-10</span>
+            <span title="last modification date" class="post-info">2020-02-10</span>
+            <span title="tags" class="post-info">:<a href="../../../../../tags/raw">raw</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-14e8f0fe-d940-44e0-aea3-3f63fe5a96b9">lujun9972</a></span>
+        </div>
+    <script src="../../../../../media/js/jquery-2.1.3.min.js"></script>
+    <script src="../../../../../media/js/md5.min.js"></script>
+        <section>
+            <div id="gitalk-container"></div>
+            <script type="text/javascript">
+             var gitalk = new Gitalk({
+                 clientID: 'fdcb5d9da3f4acb4862c',
+                 clientSecret: 'dd0a16312a206782cb7669dcec5e96874ab48170',
+                 repo: 'lujun9972.github.com',
+                 owner: 'lujun9972',
+                 admin: ['lujun9972'],
+                 id: md5(location.pathname),      // Ensure uniqueness and length less than 50
+                 distractionFreeMode: false  // Facebook-like distraction free mode
+             })
+             gitalk.render('gitalk-container')
+            </script>
+        </section>
+    <script src="../../../../../media/js/main.js"></script>
+        <script>
+         var _hmt = _hmt || [];
+         (function() {
+             var hm = document.createElement("script");
+             hm.src = "https://hm.baidu.com/hm.js?7bac4fd0247f69c27887e0d4e3aee41e";
+             var s = document.getElementsByTagName("script")[0]; 
+             s.parentNode.insertBefore(hm, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-14e8f0fe-d940-44e0-aea3-3f63fe5a96b9">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="../../../../../instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>

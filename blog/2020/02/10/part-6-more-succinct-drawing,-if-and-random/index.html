@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Part 6: more succinct drawing, if and random - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="raw" />
+  <!-- <link rel="stylesheet" href="../../../../../media/css/main.css" type="text/css"/>
+       <link rel="stylesheet" href="../../../../../media/css/comment.css" type="text/css"/> -->
+  <link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/kognise/water.css@latest/dist/dark.css'>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="../../../../../">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <ul class="trigger">
+        <li><a href="../../../../../years/">Years</a></li>
+        <li><a href="../../../../../authors/">Authors</a></li>
+        <li><a href="../../../../../tags/">Tags</a></li>
+        <li><a href="../../../../../about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="../../../../../rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="https://www.bing.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">Part 6: more succinct drawing, if and random</h1>
+<div id="table-of-contents">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#a-more-succinct-version-of-drawxy-from-last-week">A more succinct version of <code>drawxy</code> from last week</a></li>
+<li><a href="#a-more-succinct-version-of-background-from-last-week">A more succinct version of <code>background</code> from last week</a></li>
+<li><a href="#the-drawxy2-function-from-last-week-a-touch-briefer">The <code>drawxy2</code> function from last week, a touch briefer</a></li>
+<li><a href="#using-if">Using <code>if</code></a></li>
+<li><a href="#using-random">Using <code>random</code></a></li>
+</ul>
+</div>
+</div>
+<p>
+Continued from <a href="file:///project/emacs-animation/lisp5.html">Emacs Lisp programming pt. 5</a>.
+</p>
+
+<div id="outline-container-orge21bd05" class="outline-2">
+<h2 id="a-more-succinct-version-of-drawxy-from-last-week"><a id="orge21bd05"></a>A more succinct version of <code>drawxy</code> from <a href="file:///project/emacs-animation/lisp5.html">last week</a></h2>
+<div class="outline-text-2" id="text-a-more-succinct-version-of-drawxy-from-last-week">
+<p>
+Moves the cursor to an arbitrary column <code>x</code> line <code>y</code> on screen and draws <code>sprite</code>.
+</p>
+
+<pre class="example">
+(defun drawxy (x y sprite)
+ (erase-buffer)
+ (insert-char ?\n y)
+ (insert-char ?\s x)
+ (insert sprite))
+</pre>
+
+<p>
+Uses <code>insert-char</code> to space over. <code>?\s</code> is the code for the space character. With <code>insert-char</code> you can specify the number of characters to insert, and don't need a <code>dotimes</code> loop.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orge7cae53" class="outline-2">
+<h2 id="a-more-succinct-version-of-background-from-last-week"><a id="orge7cae53"></a>A more succinct version of <code>background</code> from <a href="file:///project/emacs-animation/lisp5.html">last week</a></h2>
+<div class="outline-text-2" id="text-a-more-succinct-version-of-background-from-last-week">
+<pre class="example">
+(defun background (width height)
+ (erase-buffer)
+ (dotimes (i height)
+ (insert-char ?\. width)
+ (newline)))
+</pre>
+
+<p>
+Uses <code>insert-char</code> to draw the grid, saving a <code>dotimes</code>. This draws a grid of periods (via <code>?\.</code> character code). You could replace <code>?\.</code> with <code>?\s</code> to draw an invisible grid. Either way, the goal is to create a space in which the cursor will move, to draw multiple sprites without having to erase the buffer.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgcbf8837" class="outline-2">
+<h2 id="the-drawxy2-function-from-last-week-a-touch-briefer"><a id="orgcbf8837"></a>The <code>drawxy2</code> function from <a href="file:///project/emacs-animation/lisp5.html">last week</a>, a touch briefer</h2>
+<div class="outline-text-2" id="text-the-drawxy2-function-from-last-week-a-touch-briefer">
+<pre class="example">
+(defun drawxy2 (x y sprite)
+ (goto-char 1)
+ (forward-line y)
+ (forward-char x)
+ (delete-region (point) (+ (point) (length sprite)))
+ (insert sprite))
+</pre>
+</div>
+</div>
+
+<div id="outline-container-org6698a56" class="outline-2">
+<h2 id="using-if"><a id="org6698a56"></a>Using <code>if</code></h2>
+<div class="outline-text-2" id="text-using-if">
+<p>
+Depends on having <code>background</code> and <code>drawxy2</code> already eval'd.
+</p>
+
+<pre class="example">
+(defun where ()
+ (background 40 25)
+ (dotimes (i 10)
+ (if (= i 5)
+    (drawxy2 30 i "here")
+ (drawxy2 (* i 3) (* i 2) "there?"))
+ (sit-for 0.2)))
+</pre>
+</div>
+</div>
+
+<div id="outline-container-orge9e2d6e" class="outline-2">
+<h2 id="using-random"><a id="orge9e2d6e"></a>Using <code>random</code></h2>
+<div class="outline-text-2" id="text-using-random">
+<p>
+Also depends on having <code>background</code> and <code>drawxy2</code> already eval'd.
+</p>
+
+<pre class="example">
+(defun where2 ()
+ (background 40 25)
+ (dotimes (i 20)
+ (if (= i 12)
+    (drawxy2 30 i (propertize "here" 'face '(:foreground "green")))
+ (drawxy2 (random 30) (random 25) "there?"))
+ (sit-for 0.2)))
+</pre>
+
+<p>
+Continued in <a href="file:///project/emacs-animation/lisp7.html">Emacs Lisp programming pt. 7</a>.
+</p>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2020-02-10</span>
+            <span title="last modification date" class="post-info">2020-02-10</span>
+            <span title="tags" class="post-info">:<a href="../../../../../tags/raw">raw</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-14e8f0fe-d940-44e0-aea3-3f63fe5a96b9">lujun9972</a></span>
+        </div>
+    <script src="../../../../../media/js/jquery-2.1.3.min.js"></script>
+    <script src="../../../../../media/js/md5.min.js"></script>
+        <section>
+            <div id="gitalk-container"></div>
+            <script type="text/javascript">
+             var gitalk = new Gitalk({
+                 clientID: 'fdcb5d9da3f4acb4862c',
+                 clientSecret: 'dd0a16312a206782cb7669dcec5e96874ab48170',
+                 repo: 'lujun9972.github.com',
+                 owner: 'lujun9972',
+                 admin: ['lujun9972'],
+                 id: md5(location.pathname),      // Ensure uniqueness and length less than 50
+                 distractionFreeMode: false  // Facebook-like distraction free mode
+             })
+             gitalk.render('gitalk-container')
+            </script>
+        </section>
+    <script src="../../../../../media/js/main.js"></script>
+        <script>
+         var _hmt = _hmt || [];
+         (function() {
+             var hm = document.createElement("script");
+             hm.src = "https://hm.baidu.com/hm.js?7bac4fd0247f69c27887e0d4e3aee41e";
+             var s = document.getElementsByTagName("script")[0]; 
+             s.parentNode.insertBefore(hm, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-14e8f0fe-d940-44e0-aea3-3f63fe5a96b9">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="../../../../../instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>

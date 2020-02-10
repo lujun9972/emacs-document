@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Part 9: Common Lisp, incf, decf, structs - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="raw" />
+  <!-- <link rel="stylesheet" href="../../../../../media/css/main.css" type="text/css"/>
+       <link rel="stylesheet" href="../../../../../media/css/comment.css" type="text/css"/> -->
+  <link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/kognise/water.css@latest/dist/dark.css'>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="../../../../../">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <ul class="trigger">
+        <li><a href="../../../../../years/">Years</a></li>
+        <li><a href="../../../../../authors/">Authors</a></li>
+        <li><a href="../../../../../tags/">Tags</a></li>
+        <li><a href="../../../../../about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="../../../../../rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="https://www.bing.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">Part 9: Common Lisp, incf, decf, structs</h1>
+<div id="table-of-contents">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#common-lisp">Common Lisp</a></li>
+<li><a href="#incf-and-decf"><code>incf</code> and <code>decf</code></a></li>
+<li><a href="#setf"><code>setf</code></a></li>
+<li><a href="#structures">Structures</a></li>
+<li><a href="#mapping">Mapping</a></li>
+<li><a href="#stripes-using-structures">Stripes using structures</a></li>
+</ul>
+</div>
+</div>
+<p>
+Continued from <a href="file:///project/emacs-animation/lisp8.html">Emacs Lisp programming pt. 8</a>.
+</p>
+
+<div id="outline-container-org9b6577f" class="outline-2">
+<h2 id="common-lisp"><a id="org9b6577f"></a>Common Lisp</h2>
+<div class="outline-text-2" id="text-common-lisp">
+<pre class="example">
+(require 'cl)
+</pre>
+
+<p>
+Put this at the start of your code and you can use Common Lisp commands (<code>incf</code>, <code>decf</code>, <code>setf</code>, <code>defstruct</code>, etc.).
+</p>
+</div>
+</div>
+
+<div id="outline-container-org0d060d2" class="outline-2">
+<h2 id="incf-and-decf"><a id="org0d060d2"></a><code>incf</code> and <code>decf</code></h2>
+<div class="outline-text-2" id="text-incf-and-decf">
+<pre class="example">
+(setq x 5)
+(incf x 3) ;; ==&gt; 8 (equivalent to (setq x (+ x 3))
+(incf x) ;; ==&gt; 9 (equivalent to (setq x (1+ x))
+(decf x 7) ;; ==&gt; 2 (equivalent to (setq x (- x 7))
+(decf x) ;; ==&gt; 1 (equivalent to (setq x (1- x))
+</pre>
+</div>
+</div>
+
+<div id="outline-container-org827b593" class="outline-2">
+<h2 id="setf"><a id="org827b593"></a><code>setf</code></h2>
+<div class="outline-text-2" id="text-setf">
+<pre class="example">
+(setf x 5) ;; same as (setq x 5)
+</pre>
+
+<p>
+The useful bit about <code>setf</code> is that you can set things which aren't quite variables, such as the contents of a struct.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org72c6558" class="outline-2">
+<h2 id="structures"><a id="org72c6558"></a>Structures</h2>
+<div class="outline-text-2" id="text-structures">
+<p>
+The saying goes that programming consists of defining data structures and then making algorithms to change them. <code>defstruct</code> allows the former.
+</p>
+
+<pre class="example">
+(defstruct obj x y ch)
+
+(setq o (make-obj 5 5 ?^))
+(draw-char (obj-x o) (obj-y o) (obj-ch o))
+(incf (obj-x o))
+(setf (obj-ch o) ?!)
+</pre>
+
+<p>
+Note using <code>setf</code> rather than <code>setq</code> to change something within an object.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org8146220" class="outline-2">
+<h2 id="mapping"><a id="org8146220"></a>Mapping</h2>
+<div class="outline-text-2" id="text-mapping">
+<pre class="example">
+(mapcar* '1+ '(4 5 6)) ;; ==&gt; (5 6 7)
+</pre>
+
+<p>
+Calls the function <code>1+</code> on each item in the list <code>(4 5 6)</code>, returning the result.
+</p>
+
+<p>
+Can be used to create a list of structures:
+</p>
+
+<pre class="example">
+;; data
+
+(defstruct obj x y ch)
+
+(defun make-char-obj (ch)
+ (make-obj :x (/ width 2) :y (/ height 2) :ch ch))
+
+;; algorithm
+
+(defun move-char3a ()
+ (pop-to-buffer "test")
+ (buffer-disable-undo)
+ (make-grid)
+ (let ((chars (mapcar* 'make-char-obj '(?&gt; ?&lt; ?^))))
+ (dotimes (i 2000)
+ (dolist (c chars)
+    (draw-char (obj-x c) (obj-y c) (obj-ch c))
+    (incf (obj-x c) (delta))
+    (incf (obj-y c) (delta))
+    ;; stop at edges
+    (setf (obj-x c) (clamp (obj-x c) 1 width)
+     (obj-y c) (clamp (obj-y c) 1 height)))
+ (sit-for 0.03))))
+</pre>
+
+<p>
+Needs standard helper routines, including
+</p>
+
+<pre class="example">
+(defun clamp (num low high)
+ (min (max num low) high))
+</pre>
+</div>
+</div>
+
+<div id="outline-container-orgf0fa0b3" class="outline-2">
+<h2 id="stripes-using-structures"><a id="orgf0fa0b3"></a>Stripes using structures</h2>
+<div class="outline-text-2" id="text-stripes-using-structures">
+<pre class="example">
+(require 'cl)
+
+;; global variables
+
+(setf bkgd-width 60)
+(setf bkgd-height 40)
+(setf bkgd-char ?\s)
+(setf stripe-char ?\s)
+
+;; helper routines
+
+(defun make-grid ()
+ (erase-buffer)
+ (dotimes (i bkgd-height)
+ (insert-char bkgd-char bkgd-width)
+ (newline)))
+
+(defun gotoxy (x y)
+ (goto-char (+ x (* (1- y) (1+ bkgd-width)))))
+
+(defun draw-a-stripe (s)
+ (gotoxy (stripe-x s) (stripe-y s))
+ (let ((actual-width (min (1+ (- bkgd-width (stripe-x s)))
+             (stripe-width s))))
+ (delete-char actual-width)
+ (insert (propertize (make-string actual-width stripe-char)
+            'face `(:background ,(stripe-color s))))))
+
+(defun random+ (n) (1+ (random n)))
+
+; data
+(defstruct stripe x y width color dx dy)
+
+(defun build-a-stripe (color)
+ (make-stripe :x (random+ bkgd-width) :y (random+ bkgd-height)
+     :width (random+ bkgd-width)
+     :color color :dx (- (random 3) 1) :dy (1+ (random 2))))
+
+(setf color-choices (defined-colors))
+(defun random-color ()
+ (nth (random (length color-choices)) color-choices))
+
+(defun random-gray ()
+ (format "gray%d" (random 101)))
+
+(defun build-random-stripes (num)
+ (loop repeat num
+    collect (build-a-stripe (random-color))))
+
+;; two different ways to build stripes, use one or the other!
+(setf the-stripes (build-random-stripes 100))
+(setf the-stripes (loop repeat 100 collect (build-a-stripe (random-gray))))
+
+(defun animate-a-stripe (s)
+ (draw-a-stripe s)
+ (incf (stripe-x s) (stripe-dx s))
+ (if (cond
+ ((&gt; (stripe-x s) bkgd-width) (setf (stripe-x s) 1))
+ ((&lt; (stripe-x s) 1) (setf (stripe-x s) bkgd-width)))
+ (setf (stripe-y s) (random+ bkgd-height)))
+ (incf (stripe-y s) (stripe-dy s))
+ (if (&gt; (stripe-y s) bkgd-height) (setf (stripe-y s) 1))
+ (if (&lt; (stripe-y s) 1) (setf (stripe-y s) bkgd-height)))
+
+(defun animate4 ()
+ (pop-to-buffer "stripes-animation")
+ (buffer-disable-undo)
+ (setf cursor-type nil)
+ (while (not (input-pending-p))
+ (make-grid)
+ (dolist (s the-stripes)
+ (animate-a-stripe s))
+ (sit-for 0.01)))
+</pre>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2020-02-10</span>
+            <span title="last modification date" class="post-info">2020-02-10</span>
+            <span title="tags" class="post-info">:<a href="../../../../../tags/raw">raw</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-14e8f0fe-d940-44e0-aea3-3f63fe5a96b9">lujun9972</a></span>
+        </div>
+    <script src="../../../../../media/js/jquery-2.1.3.min.js"></script>
+    <script src="../../../../../media/js/md5.min.js"></script>
+        <section>
+            <div id="gitalk-container"></div>
+            <script type="text/javascript">
+             var gitalk = new Gitalk({
+                 clientID: 'fdcb5d9da3f4acb4862c',
+                 clientSecret: 'dd0a16312a206782cb7669dcec5e96874ab48170',
+                 repo: 'lujun9972.github.com',
+                 owner: 'lujun9972',
+                 admin: ['lujun9972'],
+                 id: md5(location.pathname),      // Ensure uniqueness and length less than 50
+                 distractionFreeMode: false  // Facebook-like distraction free mode
+             })
+             gitalk.render('gitalk-container')
+            </script>
+        </section>
+    <script src="../../../../../media/js/main.js"></script>
+        <script>
+         var _hmt = _hmt || [];
+         (function() {
+             var hm = document.createElement("script");
+             hm.src = "https://hm.baidu.com/hm.js?7bac4fd0247f69c27887e0d4e3aee41e";
+             var s = document.getElementsByTagName("script")[0]; 
+             s.parentNode.insertBefore(hm, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-14e8f0fe-d940-44e0-aea3-3f63fe5a96b9">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="../../../../../instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>

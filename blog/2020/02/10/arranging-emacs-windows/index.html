@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Arranging Emacs windows - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="raw" />
+  <!-- <link rel="stylesheet" href="../../../../../media/css/main.css" type="text/css"/>
+       <link rel="stylesheet" href="../../../../../media/css/comment.css" type="text/css"/> -->
+  <link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/kognise/water.css@latest/dist/dark.css'>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="../../../../../">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <ul class="trigger">
+        <li><a href="../../../../../years/">Years</a></li>
+        <li><a href="../../../../../authors/">Authors</a></li>
+        <li><a href="../../../../../tags/">Tags</a></li>
+        <li><a href="../../../../../about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="../../../../../rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="https://www.bing.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">Arranging Emacs windows</h1>
+<div id="table-of-contents">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#orgbf39ff0">Arranging Emacs windows</a></li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-orgbf39ff0" class="outline-2">
+<h2 id="orgbf39ff0">Arranging Emacs windows</h2>
+<div class="outline-text-2" id="text-orgbf39ff0">
+<p>
+Dealing with windows in Emacs can be a bit annoying, until <a href="https://www.reddit.com/r/emacs/comments/cpdr6m/any_additional_docstutorials_on_displaybuffer_and/">someone explains you the philosophy</a> behind it and you dig a bit into <a href="https://www.gnu.org/software/emacs/manual/html_mono/elisp.html#Displaying-Buffers">the manual for <code>display-buffer</code> and <code>display-buffer-alist</code></a> . Even then, the problem that package managers do not follow the Emacs canon, or that this has changed a bit over time, makes it difficult to configure some pieces of software.
+</p>
+
+<p>
+I leave here my customizations as of Nov. 2019, in case they may help someone. They are part of an init.org file that is converted into an init.el automatically when saving it, but it should be clear as standalone explanation.
+</p>
+
+<p>
+First, we add some functions that I will use to select buffers based on modes. This is not usual: I just need it for buffers whose name does not really follow any rule; otherwise the method from display-buffer-alist just works.
+</p>
+
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">jjgr-dedicated-window</span> (fun)=
+  (<span style="font-weight: bold;">lambda</span> (buffer <span style="font-weight: bold; text-decoration: underline;">&amp;optional</span> alist)=
+    (<span style="font-weight: bold;">let</span> ((window (funcall fun buffer alist)))=
+      (<span style="font-weight: bold;">when</span> window=
+        (set-window-dedicated-p window t))<span style="font-weight: bold;">=</span>
+      window)))<span style="font-weight: bold;">=</span>
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">jjgr-rx-mode-name</span> (mode-regexp)=
+  (<span style="font-weight: bold;">lambda</span> (buffer <span style="font-weight: bold; text-decoration: underline;">&amp;rest</span> optional)=
+    (<span style="font-weight: bold;">with-current-buffer</span> buffer=
+      (string-match mode-regexp mode-name))))<span style="font-weight: bold;">=</span>
+</pre>
+</div>
+
+
+<p>
+Then I do the configuration itself. I have basically three scenarios where I use Emacs: email, coding and writing. I also have three sets of windows: the ones I open (my files, a new shell), temporary windows (captures, new emails), and informative windows (logs, error messages, help windows).
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">setq</span>
+ <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Kill a frame when quitting its only window</span>
+ frame-auto-hide-function 'delete-frame
+ <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Maximum number of side-windows to create on (left top right bottom)</span>
+ window-sides-slots '(0 1 1 1)
+ <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Default rules</span>
+ display-buffer-alist
+ `(<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Display *Help* buffer at the bottom-most slot</span>
+   (<span style="font-style: italic;">"*(Help|trace-|Backtrace|RefTeX.*)"</span>
+    (display-buffer-reuse-window display-buffer-in-previous-window display-buffer-in-side-window)
+    (side . right)
+    (slot . 0)
+    (window-width . 0.33)
+    (reusable-frames . visible))
+   (<span style="font-style: italic;">"^*info"</span>
+    (display-buffer-reuse-window display-buffer-in-previous-window display-buffer-pop-up-frame)
+    (pop-up-frame-parameters
+     (width . 80)
+     (left . 1.0)
+     (fullscreen . fullheight)))
+   <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Open new edited messages in a right-hand frame</span>
+   <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">For this to close the frame, add</span>
+   <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">(add-hook 'wl-draft-kill-pre-hook 'quit-window)</span>
+   (<span style="font-style: italic;">"(*draft*|Draft/)"</span>
+    (display-buffer-reuse-window display-buffer-in-previous-window display-buffer-pop-up-frame)
+    (pop-up-frame-parameters
+     (width . 80)
+     (left . 1.0)
+     (fullscreen . fullheight)))
+   <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">TeX output buffers to bottom, with 10 lines</span>
+   (,(jjgr-rx-mode-name <span style="font-style: italic;">"^(TeX Output|TeX)"</span>)
+    (display-buffer-reuse-window display-buffer-in-previous-window display-buffer-in-side-window)
+    (side . bottom)
+    (slot . 0)
+    (window-height . 10)
+    (reusable-frames . visible))
+   <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Display *BBDB* buffer on the bottom frame</span>
+   (<span style="font-style: italic;">"*BBDB"</span>
+    (display-buffer-reuse-window display-buffer-in-previous-window display-buffer-in-side-window)
+    (side . bottom)
+    (slot . 0)
+    (window-height . 10)
+    (reusable-frames . visible))
+   <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Split shells at the bottom</span>
+   (<span style="font-style: italic;">"^*[e]shell"</span>
+    (display-buffer-reuse-window display-buffer-in-previous-window display-buffer-below-selected)
+    (window-min-height . 20)
+    (reusable-frames . visible)
+    )
+   )
+ )
+</pre>
+</div>
+
+
+<p>
+I find the syntax of <code>display-buffer-alist</code> rather self explanatory. Helper buffers, I tend to place on a side-window that pops to the right. The exception are long <code>*info*</code> buffers with Emacs manuals, that I like to read on their own frame (i.e. window from the operating system). The database of contacts, <code>*BBDB*</code>, pops at the bottom of the screen in a small window with ten lines. Shells are split from the current window, at the bottom, instead of overriding the content of the window (the default).
+</p>
+
+<p>
+Note how I have to modify how Wanderlust (the email client) works. I instruct  Emacs to open email editing buffers on a new operating system window (frame). However I need to use <code>quit-window</code> to once the draft is finished or abandoned, because otherwise the frame will not be closed automatically. This is because Wanderlust uses <code>delete-window</code> instead.
+</p>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2020-02-10</span>
+            <span title="last modification date" class="post-info">2020-02-10</span>
+            <span title="tags" class="post-info">:<a href="../../../../../tags/raw">raw</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-14e8f0fe-d940-44e0-aea3-3f63fe5a96b9">lujun9972</a></span>
+        </div>
+    <script src="../../../../../media/js/jquery-2.1.3.min.js"></script>
+    <script src="../../../../../media/js/md5.min.js"></script>
+        <section>
+            <div id="gitalk-container"></div>
+            <script type="text/javascript">
+             var gitalk = new Gitalk({
+                 clientID: 'fdcb5d9da3f4acb4862c',
+                 clientSecret: 'dd0a16312a206782cb7669dcec5e96874ab48170',
+                 repo: 'lujun9972.github.com',
+                 owner: 'lujun9972',
+                 admin: ['lujun9972'],
+                 id: md5(location.pathname),      // Ensure uniqueness and length less than 50
+                 distractionFreeMode: false  // Facebook-like distraction free mode
+             })
+             gitalk.render('gitalk-container')
+            </script>
+        </section>
+    <script src="../../../../../media/js/main.js"></script>
+        <script>
+         var _hmt = _hmt || [];
+         (function() {
+             var hm = document.createElement("script");
+             hm.src = "https://hm.baidu.com/hm.js?7bac4fd0247f69c27887e0d4e3aee41e";
+             var s = document.getElementsByTagName("script")[0]; 
+             s.parentNode.insertBefore(hm, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-14e8f0fe-d940-44e0-aea3-3f63fe5a96b9">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="../../../../../instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>

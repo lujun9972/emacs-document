@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>The Association List (alist) Emacs Lisp Library: An Overview - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="raw" />
+  <!-- <link rel="stylesheet" href="../../../../../media/css/main.css" type="text/css"/>
+       <link rel="stylesheet" href="../../../../../media/css/comment.css" type="text/css"/> -->
+  <link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/kognise/water.css@latest/dist/dark.css'>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="../../../../../">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <ul class="trigger">
+        <li><a href="../../../../../years/">Years</a></li>
+        <li><a href="../../../../../authors/">Authors</a></li>
+        <li><a href="../../../../../tags/">Tags</a></li>
+        <li><a href="../../../../../about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="../../../../../rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="https://www.bing.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">The Association List (alist) Emacs Lisp Library: An Overview</h1>
+<p>
+The Association List Emacs Lisp library provides a comprehensive API to work with alists. It has been written by Troy Pracy and the latest release is 0.6.1. This eighth article in the GNU Emacs series explores the regular and anaphoric function variants for creating, retrieving and updating alists. It also reviews the constructs for mapping, filtering, folding and looping of alists.
+</p>
+
+<p>
+The source code featured in this article is available at <a href="https://github.com/troyp/asoc.el">https://github.com/troyp/asoc.el</a> and released under the GNU General Public License v2.
+</p>
+
+<p>
+<b>Installation</b><br />
+The asoc.el source file can be obtained from <a href="https://github.com/troyp/asoc.el">https://github.com/troyp/asoc.el</a> and added to your Emacs init configuration file so that it gets loaded on startup.<br />
+You can then use the library with the following Emacs Lisp code snippet:
+</p>
+
+<pre class="example">
+(require ‘asoc)
+</pre>
+
+<p>
+<b>Usage</b><br />
+We will begin with the constructor API available in asoc.el for creating association lists.
+</p>
+
+<p>
+<b>Constructors</b><br />
+The asoc-make function takes a set of keys and returns an association list. If you give a default value, then all the keys are initialised with this value, as shown below:
+</p>
+
+<pre class="example">
+(asoc-make &amp;optional keys default) ;; Syntax
+
+(asoc-make ‘(a b c d e))
+((a) (b) (c) (d) (e))
+
+(asoc-make ‘(a b c d e) ‘(0))
+((a 0) (b 0) (c 0) (d 0) (e 0))
+</pre>
+
+<p>
+The asoc-copy function returns a shallow copy of an alist that is passed to it as an argument. For example:
+</p>
+
+<pre class="example">
+(asoc-copy alist) ;; Syntax
+
+(let ((foo (asoc-copy ‘((a 1) (b 2) (c 3) (d 4) (e 5)))))
+foo)
+((a 1) (b 2) (c 3) (d 4) (e 5))
+</pre>
+
+<p>
+You can combine keys and values together to create an association list using the asoc-zip API. If there are more keys than values, then these additional keys have a nil value. A couple of examples are given below:
+</p>
+
+<pre class="example">
+(asoc-zip keys values) ;; Syntax
+
+(asoc-zip ‘(a b c) ‘(1 2 3))
+((a . 1) (b . 2) (c . 3))
+
+(asoc-zip ‘(a b c d e) ‘(1 2 3))
+((a . 1) (b . 2) (c . 3) (d) (e))
+</pre>
+
+<p>
+If you want to return an alist with the duplicate keys removed, you can use the asoc-uniq function. In the following example, only the first value for the key b is returned.
+</p>
+
+<pre class="example">
+(asoc-uniq alist) ;; Syntax
+
+(asoc-uniq ‘((a 1) (b 2) (b 3) (c 4) (d 5)))
+((a 1) (b 2) (c 4) (d 5))
+</pre>
+
+<p>
+The asoc-merge function helps you to merge multiple alists. If the same keys are present in multiple lists, the key in the latter alist takes precedence. If identical keys are present in the same alist, then the first occurrence is given the preference. A few examples are shown below:
+</p>
+
+<pre class="example">
+(asoc-merge alists) ;; Syntax
+
+(asoc-merge ‘((a 1) (b 2)) ‘((c 3) (d 4)))
+((c 3) (d 4) (a 1) (b 2))
+
+(asoc-merge ‘((a 1) (b 2)) ‘((b 3) (c 3)))
+((b 3) (c 3) (a 1))
+
+(asoc-merge ‘((a 1) (b 2) (a 3)) ‘((c 3) (d 4)))
+((c 3) (d 4) (a 1) (b 2))
+</pre>
+
+<p>
+You can use the asoc-sort-keys function to return a list with the elements sorted by the keys. For example:
+</p>
+
+<pre class="example">
+(asoc-sort-keys alist) ;; Syntax
+
+(let ((alphabets ‘((b . 2) (a . 1) (e . 5) (d . 4) (c . 3))))
+(asoc-sort-keys alphabets))
+((a . 1) (b . 2) (c . 3) (d . 4) (e . 5))
+</pre>
+
+<p>
+<b>Filters</b><br />
+The asoc-filter function takes a predicate function and an alist. It returns an alist with those elements that only satisfy the predicate function. In the following example, all elements whose values are less than three are returned.
+</p>
+
+<pre class="example">
+(asoc-filter predicate alist) ;; Syntax
+
+(let ((alphabets ‘((b . 2) (a . 1) (e . 5) (d . 4) (c . 3))))
+(asoc-filter (lambda (k v) (&lt; v 3)) alphabets))
+((b . 2) (a . 1))
+</pre>
+
+<p>
+The anaphoric variant of the asoc-filter function is asoc--filter. It returns alist elements for which the form is true. An example written using asoc--filter is given below:
+</p>
+
+<pre class="example">
+(asoc--filter form alist) ;; Syntax
+
+(asoc--filter (&lt; value 3)
+`((b . 2) (a . 1) (e . 5) (d . 4) (c . 3)))
+((b . 2) (a . 1))
+</pre>
+
+<p>
+You can apply a predicate function to the keys using the asoc-filter-keys function. The alist elements whose keys satisfy the predicate function alone are returned. For example:
+</p>
+
+<pre class="example">
+(asoc-filter-keys predicate alist) ;; Syntax
+
+(let ((alphabets `((b . 2) (a . 1) (e . 5) (d . 4) (c . 3))))
+(asoc-filter-keys (lambda (k) (eq k ‘a)) alphabets))
+((a . 1))
+</pre>
+
+<p>
+The asoc-filter-values function, on the other hand, applies the predicate function to the values of the alist elements. In the following example, only the alist elements whose values are greater than three are returned.
+</p>
+
+<pre class="example">
+(asoc-filter-values predicate alist) ;; Syntax
+
+(let ((alphabets `((b . 2) (a . 1) (e . 5) (d . 4) (c . 3))))
+(asoc-filter-values (lambda (v) (&gt; v 3)) alphabets))
+((e . 5) (d . 4))
+</pre>
+
+<p>
+The asoc-remove function removes the elements that satisfy the predicate function and returns the rest of the alist elements. For example:
+</p>
+
+<pre class="example">
+(asoc-remove predicate alist) ;; Syntax
+
+(let ((alphabets `((b . 2) (a . 1) (e . 5) (d . 4) (c . 3))))
+(asoc-remove (lambda (k v) (&lt; v 3)) alphabets))
+((e . 5) (d . 4) (c . 3))
+</pre>
+
+<p>
+Similar to the asoc-filter-keys and asoc-filter-values functions, you have the asoc-remove-keys and asoc-remove-values functions that perform the inverse operation. Examples of the syntax and usage of these functions are given below:
+</p>
+
+<pre class="example">
+(asoc-remove-keys predicate alist) ;; Syntax
+(asoc-remove-values predicate alist) ;; Syntax
+
+(let ((alphabets `((b . 2) (a . 1) (e . 5) (d . 4) (c . 3))))
+(asoc-remove-keys (lambda (k) (eq k ‘b)) alphabets))
+((a . 1) (e . 5) (d . 4) (c . 3))
+
+(let ((alphabets `((b . 2) (a . 1) (e . 5) (d . 4) (c . 3))))
+(asoc-remove-values (lambda (v) (&gt; v 3)) alphabets))
+((b . 2) (a . 1) (c . 3))
+</pre>
+
+<p>
+The asoc-partition function can take a flattened association list that has keys and values, and return an alist. For example:
+</p>
+
+<pre class="example">
+(asoc-partition flatlist) ;; Syntax
+(asoc-partition `(a 1 b 2 c 3 d 4 e 5 f 6))
+((a . 1) (b . 2) (c . 3) (d . 4) (e . 5) (f . 6))
+</pre>
+
+<p>
+<b>Predicates</b><br />
+The asoc-contains-key? API accepts two arguments --- an alist and a key --- and returns a Boolean value. It returns True if the key is present in the alist and nil otherwise. A couple of examples are shown below:
+</p>
+
+<pre class="example">
+(asoc-contains-key? alist key) ;; Syntax
+
+(asoc-contains-key? `((a 1) (b 2) (c 3)) ‘a)
+t
+(asoc-contains-key? `((a 1) (b 2) (c 3)) ‘d)
+nil
+</pre>
+
+<p>
+You can use the asoc-contains-pair? function that ascertains if a key-value pair exists in the given alist. It returns True if the key-value pair exists and nil otherwise. For example:
+</p>
+
+<pre class="example">
+(asoc-contains-pair? alist key value) ;; Syntax
+
+(asoc-contains-pair? ‘((a . 1) (b . 2) (c . 3)) ‘a 1)
+t
+(asoc-contains-pair? ‘((a . 1) (b . 2) (c . 3)) ‘a 2)
+nil
+</pre>
+
+<p>
+<b>Access functions</b><br />
+The asoc-get function retrieves a key from an alist. If the key is not found, nil is returned. A couple of examples are shown below:
+</p>
+
+<pre class="example">
+(asoc-get alist key) ;; Syntax
+
+(asoc-get `((b . 2) (a . 1) (e . 5) (d . 4) (c . 3)) ‘a)
+1
+(asoc-get `((b . 2) (a . 1) (e . 5) (d . 4) (c . 3)) ‘f)
+nil
+</pre>
+
+<p>
+If you want to exclude a list of keys and return an alist, you can use the asoc-dissoc function. For example:
+</p>
+
+<pre class="example">
+(asoc-dissoc alist keys) ;; Syntax
+
+(asoc-dissoc `((b . 2) (a . 1) (e . 5) (d . 4) (c . 3)) ‘a ‘b)
+((e . 5) (d . 4) (c . 3))
+</pre>
+
+<p>
+You can add a key to an existing list using the asoc-put! function, which accepts an alist, a key and a value as arguments. If the key already exists and replace is true, then the old entries are replaced. If replace is nil, then the new entry is added to the front of the alist. A few examples are given below:
+</p>
+
+<pre class="example">
+(asoc-put! alist key value &amp;optional replace) ;; Syntax
+
+(let ((alphabets (list (cons ‘a 1) (cons ‘b 2))))
+(asoc-put! alphabets ‘c 3)
+alphabets)
+((c . 3) (a . 1) (b . 2))
+
+(let ((alphabets (list (cons ‘a 1) (cons ‘b 2))))
+(asoc-put! alphabets ‘b 3 nil)
+alphabets)
+((b . 3) (a . 1) (b . 2))
+
+(let ((alphabets (list (cons ‘a 1) (cons ‘b 2))))
+(asoc-put! alphabets ‘b 3 t)
+alphabets)
+((b . 3) (a . 1))
+</pre>
+
+<p>
+The asoc-pop! function removes a key from an alist and returns the same as illustrated below:
+</p>
+
+<pre class="example">
+(asoc-pop! alist key) ;; Syntax
+
+(let ((alphabets (list (cons ‘a 1) (cons ‘b 2))))
+(asoc-pop! alphabets ‘b))
+(b . 2)
+</pre>
+
+<p>
+The asoc-find API returns the first element in a given alist that satisfies the predicate function. For example:
+</p>
+
+<pre class="example">
+(asoc-find predicate alist) ;; Syntax
+(asoc-find (lambda (k v) (&lt; v 3)) `((b . 2) (a . 1) (e . 5) (d . 4) (c . 3)))
+(b . 2)
+</pre>
+
+<p>
+The anaphoric variant of the asoc-find function is the asoc--find function, which is demonstrated below:
+</p>
+
+<pre class="example">
+(asoc--find form alist) ;; Syntax
+
+(asoc--find (lambda (k v) (&lt; v 3)) `((b . 2) (a . 1) (e . 5) (d . 4) (c . 3)))
+(b . 2)
+</pre>
+
+<p>
+The asoc-find-key function takes two arguments --- a key and an alist. It returns the first alist element that matches the key, or nil otherwise. For example:
+</p>
+
+<pre class="example">
+(asoc-find-key key alist) ;; Syntax
+
+(asoc-find-key ‘c `((b . 2) (a . 1) (e . 5) (d . 4) (c . 3)))
+(c . 3)
+(asoc-find-key ‘f `((b . 2) (a . 1) (e . 5) (d . 4) (c . 3)))
+nil
+</pre>
+
+<p>
+If you want the list of unique keys in an alist, you can use the asoc-keys function as illustrated below:
+</p>
+
+<pre class="example">
+(asoc-keys alist) ;; Syntax
+
+(asoc-keys `((b . 2) (a . 1) (e . 5) (d . 4) (c . 3)))
+(b a e d c)
+(asoc-keys `((b . 2) (a . 1) (e . 5) (d . 4) (c . 3) (a . 2) (b . 6)))
+(b a e d c)
+</pre>
+
+<p>
+On the other hand, if you want the list of unique values in an alist, you can use the asoc-values function. A couple of examples are shown below:
+</p>
+
+<pre class="example">
+(asoc-values alist) ;; Syntax
+
+(asoc-values `((b . 2) (a . 1) (e . 5) (d . 4) (c . 3)))
+(2 1 5 4 3)
+(asoc-values `((b . 2) (a . 1) (e . 5) (d . 4) (c . 3) (a . 2) (b . 6)))
+(2 1 5 4 3 6)
+</pre>
+
+<p>
+The asoc-unzip function performs the reverse operation of asoc-zip. It returns all the keys and values from an alist. An example is provided below:
+</p>
+
+<pre class="example">
+(asoc-unzip alist) ;; Syntax
+
+(asoc-unzip `((a . 1) (b . 2) (c . 3)))
+((a b c) (1 2 3))
+</pre>
+
+<p>
+<b>Loops</b><br />
+The following section addresses a couple of looping constructs possible with asoc.el. You can use the asoc-do construct to loop through each key-value pair in an alist and execute a body of code. In the following example, the sum of all the values is computed and returned as the result.
+</p>
+
+<pre class="example">
+(asoc-do ((key value) alist [result] body ...)) ;; Syntax
+
+(let ((sum 0)
+(alphabets `((b . 2) (a . 1) (e . 5) (d . 4) (c . 3))))
+(asoc-do ((key value) alphabets sum)
+(when (symbolp key)
+(setf sum (+ sum value))))
+sum)
+15
+</pre>
+
+<p>
+The anaphoric variant of the asoc-do function is the asoc--do construct and is illustrated below:
+</p>
+
+<pre class="example">
+(asoc--do (alist &amp;rest body)) ;; Syntax
+
+(let ((alphabets ‘((b . 2) (a . 1) (e . 5) (d . 4) (c . 3))))
+(asoc--do alphabets
+
+(when (symbolp key)
+(setf result (+ (or result 0) value)))))
+15
+</pre>
+
+<p>
+<b>Mapping functions</b><br />
+The asoc-map function takes two arguments --- a function and an alist. It applies the function to each and every element in the alist. In the following example, the key of every element in the alist is checked to see if it is a symbol and then its value is returned.
+</p>
+
+<pre class="example">
+(asoc-map function alist) ;; Syntax
+
+(asoc-map (lambda (k v) (when (symbolp k) v))
+‘((b . 2) (a . 1) (e . 5) (d . 4) (c . 3)))
+(2 1 5 4 3)
+</pre>
+
+<p>
+The anaphoric variant of the asoc-map function is the asoc--map function and is demonstrated below with an example:
+</p>
+
+<pre class="example">
+(asoc--map form alist) ;; Syntax
+
+(asoc--map (format “%s=%d;” key value)
+‘((b . 2) (a . 1) (e . 5) (d . 4) (c . 3)))
+(“b=2;” “a=1;” “e=5;” “d=4;” “c=3;”)
+</pre>
+
+<p>
+You can make a transformation on the keys on the given alist using the asoc-map-keys function. The keys are converted into strings in the following example:
+</p>
+
+<pre class="example">
+(asoc-map-keys function alist) ;; Syntax
+
+(asoc-map-keys #’symbol-name ‘((b . 2) (a . 1) (e . 5) (d . 4) (c . 3)))
+((“b” . 2) (“a” . 1) (“e” . 5) (“d” . 4) (“c” . 3))
+</pre>
+
+<p>
+If you want to make transformations on the values, you can use the ‘asoc-map-values' function as shown below:
+</p>
+
+<pre class="example">
+(asoc-map-values function alist) ;; Syntax
+
+(let ((alphabets '((b . 2) (a . 1) (e . 5) (d . 4) (c . 3))))
+(asoc-map-values #'list alphabets))
+((b 2) (a 1) (e 5) (d 4) (c 3))
+</pre>
+
+<p>
+<b>Folds</b><br />
+The fold operation is a reduction on an association list. The asoc-fold function takes three arguments --- a reduction function, an alist and an initial value (accumulator). In the following example, the values are added to the accumulator and the sum of the values is returned.
+</p>
+
+<pre class="example">
+(asoc-fold function alist init) ;; Syntax
+
+(let ((alphabets ‘((b . 2) (a . 1) (e . 5) (d . 4) (c . 3))))
+(asoc-fold (lambda (k v acc) (+ v acc))
+alphabets 0))
+15
+</pre>
+
+<p>
+The anaphoric variant of the asoc-fold function is the asoc--fold function. Its syntax and usage are demonstrated with the following example:
+</p>
+
+<pre class="example">
+(asoc--fold form alist init) ;; Syntax
+
+(let ((alphabets ‘((b . 2) (a . 1) (e . 5) (d . 4) (c . 3))))
+(asoc--fold (+ value acc) alphabets 0))
+15
+</pre>
+
+<p>
+You can merge multiple alists using the ‘asoc-merge-values' function. For example:
+</p>
+
+<pre class="example">
+(asoc-merge-values alists) ;; Syntax
+
+(let ( (vowels `((a . 1) (e . 5) (i . 9)))
+(consonants `((b . 2) (c . 3) (d . 4))))
+(asoc-merge-values vowels consonants))
+((a 1) (e 5) (i 9) (b 2) (c 3) (d 4))
+</pre>
+
+<p>
+If you have duplicate keys, then you can use the asoc-merge-values-no-dups function, which will merge multiple unique values for each key to a single alist. An example is shown below:
+</p>
+
+<pre class="example">
+(asoc-merge-values-no-dups alists) ;; Syntax
+
+(let ( (vowels `((a . 1) (e . 5) (i . 9) (a . 1)))
+
+(consonants `((b . 2) (c . 3) (d . 4) (d . 4))))
+(asoc-merge-values-no-dups vowels consonants))
+((a 1) (e 5) (i 9) (b 2) (c 3) (d 4))
+</pre>
+
+<p>
+Do explore the README at <a href="https://github.com/troyp/asoc.el">https://github.com/troyp/asoc.el</a> to learn more about the association list functions given above and their usage.
+</p>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2020-02-10</span>
+            <span title="last modification date" class="post-info">2020-02-10</span>
+            <span title="tags" class="post-info">:<a href="../../../../../tags/raw">raw</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-14e8f0fe-d940-44e0-aea3-3f63fe5a96b9">lujun9972</a></span>
+        </div>
+    <script src="../../../../../media/js/jquery-2.1.3.min.js"></script>
+    <script src="../../../../../media/js/md5.min.js"></script>
+        <section>
+            <div id="gitalk-container"></div>
+            <script type="text/javascript">
+             var gitalk = new Gitalk({
+                 clientID: 'fdcb5d9da3f4acb4862c',
+                 clientSecret: 'dd0a16312a206782cb7669dcec5e96874ab48170',
+                 repo: 'lujun9972.github.com',
+                 owner: 'lujun9972',
+                 admin: ['lujun9972'],
+                 id: md5(location.pathname),      // Ensure uniqueness and length less than 50
+                 distractionFreeMode: false  // Facebook-like distraction free mode
+             })
+             gitalk.render('gitalk-container')
+            </script>
+        </section>
+    <script src="../../../../../media/js/main.js"></script>
+        <script>
+         var _hmt = _hmt || [];
+         (function() {
+             var hm = document.createElement("script");
+             hm.src = "https://hm.baidu.com/hm.js?7bac4fd0247f69c27887e0d4e3aee41e";
+             var s = document.getElementsByTagName("script")[0]; 
+             s.parentNode.insertBefore(hm, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-14e8f0fe-d940-44e0-aea3-3f63fe5a96b9">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="../../../../../instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>
