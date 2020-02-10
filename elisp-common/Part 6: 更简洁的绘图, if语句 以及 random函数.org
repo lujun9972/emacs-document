@@ -1,0 +1,91 @@
+#+TITLE: Part 6: 更简洁的绘图, if语句 以及 random函数
+#+URL: http://dantorop.info/project/emacs-animation/lisp6.html
+#+AUTHOR: lujun9972
+#+TAGS: elisp-common
+#+DATE: [2020年 02月 10日 星期一 10:04:03 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+* 更简洁的=drawxy=版本
+:PROPERTIES:
+:CUSTOM_ID: a-more-succinct-version-of-drawxy-from-last-week
+:END:
+
+将光标移动到屏幕上的任意 =x= 列 =y= 行并绘制 =sprite=.
+
+#+begin_src emacs-lisp
+  (defun drawxy (x y sprite)
+    (erase-buffer)
+    (insert-char ?\n y)
+    (insert-char ?\s x)
+    (insert sprite))
+#+end_src
+
+使用 =insert-char= 用于创建空格. =?\s= 是空格字符的编码。
+使用 =insert-char= 可以指定要插入的字符数，并且不需要 =dotimes= 循环。
+
+* 更简洁的 =background= 版本
+:PROPERTIES:
+:CUSTOM_ID: a-more-succinct-version-of-background-from-last-week
+:END:
+
+#+BEGIN_EXAMPLE
+(defun background (width height)
+(erase-buffer)
+(dotimes (i height)
+(insert-char ?\. width)
+(newline)))
+#+END_EXAMPLE
+
+使用 =insert-char= 绘制网格，保存一个 =dotimes= 循环。
+这将绘制一个由句号组成的网格(通过 =?\.= 字符编码)。
+可以用 =?\s= 替换 =?\.= 来画一个看不见的网格。
+无论哪种方式，目标都是创建一个光标移动的空间，在不必擦除缓冲区的情况下绘制多个Sprint。
+
+* 一个简单的多的 =drawxy2= 函数
+:PROPERTIES:
+:CUSTOM_ID: the-drawxy2-function-from-last-week-a-touch-briefer
+:END:
+
+#+begin_src emacs-lisp
+  (defun drawxy2 (x y sprite)
+    (goto-char 1)
+    (forward-line y)
+    (forward-char x)
+    (delete-region (point) (+ (point) (length sprite)))
+    (insert sprite))
+#+end_src
+
+* 使用 =if=
+:PROPERTIES:
+:CUSTOM_ID: using-if
+:END:
+
+=background= 和 =drawxy2= 需要预先执行
+
+#+begin_src emacs-lisp
+  (defun where ()
+    (background 40 25)
+    (dotimes (i 10)
+      (if (= i 5)
+          (drawxy2 30 i "here")
+        (drawxy2 (* i 3) (* i 2) "there?"))
+      (sit-for 0.2)))
+#+end_src
+
+* 使用 =random=
+:PROPERTIES:
+:CUSTOM_ID: using-random
+:END:
+
+=background= 和 =drawxy2= 也需要预先执行
+
+#+begin_src emacs-lisp
+  (defun where2 ()
+    (background 40 25)
+    (dotimes (i 20)
+      (if (= i 12)
+          (drawxy2 30 i (propertize "here" 'face '(:foreground "green")))
+        (drawxy2 (random 30) (random 25) "there?"))
+      (sit-for 0.2)))
+#+end_src
