@@ -1,0 +1,188 @@
+#+TITLE: Part 9: Common Lisp, incf, decf, structs
+#+URL: http://dantorop.info/project/emacs-animation/lisp9.html
+#+AUTHOR: lujun9972
+#+TAGS: raw
+#+DATE: [2020年 02月 10日 星期一 10:11:02 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+Continued from [[/project/emacs-animation/lisp8.html][Emacs Lisp programming pt. 8]].
+
+*** Common Lisp
+    :PROPERTIES:
+    :CUSTOM_ID: common-lisp
+    :END:
+
+#+BEGIN_EXAMPLE
+  (require 'cl)
+#+END_EXAMPLE
+
+Put this at the start of your code and you can use Common Lisp commands (=incf=, =decf=, =setf=, =defstruct=, etc.).
+
+*** =incf= and =decf=
+    :PROPERTIES:
+    :CUSTOM_ID: incf-and-decf
+    :END:
+
+#+BEGIN_EXAMPLE
+  (setq x 5)
+  (incf x 3) ;; ==> 8 (equivalent to (setq x (+ x 3))
+  (incf x) ;; ==> 9 (equivalent to (setq x (1+ x))
+  (decf x 7) ;; ==> 2 (equivalent to (setq x (- x 7))
+  (decf x) ;; ==> 1 (equivalent to (setq x (1- x))
+#+END_EXAMPLE
+
+*** =setf=
+    :PROPERTIES:
+    :CUSTOM_ID: setf
+    :END:
+
+#+BEGIN_EXAMPLE
+  (setf x 5) ;; same as (setq x 5)
+#+END_EXAMPLE
+
+The useful bit about =setf= is that you can set things which aren't quite variables, such as the contents of a struct.
+
+*** Structures
+    :PROPERTIES:
+    :CUSTOM_ID: structures
+    :END:
+
+The saying goes that programming consists of defining data structures and then making algorithms to change them. =defstruct= allows the former.
+
+#+BEGIN_EXAMPLE
+  (defstruct obj x y ch)
+
+  (setq o (make-obj 5 5 ?^))
+  (draw-char (obj-x o) (obj-y o) (obj-ch o))
+  (incf (obj-x o))
+  (setf (obj-ch o) ?!)
+#+END_EXAMPLE
+
+Note using =setf= rather than =setq= to change something within an object.
+
+*** Mapping
+    :PROPERTIES:
+    :CUSTOM_ID: mapping
+    :END:
+
+#+BEGIN_EXAMPLE
+  (mapcar* '1+ '(4 5 6)) ;; ==> (5 6 7)
+#+END_EXAMPLE
+
+Calls the function =1+= on each item in the list =(4 5 6)=, returning the result.
+
+Can be used to create a list of structures:
+
+#+BEGIN_EXAMPLE
+  ;; data
+
+  (defstruct obj x y ch)
+
+  (defun make-char-obj (ch)
+   (make-obj :x (/ width 2) :y (/ height 2) :ch ch))
+
+  ;; algorithm
+
+  (defun move-char3a ()
+   (pop-to-buffer "test")
+   (buffer-disable-undo)
+   (make-grid)
+   (let ((chars (mapcar* 'make-char-obj '(?> ?< ?^))))
+   (dotimes (i 2000)
+   (dolist (c chars)
+      (draw-char (obj-x c) (obj-y c) (obj-ch c))
+      (incf (obj-x c) (delta))
+      (incf (obj-y c) (delta))
+      ;; stop at edges
+      (setf (obj-x c) (clamp (obj-x c) 1 width)
+       (obj-y c) (clamp (obj-y c) 1 height)))
+   (sit-for 0.03))))
+#+END_EXAMPLE
+
+Needs standard helper routines, including
+
+#+BEGIN_EXAMPLE
+  (defun clamp (num low high)
+   (min (max num low) high))
+#+END_EXAMPLE
+
+*** Stripes using structures
+    :PROPERTIES:
+    :CUSTOM_ID: stripes-using-structures
+    :END:
+
+#+BEGIN_EXAMPLE
+  (require 'cl)
+
+  ;; global variables
+
+  (setf bkgd-width 60)
+  (setf bkgd-height 40)
+  (setf bkgd-char ?\s)
+  (setf stripe-char ?\s)
+
+  ;; helper routines
+
+  (defun make-grid ()
+   (erase-buffer)
+   (dotimes (i bkgd-height)
+   (insert-char bkgd-char bkgd-width)
+   (newline)))
+
+  (defun gotoxy (x y)
+   (goto-char (+ x (* (1- y) (1+ bkgd-width)))))
+
+  (defun draw-a-stripe (s)
+   (gotoxy (stripe-x s) (stripe-y s))
+   (let ((actual-width (min (1+ (- bkgd-width (stripe-x s)))
+               (stripe-width s))))
+   (delete-char actual-width)
+   (insert (propertize (make-string actual-width stripe-char)
+              'face `(:background ,(stripe-color s))))))
+
+  (defun random+ (n) (1+ (random n)))
+
+  ; data
+  (defstruct stripe x y width color dx dy)
+
+  (defun build-a-stripe (color)
+   (make-stripe :x (random+ bkgd-width) :y (random+ bkgd-height)
+       :width (random+ bkgd-width)
+       :color color :dx (- (random 3) 1) :dy (1+ (random 2))))
+
+  (setf color-choices (defined-colors))
+  (defun random-color ()
+   (nth (random (length color-choices)) color-choices))
+
+  (defun random-gray ()
+   (format "gray%d" (random 101)))
+
+  (defun build-random-stripes (num)
+   (loop repeat num
+      collect (build-a-stripe (random-color))))
+
+  ;; two different ways to build stripes, use one or the other!
+  (setf the-stripes (build-random-stripes 100))
+  (setf the-stripes (loop repeat 100 collect (build-a-stripe (random-gray))))
+
+  (defun animate-a-stripe (s)
+   (draw-a-stripe s)
+   (incf (stripe-x s) (stripe-dx s))
+   (if (cond
+   ((> (stripe-x s) bkgd-width) (setf (stripe-x s) 1))
+   ((< (stripe-x s) 1) (setf (stripe-x s) bkgd-width)))
+   (setf (stripe-y s) (random+ bkgd-height)))
+   (incf (stripe-y s) (stripe-dy s))
+   (if (> (stripe-y s) bkgd-height) (setf (stripe-y s) 1))
+   (if (< (stripe-y s) 1) (setf (stripe-y s) bkgd-height)))
+
+  (defun animate4 ()
+   (pop-to-buffer "stripes-animation")
+   (buffer-disable-undo)
+   (setf cursor-type nil)
+   (while (not (input-pending-p))
+   (make-grid)
+   (dolist (s the-stripes)
+   (animate-a-stripe s))
+   (sit-for 0.01)))
+#+END_EXAMPLE
