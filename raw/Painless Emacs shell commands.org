@@ -1,0 +1,235 @@
+#+TITLE: Painless Emacs shell commands
+#+URL: https://www.eigenbahn.com/2020/01/19/painless-emacs-shell-commands
+#+AUTHOR: lujun9972
+#+TAGS: raw
+#+DATE: [2020年 02月 10日 星期一 09:52:48 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+[[https://www.eigenbahn.com/assets/img/drake-prf-shell-command.png]]
+
+
+* Emacs as a terminal emulator
+   :PROPERTIES:
+   :CUSTOM_ID: emacs-as-a-terminal-emulator
+   :END:
+
+Emacs can act as a powerful [[https://www.gnu.org/software/emacs/manual/html_node/emacs/Shell.html][terminal emulator]].
+
+It can spawning interactive shells (with shell-mode and term-mode) and execute single shell commands.
+
+This post will focus on single shell commands.
+
+For interactive shells, see [[file:2020/01/21/painless-emacs-interactive-shells][next post]].
+
+#+BEGIN_QUOTE
+  In this article, there are two meanings for the word “command”:
+
+  - shell commands, we will refer to them with *shell commands*
+  - interactive Emacs functions, we will refer to them with *commands*
+#+END_QUOTE
+
+* Emacs Single Shell Command API
+   :PROPERTIES:
+   :CUSTOM_ID: emacs-single-shell-command-api
+   :END:
+
+The main commands are:
+
+functionexecutionreturn valuespawned buffersshell-command-to-string =(command)=synchronousstdout shell-command =(command & output-buffer error-buffer)=synchronousreturn codestdout and stderrasync-shell-command =(command & output-buffer error-buffer)=synchronouswindow containing output-bufferstdout and stderr
+
+As you can see, the three of those only accept a limited number of arguments.
+
+But more are supported implicitly via various variables.
+
+Here is a list of the most relevant ones:
+
+vardescriptiondefault-directorylocation from which to launch shellexplicit-shell-file-name / shell-file-nameshell interpreter exec (e.g. bash ...)shell-command-switchswitch argument to use for running a command
+
+So, by redefining the value of those vars we can change the behavior of the functions.
+
+Specifically:
+
+- by having the =default-directory= be on a remote server (via TRAMP), we can open a shell on this remote server
+- by changing the other vars, we can spawn a shell from non-default interpreters (fish, zsh, ksh...)
+
+To prevent having to redefine those values, We can let-bind those vars for the duration of the execution (dynamic binding).
+
+#+BEGIN_EXAMPLE
+  (defun my/uname-local ()
+   (interactive)
+   (let ((default-directory "~")
+   (explicit-shell-file-name "fish"))
+   (message "Launching \"uname -a\" locally")
+   (message (shell-command-to-string "uname -a"))))
+
+  (defun my/uname-on-raspi ()
+   (interactive)
+   (let ((default-directory "/ssh:pi@raspi:/~")
+   (explicit-shell-file-name "bash"))
+   (message "Launching \"uname -a\" on Raspberry Pi")
+   (message (shell-command-to-string "uname -a"))))
+#+END_EXAMPLE
+
+That's pretty cool, but I'm not too fond of this hidden part of API.
+
+* Making the Implicit Explicit
+   :PROPERTIES:
+   :CUSTOM_ID: making-the-implicit-explicit
+   :END:
+
+Thankfully, it's pretty straightforward to map implicit parameters to explicit ones and define a helper function.
+
+As we want those params to be optional, it's more convenient define them as keywords.
+
+Click to toggle
+
+#+BEGIN_EXAMPLE
+  ;; ------------------------------------------------------------------------
+  ;; VARS
+
+  (defvar prf-default-remote-shell-interpreter "/bin/bash")
+  (defvar prf-default-remote-shell-interpreter-args '("-c" "export EMACS=; export TERM=dumb; stty echo; bash"))
+  (defvar prf-default-remote-shell-interpreter-command-swith "-c")
+
+
+  ;; ------------------------------------------------------------------------
+  ;; HELPER
+
+  (defun with-shell-interpreter--normalize-path (path)
+   "Normalize path, converting \\ into /."
+   (subst-char-in-string ?\\ ?/ path))
+
+
+  (defun with-shell-interpreter--get-interpreter-name (interpreter)
+   (file-name-nondirectory interpreter))
+
+
+  ;; ------------------------------------------------------------------------
+  ;; MAIN
+
+  (cl-defun eval-with-shell-interpreter (&key form path
+   interpreter interpreter-args command-switch)
+   (unless path
+   (setq path default-directory))
+   (unless (file-exists-p path)
+   (error "Path %s doesn't seem to exist" path))
+
+   (let* ((func
+   (if (functionp form) form
+   ;; Try to use the "current" lexical/dynamic mode for `form'.
+   (eval `(lambda () ,form) lexical-binding)))
+   (is-remote (file-remote-p path))
+   (interpreter (or interpreter
+   (if is-remote
+   prf-default-remote-shell-interpreter
+   shell-file-name)))
+   (interpreter (with-shell-interpreter--normalize-path interpreter))
+   (interpreter-name (with-shell-interpreter--get-interpreter-name interpreter))
+   (explicit-interpreter-args-var (intern (concat "explicit-" interpreter-name "-args")))
+   (interpreter-args (or interpreter-args (when is-remote prf-default-remote-shell-interpreter-args)))
+   (command-switch (or command-switch
+   (if is-remote
+   prf-default-remote-shell-interpreter-command-swith
+   shell-command-switch)))
+   (default-directory path)
+   (shell-file-name interpreter)
+   (explicit-shell-file-name interpreter)
+   (shell-command-switch command-switch))
+   (cl-progv
+   (list explicit-interpreter-args-var)
+   (list (or interpreter-args
+   (when (boundp explicit-interpreter-args-var)
+   (symbol-value explicit-interpreter-args-var))))
+   (funcall func))))
+#+END_EXAMPLE
+
+Note that we are defining =prf-default-remote-shell-interpreter= to have a default interpreter different from local =shell-file-name=.
+
+This allows rewriting the =my/uname-local= example with:
+
+#+BEGIN_EXAMPLE
+  (defun my/uname-local ()
+   (interactive)
+   (eval-with-shell-interpreter
+   :path "~"
+   :interpreter "fish"
+   :form
+   '(progn
+   (message "Launching \"uname -a\" locally")
+   (message (shell-command-to-string "uname -a")))))
+#+END_EXAMPLE
+
+That's pretty cool, but having to quote :form and wrap it in a =progn= is kinda cumbersome.
+
+A macro wrapper to the rescue:
+
+#+BEGIN_EXAMPLE
+  (defmacro with-shell-interpreter (&rest args)
+   (declare (indent 1) (debug t))
+   `(eval-with-shell-interpreter
+   :form (lambda () ,(cons 'progn (with-shell-interpreter--plist-get args :form)))
+   :path ,(plist-get args :path)
+   :interpreter ,(plist-get args :interpreter)
+   :interpreter-args ,(plist-get args :interpreter-args)
+   :command-switch ,(plist-get args :command-switch)))
+
+  (defun with-shell-interpreter--plist-get (plist prop)
+   "Like `plist-get' except allows value to be multiple elements."
+   (unless (null plist)
+   (cl-loop with passed = nil
+   for e in plist
+   until (and passed
+   (keywordp e)
+   (not (eq e prop)))
+   if (and passed
+   (not (keywordp e)))
+   collect e
+   else if (not passed)
+   do (setq passed 't))))
+#+END_EXAMPLE
+
+Which allows us to rewrite it like so:
+
+#+BEGIN_EXAMPLE
+  (defun my/uname-local ()
+   (interactive)
+   (with-shell-interpreter
+   :path "~"
+   :interpreter "fish"
+   :form
+   (message "Launching \"uname -a\" locally")
+   (message (shell-command-to-string "uname -a"))))
+#+END_EXAMPLE
+
+The code for =with-shell-interpreter= can be found in package [[https://github.com/p3r7/with-shell-interpreter][with-shell-interpreter]].
+
+* Even better
+   :PROPERTIES:
+   :CUSTOM_ID: even-better
+   :END:
+
+Let's just spin off our own version of =shell-command-to-string=.
+
+#+BEGIN_EXAMPLE
+  (cl-defun prf-shell-command-to-string (command &key path interpreter command-switch)
+   "Call CMD w/ `shell-command-to-string' on host and location described by PATH"
+   (with-shell-interpreter
+   :form (shell-command-to-string command)
+   :path path
+   :interpreter interpreter
+   :command-switch command-switch))
+#+END_EXAMPLE
+
+Our example command becomes:
+
+#+BEGIN_EXAMPLE
+  (defun my/uname-local ()
+   (interactive)
+   (message "Launching \"uname -a\" locally")
+   (prf/shell-command-to-string "uname -a"
+   :path "~"
+   :interpreter "fish"))
+#+END_EXAMPLE
+
+The code for =prf-shell-command-to-string= can be found in package [[https://github.com/p3r7/prf-shell][prf-shell-command]].
