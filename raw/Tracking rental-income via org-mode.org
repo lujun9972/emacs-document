@@ -1,0 +1,131 @@
+#+TITLE: Tracking rental-income via org-mode
+#+URL: https://blog.steve.fi/tracking_rental_income_via_org_mode.html
+#+AUTHOR: lujun9972
+#+TAGS: raw
+#+DATE: [2020年 02月 10日 星期一 10:28:36 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+7 February 2020 21:20
+
+I've been enjoying the process of exploring =org-mode= recently as I
+keep running into references to it. Often these references are people
+questioning me: why don't you just use 'org-mode' instead of this crazy-thing you're managing yourself?
+
+As one concrete example, no pun intended, I look after some flats, and every month I update my records to keep track of things. Until now I've used a set of markdown files, one for each property, and each has details of tenants, income, repairs, & etc. I've now ported these to =org-mode=-files. The first thing I did was create a table for each year so this year's might look like this:
+
+#+BEGIN_EXAMPLE
+  #+NAME: 2020
+  | Month | Tenant | Rent | Mortgage | Housing Company |
+  |-----------+--------+---------+----------+-----------------|
+  | January | Bob | 250 | 150.00 | 75.00 |
+  | February | Bob | 250 | 150.00 | 75.00 |
+  | March | | | | |
+  | April | | | | |
+  | May | | | | |
+  | .. | ... | ... | .... | ... |
+  |-----------+--------+---------+----------+-----------------|
+  | Totals | | 500.00 | 300.00 | 150.00 |
+  #+TBLFM: @>$3=vsum(@I..@II);%0.2f::@>$4=vsum(@I..@II);%0.2f::@>$5=vsum(@I..@II);%0.2f
+#+END_EXAMPLE
+
+Here you see the obvious:
+
+- I've declared a table with a name 2020.
+- I've got totals of the various columns at the bottom of the table.
+- I only populate each row on the day when I check to see whether rent has been paid by the lovely tenant.
+
+  - So all the rows past the current-month are empty.
+
+This is probably all very familiar to =org-mode= users, let us go a little further, we have a table named =2020=, let us create a new table called =2020-totals= to show more useful figures:
+
+#+BEGIN_EXAMPLE
+  #+NAME: 2020-totals
+  | Year | Income | Expenses | Profit |
+  |------+---------+----------+--------|
+  | 2020 | 500.00 | 450.00 | 50.00 |
+  #+TBLFM: @2$2=remote(2020,@>$3);%.2f::@2$3=remote(2020,@>$4)+remote(2020,@>$5);%.2f::@>$4=@>$2-@$3;%.2f
+#+END_EXAMPLE
+
+Again nothing amazing here:
+
+- We reference "remote"-values (i.e values from a different table).
+- We look for things like "row:@>", "column:$3" which means "row:last column:3rd".
+
+  - The bottom line should be split by =::= to make sense, like so:
+
+    - =@2$2=remote(2020,@>$3);%.2f=
+    - =%.2f= is a format-string, to control how many decimal places to show.
+    - =@2$3=remote(2020,@>$4) + remote(2020,@>$5);%.2f=
+    - Expenses are "Mortgage" + "Housing Company"
+    - i.e. The contents of the fourth and fifth column.
+    - =@>$4=@>$2-@$3;%.2f=
+
+- The end result is that we have sum of income, sum of expenses, and the difference between them is the profit (or loss).
+
+Of course I've got records going back a while, so what we really want is to have a complete/global table of income/expenses and profit (or loss if that's a negative figure). We'll assume there are *multiple* tables in our document, a pair for each year "=2019=", "=2019-totals=", etc. To generate our global income/expenses/property we just have to sum the columns for each of the tables which have names matching the pattern "=*-totals=". Here we go:
+
+#+BEGIN_EXAMPLE
+  #+NAME: income-expenses-profit
+  |----------+-----------|
+  | Income | €10000.00 |
+  | Expenses | € 8000.00 |
+  | Profit | € 2000.00 |
+  |----------+-----------|
+  #+TBLFM: @1$2='(car (sum-field-in-tables "-totals$" 1));€%.2f::@2$2='(car (sum-field-in-tables "-totals$" 2));€%.2f::@3$2='(car (sum-field-in-tables "-totals$" 3));€%.2f
+#+END_EXAMPLE
+
+Once again there are three values here, and splitting by =::= makes them more readable:
+
+- =@1$2='(car (sum-field-in-tables "-totals$" 1));€%.2f=
+- =@2$2='(car (sum-field-in-tables "-totals$" 2));€%.2f=
+- =@3$2='(car (sum-field-in-tables "-totals$" 3));€%.2f=
+
+In short we set the value row:X, column:2 to be the value of evaluating the Emacs lisp expression =(car (sum-field-in-tables ..=, rather than using the built-in table support from =org-mode=. I did have to write that function myself to do the necessary table-iteration and field summing, but with the addition of naive filtering-support that turned out to be pretty useful as we'll see later:
+
+#+BEGIN_EXAMPLE
+  (defun sum-field-in-tables (pattern field &optional filter)
+   "For every table in the current document which has a name matching the
+  supplied pattern perform a sum of the specified column.
+
+  If the optional filter is present then the summing will ignore any rows
+  which do not match the given filter-pattern.
+
+  The return value is a list containing the sum, and a count of those
+  rows which were summed."
+#+END_EXAMPLE
+
+Using this function I managed to achieve what I wanted, and also as a bonus I could do clever things like show the total income/payments from a given tenant. If you refer back to the =2020=-table you'll see there is a column for the tenant's name. So I can calculate the total income from that tenant, and the number of payments by summing:
+
+- All tables with a name "=^:digit:$="
+
+  - column 3 (i.e. rent)
+  - where rows match the filter "Bob"
+
+The end result is another table like so:
+
+#+BEGIN_EXAMPLE
+  #+NAME: tenants-paid
+  | Tenant | Rent Paid | Rented Months |
+  |-----------+-----------+---------------|
+  | [[Alice]] | €1500.00 | 6 |
+  | [[Bob]] | €1500.00 | 6 |
+  | [[Chris]] | €1500.00 | 6 |
+  #+TBLFM: $2='(car (sum-field-in-tables "^[0-9]*$" 2 $1));€%0.2f::$3='(cdr (sum-field-in-tables "^[0-9]*$" 2 $1))
+#+END_EXAMPLE
+
+This works because the table-sum function returns two things, the actual sum of the rows, and the number of rows that were summed:
+
+- So =(car (sum-field-in-tables ..= returns the actual sum. The rent the person has paid, total.
+- And =(cdr (sum-field-in-tables ..= returns the number of payments that have been made by the tenant with the given name.
+
+The only thing I had to do explicitly was to add the rows for =Alice=, =Bob=, and =Chris= to this table.
+
+Anyway this is all rather cool, and I'm pretty happy, though if I could have avoided writing lisp I'd have been a little happier. Now I guess I need to choose between one of two approaches:
+
+- Do I put the lisp function in the report-file itself?
+
+  - Which then needs to be evaluated when the file is loaded - [[https://github.com/skx/dotfiles/blob/master/.emacs.d/init.md#org-mode][simple enough]].
+
+- Or do I drop it inside [[https://github.com/skx/dotfiles/blob/master/.emacs.d/init.md][~/.emacs/init.md]] - which is good for me, but means the file isn't self-contained for others?
+
+I'll probably continue to play with this a little more over the next few days/weeks. Exporting to HTML and PDF worked like a charm, once I configured some minor things and setup a couple of sections of my documents with a =:noexport:= tag.
