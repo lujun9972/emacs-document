@@ -1,0 +1,137 @@
+#+TITLE: Native macOS Notifications for Emacs Org Tasks and Appointments
+#+URL: https://christiantietze.de/posts/2019/12/emacs-notifications/
+#+AUTHOR: lujun9972
+#+TAGS: raw
+#+DATE: [2020年 02月 10日 星期一 10:33:25 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+Dec 4th, 2019
+
+Emacs is a text editor, kind of. But I use its [[https://orgmode.org/][Org mode]] for “keeping notes, maintaining TODO lists, planning projects, and authoring documents with a fast and effective plain-text system” -- its [[https://orgmode.org/features.html#org700f940][Agenda]] became my daily productivity hub. It's a calendar view of all things scheduled for the day, plus some other info interspersed: thanks to the plain text nature of the whole interface, it's simple (albeit not easy) to re-style everything you see there. Add sub-headings, spacing, links, text, what have you.
+
+But I still use the macOS native Calendar and Reminders. Because they produce notifications on my Mac.
+
+On iOS, thanks to the amazing [[https://beorgapp.com/][beorg app]], I get notifications for the parts beorg understands. And it seems to understand all of my task deadlines and appointments so far. I can highly recommend this app. It's a native iOS app that parses the .org files and presents a graphical UI, though. Emacs is just text. And as long as I don't run macOS from within Emacs, which I by this point bet you can do, Emacs-internal popups will go by unnoticed when I browse the web, message people, do email, or program in Xcode. So Emacs Org mode cannot be my sole trusted system whenever I need a push notification to e.g. get up and leave the house for an appointment.
+
+Until this week, that is.
+
+I figured out a crude way to produce macOS native notifications based on deadlines and appointment times in my Org task items. At the moment, I get a notification of everything with a time and date attached to it and cannot selectively enable or disable reminders-like notifications. But it's a start.
+
+** Approach to a Solution
+   :PROPERTIES:
+   :CUSTOM_ID: approach-to-a-solution
+   :END:
+
+Emacs can run shell processes just fine. That means as long as I have access to a command-line program to produce notifications, I can make this work.
+
+- I know and use [[https://github.com/julienXX/terminal-notifier][=terminal-notifier=]] by Julien Blanchard to produce Banner-style notifications for long-running tasks from the shell. You get a notification that faded away after a while. Good start, but I need sticky Reminders-like notifications for most appointments.
+- A fork of =terminal-notifier= by Valere Jeantet called [[https://github.com/vjeantet/alerter][=alerter=]] implements sticky notifications, with the ability to even send Message-like replies back to the process if configured thus. That's what I'm using, albeit with the default “Close” and “View” actions.
+
+Emacs comes with a package called =appt= for [[https://www.emacswiki.org/emacs/AppointmentMode][Appointment Mode]]. I don't use the mode, but the package comes with background checks that one can hook into to produce notifications at the right time.
+
+** Code to Implement This
+   :PROPERTIES:
+   :CUSTOM_ID: code-to-implement-this
+   :END:
+
+I didn't figure this out on my own. My Emacs Lisp is just too bad for coming up with a working solution for most things.
+
+I did modify [[https://lists.gnu.org/archive/html/emacs-orgmode/2013-02/msg00644.html][a solution by Sarah Bagby]] that is itself a modification of [[http://emacs-fu.blogspot.com/2009/11/showing-pop-ups.html][other]] [[http://article.gmane.org/gmane.emacs.orgmode/5271][people's]] [[http://article.gmane.org/gmane.emacs.orgmode/5806][code]].
+
+Sarah uses =terminal-notifier=, which runs the notification and exits immediately. =alerter= keeps running while the notification is visible to receive the reply event; so Sarah's synchronous call to the =shell-command= function wasn't viable as it blocks Emacs. The obvious alternative, =async-shell-command=, produces a new buffer to capture the output in a split window, which I don't want to happen.
+
+Luckily, I found the =start-process= function that runs an executable asynchronously, and you can also specify a buffer name to capture the output, and pass =nil= to simply discard all output.
+
+This lead me to [[https://gist.github.com/justinhj/eb2d354d06631076566f#file-gistfile1-el][changes by Justin Heyes-Jones]] who's also using =terminal-notifier= but with the =start-process= function, and the following nifty line of code:
+
+#+BEGIN_EXAMPLE
+  (defvar terminal-notifier-command (executable-find "terminal-notifier") "The path to terminal-notifier.")
+#+END_EXAMPLE
+
+This produces a variable with the full path to the executable program, based on a lookup in your executable path directory list. I compiled and installed =alerter= locally in =~/bin=, so I added this path to the lookup list, before the Homebrew binary folder:
+
+#+BEGIN_EXAMPLE
+  (setq exec-path (append '("/Users/ctm/bin" "/usr/local/bin" "/usr/local/sbin") exec-path))
+#+END_EXAMPLE
+
+I'm so bad at Emacs Lisp that I couldn't make this work with =~/bin= using [[https://www.gnu.org/software/emacs/manual/html_node/elisp/File-Name-Expansion.html][=expand-file-name=]], so I hard-coded my path reference in there as =/Users/ctm/bin=. If you want to copy the code, I'm sorry you have to adjust this.
+
+Now to the adjusted setting in my =init.el=:
+
+#+BEGIN_EXAMPLE
+  (require 'appt)
+
+  (setq appt-time-msg-list nil) ;; clear existing appt list
+  (setq appt-display-interval '5) ;; warn every 5 minutes from t - appt-message-warning-time
+  (setq
+   appt-message-warning-time '15 ;; send first warning 15 minutes before appointment
+   appt-display-mode-line nil ;; don't show in the modeline
+   appt-display-format 'window) ;; pass warnings to the designated window function
+  (setq appt-disp-window-function (function ct/appt-display-native))
+
+  (appt-activate 1) ;; activate appointment notification
+  ; (display-time) ;; Clock in modeline
+
+  (defun ct/send-notification (title msg)
+   (let ((notifier-path (executable-find "alerter")))
+   (start-process 
+   "Appointment Alert" 
+   "*Appointment Alert*" ; use `nil` to not capture output; this captures output in background
+   notifier-path 
+   "-message" msg 
+   "-title" title 
+   "-sender" "org.gnu.Emacs"
+   "-activate" "org.gnu.Emacs")))
+  (defun ct/appt-display-native (min-to-app new-time msg)
+   (ct/send-notification 
+   (format "Appointment in %s minutes" min-to-app) ; Title
+   (format "%s" msg))) ; Message/detail text
+
+
+  ;; Agenda-to-appointent hooks
+  (org-agenda-to-appt) ;; generate the appt list from org agenda files on emacs launch
+  (run-at-time "24:01" 3600 'org-agenda-to-appt) ;; update appt list hourly
+  (add-hook 'org-finalize-agenda-hook 'org-agenda-to-appt) ;; update appt list on agenda view
+#+END_EXAMPLE
+
+You can see that I copied most of the setup code, removed the =(display-time)= function call (because I don't want to have a visible clock in my editor), and created the =ct/send-notification= function so it finds the =alerter= binary for me (Sarah's code had this hard-coded) and invokes the notification helper program. I added =-sender= and =-activate= arguments to the call so that I get the app icon in the notification based on the sender, and because =terminal-notifier= would use the =-activate= argument to open Emacs when clicking a notification (=alerter= currently doesn't, but maybe someone will merge these two together again ...).
+
+The appointment database is refreshed hourly, plus every time my Org agenda is rebuilt. Sounds sufficient so far.
+
+Now this Org mode sub-task:
+
+#+BEGIN_EXAMPLE
+  ** TODO Hello World, this is a task due soon!
+  SCHEDULED: <2019-12-04 Wed 10:53>
+#+END_EXAMPLE
+
+is transformed into a notification:
+
+When you have multiple items due at about the same time, all their info is crammed into the same notification box. That's not that useful on its own, but it still is a trigger for me to look at the agenda and see what's going on.
+
+For appointments that happen in the city, I usually add alerts in the native Calendar.app 45m to 60m before the appointment to pack my things and prepare to leave the desk. I had trouble at first, but it works out-of-the-box when I add =:APPT_WARNTIME: 60= to the [[https://orgmode.org/manual/Drawers.html#Drawers][task property drawer]]:
+
+#+BEGIN_EXAMPLE
+  ** TODO Hello World, this is a task due in the far future!
+  DEADLINE: <2019-12-04 Wed 23:59>
+  :PROPERTIES:
+  :APPT_WARNTIME: 60
+  :END:
+#+END_EXAMPLE
+
+This will produce a notification 60 minutes before the event. And then repeat the notification ever 5 minutes, because that's the =appt-display-interval= setting for me. This is not optimal, and I'd rather have a de-escalating display timer that happens 60m, 15m, 5m, and at the meeting itself.
+
+I think I will disable the interval completely. I have to test all of this in practice, first, though.
+
+** Next Steps
+   :PROPERTIES:
+   :CUSTOM_ID: next-steps
+   :END:
+
+- =alerter=‘s output is appended to a buffer in the background; I could process this output to e.g. show the Org agenda when the “Show” action button is clicked. That would be helpful to offer a “remind me again in X minutes” option, solving the problem of notifications popping up every 5 mins for an hour when I set =:APPT_WARNTIME: 60=.
+- =alerter= does not activate Emacs when I click the “Show” button at the moment, but =terminal-notifier= has built-in support for this. Should be fix-able.
+- The notification title is “Appointment in X minutes”. If you have 2 appointments, one due in 5, one in 10 minutes, the title will read “Appointment in (10 5) minutes”. That's a string representation of an emacs list of minutes. Not that useful in practice.
+- =terminal-notifier= and =alerter= don't need to be separate binaries, and I want to see why their re-combination failed in the past. Maybe I can help out there.
+- =org-agenda-to-appt= doesn't clean up removed appointments. I don't know if I want it so, because then it will be a destructive process. It's not “stateless” insofar as it cleans and replaces appointment reminders; it's not a pure function mapping all agenda tasks to the new list of appointments. If you add appointments to the list via any other means, they will be preserved at the moment. That's good. But on the flip-side, after I added the test event with warnings 60 minutes before the due time, it wouldn't ever go away. Call =appt-delete= interactively to go through all upcoming reminders and delete whichever gets on your nerves.
+
+Receive new .
