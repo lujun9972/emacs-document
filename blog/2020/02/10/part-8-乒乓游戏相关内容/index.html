@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Part 8: 乒乓游戏相关内容 - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="elisp-common" />
+  <!-- <link rel="stylesheet" href="../../../../../media/css/main.css" type="text/css"/>
+       <link rel="stylesheet" href="../../../../../media/css/comment.css" type="text/css"/> -->
+  <link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/kognise/water.css@latest/dist/dark.css'>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="../../../../../">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <ul class="trigger">
+        <li><a href="../../../../../years/">Years</a></li>
+        <li><a href="../../../../../authors/">Authors</a></li>
+        <li><a href="../../../../../tags/">Tags</a></li>
+        <li><a href="../../../../../about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="../../../../../rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="https://www.bing.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">Part 8: 乒乓游戏相关内容</h1>
+<div id="table-of-contents">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#multi-player-moving-character-game">多玩家角色移动游戏</a></li>
+<li><a href="#basic-pong">简单的乒乓游戏</a></li>
+<li><a href="#pretty-clean-multiplayer-pong-code">清晰的多人乒乓代码</a></li>
+<li><a href="#multiplayer-pong-elaborate">精心制作的多人乒乓游戏...</a></li>
+<li><a href="#pong-against-the-computer">与电脑对抗的乒乓游戏</a></li>
+<li><a href="#tools-for-drawing-colored-stripes">绘制彩色条纹字符的工具</a></li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-orgaea211c" class="outline-2">
+<h2 id="multi-player-moving-character-game"><a id="orgaea211c"></a>多玩家角色移动游戏</h2>
+<div class="outline-text-2" id="text-multi-player-moving-character-game">
+<p>
+基于 Travis 的代码
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp"><span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">global variables </span>
+
+(<span style="font-weight: bold;">setq</span> width 50)
+(<span style="font-weight: bold;">setq</span> height 25)
+(<span style="font-weight: bold;">setq</span> background-char ?\-)
+
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">helper routines (foundations)</span>
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">make-grid</span> ()
+  (erase-buffer)
+  (<span style="font-weight: bold;">dotimes</span> (i height)
+    (insert-char background-char width)
+    (newline)))
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">draw-char</span> (x y char)
+  (goto-char (+ x (* (1- y) (1+ width))))
+  (delete-char 1)
+  (insert-char char 1))
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">clear-char</span> (x y)
+  (draw-char x y background-char))
+
+<span style="font-weight: bold; font-style: italic;">;;</span><span style="font-weight: bold; font-style: italic;">main programs</span>
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">move-char</span> ()
+  (make-grid)
+  (<span style="font-weight: bold;">let</span> ((x 1 ) (y 1))
+    (<span style="font-weight: bold;">dotimes</span> (i 30)
+      (draw-char x y ?\o)
+      (sit-for 0.1)
+      (clear-char x y)
+      (<span style="font-weight: bold;">setq</span> x (+ x (random 3))
+            y (+ y (random 3))))))
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">running-man</span> ()
+  (<span style="font-weight: bold;">setq</span> cursor-type nil)
+  (make-grid)
+  (<span style="font-weight: bold;">let</span> ((ax 1) (ay 1)
+        (dax 0) (day 0)
+        (bx width) (by height)
+        (dbx 0) (dby 0))
+    (<span style="font-weight: bold;">while</span> (<span style="font-weight: bold;">and</span> (&gt;= ax 1) (&lt;= ax width)
+                (&gt;= bx 1) (&lt;= bx width))
+      <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">draw characters</span>
+      (draw-char ax ay ?o)
+      (draw-char bx by ?*)
+      <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">check input</span>
+      (<span style="font-weight: bold;">let</span> ((key (read-event nil nil 0.05)))
+        (<span style="font-weight: bold;">cond</span> 
+         ((eq key ?a)                   <span style="font-weight: bold; font-style: italic;">;</span><span style="font-weight: bold; font-style: italic;">character a</span>
+          (<span style="font-weight: bold;">setq</span> dax -1))
+         ((eq key ?s)
+          (<span style="font-weight: bold;">setq</span> dax 1))
+         ((eq key ?w)
+          (<span style="font-weight: bold;">setq</span> day -1))
+         ((eq key '?z)
+          (<span style="font-weight: bold;">setq</span> day 1))
+         ((eq key 'left)                <span style="font-weight: bold; font-style: italic;">;</span><span style="font-weight: bold; font-style: italic;">character b</span>
+          (<span style="font-weight: bold;">setq</span> dbx -1))
+         ((eq key 'right)
+          (<span style="font-weight: bold;">setq</span> dbx 1))
+         ((eq key 'up)
+          (<span style="font-weight: bold;">setq</span> dby -1))
+         ((eq key 'down)
+          (<span style="font-weight: bold;">setq</span> dby 1))))
+      <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">clear characters</span>
+      (clear-char ax ay)
+      (clear-char bx by)
+      <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">move characters</span>
+      (<span style="font-weight: bold;">setq</span> ax (+ ax dax)
+            ay (+ ay day)
+            bx (+ bx dbx)
+            by (+ by dby))
+      <span style="font-weight: bold; font-style: italic;">;;</span><span style="font-weight: bold; font-style: italic;">bounce of top/bottom edges</span>
+      (<span style="font-weight: bold;">if</span> (<span style="font-weight: bold;">or</span> (&lt; ay 1) (&gt; ay height))
+          (<span style="font-weight: bold;">setq</span> day (- day)))
+      (<span style="font-weight: bold;">if</span> (<span style="font-weight: bold;">or</span> (&lt; by 1) (&gt; by height))
+          (<span style="font-weight: bold;">setq</span> dby (- dby)))
+      <span style="font-weight: bold; font-style: italic;">;;</span><span style="font-weight: bold; font-style: italic;">stop at edges of screen</span>
+      (<span style="font-weight: bold;">setq</span> ay (min ay height)
+            ay (max ay 1))
+      (<span style="font-weight: bold;">setq</span> by (min by height)
+            by (max by 1)))
+    (<span style="font-weight: bold;">if</span> (<span style="font-weight: bold;">and</span> (&gt;= ax 1) (&lt;= ax width))
+        (insert <span style="font-style: italic;">"Congratulations, o won!"</span>))
+    (<span style="font-weight: bold;">if</span> (<span style="font-weight: bold;">and</span> (&gt;= bx 1) (&lt;= bx width))
+        (insert <span style="font-style: italic;">"Congratulations, * win!"</span>))))
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org10a0b94" class="outline-2">
+<h2 id="basic-pong"><a id="org10a0b94"></a>简单的乒乓游戏</h2>
+<div class="outline-text-2" id="text-basic-pong">
+<p>
+One character wide paddle.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp"><span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">global variables</span>
+
+(<span style="font-weight: bold;">setq</span> width 50)
+(<span style="font-weight: bold;">setq</span> height 25)
+(<span style="font-weight: bold;">setq</span> background-char ?:)
+
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">helper routines (foundations)</span>
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">make-grid</span> ()
+  (erase-buffer)
+  (<span style="font-weight: bold;">dotimes</span> (i height)
+    (insert-char background-char width)
+    (newline)))
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">draw-char</span> (x y char)
+  (goto-char (+ x (* (1- y) (1+ width))))
+  (delete-char 1)
+  (insert-char char 1))
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">clear-char</span> (x y)
+  (draw-char x y background-char))
+
+<span style="font-weight: bold; font-style: italic;">;;</span><span style="font-weight: bold; font-style: italic;">main programs</span>
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">pong1</span> ()
+  (<span style="font-weight: bold;">setq</span> cursor-type nil)
+  (<span style="font-weight: bold;">let</span> ((pongx (/ width 2)) (pongy (/ height 2))
+        (dpongx -1) (dpongy 0)
+        (left-paddle-y (/ height 2))
+        (right-paddle-y (/ height 2)))
+    (<span style="font-weight: bold;">while</span> (<span style="font-weight: bold;">and</span> (&gt;= pongx 1) (&lt;= pongx width))
+      <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">draw characters</span>
+      (make-grid)
+      (draw-char pongx pongy ?o)
+      (draw-char 1 left-paddle-y ?#)
+      (draw-char width right-paddle-y ?#)
+      <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">check input</span>
+      (<span style="font-weight: bold;">let</span> ((key (read-event nil nil 0.05)))
+        (<span style="font-weight: bold;">cond</span>
+         ((eq key ?a)
+          (<span style="font-weight: bold;">setq</span> left-paddle-y (1- left-paddle-y))
+          (<span style="font-weight: bold;">if</span> (&lt;= left-paddle-y 1)
+              (<span style="font-weight: bold;">setq</span> left-paddle-y 1)))
+         ((eq key '?z)
+          (<span style="font-weight: bold;">setq</span> left-paddle-y (1+ left-paddle-y))
+          (<span style="font-weight: bold;">if</span> (&gt;= left-paddle-y height)
+              (<span style="font-weight: bold;">setq</span> left-paddle-y height)))
+         ((eq key 'up)
+          (<span style="font-weight: bold;">setq</span> right-paddle-y (1- right-paddle-y))
+          (<span style="font-weight: bold;">if</span> (&lt;= right-paddle-y 1)
+              (<span style="font-weight: bold;">setq</span> right-paddle-y 1)))
+         ((eq key 'down)
+          (<span style="font-weight: bold;">setq</span> right-paddle-y (1+ right-paddle-y))
+          (<span style="font-weight: bold;">if</span> (&gt;= right-paddle-y height)
+              (<span style="font-weight: bold;">setq</span> right-paddle-y height)))))
+      <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">move characters</span>
+      (<span style="font-weight: bold;">setq</span> pongx (+ pongx dpongx)
+            pongy (+ pongy dpongy))
+      <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">bounce off paddles</span>
+      (<span style="font-weight: bold;">if</span> (<span style="font-weight: bold;">and</span> (= pongx 2) (= pongy left-paddle-y))
+          (<span style="font-weight: bold;">setq</span> dpongx 1))
+      (<span style="font-weight: bold;">if</span> (<span style="font-weight: bold;">and</span> (= pongx (1- width)) (= pongy right-paddle-y))
+          (<span style="font-weight: bold;">setq</span> dpongx -1))
+      <span style="font-weight: bold; font-style: italic;">;;</span><span style="font-weight: bold; font-style: italic;">bounce of top/bottom edges</span>
+      (<span style="font-weight: bold;">if</span> (<span style="font-weight: bold;">or</span> (&lt; pongy 1) (&gt; pongy height))
+          (<span style="font-weight: bold;">setq</span> dpongy (- dpongy)))
+      <span style="font-weight: bold; font-style: italic;">;;</span><span style="font-weight: bold; font-style: italic;">stop at edges of screen</span>
+      (<span style="font-weight: bold;">setq</span> pongy (min pongy height)
+            pongy (max pongy 1)))
+    (<span style="font-weight: bold;">if</span> (&lt; pongx 1)
+        (insert <span style="font-style: italic;">"Game over. Right player won!"</span>))
+    (<span style="font-weight: bold;">if</span> (&gt; pongx width)
+        (insert <span style="font-style: italic;">"Game over. Left player win!"</span>))))
+</pre>
+</div>
+
+<pre class="example">
+pong1
+
+</pre>
+</div>
+</div>
+
+<div id="outline-container-org529e5bc" class="outline-2">
+<h2 id="pretty-clean-multiplayer-pong-code"><a id="org529e5bc"></a>清晰的多人乒乓代码</h2>
+<div class="outline-text-2" id="text-pretty-clean-multiplayer-pong-code">
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">draw-paddle</span> (x y)
+  (draw-char x y ?\#)
+  (draw-char x (1- y) ?\#)
+  (draw-char x (1+ y) ?\#))
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">keep-in-range</span> (num min-num max-num)
+  (min (max num min-num) max-num))
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">move-paddle</span> (paddle-y dir)
+  (keep-in-range (+ paddle-y dir) 2 (1- height)))
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">distance</span> (a b)
+  (abs (- a b)))
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">bounce-paddle</span> (paddle-x paddle-y bounce-dir)
+  (<span style="font-weight: bold;">if</span> (<span style="font-weight: bold;">and</span> (= x (+ paddle-x bounce-dir))
+           (/= dx bounce-dir)
+           (<span style="font-weight: bold;">or</span> (&lt;= (distance y paddle-y) 1)
+               (<span style="font-weight: bold;">and</span> (= (distance y paddle-y) 2)
+                    (= (distance (+ y dy) paddle-y) 1))))
+      (<span style="font-weight: bold;">setq</span> dx bounce-dir
+            dy (- y paddle-y))))
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">pong3a</span> ()
+  (buffer-disable-undo)
+  (<span style="font-weight: bold;">setq</span> cursor-type nil)
+  (<span style="font-weight: bold;">while</span> t
+    (<span style="font-weight: bold;">let</span> ((x (/ width 2)) (y (/ height 2))
+          (dx -1) (dy 0)
+          (left-paddle-x 2)
+          (left-paddle-y (/ height 2))
+          (right-paddle-x (1- width))
+          (right-paddle-y (/ height 2)))
+      (<span style="font-weight: bold;">while</span> (<span style="font-weight: bold;">and</span> (&gt;= x 1) (&lt;= x width))
+        <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">draw scene</span>
+        (make-grid)
+        (draw-char x y ?\*)
+        (draw-paddle left-paddle-x left-paddle-y)
+        (draw-paddle right-paddle-x right-paddle-y)
+        <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">handle input</span>
+        (<span style="font-weight: bold;">let</span> ((key (read-event nil nil 0.1)))
+          (<span style="font-weight: bold;">cond</span>
+           ((eq key 'left)
+            (<span style="font-weight: bold;">setq</span> right-paddle-y (move-paddle right-paddle-y -1)))
+           ((eq key 'right)
+            (<span style="font-weight: bold;">setq</span> right-paddle-y (move-paddle right-paddle-y 1)))
+           ((eq key 'up)
+            (<span style="font-weight: bold;">setq</span> left-paddle-y (move-paddle left-paddle-y -1)))
+           ((eq key 'down)
+            (<span style="font-weight: bold;">setq</span> left-paddle-y (move-paddle left-paddle-y 1)))))
+        <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">update ball</span>
+        (<span style="font-weight: bold;">setq</span> x (+ x dx)
+              y (+ y dy))
+        (<span style="font-weight: bold;">if</span> (<span style="font-weight: bold;">or</span> (&lt;= y 1) (&gt;= y height))
+            (<span style="font-weight: bold;">setq</span> dy (- dy)))
+        (<span style="font-weight: bold;">if</span> (= y 0) (<span style="font-weight: bold;">setq</span> y 2))
+        (<span style="font-weight: bold;">if</span> (= y (1+ height)) (<span style="font-weight: bold;">setq</span> y (1- height)))
+        <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">bounce off paddles</span>
+        (bounce-paddle left-paddle-x left-paddle-y 1)
+        (bounce-paddle right-paddle-x right-paddle-y -1)))
+    (sit-for 1)))
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org2796b88" class="outline-2">
+<h2 id="multiplayer-pong-elaborate"><a id="org2796b88"></a>精心制作的多人乒乓游戏...</h2>
+<div class="outline-text-2" id="text-multiplayer-pong-elaborate">
+<div class="org-src-container">
+<pre class="src src-emacs-lisp"><span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">global variables </span>
+
+(<span style="font-weight: bold;">setq</span> width 55)
+(<span style="font-weight: bold;">setq</span> height 25)
+(<span style="font-weight: bold;">setq</span> background-char ?\:)
+
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">helper routines (foundations)</span>
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">make-grid</span> ()
+  (erase-buffer)
+  (<span style="font-weight: bold;">dotimes</span> (i height)
+    (insert-char background-char width)
+    (newline)))
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">draw-char</span> (x y char)
+  (goto-char (+ x (* (1- y) (1+ width))))
+  (delete-char 1)
+  (insert-char char 1))
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">draw-paddle</span> (x y)
+  (draw-char x y ?#)
+  (draw-char x (1- y) ?#)
+  (draw-char x (1+ y) ?#))
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">distance</span> (a b)
+  (abs (- a b)))
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">clamp</span> (num min-num max-num)
+  (min (max num min-num) max-num))
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">move-paddle</span> (paddle-y dir)
+  (clamp (+ paddle-y dir) 2 (1- height)))
+
+<span style="font-weight: bold; font-style: italic;">;;</span><span style="font-weight: bold; font-style: italic;">main programs</span>
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">pong3</span> ()
+  (<span style="font-weight: bold;">setq</span> cursor-type nil)
+  (<span style="font-weight: bold;">let</span> ((pongx (/ width 2)) (pongy (/ height 2))
+        (dpongx -1) (dpongy 0)
+        (left-paddle-y (/ height 2))
+        (d-left-paddle 0)
+        (right-paddle-y (/ height 2))
+        (d-right-paddle 0))
+    (<span style="font-weight: bold;">while</span> (<span style="font-weight: bold;">and</span> (&gt;= pongx 1) (&lt;= pongx width))
+      <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">draw characters</span>
+      (make-grid)
+      (draw-char pongx pongy ?O)
+      (draw-paddle 1 left-paddle-y)
+      (draw-paddle width right-paddle-y)
+      <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">check input</span>
+      (<span style="font-weight: bold;">let</span> ((key (read-event nil nil 0.05)))
+        (<span style="font-weight: bold;">cond</span> 
+         ((eq key ?q) (<span style="font-weight: bold;">setq</span> d-left-paddle -1))
+         ((eq key ?a) (<span style="font-weight: bold;">setq</span> d-left-paddle 0))
+         ((eq key ?z) (<span style="font-weight: bold;">setq</span> d-left-paddle 1))
+         ((eq key ?p) (<span style="font-weight: bold;">setq</span> d-right-paddle -1))
+         ((eq key ?\;) (<span style="font-weight: bold;">setq</span> d-right-paddle 0))
+         ((eq key ?/) (<span style="font-weight: bold;">setq</span> d-right-paddle 1))))
+      <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">update pong &amp; paddles</span>
+      (<span style="font-weight: bold;">setq</span> pongx (+ pongx dpongx)
+            pongy (+ pongy dpongy))
+      (<span style="font-weight: bold;">setq</span> left-paddle-y
+            (move-paddle left-paddle-y d-left-paddle))
+      (<span style="font-weight: bold;">setq</span> right-paddle-y
+            (move-paddle right-paddle-y d-right-paddle))
+      <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">bounce off paddles</span>
+      (<span style="font-weight: bold;">if</span> (<span style="font-weight: bold;">and</span> (= pongx 2)
+               (&lt;= (distance pongy left-paddle-y) 1))
+          (<span style="font-weight: bold;">setq</span> dpongx 1
+                dpongy (- pongy left-paddle-y)))
+      (<span style="font-weight: bold;">if</span> (<span style="font-weight: bold;">and</span> (= pongx (1- width))
+               (&lt;= (distance pongy right-paddle-y) 1))
+          (<span style="font-weight: bold;">setq</span> dpongx -1
+                dpongy (- pongy right-paddle-y)))
+      <span style="font-weight: bold; font-style: italic;">;;</span><span style="font-weight: bold; font-style: italic;">bounce of top/bottom edges</span>
+      (<span style="font-weight: bold;">if</span> (<span style="font-weight: bold;">or</span> (&lt; pongy 1) (&gt; pongy height))
+          (<span style="font-weight: bold;">setq</span> dpongy (- dpongy)))
+      <span style="font-weight: bold; font-style: italic;">;;</span><span style="font-weight: bold; font-style: italic;">stop at edges of screen</span>
+      (<span style="font-weight: bold;">setq</span> pongy (min pongy height)
+            pongy (max pongy 1)))
+    (<span style="font-weight: bold;">if</span> (&lt; pongx 1)
+        (insert <span style="font-style: italic;">"Game over. Right player won!"</span>))
+    (<span style="font-weight: bold;">if</span> (&gt; pongx width)
+        (insert <span style="font-style: italic;">"Game over. Left player win!"</span>))))
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org21b35d0" class="outline-2">
+<h2 id="pong-against-the-computer"><a id="org21b35d0"></a>与电脑对抗的乒乓游戏</h2>
+<div class="outline-text-2" id="text-pong-against-the-computer">
+<div class="org-src-container">
+<pre class="src src-emacs-lisp"><span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">global variables </span>
+
+(<span style="font-weight: bold;">setq</span> width 55)
+(<span style="font-weight: bold;">setq</span> height 25)
+(<span style="font-weight: bold;">setq</span> background-char ?\:)
+
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">helper routines (foundations)</span>
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">make-grid</span> ()
+  (erase-buffer)
+  (<span style="font-weight: bold;">dotimes</span> (i height)
+    (insert-char background-char width)
+    (newline)))
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">draw-char</span> (x y char)
+  (goto-char (+ x (* (1- y) (1+ width))))
+  (delete-char 1)
+  (insert-char char 1))
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">draw-score</span> ()
+  (goto-char (point-max))
+  (newline)
+  (newline)
+  (insert (format <span style="font-style: italic;">"Your score: %d   Emacs score: %d"</span>
+                  score-player-1 score-player-2)))
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">draw-paddle</span> (x y)
+  (draw-char x y ?#)
+  (draw-char x (1- y) ?#)
+  (draw-char x (- y 2) ?#)
+  (draw-char x (1+ y) ?#)
+  (draw-char x (+ y 2) ?#))
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">distance</span> (a b)
+  (abs (- a b)))
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">clamp</span> (num min-num max-num)
+  (min (max num min-num) max-num))
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">move-paddle</span> (paddle-y dir)
+  (clamp (+ paddle-y dir) 3 (- height 2)))
+
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">actual game</span>
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">pong-game</span> ()
+  (<span style="font-weight: bold;">let</span> ((pongx (/ width 2)) (pongy (/ height 2))
+        (dpongx -1) (dpongy 0)
+        (left-paddle-y (/ height 2))
+        (d-left-paddle 0)
+        (right-paddle-y (/ height 2))
+        (d-right-paddle 0))
+    (<span style="font-weight: bold;">while</span> (<span style="font-weight: bold;">and</span> (&gt;= pongx 1) (&lt;= pongx width))
+      <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">draw characters</span>
+      (make-grid)
+      (draw-char pongx pongy ?O)
+      (draw-paddle 1 (round left-paddle-y))
+      (draw-paddle width (round right-paddle-y))
+      (draw-score)
+      <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">check input</span>
+      (<span style="font-weight: bold;">let</span> ((key (read-event nil nil 0.05)))
+        (<span style="font-weight: bold;">cond</span> 
+         ((eq key ?q) (<span style="font-weight: bold;">setq</span> d-left-paddle -0.7))
+         ((eq key ?a) (<span style="font-weight: bold;">setq</span> d-left-paddle 0))
+         ((eq key ?z) (<span style="font-weight: bold;">setq</span> d-left-paddle 0.7))))
+      <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">computer opponent</span>
+      (<span style="font-weight: bold;">cond</span>
+       ((&gt; right-paddle-y pongy)
+        (<span style="font-weight: bold;">setq</span> d-right-paddle -0.9))
+       ((&lt; right-paddle-y pongy)
+        (<span style="font-weight: bold;">setq</span> d-right-paddle 0.9))
+       (t
+        (<span style="font-weight: bold;">setq</span> d-right-paddle 0)))
+      <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">update pong &amp; paddles</span>
+      (<span style="font-weight: bold;">setq</span> pongx (+ pongx dpongx)
+            pongy (+ pongy dpongy))
+      (<span style="font-weight: bold;">setq</span> left-paddle-y
+            (move-paddle left-paddle-y d-left-paddle))
+      (<span style="font-weight: bold;">setq</span> right-paddle-y
+            (move-paddle right-paddle-y d-right-paddle))
+      <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">bounce off paddles</span>
+      (<span style="font-weight: bold;">if</span> (<span style="font-weight: bold;">and</span> (= pongx 2)
+               (&lt;= (distance pongy (round left-paddle-y)) 2))
+          (<span style="font-weight: bold;">setq</span> dpongx 1
+                dpongy (- pongy (round left-paddle-y))))
+      (<span style="font-weight: bold;">if</span> (<span style="font-weight: bold;">and</span> (= pongx (1- width))
+               (&lt;= (distance pongy (round right-paddle-y)) 2))
+          (<span style="font-weight: bold;">setq</span> dpongx -1
+                dpongy (- pongy (round right-paddle-y))))
+      <span style="font-weight: bold; font-style: italic;">;;</span><span style="font-weight: bold; font-style: italic;">bounce of top/bottom edges</span>
+      (<span style="font-weight: bold;">if</span> (<span style="font-weight: bold;">or</span> (&lt; pongy 1) (&gt; pongy height))
+          (<span style="font-weight: bold;">setq</span> dpongy (- dpongy)))
+      <span style="font-weight: bold; font-style: italic;">;;</span><span style="font-weight: bold; font-style: italic;">stop at edges of screen</span>
+      (<span style="font-weight: bold;">setq</span> pongy (min pongy height)
+            pongy (max pongy 1)))
+    (<span style="font-weight: bold;">if</span> (&lt; pongx 1) 2 1)))
+
+<span style="font-weight: bold; font-style: italic;">;;</span><span style="font-weight: bold; font-style: italic;">main program</span>
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">pong5</span> ()
+  (pop-to-buffer <span style="font-style: italic;">"pong-game"</span>)
+  (<span style="font-weight: bold;">setq</span> cursor-type nil)
+  (buffer-disable-undo)
+  (<span style="font-weight: bold;">let</span> ((score-player-1 0)
+        (score-player-2 0))
+    (<span style="font-weight: bold;">while</span> t
+      (<span style="font-weight: bold;">let</span> ((winner (pong-game)))
+        (<span style="font-weight: bold;">if</span> (= winner 1)
+            (<span style="font-weight: bold;">setq</span> score-player-1 (1+ score-player-1)))
+        (<span style="font-weight: bold;">if</span> (= winner 2)
+            (<span style="font-weight: bold;">setq</span> score-player-2 (1+ score-player-2))))
+      (sit-for 1))))
+</pre>
+</div>
+
+<pre class="example">
+pong5
+
+</pre>
+</div>
+</div>
+
+<div id="outline-container-org6d5cb36" class="outline-2">
+<h2 id="tools-for-drawing-colored-stripes"><a id="org6d5cb36"></a>绘制彩色条纹字符的工具</h2>
+<div class="outline-text-2" id="text-tools-for-drawing-colored-stripes">
+<div class="org-src-container">
+<pre class="src src-emacs-lisp"><span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">global variables</span>
+
+(<span style="font-weight: bold;">setq</span> bkgd-width 40
+      bkgd-height 25
+      bkgd-char ?\.
+      stripe-char ?\s)
+
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">helper routines</span>
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">make-grid</span> ()
+  (erase-buffer)
+  (<span style="font-weight: bold;">dotimes</span> (i bkgd-height)
+    (insert-char bkgd-char bkgd-width)
+    (newline)))
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">gotoxy</span> (x y)
+  (goto-char (+ x (* (1- y) (1+ bkgd-width)))))
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">draw-a-stripe</span> (x y width color)
+  (gotoxy x y)
+  (<span style="font-weight: bold;">let</span> ((actual-width (min width
+                           (1+ (- bkgd-width x)))))
+    (delete-char actual-width)
+    (insert (propertize (make-string actual-width stripe-char)
+                        'face `(<span style="font-weight: bold;">:background</span> ,color)))))
+
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">main program</span>
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">stripe-drawing</span> ()
+  (<span style="font-weight: bold;">dotimes</span> (i 100)
+    (make-grid)
+    (<span style="font-weight: bold;">dotimes</span> (j 10)
+      (draw-a-stripe j j j <span style="font-style: italic;">"green"</span>))
+    (sit-for 0.1)
+    (<span style="font-weight: bold;">dotimes</span> (j 20)
+      (draw-a-stripe (+ j 5) (+ j 3) j <span style="font-style: italic;">"orange"</span>))
+    (sit-for 0.1)))
+</pre>
+</div>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2020-02-10</span>
+            <span title="last modification date" class="post-info">2020-02-11</span>
+            <span title="tags" class="post-info">:<a href="../../../../../tags/elisp-common">elisp-common</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-8aefe58b-7a50-4818-82c5-fcb990c860e7">lujun9972</a></span>
+        </div>
+    <script src="../../../../../media/js/jquery-2.1.3.min.js"></script>
+    <script src="../../../../../media/js/md5.min.js"></script>
+        <section>
+            <div id="gitalk-container"></div>
+            <script type="text/javascript">
+             var gitalk = new Gitalk({
+                 clientID: 'fdcb5d9da3f4acb4862c',
+                 clientSecret: 'dd0a16312a206782cb7669dcec5e96874ab48170',
+                 repo: 'lujun9972.github.com',
+                 owner: 'lujun9972',
+                 admin: ['lujun9972'],
+                 id: md5(location.pathname),      // Ensure uniqueness and length less than 50
+                 distractionFreeMode: false  // Facebook-like distraction free mode
+             })
+             gitalk.render('gitalk-container')
+            </script>
+        </section>
+    <script src="../../../../../media/js/main.js"></script>
+        <script>
+         var _hmt = _hmt || [];
+         (function() {
+             var hm = document.createElement("script");
+             hm.src = "https://hm.baidu.com/hm.js?7bac4fd0247f69c27887e0d4e3aee41e";
+             var s = document.getElementsByTagName("script")[0]; 
+             s.parentNode.insertBefore(hm, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-8aefe58b-7a50-4818-82c5-fcb990c860e7">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="../../../../../instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>
