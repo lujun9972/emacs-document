@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>无痛使用Emacs中的交互式shell - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="emacs-common" />
+  <!-- <link rel="stylesheet" href="../../../../../media/css/main.css" type="text/css"/>
+       <link rel="stylesheet" href="../../../../../media/css/comment.css" type="text/css"/> -->
+  <link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/kognise/water.css@latest/dist/dark.css'>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="../../../../../">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <ul class="trigger">
+        <li><a href="../../../../../years/">Years</a></li>
+        <li><a href="../../../../../authors/">Authors</a></li>
+        <li><a href="../../../../../tags/">Tags</a></li>
+        <li><a href="../../../../../about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="../../../../../rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="https://www.bing.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">无痛使用Emacs中的交互式shell</h1>
+<div id="table-of-contents">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#recap">回顾</a></li>
+<li><a href="#emacs-interactive-shells-api">Emacs交互式shell的API</a></li>
+<li><a href="#reusing-our-wrappers">重用包装器</a></li>
+<li><a href="#another-wrapper">另一个包装器</a></li>
+</ul>
+</div>
+</div>
+
+<div class="figure">
+<p><img src="https://www.eigenbahn.com/assets/img/drake-prf-shell.png" alt="drake-prf-shell.png" />
+</p>
+</div>
+
+
+<div id="outline-container-org622f005" class="outline-2">
+<h2 id="recap"><a id="org622f005"></a>回顾</h2>
+<div class="outline-text-2" id="text-recap">
+<p>
+在<a href="file:///2020/01/19/painless-emacs-shell-commands">前一篇文章</a>中，我们讨论了如何创建显式函数来调用单个shell命令。
+</p>
+
+<p>
+现在，让我们进入交互式shell中更有趣的内容。
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgd6e1025" class="outline-2">
+<h2 id="emacs-interactive-shells-api"><a id="orgd6e1025"></a>Emacs交互式shell的API</h2>
+<div class="outline-text-2" id="text-emacs-interactive-shells-api">
+<p>
+派生shell的主要命令是: <b>shell</b> <code>(可以接一个buffer参数)</code>.
+</p>
+
+<p>
+与单个shell命令类似，我们可以通过操作一些隐藏的变量来更改其行为。
+</p>
+
+<p>
+重要的变量如包括：
+</p>
+
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-left" />
+
+<col  class="org-left" />
+</colgroup>
+<tbody>
+<tr>
+<td class="org-left">default-directorylocation</td>
+<td class="org-left">指定从哪个地方运行shell</td>
+</tr>
+
+<tr>
+<td class="org-left">explicit-shell-file-name / shell-file-name</td>
+<td class="org-left">执行的shell解释器 (例如 bash ...)</td>
+</tr>
+
+<tr>
+<td class="org-left">explicit-&lt;INTERPRETER&gt;-args</td>
+<td class="org-left">交互式shell的启动参数</td>
+</tr>
+</tbody>
+</table>
+
+<p>
+注意，=shell-command-switch= 对对交互式shell没有用处,因此没有列在此处。
+</p>
+
+<p>
+相反，我们有了新的变量 <code>explicit-&lt;INTEPRETER&gt;-args</code>, 它允许为交互式shell提供一系列参数。
+</p>
+
+<p>
+您可能已经在前文中见过它了，函数 <code>eval-with-shell-interpreter</code> 中用到了这个变量。
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgbbe719a" class="outline-2">
+<h2 id="reusing-our-wrappers"><a id="orgbbe719a"></a>重用包装器</h2>
+<div class="outline-text-2" id="text-reusing-our-wrappers">
+<p>
+因此，我们可以重用前面定义的包装器 <code>with-shell-interpreter</code>.
+</p>
+
+<p>
+这里有一个小麻烦: 默认的 <code>shell</code> 命令会提示用户指定解释器路径。
+</p>
+
+<p>
+每次都要提醒太麻烦了
+</p>
+
+<p>
+我们可能更系统让它的默认值在启动本地shell时使用 <code>shell-file-name</code> 的值,而在启动远程shell时使用 <code>default-remote-shell-interpreter</code> 的值。
+</p>
+
+<p>
+如果我们想要更改shell的位置，那么创建一个显式定义 <code>:interpreter</code> 的命令会更实用。
+</p>
+
+<p>
+要禁止 <code>shell</code> 提示输入解释器路径，我们必须使用默认的前缀参数来调用它(例如 <code>C-u M-x shell</code>)。
+</p>
+
+<p>
+要以编程方式重现此行为，我们必须使用let 将 <code>current-prefix-arg</code> 设置为 ='(4)=。
+</p>
+
+<p>
+例如:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">my/zsh-local</span> ()
+  (<span style="font-weight: bold;">interactive</span>)
+  (with-shell-interpreter
+   <span style="font-weight: bold;">:path</span> <span style="font-style: italic;">"~"</span>
+   <span style="font-weight: bold;">:interpreter</span> <span style="font-style: italic;">"zsh"</span>
+   <span style="font-weight: bold;">:form</span>
+   (<span style="font-weight: bold;">let</span> (current-prefix-arg '(4))
+     (shell))))
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">my/bash-on-raspi</span> ()
+  (interractive)
+  (with-shell-interpreter
+   <span style="font-weight: bold;">:path</span> <span style="font-style: italic;">"/ssh:pi@raspi:/~"</span>
+   <span style="font-weight: bold;">:interpreter</span> <span style="font-style: italic;">"bash"</span>
+   <span style="font-weight: bold;">:form</span>
+   (<span style="font-weight: bold;">let</span> (current-prefix-arg '(4))
+     (shell))))
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgfec8f3f" class="outline-2">
+<h2 id="another-wrapper"><a id="orgfec8f3f"></a>另一个包装器</h2>
+<div class="outline-text-2" id="text-another-wrapper">
+<p>
+这仍然很麻烦。
+</p>
+
+<p>
+因此，让我们创建另一个派生辅助函数来防止重复。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp"><span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">------------------------------------------------------------------------</span>
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">MAIN</span>
+
+(<span style="font-weight: bold;">cl-defun</span> <span style="font-weight: bold;">prf-shell</span> (<span style="font-weight: bold; text-decoration: underline;">&amp;key</span> path interpreter interpreter-args command-switch)
+  <span style="font-style: italic;">"Create a shell at given PATH, using given INTERPRETER binary."</span>
+  (<span style="font-weight: bold;">interactive</span>)
+
+  (with-shell-interpreter
+    <span style="font-weight: bold;">:form</span>
+    (<span style="font-weight: bold;">let*</span> ((path (<span style="font-weight: bold;">or</span> path default-directory))
+           (is-remote (file-remote-p path))
+           (interpreter (<span style="font-weight: bold;">or</span> interpreter
+                            (<span style="font-weight: bold;">if</span> is-remote
+                                with-shell-interpreter-default-remote
+                              shell-file-name)))
+           (interpreter (prf/tramp/path/normalize interpreter))
+           (shell-buffer-basename (prf-shell--generate-buffer-name is-remote interpreter path))
+           (shell-buffer-name (generate-new-buffer-name shell-buffer-name))
+           (current-prefix-arg '(4))
+           (comint-process-echoes t))
+      (shell shell-buffer-name))
+    <span style="font-weight: bold;">:path</span> path
+    <span style="font-weight: bold;">:interpreter</span> interpreter
+    <span style="font-weight: bold;">:interpreter-args</span> interpreter-args))
+
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">------------------------------------------------------------------------</span>
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">HELPERS: BUFFER NAME</span>
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">prf-shell--generate-buffer-name</span> (is-remote interpreter path)
+  (<span style="font-weight: bold;">if</span> is-remote
+      (prf-shell--generate-buffer-name-remote interpreter path)
+    (prf-shell--generate-buffer-name-local interpreter path)))
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">prf-shell--generate-buffer-name-local</span> (<span style="font-weight: bold; text-decoration: underline;">&amp;optional</span> interpreter _path)
+  (<span style="font-weight: bold;">if</span> interpreter
+      (prf-with-interpreter--get-interpreter-name interpreter)
+    <span style="font-style: italic;">"shell"</span>))
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">prf-shell--generate-buffer-name-remote</span> (intepreter path)
+  (<span style="font-weight: bold;">let</span> ((vec (tramp-dissect-file-name path)))
+    (prf-shell--generate-buffer-name-remote-from-vec vec)))
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">prf-shell--generate-buffer-name-remote-from-vec</span> (vec)
+  (<span style="font-weight: bold;">let</span> (user host)
+    (concat
+     (tramp-file-name-user vec) <span style="font-style: italic;">"@"</span> (tramp-file-name-host vec))))
+</pre>
+</div>
+
+<p>
+请注意，我们设置 <code>comint-process-echos</code> 为 <code>t</code> 来确保能正确地追踪目录变化。
+</p>
+
+<p>
+目录跟踪(简称ditrack)是Emacs的一项功能，能在执行 <code>cd</code> 时跟踪当前目录。
+</p>
+
+<p>
+此外，我们还提供了一些函数来让shell缓冲区的名称更加明确。
+</p>
+
+<p>
+我们重写的命令变成了:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">my/zsh-local</span> ()
+  (interractive)
+  (prf-shell <span style="font-weight: bold;">:path</span> <span style="font-style: italic;">"~"</span> <span style="font-weight: bold;">:interpreter</span> <span style="font-style: italic;">"zsh"</span>))
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">my/bash-on-raspi</span> ()
+  (interractive)
+  (prf-shell <span style="font-weight: bold;">:path</span> <span style="font-style: italic;">"/ssh:pi@raspi:/~"</span> <span style="font-weight: bold;">:interpreter</span> <span style="font-style: italic;">"bash"</span>))
+</pre>
+</div>
+
+<p>
+<code>prf-shell</code> 的代码可以在包<a href="https://github.com/p3r7/prf-shell">prf-shell</a>中找到。
+</p>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2020-02-10</span>
+            <span title="last modification date" class="post-info">2020-02-13</span>
+            <span title="tags" class="post-info">:<a href="../../../../../tags/emacs-common">emacs-common</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-fcc33ffe-e08b-4647-b57b-021e37212b27">lujun9972</a></span>
+        </div>
+    <script src="../../../../../media/js/jquery-2.1.3.min.js"></script>
+    <script src="../../../../../media/js/md5.min.js"></script>
+        <section>
+            <div id="gitalk-container"></div>
+            <script type="text/javascript">
+             var gitalk = new Gitalk({
+                 clientID: 'fdcb5d9da3f4acb4862c',
+                 clientSecret: 'dd0a16312a206782cb7669dcec5e96874ab48170',
+                 repo: 'lujun9972.github.com',
+                 owner: 'lujun9972',
+                 admin: ['lujun9972'],
+                 id: md5(location.pathname),      // Ensure uniqueness and length less than 50
+                 distractionFreeMode: false  // Facebook-like distraction free mode
+             })
+             gitalk.render('gitalk-container')
+            </script>
+        </section>
+    <script src="../../../../../media/js/main.js"></script>
+        <script>
+         var _hmt = _hmt || [];
+         (function() {
+             var hm = document.createElement("script");
+             hm.src = "https://hm.baidu.com/hm.js?7bac4fd0247f69c27887e0d4e3aee41e";
+             var s = document.getElementsByTagName("script")[0]; 
+             s.parentNode.insertBefore(hm, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-fcc33ffe-e08b-4647-b57b-021e37212b27">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="../../../../../instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>
