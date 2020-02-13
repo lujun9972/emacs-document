@@ -1,0 +1,158 @@
+#+TITLE: 无痛使用Emacs中的交互式shell
+#+URL: https://www.eigenbahn.com/2020/01/21/painless-emacs-interactive-shells
+#+AUTHOR: lujun9972
+#+TAGS: emacs-common
+#+DATE: [2020年 02月 10日 星期一 09:54:39 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+[[https://www.eigenbahn.com/assets/img/drake-prf-shell.png]]
+
+
+* 回顾
+:PROPERTIES:
+:CUSTOM_ID: recap
+:END:
+
+在[[/2020/01/19/painless-emacs-shell-commands][前一篇文章]]中，我们讨论了如何创建显式函数来调用单个shell命令。
+
+现在，让我们进入交互式shell中更有趣的内容。
+
+* Emacs交互式shell的API
+:PROPERTIES:
+:CUSTOM_ID: emacs-interactive-shells-api
+:END:
+
+派生shell的主要命令是: *shell* =(可以接一个buffer参数)=.
+
+与单个shell命令类似，我们可以通过操作一些隐藏的变量来更改其行为。
+
+重要的变量如包括：
+
+| default-directorylocation                  | 指定从哪个地方运行shell           |
+| explicit-shell-file-name / shell-file-name | 执行的shell解释器 (例如 bash ...) |
+| explicit-<INTERPRETER>-args                | 交互式shell的启动参数             |
+
+注意，=shell-command-switch= 对对交互式shell没有用处,因此没有列在此处。
+
+相反，我们有了新的变量 =explicit-<INTEPRETER>-args=, 它允许为交互式shell提供一系列参数。
+
+您可能已经在前文中见过它了，函数 =eval-with-shell-interpreter= 中用到了这个变量。
+
+* 重用包装器
+:PROPERTIES:
+:CUSTOM_ID: reusing-our-wrappers
+:END:
+
+因此，我们可以重用前面定义的包装器 =with-shell-interpreter=.
+
+这里有一个小麻烦: 默认的 =shell= 命令会提示用户指定解释器路径。
+
+每次都要提醒太麻烦了
+
+我们可能更系统让它的默认值在启动本地shell时使用 =shell-file-name= 的值,而在启动远程shell时使用 =default-remote-shell-interpreter= 的值。
+
+如果我们想要更改shell的位置，那么创建一个显式定义 =:interpreter= 的命令会更实用。
+
+要禁止 =shell= 提示输入解释器路径，我们必须使用默认的前缀参数来调用它(例如 =C-u M-x shell=)。
+
+要以编程方式重现此行为，我们必须使用let 将 =current-prefix-arg= 设置为 ='(4)=。
+
+例如:
+
+#+begin_src emacs-lisp
+  (defun my/zsh-local ()
+    (interactive)
+    (with-shell-interpreter
+     :path "~"
+     :interpreter "zsh"
+     :form
+     (let (current-prefix-arg '(4))
+       (shell))))
+
+  (defun my/bash-on-raspi ()
+    (interractive)
+    (with-shell-interpreter
+     :path "/ssh:pi@raspi:/~"
+     :interpreter "bash"
+     :form
+     (let (current-prefix-arg '(4))
+       (shell))))
+#+end_src
+
+* 另一个包装器
+:PROPERTIES:
+:CUSTOM_ID: another-wrapper
+:END:
+
+这仍然很麻烦。
+
+因此，让我们创建另一个派生辅助函数来防止重复。
+
+#+begin_src emacs-lisp
+  ;; ------------------------------------------------------------------------
+  ;; MAIN
+
+  (cl-defun prf-shell (&key path interpreter interpreter-args command-switch)
+    "Create a shell at given PATH, using given INTERPRETER binary."
+    (interactive)
+
+    (with-shell-interpreter
+      :form
+      (let* ((path (or path default-directory))
+             (is-remote (file-remote-p path))
+             (interpreter (or interpreter
+                              (if is-remote
+                                  with-shell-interpreter-default-remote
+                                shell-file-name)))
+             (interpreter (prf/tramp/path/normalize interpreter))
+             (shell-buffer-basename (prf-shell--generate-buffer-name is-remote interpreter path))
+             (shell-buffer-name (generate-new-buffer-name shell-buffer-name))
+             (current-prefix-arg '(4))
+             (comint-process-echoes t))
+        (shell shell-buffer-name))
+      :path path
+      :interpreter interpreter
+      :interpreter-args interpreter-args))
+
+  ;; ------------------------------------------------------------------------
+  ;; HELPERS: BUFFER NAME
+
+  (defun prf-shell--generate-buffer-name (is-remote interpreter path)
+    (if is-remote
+        (prf-shell--generate-buffer-name-remote interpreter path)
+      (prf-shell--generate-buffer-name-local interpreter path)))
+
+  (defun prf-shell--generate-buffer-name-local (&optional interpreter _path)
+    (if interpreter
+        (prf-with-interpreter--get-interpreter-name interpreter)
+      "shell"))
+
+  (defun prf-shell--generate-buffer-name-remote (intepreter path)
+    (let ((vec (tramp-dissect-file-name path)))
+      (prf-shell--generate-buffer-name-remote-from-vec vec)))
+
+  (defun prf-shell--generate-buffer-name-remote-from-vec (vec)
+    (let (user host)
+      (concat
+       (tramp-file-name-user vec) "@" (tramp-file-name-host vec))))
+#+end_src
+
+请注意，我们设置 =comint-process-echos= 为 =t= 来确保能正确地追踪目录变化。
+
+目录跟踪(简称ditrack)是Emacs的一项功能，能在执行 =cd= 时跟踪当前目录。
+
+此外，我们还提供了一些函数来让shell缓冲区的名称更加明确。
+
+我们重写的命令变成了:
+
+#+begin_src emacs-lisp
+  (defun my/zsh-local ()
+    (interractive)
+    (prf-shell :path "~" :interpreter "zsh"))
+
+  (defun my/bash-on-raspi ()
+    (interractive)
+    (prf-shell :path "/ssh:pi@raspi:/~" :interpreter "bash"))
+#+end_src
+
+=prf-shell= 的代码可以在包[[https://github.com/p3r7/prf-shell][prf-shell]]中找到。
