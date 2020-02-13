@@ -1,0 +1,159 @@
+#+TITLE: 更好的 TRAMP 自动登陆的方法
+#+URL: https://www.eigenbahn.com/2020/01/15/tramp-autologin-insanity
+#+AUTHOR: lujun9972
+#+TAGS: emacs-lisp
+#+DATE: [2020年 02月 10日 星期一 10:23:30 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+* 介绍
+:PROPERTIES:
+:CUSTOM_ID: introduction
+:END:
+
+如果你不知道TRAMP，那么我告诉你，[[https://www.gnu.org/software/tramp/][TRAMP]]是Emacs的杀手级应用程序之一。它是一个包，允许通过[[https://www.gnu.org/software/tramp/#inmethods][各种协议]]与远程系统交互。
+
+这些交互包括打开shell和浏览远程文件树，就好像它们挂载在本地一样。
+你甚至可以透明地在几台机器之间跳转(这种行为叫做 [[https://www.gnu.org/software/emacs/manual/html_node/tramp/Ad_002dhoc-multi_002dhops.html][multi-hops]])。
+
+但是有一件事可以破坏这些无缝交互:登录提示。
+
+* Authinfo 的解决方案
+:PROPERTIES:
+:CUSTOM_ID: the-authinfo-way
+:END:
+
+为了消除登陆提示，emacs通过 =auth-source= 包来为Gnus Authinfo和.netrc 提供了原生支持:
+
+#+begin_src emacs-lisp
+  (require 'dash)
+
+  (use-package auth-source
+    :demand
+    :no-require t
+    :config
+    (setq auth-sources (-filter #'file-exists-p '("~/.authinfo.gpg" "~/.authinfo" "~/.netrc"))))
+#+end_src
+
+Now you can just create a =~/.authinfo= like this:
+现在你可以创建一个 =~/.authinfo= 文件，就像这样的:
+
+#+BEGIN_EXAMPLE
+machine raspi login pi password raspberry
+#+END_EXAMPLE
+
+然后执行 =C-x f /ssh:pi@raspi:/= ,它就会自动连接了，耶!
+
+…只是，这种方法慢死了。
+
+* 使用SSH密钥来解决
+:PROPERTIES:
+:CUSTOM_ID: ssh-keys-to-the-rescue
+:END:
+
+事实上密码登陆太慢了。消耗大把时间。当有大量的远程主机需要连接时更是如此。
+
+SSH密钥(又名身份文件、证书)是一种更智能(而且在大多数情况下更安全)的处理方式。
+
+如果你有一个主密钥来连接你所有的机器，只需进入 =~/.ssh/config= 填入下面内容:
+
+#+BEGIN_EXAMPLE
+Host *
+User eigen
+IdentityFile ~/.ssh/eigen-identity
+#+END_EXAMPLE
+
+然后你就可以连接到任何服务器了，对于用户 =eigen= 都会使用指定的密钥。
+
+* PuTTY 的困境
+:PROPERTIES:
+:CUSTOM_ID: the-putty-dilemma
+:END:
+
+如果您使用的是Windows，那么很有可能使用PuTTY/plink来代替SSH。
+
+TRAMP也挺支持PuTTY的(通过 =/pscp:= 方法，这就是你所要的方法)。
+
+PuTTY通过 [[https://the.earth.li/~sgtatham/putty/0.73/htmldoc/Chapter4.html#config-saving][默认设置]] 和 [[https://the.earth.li/~sgtatham/putty/0.73/htmldoc/Chapter9.html][Pageant]] 提供了一种设置默认密钥的方法。
+
+前一种方法只有当你将每台主机都保存为连接配置文件并使用 =/plinkx:<PROFILE>:= 来访问时才有效。
+
+而后者似乎只有在启动putty.exe (GUI界面)时才会加载。
+
+现在是疯狂冒险的时候了。
+
+* 疯狂的尝试(使用elisp搞定所有事情)
+:PROPERTIES:
+:CUSTOM_ID: insanity-or-elisp-bind-all-the-things
+:END:
+
+另一个跨平台的解决方案是用纯elisp来实现的。
+
+这里的技巧是使用与identity file选项(=-i=)对应的额外参数来对 =tramp-methods= 进行补充。
+
+因此，我们需要一些工具来更改那些方法定义。
+
+#+begin_src emacs-lisp
+  ;; ------------------------------------------------------------------------
+  ;; DEPS
+
+  (require 'tramp)
+  (require 'dash)
+
+  ;; ------------------------------------------------------------------------
+  ;; TRAMP METHODS ARGS
+
+  (defun prf/tramp/method/def/some-args/with-cert (some-args cert-arg cert)
+  "Returns enriched tramp def SOME-ARGS with certificate arg.
+  SOME-ARGS can be of type `tramp-login-args' or `tramp-copy-args'"
+  (let ((args-type (car some-args))
+  (args (car (cdr some-args))))
+  (add-to-list 'args `(,cert-arg ,(concat """ cert """)))
+  `(,args-type ,args)))
+
+  (defun prf/tramp/method/def/with-cert-in-some-args (tramp-method-def args-type cert-arg cert)
+  "Returns copy of TRAMP-METHOD-DEF with certificate arg added to ARGS-TYPE.
+  ARGS-TYPE can be `tramp-login-args' or `tramp-copy-args'."
+  (let ((method-name (car tramp-method-def))
+  (method-def-args (cdr tramp-method-def)))
+  (cons method-name
+  (-map-when
+  (lambda (e) (equal (car e) args-type))
+  (lambda (e) (prf/tramp/method/def/args/with-cert e cert-arg cert))
+  method-def-args))))
+
+  ;; ------------------------------------------------------------------------
+  ;; TRAMP METHODS
+
+  (defun prf/tramp/method/def/with-cert-in-args (tramp-method-def cert-arg cert)
+  "Returns copy of TRAMP-METHOD-DEF enriched with certificate arg.
+  Certificate arg gets added to both 'tramp-login-args and 'tramp-copy-args."
+  (-> tramp-method-def
+  (prf/tramp/method/def/with-cert-in-some-args 'tramp-login-args cert-arg cert)
+  (prf/tramp/method/def/with-cert-in-some-args 'tramp-copy-args cert-arg cert)))
+#+end_src
+
+然后我们可以覆盖方法定义:
+
+#+begin_src emacs-lisp
+  ;; PuTTY
+  (let ((cert-path "~/my-cert.ppk")
+        (putty-methods '("pscp" "plink" "plinkx" "psftp")))
+    (setq tramp-methods
+          (-map-when
+           (lambda (e) (member (car e) putty-methods))
+           (lambda (e) (prf/tramp/method/def/with-cert-in-args e "-i" cert-path))
+           tramp-methods)))
+
+  ;; SSH
+  (let ((cert-path "~/.ssh/id_dsa")
+        (ssh-methods '("ssh" "sshx")))
+    (setq tramp-methods
+          (-map-when
+           (lambda (e) (member (car e) ssh-methods))
+           (lambda (e) (prf/tramp/method/def/with-cert-in-args e "-i" cert-path))
+           tramp-methods)))
+#+end_src
+
+这样做的好处是，如果远程主机不知道你的密钥，它仍然会提示你输入密码而不会失败。
+
+代码可以在[[https://github.com/p3r7/prf-tramp/blob/master/prf-tramp-method.el][prf-tramp-method包]]中找到。
