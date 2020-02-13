@@ -1,13 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <title>Arranging Emacs windows - EMACS-DOCUMENT</title>
+  <title>编排 Emacs 窗口 - EMACS-DOCUMENT</title>
   <meta charset="utf-8" />
   <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
   <meta name="viewport"
         content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
   <meta name="author" content="lujun9972" />
-  <meta name="keywords" content="raw" />
+  <meta name="keywords" content="emacs-common" />
   <!-- <link rel="stylesheet" href="../../../../../media/css/main.css" type="text/css"/>
        <link rel="stylesheet" href="../../../../../media/css/comment.css" type="text/css"/> -->
   <link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/kognise/water.css@latest/dist/dark.css'>
@@ -39,50 +39,58 @@
 
 <div>
 <div class="post">
-<h1 class="title">Arranging Emacs windows</h1>
+<h1 class="title">编排 Emacs 窗口</h1>
 <div id="table-of-contents">
 <h2>&#30446;&#24405;</h2>
 <div id="text-table-of-contents">
 <ul>
-<li><a href="#orgbf39ff0">Arranging Emacs windows</a></li>
+<li><a href="#org565cd0b">编排 Emacs 窗口</a></li>
 </ul>
 </div>
 </div>
 
-<div id="outline-container-orgbf39ff0" class="outline-2">
-<h2 id="orgbf39ff0">Arranging Emacs windows</h2>
-<div class="outline-text-2" id="text-orgbf39ff0">
+<div id="outline-container-org565cd0b" class="outline-2">
+<h2 id="org565cd0b">编排 Emacs 窗口</h2>
+<div class="outline-text-2" id="text-org565cd0b">
 <p>
-Dealing with windows in Emacs can be a bit annoying, until <a href="https://www.reddit.com/r/emacs/comments/cpdr6m/any_additional_docstutorials_on_displaybuffer_and/">someone explains you the philosophy</a> behind it and you dig a bit into <a href="https://www.gnu.org/software/emacs/manual/html_mono/elisp.html#Displaying-Buffers">the manual for <code>display-buffer</code> and <code>display-buffer-alist</code></a> . Even then, the problem that package managers do not follow the Emacs canon, or that this has changed a bit over time, makes it difficult to configure some pieces of software.
+处理Emacs中的windows有点麻烦,除非 <a href="https://www.reddit.com/r/emacs/comments/cpdr6m/any_additional_docstutorials_on_displaybuffer_and/">有人向你解释这背后的哲学思想</a> 然后你再深入阅读 <a href="https://www.gnu.org/software/emacs/manual/html_mono/elisp.html#Displaying-Buffers"><code>display-buffer</code> 和 <code>display-buffer-alist</code> 的手册</a> 。
+即使是这样，软件包管理人员也不一定会遵循Emacs标准，而且该标准也会随着时间的推移发生变化，这些因素都使的配置软件变得困难。
 </p>
 
 <p>
-I leave here my customizations as of Nov. 2019, in case they may help someone. They are part of an init.org file that is converted into an init.el automatically when saving it, but it should be clear as standalone explanation.
+为了帮助别人，我把我的定制(2019年11月)记录在此。它们摘录自init.org文件，该文件会在保存时自动转换成init.el，但它本身对配置的解释解释的比较清楚。
 </p>
 
 <p>
-First, we add some functions that I will use to select buffers based on modes. This is not usual: I just need it for buffers whose name does not really follow any rule; otherwise the method from display-buffer-alist just works.
+首先，我们定义了一些函数来根据模式选择缓冲区。
+这是些函数不太常用傲:我只是需要它来处理那些名称并没有遵循任何规则的buffer;其他的buffer，display-buffer-alist 定义的方法就能搞定。
 </p>
 
 
 <div class="org-src-container">
-<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">jjgr-dedicated-window</span> (fun)=
-  (<span style="font-weight: bold;">lambda</span> (buffer <span style="font-weight: bold; text-decoration: underline;">&amp;optional</span> alist)=
-    (<span style="font-weight: bold;">let</span> ((window (funcall fun buffer alist)))=
-      (<span style="font-weight: bold;">when</span> window=
-        (set-window-dedicated-p window t))<span style="font-weight: bold;">=</span>
-      window)))<span style="font-weight: bold;">=</span>
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">jjgr-dedicated-window</span> (fun)
+       (<span style="font-weight: bold;">lambda</span> (buffer <span style="font-weight: bold; text-decoration: underline;">&amp;optional</span> alist)
+         (<span style="font-weight: bold;">let</span> ((window (funcall fun buffer alist)))
+              (<span style="font-weight: bold;">when</span> window
+                (set-window-dedicated-p window t))
+              window)))
 
-(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">jjgr-rx-mode-name</span> (mode-regexp)=
-  (<span style="font-weight: bold;">lambda</span> (buffer <span style="font-weight: bold; text-decoration: underline;">&amp;rest</span> optional)=
-    (<span style="font-weight: bold;">with-current-buffer</span> buffer=
-      (string-match mode-regexp mode-name))))<span style="font-weight: bold;">=</span>
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">jjgr-rx-mode-name</span> (mode-regexp)
+       (<span style="font-weight: bold;">lambda</span> (buffer <span style="font-weight: bold; text-decoration: underline;">&amp;rest</span> optional)
+         (<span style="font-weight: bold;">with-current-buffer</span> buffer
+           (string-match mode-regexp mode-name))))
 </pre>
 </div>
 
+<pre class="example">
+jjgr-rx-mode-name
+
+</pre>
+
 
 <p>
-Then I do the configuration itself. I have basically three scenarios where I use Emacs: email, coding and writing. I also have three sets of windows: the ones I open (my files, a new shell), temporary windows (captures, new emails), and informative windows (logs, error messages, help windows).
+然后我开始进行配置。我基本上有三个使用Emacs的场景:电子邮件、编码和写作。
+我还有三类窗口:主动打开的(编辑的文件，新的shell)，临时窗口(capture，新邮件)，提供信息的窗口(日志，错误消息，帮助窗口)。
 </p>
 
 <div class="org-src-container">
@@ -142,11 +150,15 @@ Then I do the configuration itself. I have basically three scenarios where I use
 
 
 <p>
-I find the syntax of <code>display-buffer-alist</code> rather self explanatory. Helper buffers, I tend to place on a side-window that pops to the right. The exception are long <code>*info*</code> buffers with Emacs manuals, that I like to read on their own frame (i.e. window from the operating system). The database of contacts, <code>*BBDB*</code>, pops at the bottom of the screen in a small window with ten lines. Shells are split from the current window, at the bottom, instead of overriding the content of the window (the default).
+我发现 <code>display-buffer-alist</code> 的语法相当容易理解。
+我倾向于将辅助缓冲区放置在右侧的边窗中。除了 <code>*info*</code> buffer在显示Emacs手册时，这种情况下我一般喜欢把它放在独立的frame中(即操作系统中窗口)。
+联系人数据库 <code>*BBDB*</code> 将在屏幕底部的一个小窗口中弹出，10行高。shell从当前窗口的底部分离出一个新窗口，而不是覆盖原窗口的内容(默认值)。
 </p>
 
 <p>
-Note how I have to modify how Wanderlust (the email client) works. I instruct  Emacs to open email editing buffers on a new operating system window (frame). However I need to use <code>quit-window</code> to once the draft is finished or abandoned, because otherwise the frame will not be closed automatically. This is because Wanderlust uses <code>delete-window</code> instead.
+注意我是如何修改Wanderlust(一种电子邮件客户端)的工作方式的。
+我指示Emacs在新的操作系统窗口(frame)上打开电子邮件编辑缓冲区。然而这样一来写完邮件或放弃邮件后，我需要执行 <code>quit-window</code>, 否则不会自动关闭frame。
+这是因为Wanderlust的退出使用的是 <code>delete-window</code>.
 </p>
 </div>
 </div>
@@ -156,9 +168,9 @@ Note how I have to modify how Wanderlust (the email client) works. I instruct  
 <div>
         <div class="post-meta">
             <span title="post date" class="post-info">2020-02-10</span>
-            <span title="last modification date" class="post-info">2020-02-10</span>
-            <span title="tags" class="post-info">:<a href="../../../../../tags/raw">raw</a>:</span>
-            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-14e8f0fe-d940-44e0-aea3-3f63fe5a96b9">lujun9972</a></span>
+            <span title="last modification date" class="post-info">2020-02-13</span>
+            <span title="tags" class="post-info">:<a href="../../../../../tags/emacs-common">emacs-common</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-2bfe2b8d-f30d-4507-a33f-cabcaefc34d1">lujun9972</a></span>
         </div>
     <script src="../../../../../media/js/jquery-2.1.3.min.js"></script>
     <script src="../../../../../media/js/md5.min.js"></script>
@@ -190,7 +202,7 @@ Note how I have to modify how Wanderlust (the email client) works. I instruct  
     <div class="footer">
         <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
         <p>
-            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-14e8f0fe-d940-44e0-aea3-3f63fe5a96b9">lujun9972</a>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-2bfe2b8d-f30d-4507-a33f-cabcaefc34d1">lujun9972</a>
             &nbsp;&nbsp;-&nbsp;&nbsp;
             Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
             <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
