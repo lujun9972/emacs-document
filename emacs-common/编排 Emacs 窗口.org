@@ -1,0 +1,102 @@
+#+TITLE: 编排 Emacs 窗口
+#+URL: https://sites.google.com/site/juanjosegarciaripoll/blog/arranging-emacs-windows
+#+AUTHOR: lujun9972
+#+TAGS: emacs-common
+#+DATE: [2020年 02月 10日 星期一 10:38:11 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+* 编排 Emacs 窗口
+
+处理Emacs中的windows有点麻烦,除非 [[https://www.reddit.com/r/emacs/comments/cpdr6m/any_additional_docstutorials_on_displaybuffer_and/][有人向你解释这背后的哲学思想]] 然后你再深入阅读 [[https://www.gnu.org/software/emacs/manual/html_mono/elisp.html#Displaying-Buffers][=display-buffer= 和 =display-buffer-alist= 的手册]] 。
+即使是这样，软件包管理人员也不一定会遵循Emacs标准，而且该标准也会随着时间的推移发生变化，这些因素都使的配置软件变得困难。
+
+为了帮助别人，我把我的定制(2019年11月)记录在此。它们摘录自init.org文件，该文件会在保存时自动转换成init.el，但它本身对配置的解释解释的比较清楚。
+
+首先，我们定义了一些函数来根据模式选择缓冲区。
+这是些函数不太常用傲:我只是需要它来处理那些名称并没有遵循任何规则的buffer;其他的buffer，display-buffer-alist 定义的方法就能搞定。
+
+
+#+begin_src emacs-lisp :lexical t :tangle init.el
+  (defun jjgr-dedicated-window (fun)
+         (lambda (buffer &optional alist)
+           (let ((window (funcall fun buffer alist)))
+                (when window
+                  (set-window-dedicated-p window t))
+                window)))
+
+  (defun jjgr-rx-mode-name (mode-regexp)
+         (lambda (buffer &rest optional)
+           (with-current-buffer buffer
+             (string-match mode-regexp mode-name))))
+#+end_src
+
+#+RESULTS:
+: jjgr-rx-mode-name
+
+
+然后我开始进行配置。我基本上有三个使用Emacs的场景:电子邮件、编码和写作。
+我还有三类窗口:主动打开的(编辑的文件，新的shell)，临时窗口(capture，新邮件)，提供信息的窗口(日志，错误消息，帮助窗口)。
+
+#+begin_src emacs-lisp :lexical t :tangle init.el
+  (setq
+   ;; Kill a frame when quitting its only window
+   frame-auto-hide-function 'delete-frame
+   ;; Maximum number of side-windows to create on (left top right bottom)
+   window-sides-slots '(0 1 1 1)
+   ;; Default rules
+   display-buffer-alist
+   `(;; Display *Help* buffer at the bottom-most slot
+     ("*(Help|trace-|Backtrace|RefTeX.*)"
+      (display-buffer-reuse-window display-buffer-in-previous-window display-buffer-in-side-window)
+      (side . right)
+      (slot . 0)
+      (window-width . 0.33)
+      (reusable-frames . visible))
+     ("^*info"
+      (display-buffer-reuse-window display-buffer-in-previous-window display-buffer-pop-up-frame)
+      (pop-up-frame-parameters
+       (width . 80)
+       (left . 1.0)
+       (fullscreen . fullheight)))
+     ;; Open new edited messages in a right-hand frame
+     ;; For this to close the frame, add
+     ;; (add-hook 'wl-draft-kill-pre-hook 'quit-window)
+     ("(*draft*|Draft/)"
+      (display-buffer-reuse-window display-buffer-in-previous-window display-buffer-pop-up-frame)
+      (pop-up-frame-parameters
+       (width . 80)
+       (left . 1.0)
+       (fullscreen . fullheight)))
+     ;; TeX output buffers to bottom, with 10 lines
+     (,(jjgr-rx-mode-name "^(TeX Output|TeX)")
+      (display-buffer-reuse-window display-buffer-in-previous-window display-buffer-in-side-window)
+      (side . bottom)
+      (slot . 0)
+      (window-height . 10)
+      (reusable-frames . visible))
+     ;; Display *BBDB* buffer on the bottom frame
+     ("*BBDB"
+      (display-buffer-reuse-window display-buffer-in-previous-window display-buffer-in-side-window)
+      (side . bottom)
+      (slot . 0)
+      (window-height . 10)
+      (reusable-frames . visible))
+     ;; Split shells at the bottom
+     ("^*[e]shell"
+      (display-buffer-reuse-window display-buffer-in-previous-window display-buffer-below-selected)
+      (window-min-height . 20)
+      (reusable-frames . visible)
+      )
+     )
+   )
+#+end_src
+
+
+我发现 =display-buffer-alist= 的语法相当容易理解。
+我倾向于将辅助缓冲区放置在右侧的边窗中。除了 =*info*= buffer在显示Emacs手册时，这种情况下我一般喜欢把它放在独立的frame中(即操作系统中窗口)。
+联系人数据库 =*BBDB*= 将在屏幕底部的一个小窗口中弹出，10行高。shell从当前窗口的底部分离出一个新窗口，而不是覆盖原窗口的内容(默认值)。
+
+注意我是如何修改Wanderlust(一种电子邮件客户端)的工作方式的。
+我指示Emacs在新的操作系统窗口(frame)上打开电子邮件编辑缓冲区。然而这样一来写完邮件或放弃邮件后，我需要执行 =quit-window=, 否则不会自动关闭frame。
+这是因为Wanderlust的退出使用的是 =delete-window=.
