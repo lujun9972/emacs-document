@@ -1,0 +1,242 @@
+#+TITLE: 无痛使用 Emacs 运行 shell 命令
+#+URL: https://www.eigenbahn.com/2020/01/19/painless-emacs-shell-commands
+#+AUTHOR: lujun9972
+#+TAGS: emacs-common
+#+DATE: [2020年 02月 10日 星期一 09:52:48 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+[[https://www.eigenbahn.com/assets/img/drake-prf-shell-command.png]]
+
+
+* Emacs 作为仿真终端
+:PROPERTIES:
+:CUSTOM_ID: emacs-as-a-terminal-emulator
+:END:
+
+Emacs可以成为一个强大的[[https://www.gnu.org/software/emacs/manual/html_node/emacs/Shell.html][终端仿真器]]。
+
+它可以派生出一个交互式shell (shell-mode和term-mode)并执行单个shell命令。
+
+这篇文章将关注在单个shell命令上。
+
+关于交互式shell，请参阅[[https://www.eigenbahn.com/2020/01/21/painless-emacs-interactive-shell][下一篇文章]]。
+
+#+BEGIN_QUOTE
+在这篇文章中，“command”这个词有两个意思:
+
+- shell命令，我们将它用 *shell命令* 来表示
+- 交互式Emacs函数，我们将用 *命令* 来表示
+#+END_QUOTE
+
+* Emacs 单shell命令的API
+:PROPERTIES:
+:CUSTOM_ID: emacs-single-shell-command-api
+:END:
+
+主要命令有:
+
+| 函数                                                       | 执行方式 | 返回值                 | 产生的 buffers   |
+|------------------------------------------------------------+----------+------------------------+------------------|
+| shell-command-to-string (command)                          | 同步     | stdout的内容           |                  |
+| shell-command (command & output-buffer error-buffer)       | 同步     | 命令返回值             | stdout 与 stderr |
+| async-shell-command (command & output-buffer error-buffer) | 同步     | 包含输出buffer的window | stdout 与 stderr |
+
+
+正如你所见，这三个函数接受的参数数量有限。
+
+其行为更多的是通过各种变量来隐式设置的。
+
+以下是最常用的一些变量:
+| var                                        | description                         |
+|--------------------------------------------+-------------------------------------|
+| default-directory                          | 启动shell的位置                     |
+| explicit-shell-file-name / shell-file-name | 执行的 shell 解释器 (例如. bash …) |
+| shell-command-switch                       | 使用shell来运行命令的参数      |
+
+
+通过重新定义这些变量的值我们可以改变函数的行为。
+
+具体地说:
+
+- 通过将 =default-directory= 设置为位于远程服务器上(通过TRAMP)的路径，我们可以在此远程服务器上打开shell
+- 通过改变其他变量，我们可以从非默认支持的解释器中衍生出一个shell (fish, zsh, ksh…)
+
+为了避免总是重复定义这些值，我们可以在执行期间对这些变量用let进行帮顶(动态绑定)。
+
+#+begin_src emacs-lisp
+  (defun my/uname-local ()
+    (interactive)
+    (let ((default-directory "~")
+          (explicit-shell-file-name "fish"))
+      (message "Launching \"uname -a\" locally")
+      (message (shell-command-to-string "uname -a"))))
+
+  (defun my/uname-on-raspi ()
+    (interactive)
+    (let ((default-directory "/ssh:pi@raspi:/~")
+          (explicit-shell-file-name "bash"))
+      (message "Launching \"uname -a\" on Raspberry Pi")
+      (message (shell-command-to-string "uname -a"))))
+#+end_src
+
+这很酷，但我不太喜欢API的隐藏部分。
+
+* 将隐式参数显式化
+:PROPERTIES:
+:CUSTOM_ID: making-the-implicit-explicit
+:END:
+
+值得庆幸的是，将隐式参数映射到显式参数并定义辅助函数非常简单。
+
+因为我们希望这些参数是可选的，所以将它们定义为关键字更方便。
+
+#+begin_src emacs-lisp
+  ;; ------------------------------------------------------------------------
+  ;; VARS
+
+  (defvar prf-default-remote-shell-interpreter "/bin/bash")
+  (defvar prf-default-remote-shell-interpreter-args '("-c" "export EMACS=; export TERM=dumb; stty echo; bash"))
+  (defvar prf-default-remote-shell-interpreter-command-swith "-c")
+
+
+  ;; ------------------------------------------------------------------------
+  ;; HELPER
+
+  (defun with-shell-interpreter--normalize-path (path)
+    "Normalize path, converting \\ into /."
+    (subst-char-in-string ?\\ ?/ path))
+
+
+  (defun with-shell-interpreter--get-interpreter-name (interpreter)
+    (file-name-nondirectory interpreter))
+
+
+  ;; ------------------------------------------------------------------------
+  ;; MAIN
+
+  (cl-defun eval-with-shell-interpreter (&key form path
+                                              interpreter interpreter-args command-switch)
+    (unless path
+      (setq path default-directory))
+    (unless (file-exists-p path)
+      (error "Path %s doesn't seem to exist" path))
+
+    (let* ((func
+            (if (functionp form) form
+              ;; Try to use the "current" lexical/dynamic mode for `form'.
+              (eval `(lambda () ,form) lexical-binding)))
+           (is-remote (file-remote-p path))
+           (interpreter (or interpreter
+                            (if is-remote
+                                prf-default-remote-shell-interpreter
+                              shell-file-name)))
+           (interpreter (with-shell-interpreter--normalize-path interpreter))
+           (interpreter-name (with-shell-interpreter--get-interpreter-name interpreter))
+           (explicit-interpreter-args-var (intern (concat "explicit-" interpreter-name "-args")))
+           (interpreter-args (or interpreter-args (when is-remote prf-default-remote-shell-interpreter-args)))
+           (command-switch (or command-switch
+                               (if is-remote
+                                   prf-default-remote-shell-interpreter-command-swith
+                                 shell-command-switch)))
+           (default-directory path)
+           (shell-file-name interpreter)
+           (explicit-shell-file-name interpreter)
+           (shell-command-switch command-switch))
+      (cl-progv
+          (list explicit-interpreter-args-var)
+          (list (or interpreter-args
+                    (when (boundp explicit-interpreter-args-var)
+                      (symbol-value explicit-interpreter-args-var))))
+        (funcall func))))
+#+end_src
+
+注意，我们定义了 =prf-default-remote-shell-interpreter= 变量，它有一个不同于本地 =shell-file-name= 的缺省解释器。
+
+这允许我们重写 =my/uname-local= 例子为:
+
+#+begin_src emacs-lisp
+  (defun my/uname-local ()
+    (interactive)
+    (eval-with-shell-interpreter
+     :path "~"
+     :interpreter "fish"
+     :form
+     '(progn
+        (message "Launching \"uname -a\" locally")
+        (message (shell-command-to-string "uname -a")))))
+#+end_src
+
+这很酷，但必须引用 =:form= 并将其封装在一个 =progn= 中是有点麻烦。
+
+一个宏包装可以解决这个问题:
+
+#+begin_src emacs-lisp
+  (defmacro with-shell-interpreter (&rest args)
+    (declare (indent 1) (debug t))
+    `(eval-with-shell-interpreter
+      :form (lambda () ,(cons 'progn (with-shell-interpreter--plist-get args :form)))
+      :path ,(plist-get args :path)
+      :interpreter ,(plist-get args :interpreter)
+      :interpreter-args ,(plist-get args :interpreter-args)
+      :command-switch ,(plist-get args :command-switch)))
+
+  (defun with-shell-interpreter--plist-get (plist prop)
+    "Like `plist-get' except allows value to be multiple elements."
+    (unless (null plist)
+      (cl-loop with passed = nil
+               for e in plist
+               until (and passed
+                          (keywordp e)
+                          (not (eq e prop)))
+               if (and passed
+                       (not (keywordp e)))
+               collect e
+               else if (not passed)
+               do (setq passed 't))))
+#+end_src
+
+这让我们可以这样重写它:
+
+#+begin_src emacs-lisp
+  (defun my/uname-local ()
+    (interactive)
+    (with-shell-interpreter
+     :path "~"
+     :interpreter "fish"
+     :form
+     (message "Launching "uname -a" locally")
+     (message (shell-command-to-string "uname -a"))))
+#+end_src
+
+=with-shell-interpreter= 的代码可以在package [[https://github.com/p3r7/with-shell-interpreter][with-shell-interpreter]] 中找到。
+
+* 进一步优化
+:PROPERTIES:
+:CUSTOM_ID: even-better
+:END:
+
+让我们派生出出自己的版本的 =shell-command-to-string=.
+
+#+begin_src emacs-lisp
+  (cl-defun prf-shell-command-to-string (command &key path interpreter command-switch)
+    "Call CMD w/ `shell-command-to-string' on host and location described by PATH"
+    (with-shell-interpreter
+     :form (shell-command-to-string command)
+     :path path
+     :interpreter interpreter
+     :command-switch command-switch))
+#+end_src
+
+我们的示例命令可以变成:
+
+#+begin_src emacs-lisp
+  (defun my/uname-local ()
+    (interactive)
+    (message "Launching \"uname -a\" locally")
+    (prf/shell-command-to-string "uname -a"
+                                 :path "~"
+                                 :interpreter "fish"))
+#+end_src
+
+可以在[[https://github.com/p3r7/prf-shell][prf-shell-command]]包中找到 =prf-shell-command-string= 的代码。
