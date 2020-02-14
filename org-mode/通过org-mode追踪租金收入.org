@@ -1,0 +1,133 @@
+#+TITLE: 通过org-mode追踪租金收入
+#+URL: https://blog.steve.fi/tracking_rental_income_via_org_mode.html
+#+AUTHOR: lujun9972
+#+TAGS: org-mode
+#+DATE: [2020年 02月 10日 星期一 10:28:36 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+我最近一直在享受探索 =org-mode= 的过程，因为我总是在其他地方看到它。经常都有人问我:为什么你不直接使用“org-mode”而使用自己管理的这个疯狂玩意呢?
+
+这里有一个具体的例子，没有双关语的意思，我管理着一些公寓，并且每个月都更新记录来跟踪一些事情。
+之前，我都是通过使用一组markdown文件来记录租户、收入、维修等详细信息，每个属性一个。
+现在我将它们移植到 =org-mode= 文件中。我用org-mode文件做的第一件事是为每一年都创建一个表，今年的表格类似这样的:
+
+#+begin_src org
+  ,#+NAME: 2020
+  | Month    | Tenant |   Rent | Mortgage | Housing Company |
+  |----------+--------+--------+----------+-----------------|
+  | January  | Bob    |    250 |   150.00 |           75.00 |
+  | February | Bob    |    250 |   150.00 |           75.00 |
+  | March    |        |        |          |                 |
+  | April    |        |        |          |                 |
+  | May      |        |        |          |                 |
+  | ..       | ...    |    ... |     .... |             ... |
+  |----------+--------+--------+----------+-----------------|
+  | Totals   |        | 500.00 |   300.00 |          150.00 |
+  ,#+TBLFM: @>$3=vsum(@I..@II);%0.2f::@>$4=vsum(@I..@II);%0.2f::@>$5=vsum(@I..@II);%0.2f
+#+end_src
+
+在这里你明显可以看出:
+
+- 我声明了一个名为2020的表。
+- 我在表格底部计算各列的总数。
+- 我只会在确定我可爱的租户支付了租金的那一天才会填写那一行。
+
+- 因此，当前月之后的所有行都是空的。
+
+=org-mode= 用户应该非常熟悉这样的操作，让我们更进一步，我们有一个名为 =2020= 的表，让我们创建一个名为 =2020-total= 的新表来显示更多有用的数据:
+
+#+begin_src org
+  ,#+NAME: 2020-totals
+  | Year | Income | Expenses | Profit |
+  |------+---------+----------+--------|
+  | 2020 | 500.00 | 450.00 | 50.00 |
+  ,#+TBLFM: @2$2=remote(2020,@>$3);%.2f::@2$3=remote(2020,@>$4)+remote(2020,@>$5);%.2f::@>$4=@>$2-@$3;%.2f
+#+end_src
+
+也没有什么特殊的东西:
+
+- 我们引用的是“远程”值(即来自不同的表的值)。
+- 我们会查找类似“row:@>”，“column:$3”的内容，他们的意思是“最后一行，第三列（row:last column:3rd)”。
+
+- 最后一行应该 =::= 分割，比如:
+
+- ~@2$2=remote(2020,@>$3);%.2f~
+- =%.2f= 是一个格式字符串，用于控制要显示的小数位数。
+- ~@2$3=remote(2020,@>$4) + remote(2020,@>$5);%.2f~
+- 费用包含“按揭”+“房屋公司”两部分
+- 即第四和第五栏的内容。
+- ~@>$4=@>$2-@$3;%.2f~
+- 最终的结果是我们得到了收入和费用的总和，它们之间的差额就是利润(或损失)。
+
+自然而然的，我已经记录有一段时间了，所以我们真正想要的是一个完整的/全局的收入/支出和利润表(如果是负数，就是亏损)。
+我们假设在文档中有 *多个* 表，每年有一对 “=2019=”、“=2019-total=” 这样的表格。
+要生成全局的收入/费用/属性表，我们只需将名称与模式 "=*-total=" 匹配的每个表的列相加。我们开始吧:
+
+#+begin_src org
+  ,#+NAME: income-expenses-profit
+  |----------+-----------|
+  | Income | €10000.00 |
+  | Expenses | € 8000.00 |
+  | Profit | € 2000.00 |
+  |----------+-----------|
+  ,#+TBLFM: @1$2='(car (sum-field-in-tables "-totals$" 1));€%.2f::@2$2='(car (sum-field-in-tables "-totals$" 2));€%.2f::@3$2='(car (sum-field-in-tables "-totals$" 3));€%.2f
+#+end_src
+
+同样，这里有三个值，通过 =::= 分隔使它们更具可读性:
+
+- =@1$2='(car (sum-field-in-tables "-totals$" 1));€%.2f=
+- =@2$2='(car (sum-field-in-tables "-totals$" 2));€%.2f=
+- =@3$2='(car (sum-field-in-tables "-totals$" 3));€%.2f=
+
+简而言之，我们将第二列各行的值设置为计算Emacs lisp表达式 =(car (sum-field-in-tables ..= 的值，而不是使用来自 =org-mode= 的内置表格支持。
+我确实需要自己编写这个函数来执行必要的表格迭代和字段求和，同时还添加了简单的过滤支持，这非常有用，我们将在后面看到:
+
+#+begin_src emacs-lisp
+  (defun sum-field-in-tables (pattern field &optional filter)
+    "For every table in the current document which has a name matching the
+  supplied pattern perform a sum of the specified column.
+
+  If the optional filter is present then the summing will ignore any rows
+  which do not match the given filter-pattern.
+
+  The return value is a list containing the sum, and a count of those
+  rows which were summed."
+#+end_src
+
+通过该函数，我成功地实现了我想要的功能，而且还不止这些，我可以做一些很厉害的事情，比如显示给定租户的总收入/付款。
+如果您看回到 =2020= 年的表，你会看到有一列中列出的是租户的名称。这样我就可以计算出租户的总收入，以及支付的金额总和:
+
+- 所有表格名称的模式为"=^:digit:$="
+
+- 第三列(即租金)
+- 行需要匹配过滤器“Bob”
+
+最终结果是这样的另一个表:
+
+#+begin_src org
+  ,#+NAME: tenants-paid
+  | Tenant | Rent Paid | Rented Months |
+  |--------+-----------+---------------|
+  | [[Alice]]  | €1500.00  |             6 |
+  | [[Bob]]    | €1500.00  |             6 |
+  | [[Chris]]  | €1500.00  |             6 |
+  ,#+TBLFM: $2='(car (sum-field-in-tables "^[0-9]*$" 2 $1));€%0.2f::$3='(cdr (sum-field-in-tables "^[0-9]*$" 2 $1))
+
+#+end_src
+
+这个公式能正常工作是因为table-sum函数返回两项内容，即行的实际求和已求和的行数:
+
+- 因此 =(car (sum-field-in-tables ..= 返回实际的和。这个人付的总房租。
+- 而 =(cdr (sum-field-in-tables ..= 返回指定租户支付金额的次数。
+
+唯一需要显式执行的操作是将 =Alice=, =Bob= 和 =Chris= 的行添加到这个表中。
+
+无论如何，这些操作相当酷的，我挺满意的，不过如果我可以避免写lisp我会更满意一点。现在我想我需要在两种方法中选择一种:
+
+- 我把lisp函数嵌入报告文件本身中?
+- 当文件被加载时就会执行这些lisp函数- [[https://github.com/skx/dotfiles/blob/master/.emacs.d/init.md#org-mode][这个方案很简单]]。
+
+- 或者我把它放在[[https://github.com/skx/dotfiles/blob/master/.emacs.d/init.md][~/.emacs/init.md]] 中?-这对我来说很好，但这意味着这个文件对其他人来说不是自包含的.
+
+在接下来的几天或几周内，我可能会继续倒腾这个玩意。我只要稍微配置一下，然后在文档的某些部分设置 =:noexport:= 标记,将org文件导出成HTML和PDF就变得很有魅力的一件事情了。
