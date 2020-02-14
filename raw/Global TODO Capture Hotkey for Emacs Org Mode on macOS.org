@@ -1,0 +1,50 @@
+#+TITLE: Global TODO Capture Hotkey for Emacs Org Mode on macOS
+#+URL: https://christiantietze.de/posts/2018/05/emacs-org-mode-global-capture-macos/
+#+AUTHOR: lujun9972
+#+TAGS: raw
+#+DATE: [2020年 02月 14日 星期五 12:30:24 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+May 9th, 2018
+
+[[https://vg01.met.vgwort.de/na/38ac0231c58b4b7889745a9ac61697d7]]
+
+I am using GNU Emacs for a while now to do all kinds of stuff. I'm thinking about migrating away from OmniFocus as my task manager and use Org mode instead. What I like so far is the free-form list nature of Org files. I can have an outline of notes and sprinkle =TODO= items inside them. This way I can take notes on puzzling problems I'm working on and mark things I need to do later. This is super useful to remind myself what to clean up before a commit, for example write or amend tests or remove debug code somewhere. I like it. I got used to a lot of shortcuts already, so most of the pain of daily use is gone.
+
+Today I played around with =org-capture=. It's a command that opens a temporary text entry field (i.e. a buffer) and stores the entry in a specific location for you. You need to configure [[https://orgmode.org/manual/Capture-templates.html][Capture templates]] for this to work, and they can do really amazing stuff, like “insert the captured item in file foo.txt below the heading XYZ for the current date”. Ah, the power of plain text.
+
+A very simple capture template is a simple =TODO= item that gets filed in your inbox, e.g. located at =~/org/inbox.org=:
+
+#+BEGIN_EXAMPLE
+  (setq org-capture-templates
+   (quote (("t" "todo" entry (file "~/org/inbox.org")
+   "* TODO %?\n%a\n"))))
+#+END_EXAMPLE
+
+When you invoke =org-capture= and select this template with the shorthand “t”, it will populate the temporary text entry for you with a new list item starting with =* TODO=. In a line below the cursor position (indicated by =%?= in the template), a link to the current place you were at is inserted (=%a=). That link can be a file, or a location in an Org document. You can click on these links to jump to that location. These =TODO= items become system-wide file annotations, so to speak.
+
+Now if you're not working inside Emacs at the moment but want to capture a task for your inbox from Xcode or Chrome or whatever, you can actually remote-control Emacs with the =emacsclient= command-line application. That will be able to execute Lisp commands in your current Emacs session.
+
+First, start the Emacs server with the command =server-start=. (You can execute commands with M-x, which is shorthand for Meta-x. The Meta key has to be configured first. It's my left Command key, for example.)
+
+The template I pasted above had the key “t”, so the remote control command to use =org-capture= is this:
+
+#+BEGIN_EXAMPLE
+  $ /usr/local/bin/emacsclient org-protocol://capture?template=t
+#+END_EXAMPLE
+
+To enable recognition of =org-protocol://= as a parameter, you need to enable this optional module in Emacs, too. The module is called =org-protocol=, and the variable that holds the list of enabled modules is called =org-modules=:
+
+#+BEGIN_EXAMPLE
+  (setq org-modules (quote (org-protocol)))
+#+END_EXAMPLE
+
+I actually configured this in Emacs's “customize” tool that stores user-preferences (you can get there when you hit Cmd-, in the macOS app). Search for “Modules”, expand “Org Modules”, and select the “protocol” module. Then apply & save changes.
+
+[[https://christiantietze.de/posts/2018/05/emacs-org-mode-global-capture-macos/emacs-customize-org-modules.png]]
+
+Interactive Customize editor with Org Modules expanded
+
+With the server running and the =org-protocol= enabled, the shell command will just work as if you invoked the capture template yourself, e.g. hit C-c c t.
+
+I bound this to a Keyboard Maestro macro that replaces my global shortcut to enter a new task into OmniFocus. The macro also brings the Emacs app to front, if it isn't the frontmost app already.
