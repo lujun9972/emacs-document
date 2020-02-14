@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>通过org-mode追踪租金收入 - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="org-mode" />
+  <!-- <link rel="stylesheet" href="../../../../../media/css/main.css" type="text/css"/>
+       <link rel="stylesheet" href="../../../../../media/css/comment.css" type="text/css"/> -->
+  <link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/kognise/water.css@latest/dist/dark.css'>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="../../../../../">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <ul class="trigger">
+        <li><a href="../../../../../years/">Years</a></li>
+        <li><a href="../../../../../authors/">Authors</a></li>
+        <li><a href="../../../../../tags/">Tags</a></li>
+        <li><a href="../../../../../about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="../../../../../rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="https://www.bing.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">通过org-mode追踪租金收入</h1>
+<p>
+我最近一直在享受探索 <code>org-mode</code> 的过程，因为我总是在其他地方看到它。经常都有人问我:为什么你不直接使用“org-mode”而使用自己管理的这个疯狂玩意呢?
+</p>
+
+<p>
+这里有一个具体的例子，没有双关语的意思，我管理着一些公寓，并且每个月都更新记录来跟踪一些事情。
+之前，我都是通过使用一组markdown文件来记录租户、收入、维修等详细信息，每个属性一个。
+现在我将它们移植到 <code>org-mode</code> 文件中。我用org-mode文件做的第一件事是为每一年都创建一个表，今年的表格类似这样的:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-org"><span style="font-weight: bold; font-style: italic;">#+NAME: 2020</span>
+| Month    | Tenant |   Rent | Mortgage | Housing Company |
+|----------+--------+--------+----------+-----------------|
+| January  | Bob    |    250 |   150.00 |           75.00 |
+| February | Bob    |    250 |   150.00 |           75.00 |
+| March    |        |        |          |                 |
+| April    |        |        |          |                 |
+| May      |        |        |          |                 |
+| ..       | ...    |    ... |     .... |             ... |
+|----------+--------+--------+----------+-----------------|
+| Totals   |        | 500.00 |   300.00 |          150.00 |
+<span style="font-weight: bold; font-style: italic;">#+TBLFM: @&gt;$3=vsum(@I..@II);%0.2f::@&gt;$4=vsum(@I..@II);%0.2f::@&gt;$5=vsum(@I..@II);%0.2f</span>
+</pre>
+</div>
+
+<p>
+在这里你明显可以看出:
+</p>
+
+<ul class="org-ul">
+<li>我声明了一个名为2020的表。</li>
+<li>我在表格底部计算各列的总数。</li>
+<li>我只会在确定我可爱的租户支付了租金的那一天才会填写那一行。</li>
+
+<li>因此，当前月之后的所有行都是空的。</li>
+</ul>
+
+<p>
+<code>org-mode</code> 用户应该非常熟悉这样的操作，让我们更进一步，我们有一个名为 <code>2020</code> 的表，让我们创建一个名为 <code>2020-total</code> 的新表来显示更多有用的数据:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-org"><span style="font-weight: bold; font-style: italic;">#+NAME: 2020-totals</span>
+| Year | Income | Expenses | Profit |
+|------+---------+----------+--------|
+| 2020 | 500.00 | 450.00 | 50.00 |
+<span style="font-weight: bold; font-style: italic;">#+TBLFM: @2$2=remote(2020,@&gt;$3);%.2f::@2$3=remote(2020,@&gt;$4)+remote(2020,@&gt;$5);%.2f::@&gt;$4=@&gt;$2-@$3;%.2f</span>
+</pre>
+</div>
+
+<p>
+也没有什么特殊的东西:
+</p>
+
+<ul class="org-ul">
+<li>我们引用的是“远程”值(即来自不同的表的值)。</li>
+<li>我们会查找类似“row:@&gt;”，“column:$3”的内容，他们的意思是“最后一行，第三列（row:last column:3rd)”。</li>
+
+<li>最后一行应该 <code>::</code> 分割，比如:</li>
+
+<li><code>@2$2=remote(2020,@&gt;$3);%.2f</code></li>
+<li><code>%.2f</code> 是一个格式字符串，用于控制要显示的小数位数。</li>
+<li><code>@2$3=remote(2020,@&gt;$4) + remote(2020,@&gt;$5);%.2f</code></li>
+<li>费用包含“按揭”+“房屋公司”两部分</li>
+<li>即第四和第五栏的内容。</li>
+<li><code>@&gt;$4=@&gt;$2-@$3;%.2f</code></li>
+<li>最终的结果是我们得到了收入和费用的总和，它们之间的差额就是利润(或损失)。</li>
+</ul>
+
+<p>
+自然而然的，我已经记录有一段时间了，所以我们真正想要的是一个完整的/全局的收入/支出和利润表(如果是负数，就是亏损)。
+我们假设在文档中有 <b>多个</b> 表，每年有一对 “=2019=”、“=2019-total=” 这样的表格。
+要生成全局的收入/费用/属性表，我们只需将名称与模式 "<code>*-total</code>" 匹配的每个表的列相加。我们开始吧:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-org"><span style="font-weight: bold; font-style: italic;">#+NAME: income-expenses-profit</span>
+|----------+-----------|
+| Income | &#8364;10000.00 |
+| Expenses | &#8364; 8000.00 |
+| Profit | &#8364; 2000.00 |
+|----------+-----------|
+<span style="font-weight: bold; font-style: italic;">#+TBLFM: @1$2='(car (sum-field-in-tables "-totals$" 1));&#8364;%.2f::@2$2='(car (sum-field-in-tables "-totals$" 2));&#8364;%.2f::@3$2='(car (sum-field-in-tables "-totals$" 3));&#8364;%.2f</span>
+</pre>
+</div>
+
+<p>
+同样，这里有三个值，通过 <code>::</code> 分隔使它们更具可读性:
+</p>
+
+<ul class="org-ul">
+<li><code>@1$2</code>'(car (sum-field-in-tables "-totals$" 1));€%.2f=</li>
+<li><code>@2$2</code>'(car (sum-field-in-tables "-totals$" 2));€%.2f=</li>
+<li><code>@3$2</code>'(car (sum-field-in-tables "-totals$" 3));€%.2f=</li>
+</ul>
+
+<p>
+简而言之，我们将第二列各行的值设置为计算Emacs lisp表达式 <code>(car (sum-field-in-tables ..</code> 的值，而不是使用来自 <code>org-mode</code> 的内置表格支持。
+我确实需要自己编写这个函数来执行必要的表格迭代和字段求和，同时还添加了简单的过滤支持，这非常有用，我们将在后面看到:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">sum-field-in-tables</span> (pattern field <span style="font-weight: bold; text-decoration: underline;">&amp;optional</span> filter)
+  <span style="font-style: italic;">"For every table in the current document which has a name matching the</span>
+<span style="font-style: italic;">supplied pattern perform a sum of the specified column.</span>
+
+<span style="font-style: italic;">If the optional filter is present then the summing will ignore any rows</span>
+<span style="font-style: italic;">which do not match the given filter-pattern.</span>
+
+<span style="font-style: italic;">The return value is a list containing the sum, and a count of those</span>
+<span style="font-style: italic;">rows which were summed."</span>
+</pre>
+</div>
+
+<p>
+通过该函数，我成功地实现了我想要的功能，而且还不止这些，我可以做一些很厉害的事情，比如显示给定租户的总收入/付款。
+如果您看回到 <code>2020</code> 年的表，你会看到有一列中列出的是租户的名称。这样我就可以计算出租户的总收入，以及支付的金额总和:
+</p>
+
+<ul class="org-ul">
+<li>所有表格名称的模式为"<code>^:digit:$</code>"</li>
+
+<li>第三列(即租金)</li>
+<li>行需要匹配过滤器“Bob”</li>
+</ul>
+
+<p>
+最终结果是这样的另一个表:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-org"><span style="font-weight: bold; font-style: italic;">#+NAME: tenants-paid</span>
+| Tenant | Rent Paid | Rented Months |
+|--------+-----------+---------------|
+| <span style="text-decoration: underline;"><a href="Alice">Alice</a></span>  | &#8364;1500.00  |             6 |
+| <span style="text-decoration: underline;"><a href="Bob">Bob</a></span>    | &#8364;1500.00  |             6 |
+| <span style="text-decoration: underline;"><a href="Chris">Chris</a></span>  | &#8364;1500.00  |             6 |
+<span style="font-weight: bold; font-style: italic;">#+TBLFM: $2='(car (sum-field-in-tables "^[0-9]*$" 2 $1));&#8364;%0.2f::$3='(cdr (sum-field-in-tables "^[0-9]*$" 2 $1))</span>
+
+</pre>
+</div>
+
+<p>
+这个公式能正常工作是因为table-sum函数返回两项内容，即行的实际求和已求和的行数:
+</p>
+
+<ul class="org-ul">
+<li>因此 <code>(car (sum-field-in-tables ..</code> 返回实际的和。这个人付的总房租。</li>
+<li>而 <code>(cdr (sum-field-in-tables ..</code> 返回指定租户支付金额的次数。</li>
+</ul>
+
+<p>
+唯一需要显式执行的操作是将 <code>Alice</code>, <code>Bob</code> 和 <code>Chris</code> 的行添加到这个表中。
+</p>
+
+<p>
+无论如何，这些操作相当酷的，我挺满意的，不过如果我可以避免写lisp我会更满意一点。现在我想我需要在两种方法中选择一种:
+</p>
+
+<ul class="org-ul">
+<li>我把lisp函数嵌入报告文件本身中?</li>
+<li>当文件被加载时就会执行这些lisp函数- <a href="https://github.com/skx/dotfiles/blob/master/.emacs.d/init.md#org-mode">这个方案很简单</a>。</li>
+
+<li>或者我把它放在<a href="https://github.com/skx/dotfiles/blob/master/.emacs.d/init.md">~/.emacs/init.md</a> 中?-这对我来说很好，但这意味着这个文件对其他人来说不是自包含的.</li>
+</ul>
+
+<p>
+在接下来的几天或几周内，我可能会继续倒腾这个玩意。我只要稍微配置一下，然后在文档的某些部分设置 <code>:noexport:</code> 标记,将org文件导出成HTML和PDF就变得很有魅力的一件事情了。
+</p>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2020-02-10</span>
+            <span title="last modification date" class="post-info">2020-02-14</span>
+            <span title="tags" class="post-info">:<a href="../../../../../tags/org-mode">org-mode</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-cfa6e556-abb9-493f-aadc-feac32ea397e">lujun9972</a></span>
+        </div>
+    <script src="../../../../../media/js/jquery-2.1.3.min.js"></script>
+    <script src="../../../../../media/js/md5.min.js"></script>
+        <section>
+            <div id="gitalk-container"></div>
+            <script type="text/javascript">
+             var gitalk = new Gitalk({
+                 clientID: 'fdcb5d9da3f4acb4862c',
+                 clientSecret: 'dd0a16312a206782cb7669dcec5e96874ab48170',
+                 repo: 'lujun9972.github.com',
+                 owner: 'lujun9972',
+                 admin: ['lujun9972'],
+                 id: md5(location.pathname),      // Ensure uniqueness and length less than 50
+                 distractionFreeMode: false  // Facebook-like distraction free mode
+             })
+             gitalk.render('gitalk-container')
+            </script>
+        </section>
+    <script src="../../../../../media/js/main.js"></script>
+        <script>
+         var _hmt = _hmt || [];
+         (function() {
+             var hm = document.createElement("script");
+             hm.src = "https://hm.baidu.com/hm.js?7bac4fd0247f69c27887e0d4e3aee41e";
+             var s = document.getElementsByTagName("script")[0]; 
+             s.parentNode.insertBefore(hm, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-cfa6e556-abb9-493f-aadc-feac32ea397e">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="../../../../../instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>
