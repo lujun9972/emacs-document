@@ -1,0 +1,58 @@
+#+TITLE: MacOS上捕获Emacs Org Mode代办模板的全局热键
+#+URL: https://christiantietze.de/posts/2018/05/emacs-org-mode-global-capture-macos/
+#+AUTHOR: lujun9972
+#+TAGS: org-mode
+#+DATE: [2020年 02月 14日 星期五 12:30:24 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+[[https://vg01.met.vgwort.de/na/38ac0231c58b4b7889745a9ac61697d7]]
+
+我使用GNU Emacs来做各种事情有一段时间了。我正在考虑将我的任务管理器从OmniFocus迁移到Org模式。
+目前，我最钟意的就是Org文件的自由性。我可以有一个笔记大纲，其中充斥着 =代办（TODO）= 项目。
+这样我就可以把正在解决的难题记下来，把以后要做的事情标记出来。
+它能提醒我在提交代码之前进行清理(例如编写或修改测试,删除调试代码)，非常有用。我喜欢它。我已经习惯了走捷径，所以日常生活中的大部分痛苦都消失了。
+
+今天我玩了一下 =org-capture=. 这个命令会打开一个临时文本(即一个缓冲区)输入字段，并将该条目存储在特定的位置。
+你需要配置[[https://orgmode.org/manual/captemplates.html][Capture templates]]来让它工作，它们可以做一些非常神奇的事情，比如“将捕获项插入文件foo.txt中，标题XYZ下的当前日期下”。啊，纯文本的力量。
+
+一个非常简单的捕获模板例子就是将你inbox中的 =TODO= 项目存到 =~/org/inbox.org= 中:
+
+#+begin_src emacs-lisp
+  (setq org-capture-templates
+        (quote (("t" "todo" entry (file "~/org/inbox.org")
+                 "* TODO %?n%an"))))
+#+end_src
+
+当调用 =org-capture= 并输入“t”选择此模板时，它将使用以 =*TODO= 开头的新列表项为你作为临时的文本条目。
+在光标位置(由模板中的 =%?= 指定)的下一行，插入了当前位置的链接(=%a=)。
+该链接可以是一个文件，也可以是Org文档中的一个位置。你可以单击这些链接跳转到当前位置。
+可以这么说，这些 =TODO= 项对系统范围内的文件进行了注释。
+
+现在，如果你暂时没在使用Emacs，却想从Xcode或Chrome或其他什么地方为inbox捕获一个任务，就可以使用 =emacsclient= 命令行应用程序远程控制Emacs。
+它将能够让你在当前Emacs会话中执行Lisp命令。
+
+首先，使用命令 =server-start= 启动Emacs服务器。(您可以使用M-x执行命令，M-x是Meta-x的缩写。必须首先配置好Meta键。例如，我把它配置成左command键。)
+
+我在上面粘贴的模板有一个键“t”，所以使用 =org-capture= 的远程控制命令是这样的:
+
+#+begin_src shell
+  $ /usr/local/bin/emacsclient org-protocol://capture?template=t
+#+end_src
+
+要启用 =org-protocol://= 作为识别参数，你还需要在Emacs中启用一个可选模块。该模块名为 =org-protocol=,而保存启用模块列表的变量被是 =org-modules=:
+
+#+begin_src emacs-lisp
+  (setq org-modules (quote (org-protocol)))
+#+end_src
+
+实际上，我是使用Emacs的“customize”工具进行配置的，该工具存储用户首选项(在macOS应用程序中，可以按下Cmd-进入其中)。
+搜索“Modules”，展开“Org Modules”，选择“protocol”模块。然后应用和保存更改。
+
+[[https://christiantietze.de/posts/2018/05/emacs-org-mode-global-capture-macos/emacs-customize-org-modules.png]]
+
+Org模块展开后的交互式自定义项编辑器
+
+当服务器运行并且启用了 =org-protocol= 后，shell命令就会像你自己调用捕获模板(在Emacs中输入 C-c c t)一样工作
+
+我将它绑定到一个Keyboard Maestro 宏上，它代替了我在OmniFocus中输入新任务的全局快捷键。如果Emacs应用程序还不是最前面的应用程序，那么宏也会把它放到前面。
