@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>设置Ediff - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="emacs-common" />
+  <!-- <link rel="stylesheet" href="../../../../../media/css/main.css" type="text/css"/>
+       <link rel="stylesheet" href="../../../../../media/css/comment.css" type="text/css"/> -->
+  <link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/kognise/water.css@latest/dist/dark.css'>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="../../../../../">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <ul class="trigger">
+        <li><a href="../../../../../years/">Years</a></li>
+        <li><a href="../../../../../authors/">Authors</a></li>
+        <li><a href="../../../../../tags/">Tags</a></li>
+        <li><a href="../../../../../about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="../../../../../rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="https://www.bing.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">设置Ediff</h1>
+<div id="table-of-contents">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#setting-up-ediff">设置Ediff</a>
+<ul>
+<li><a href="#customizing-the-customize">自定义</a></li>
+<li><a href="#changing-some-ediff-options">更改某些Ediff选项</a></li>
+<li><a href="#changing-some-ediff-key-bindings">更改Ediff快捷键</a></li>
+<li><a href="#restoring-the-windows-after-ediff-quits">Ediff退出后恢复窗户设置</a></li>
+<li><a href="#list-of-ways-that-i-use-to-invoke-ediff">调用Ediff的各种方法</a>
+<ul>
+<li><a href="#from-magit">从 <code>magit</code> 中调用</a></li>
+<li><a href="#other-methods">其他方法</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-org3538e3e" class="outline-2">
+<h2 id="setting-up-ediff"><a id="org3538e3e"></a>设置Ediff</h2>
+<div class="outline-text-2" id="text-setting-up-ediff">
+<p>
+一旦你改善了Ediff的使用体验，它就可以算是一个神器了。至少我的经历就是这样。在我看来这是一个非常好的工具，但是有些默认设置非常糟糕。
+</p>
+</div>
+
+<div id="outline-container-org79fbbf7" class="outline-3">
+<h3 id="customizing-the-customize"><a id="org79fbbf7"></a>自定义</h3>
+<div class="outline-text-3" id="text-customizing-the-customize">
+<p>
+首先，我会展示出一个宏，我用设它来设置自定义变量:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defmacro</span> <span style="font-weight: bold;">csetq</span> (variable value)
+  `(funcall (<span style="font-weight: bold;">or</span> (get ',variable 'custom-set)
+                'set-default)
+            ',variable ,value))
+</pre>
+</div>
+
+<p>
+这个宏是我自定义的，因为在Emacs的代码库中搜索后不到类似的东西; <code>custom-set-variables</code> 和 <code>custom-initialize-changed</code> 跟我想要的很接近。
+基本上，我想要的是一个理解变量 <code>custom-set</code> 属性的 <code>setq</code>. 如果你知道这样的宏，请告诉我。
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgdada5d2" class="outline-3">
+<h3 id="changing-some-ediff-options"><a id="orgdada5d2"></a>更改某些Ediff选项</h3>
+<div class="outline-text-3" id="text-changing-some-ediff-options">
+<p>
+现在，我已经解释了自定义的setter(顺便说一下，使用 <code>custom-set-variables</code> 完全等同于 <code>csetq</code>)，下面是我的更改内容:
+</p>
+
+<ol class="org-ol">
+<li><p>
+不要在单独的框架中使用控制面板,这个设置很奇怪。在Emacs中管理窗口，比在桌面(Unity或Gnome Shell)管理Emacs frame要好得多。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(csetq ediff-window-setup-function 'ediff-setup-windows-plain)
+</pre>
+</div></li>
+
+<li><p>
+将窗户水平分开，而不是垂直分开。这样，更容易跟踪变更。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(csetq ediff-split-window-function 'split-window-horizontally)
+</pre>
+</div></li>
+
+<li><p>
+忽略空格。我不怎么写Python，所以我不关心不同之处的空格。此外我根据喜好重新格式化编辑过的所有LISP代码，且只希望看到diff中的重要更改，而不希望看到毫无意义的空白。
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(csetq ediff-diff-options <span style="font-style: italic;">"-w"</span>)
+</pre>
+</div></li>
+</ol>
+</div>
+</div>
+
+<div id="outline-container-org19a1c7f" class="outline-3">
+<h3 id="changing-some-ediff-key-bindings"><a id="org19a1c7f"></a>更改Ediff快捷键</h3>
+<div class="outline-text-3" id="text-changing-some-ediff-key-bindings">
+<p>
+我对每个不需要输入的每个mode就做的设置：设置j为下移，设置k为上移
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">ora-ediff-hook</span> ()
+  (ediff-setup-keymap)
+  (define-key ediff-mode-map <span style="font-style: italic;">"j"</span> 'ediff-next-difference)
+  (define-key ediff-mode-map <span style="font-style: italic;">"k"</span> 'ediff-previous-difference))
+
+(add-hook 'ediff-mode-hook 'ora-ediff-hook)
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org72fab92" class="outline-3">
+<h3 id="restoring-the-windows-after-ediff-quits"><a id="org72fab92"></a>Ediff退出后恢复窗户设置</h3>
+<div class="outline-text-3" id="text-restoring-the-windows-after-ediff-quits">
+<p>
+当使用q退出一个Ediff会话时，它只会留下两个diff窗口，而不是恢复Ediff启动前的窗口配置。下面是恢复旧窗口配置的代码:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(winner-mode)
+(add-hook 'ediff-after-quit-hook-internal 'winner-undo)
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org2b171f1" class="outline-3">
+<h3 id="list-of-ways-that-i-use-to-invoke-ediff"><a id="org2b171f1"></a>调用Ediff的各种方法</h3>
+<div class="outline-text-3" id="text-list-of-ways-that-i-use-to-invoke-ediff">
+</div>
+
+<div id="outline-container-orga158313" class="outline-4">
+<h4 id="from-magit"><a id="orga158313"></a>从 <code>magit</code> 中调用</h4>
+<div class="outline-text-4" id="text-from-magit">
+<p>
+在80%的情况下，我使用快捷键e (<code>magit-ediff</code>)从 <code>magit-status-mode</code> 调用Ediff。
+这使我对更改有了更好的了解，特别是当我希望使用a (<code>ediff-copy-A-to-B</code>)或b (<code>ediff-copy-B-to-A</code>)来还原内容时。
+使用a的情况比较多，因为<a href="https://github.com/magit/magit">magit</a>似乎总是将 <code>@{index}</code> 文件放在 <code>A</code> 窗口，而将当前文件放入 <code>B</code> 窗口。
+</p>
+
+<p>
+因此，当我我查看一个不同之处(我用j/k导航到它)时，我可以用a来进行还原。此时，当前文件中的diff区域将等于索引文件中的diff区域。
+但这是还原的内容还未被保存。如果想保存 <code>B</code> 窗口的文件，可以使用wb (<code>ediff-save-buffer</code>)。
+在还原之后，还可以调用!(<code>ediff-update-diffs</code>)来删除零长度的diff并更新模式行的diffcount。
+</p>
+</div>
+</div>
+
+<div id="outline-container-org48bae52" class="outline-4">
+<h4 id="other-methods"><a id="org48bae52"></a>其他方法</h4>
+<div class="outline-text-4" id="text-other-methods">
+<ol class="org-ol">
+<li><code>ediff-buffers</code> 会对比两个(不同的)buffer。如果你碰巧只打开了两个窗口，并且刚好打开的是要对比的缓冲区，Ediff会使用它们作为默认值，并可以一路按下回车快速地选择这两个buffer。</li>
+<li><code>ediff-files</code> 也类似，但对比对象为文件。我喜欢在 <code>dired</code> 中使用m标记要对比的文件，然后它们也会被 <code>ediff-files</code> 自动选中。</li>
+<li><code>ediff-current-file</code> 用于查看对当前文件未保存之处的变更。我很少用它，因为我有一种冲动，一有机会就把每个文件都存起来。除非有人实现了一个类似的<a href="https://github.com/bbatsov/guru-mode">guru-mode</a>的模式，它会在你保存文件时打扰你，否则很难从这种上瘾中恢复过来。实际上，经常执行 <code>C-x C-s</code> 不是一个坏主意</li>
+</ol>
+
+<blockquote>
+<p>
+哦，你前一小时已经保存该文件40次;上一次保存是在 <code>0分34秒</code>;从那时算起你更改了27个字节.你 <b>确定</b> 要保存吗 <code>[y/N]</code>?
+</p>
+</blockquote>
+</div>
+</div>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2020-02-14</span>
+            <span title="last modification date" class="post-info">2020-02-15</span>
+            <span title="tags" class="post-info">:<a href="../../../../../tags/emacs-common">emacs-common</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-10f10187-7e95-416a-abc2-e25f01da952a">lujun9972</a></span>
+        </div>
+    <script src="../../../../../media/js/jquery-2.1.3.min.js"></script>
+    <script src="../../../../../media/js/md5.min.js"></script>
+        <section>
+            <div id="gitalk-container"></div>
+            <script type="text/javascript">
+             var gitalk = new Gitalk({
+                 clientID: 'fdcb5d9da3f4acb4862c',
+                 clientSecret: 'dd0a16312a206782cb7669dcec5e96874ab48170',
+                 repo: 'lujun9972.github.com',
+                 owner: 'lujun9972',
+                 admin: ['lujun9972'],
+                 id: md5(location.pathname),      // Ensure uniqueness and length less than 50
+                 distractionFreeMode: false  // Facebook-like distraction free mode
+             })
+             gitalk.render('gitalk-container')
+            </script>
+        </section>
+    <script src="../../../../../media/js/main.js"></script>
+        <script>
+         var _hmt = _hmt || [];
+         (function() {
+             var hm = document.createElement("script");
+             hm.src = "https://hm.baidu.com/hm.js?7bac4fd0247f69c27887e0d4e3aee41e";
+             var s = document.getElementsByTagName("script")[0]; 
+             s.parentNode.insertBefore(hm, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-10f10187-7e95-416a-abc2-e25f01da952a">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="../../../../../instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>
