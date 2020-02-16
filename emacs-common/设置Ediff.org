@@ -1,0 +1,115 @@
+#+TITLE: 设置Ediff
+#+URL: https://oremacs.com/2015/01/17/setting-up-ediff/
+#+AUTHOR: lujun9972
+#+TAGS: emacs-common
+#+DATE: [2020年 02月 14日 星期五 12:29:08 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+* 设置Ediff
+:PROPERTIES:
+:CUSTOM_ID: setting-up-ediff
+:CLASS: post-title
+:END:
+
+一旦你改善了Ediff的使用体验，它就可以算是一个神器了。至少我的经历就是这样。在我看来这是一个非常好的工具，但是有些默认设置非常糟糕。
+
+** 自定义
+:PROPERTIES:
+:CUSTOM_ID: customizing-the-customize
+:END:
+
+首先，我会展示出一个宏，我用设它来设置自定义变量:
+
+#+begin_src emacs-lisp
+  (defmacro csetq (variable value)
+    `(funcall (or (get ',variable 'custom-set)
+                  'set-default)
+              ',variable ,value))
+#+end_src
+
+这个宏是我自定义的，因为在Emacs的代码库中搜索后不到类似的东西; =custom-set-variables= 和 =custom-initialize-changed= 跟我想要的很接近。
+基本上，我想要的是一个理解变量 =custom-set= 属性的 =setq=. 如果你知道这样的宏，请告诉我。
+
+** 更改某些Ediff选项
+:PROPERTIES:
+:CUSTOM_ID: changing-some-ediff-options
+:END:
+
+现在，我已经解释了自定义的setter(顺便说一下，使用 =custom-set-variables= 完全等同于 =csetq=)，下面是我的更改内容:
+
+1. 不要在单独的框架中使用控制面板,这个设置很奇怪。在Emacs中管理窗口，比在桌面(Unity或Gnome Shell)管理Emacs frame要好得多。
+
+   #+begin_src emacs-lisp
+     (csetq ediff-window-setup-function 'ediff-setup-windows-plain)
+   #+end_src
+
+2. 将窗户水平分开，而不是垂直分开。这样，更容易跟踪变更。
+
+   #+begin_src emacs-lisp
+     (csetq ediff-split-window-function 'split-window-horizontally)
+   #+end_src
+
+3. 忽略空格。我不怎么写Python，所以我不关心不同之处的空格。此外我根据喜好重新格式化编辑过的所有LISP代码，且只希望看到diff中的重要更改，而不希望看到毫无意义的空白。
+
+   #+begin_src emacs-lisp
+     (csetq ediff-diff-options "-w")
+   #+end_src
+
+** 更改Ediff快捷键
+:PROPERTIES:
+:CUSTOM_ID: changing-some-ediff-key-bindings
+:END:
+
+我对每个不需要输入的每个mode就做的设置：设置j为下移，设置k为上移
+
+#+begin_src emacs-lisp
+  (defun ora-ediff-hook ()
+    (ediff-setup-keymap)
+    (define-key ediff-mode-map "j" 'ediff-next-difference)
+    (define-key ediff-mode-map "k" 'ediff-previous-difference))
+
+  (add-hook 'ediff-mode-hook 'ora-ediff-hook)
+#+end_src
+
+** Ediff退出后恢复窗户设置
+:PROPERTIES:
+:CUSTOM_ID: restoring-the-windows-after-ediff-quits
+:END:
+
+当使用q退出一个Ediff会话时，它只会留下两个diff窗口，而不是恢复Ediff启动前的窗口配置。下面是恢复旧窗口配置的代码:
+
+#+begin_src emacs-lisp
+  (winner-mode)
+  (add-hook 'ediff-after-quit-hook-internal 'winner-undo)
+#+end_src
+
+** 调用Ediff的各种方法
+:PROPERTIES:
+:CUSTOM_ID: list-of-ways-that-i-use-to-invoke-ediff
+:END:
+
+*** 从 =magit= 中调用
+:PROPERTIES:
+:CUSTOM_ID: from-magit
+:END:
+
+在80%的情况下，我使用快捷键e (=magit-ediff=)从 =magit-status-mode= 调用Ediff。
+这使我对更改有了更好的了解，特别是当我希望使用a (=ediff-copy-A-to-B=)或b (=ediff-copy-B-to-A=)来还原内容时。
+使用a的情况比较多，因为[[https://github.com/magit/magit][magit]]似乎总是将 =@{index}= 文件放在 =A= 窗口，而将当前文件放入 =B= 窗口。
+
+因此，当我我查看一个不同之处(我用j/k导航到它)时，我可以用a来进行还原。此时，当前文件中的diff区域将等于索引文件中的diff区域。
+但这是还原的内容还未被保存。如果想保存 =B= 窗口的文件，可以使用wb (=ediff-save-buffer=)。
+在还原之后，还可以调用!(=ediff-update-diffs=)来删除零长度的diff并更新模式行的diffcount。
+
+*** 其他方法
+:PROPERTIES:
+:CUSTOM_ID: other-methods
+:END:
+
+1. =ediff-buffers= 会对比两个(不同的)buffer。如果你碰巧只打开了两个窗口，并且刚好打开的是要对比的缓冲区，Ediff会使用它们作为默认值，并可以一路按下回车快速地选择这两个buffer。
+2. =ediff-files= 也类似，但对比对象为文件。我喜欢在 =dired= 中使用m标记要对比的文件，然后它们也会被 =ediff-files= 自动选中。
+3. =ediff-current-file= 用于查看对当前文件未保存之处的变更。我很少用它，因为我有一种冲动，一有机会就把每个文件都存起来。除非有人实现了一个类似的[[https://github.com/bbatsov/guru-mode][guru-mode]]的模式，它会在你保存文件时打扰你，否则很难从这种上瘾中恢复过来。实际上，经常执行 =C-x C-s= 不是一个坏主意
+
+#+BEGIN_QUOTE
+哦，你前一小时已经保存该文件40次;上一次保存是在 =0分34秒=;从那时算起你更改了27个字节.你 *确定* 要保存吗 =[y/N]=?
+#+END_QUOTE
