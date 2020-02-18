@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Emacs Org 任务和预约的原生 macOS 通知 - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="org-mode" />
+  <!-- <link rel="stylesheet" href="../../../../../media/css/main.css" type="text/css"/>
+       <link rel="stylesheet" href="../../../../../media/css/comment.css" type="text/css"/> -->
+  <link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/kognise/water.css@latest/dist/dark.css'>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="../../../../../">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <ul class="trigger">
+        <li><a href="../../../../../years/">Years</a></li>
+        <li><a href="../../../../../authors/">Authors</a></li>
+        <li><a href="../../../../../tags/">Tags</a></li>
+        <li><a href="../../../../../about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="../../../../../rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="https://www.bing.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">Emacs Org 任务和预约的原生 macOS 通知</h1>
+<div id="table-of-contents">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#approach-to-a-solution">解决方案</a></li>
+<li><a href="#code-to-implement-this">实现代码</a></li>
+<li><a href="#next-steps">下一个步骤</a></li>
+</ul>
+</div>
+</div>
+<p>
+Emacs是一种文本编辑器。但是我会使用它的<a href="https://orgmode.org/">Org模式</a>来“记录笔记，维护待办事项列表，规划项目，以及使用快速有效的纯文本系统编写文档”——它的<a href="https://orgmode.org/features.html#org700f940">日程表</a>是我日常工作的中心。
+日程表是一中日历视图，包含了当天安排的所有事情等信息:由于整个界面是由纯文本组成的，所以很方便(尽管不容易)重新设置你在日程表中看到的所有内容，比如添加子标题、空格、链接、文本等等。
+</p>
+
+<p>
+不过我仍然使用macOS的本地日历和提醒。因为它们会在我的Mac电脑上生成通知。
+</p>
+
+<p>
+在iOS上，多亏了神奇的<a href="https://beorgapp.com/">beorg应用</a>，beorg能部分理解Org文件并生成相应的通知。
+到目前为止，它似乎能理解我所有的任务死线和约会信息。我强烈推荐这个应用程序。它是一个原生的iOS应用程序，可以解析org文件并显示一个图形用户界面。Emacs则只有文本界面。
+并且只要在MacOS前台上运行的不是Emacs，我敢打赌你肯定会这样，比如浏览web、发消息、收发电子邮件或用Xcode编程时，Emacs内部的弹出窗口就会自动消失。
+所以当我需要一个推送通知(比如起床，出门赴约)时,Emacs Org模式并不是我唯一信任的系统。
+</p>
+
+<p>
+直到本周，情况才有所改观。
+</p>
+
+<p>
+我找到了一种基于Org任务项中的截止日期和约会时间生成macOS本机通知的简单方法。目前，我收到的所有通知都附有时间和日期，我还不能有选择地启用或禁用类似提醒的通知。但这只是个开始。
+</p>
+
+<div id="outline-container-orge4b868e" class="outline-2">
+<h2 id="approach-to-a-solution"><a id="orge4b868e"></a>解决方案</h2>
+<div class="outline-text-2" id="text-approach-to-a-solution">
+<p>
+Emacs可以很好地运行shell进程。这意味着只要我能够通过访问命令行程序来生成通知，我就可以完成工作。
+</p>
+
+<ul class="org-ul">
+<li>我知道Julien Blanchard写过一款 <a href="https://github.com/julienXX/terminal-notifier"><code>terminal-notifier</code></a> 来为shell中长时间运行的任务生成banner风格的通知,并且已经在用了。使用它你会收到一个通知，然后过一会儿就消失了。这是个不错的开始，但对于大多数约会提醒我希望提醒不会消失。</li>
+<li>Valere Jeantet的 <a href="https://github.com/vjeantet/alerter"><code>alerter</code></a> 是 <code>terminal-notifier</code> 的复克版本，它可以让通知不再自动消失，经过配置，甚至可以将类似消息的回复发送回进程。我现在就在用它，尽管只用到了默认的“关闭”和“查看”操作。</li>
+</ul>
+
+<p>
+Emacs附带了一个名为 <code>appt</code> (意为 <a href="https://www.emacswiki.org/emacs/AppointmentMode">Appointment Mode</a> )的包。我没有使用这个模式，但这个程序包附带了背景检查，你可以在适当的时候通过hook产生通知。
+</p>
+</div>
+</div>
+
+<div id="outline-container-org1aefbed" class="outline-2">
+<h2 id="code-to-implement-this"><a id="org1aefbed"></a>实现代码</h2>
+<div class="outline-text-2" id="text-code-to-implement-this">
+<p>
+这不是我自己想出来的。我的Emacs Lisp太糟糕了，大多数时候都搞不定。
+</p>
+
+<p>
+I did modify <a href="https://lists.gnu.org/archive/html/emacs-orgmode/2013-02/msg00644.html">a solution by Sarah Bagby</a> that is itself a modification of
+我做了修改<a href="https://lists.gnu.org/archive/html/emacs-orgmode/2013-02/msg00644.html">Sarah Bagby解决方案</a>,它本身也是修改自 <a href="http://emacs-fu.blogspot.com/2009/11/showing-pop-ups.html">其他</a> <a href="http://article.gmane.org/gmane.emacs.orgmode/5271">人的</a> <a href="http://article.gmane.org/gmane.emacs.orgmode/5806">代码</a> .
+Sarah使用的是 <code>terminal-notifier</code>,它生成通知后立即退出。而 <code>alerter</code> 会一直运行，且通知是一直可见的，可以接收回复事件;
+因此，Sarah使用 <code>shell-command</code> 函数同步调用是不可行的，它会阻塞Emacs。一个明显的替代方法是 <code>async-shell-command</code>,但它会拆分窗口并生成一个新的缓冲区来捕获输出，这不是希望的。
+</p>
+
+<p>
+幸运的是，我找到了异步运行可执行文件的 <code>start-process</code> 函数，你可以指定一个缓冲区名称来捕获输出，并通过将其设置为 <code>nil</code> 来简单地丢弃所有输出。
+</p>
+
+<p>
+这让我找到了<a href="https://gist.github.com/justinhj/eb2d354d06631076566f#file-gistfile1-el">Justin Heyes-Jones所做的更改</a>，他也使用 <code>terminal-notifier</code>,但是通过 <code>start-process</code> 函数调用，以及下面一行漂亮的代码:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">defvar</span> <span style="font-weight: bold; font-style: italic;">terminal-notifier-command</span> (executable-find <span style="font-style: italic;">"terminal-notifier"</span>) <span style="font-style: italic;">"The path to terminal-notifier."</span>)
+</pre>
+</div>
+
+<p>
+ I compiled and installed <code>alerter</code> locally in <code>~/bin</code>, so I added this path to the lookup list, before the Homebrew binary folder:
+这将查找可执行路径目录列表从而生成一个具有可执行程序完整路径的变量。我编译并在 <code>~/bin</code> 目录下安装了 <code>alerter</code>,因此我将此路径添加到查找列表中,放在homebrew的二进制文件夹之前:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">setq</span> exec-path (append '(<span style="font-style: italic;">"/Users/ctm/bin"</span> <span style="font-style: italic;">"/usr/local/bin"</span> <span style="font-style: italic;">"/usr/local/sbin"</span>) exec-path))
+</pre>
+</div>
+
+<p>
+我对Emacs Lisp不太了解，我无法通过 <a href="https://www.gnu.org/software/emacs/manual/html_node/elisp/File-Name-Expansion.html"><code>expand-file-name</code></a> 来扩展 <code>~/bin</code>,因此我将路径硬编码为 <code>/Users/ctm/bin</code>.你复制代码时必须对它进行调整,很抱歉。
+</p>
+
+<p>
+现在调整 <code>init.el</code> 中的配置:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="font-weight: bold;">require</span> '<span style="font-weight: bold; text-decoration: underline;">appt</span>)
+
+(<span style="font-weight: bold;">setq</span> appt-time-msg-list nil) <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">clear existing appt list</span>
+(<span style="font-weight: bold;">setq</span> appt-display-interval '5) <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">warn every 5 minutes from t - appt-message-warning-time</span>
+(<span style="font-weight: bold;">setq</span>
+ appt-message-warning-time '15 <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">send first warning 15 minutes before appointment</span>
+ appt-display-mode-line nil <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">don't show in the modeline</span>
+ appt-display-format 'window) <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">pass warnings to the designated window function</span>
+(<span style="font-weight: bold;">setq</span> appt-disp-window-function (<span style="font-weight: bold;">function</span> t/appt-display-native))
+
+(appt-activate 1) <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">activate appointment notification</span>
+<span style="font-weight: bold; font-style: italic;">; </span><span style="font-weight: bold; font-style: italic;">(display-time) ;; Clock in modeline</span>
+
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">ct/send-notification</span> (title msg)
+  (<span style="font-weight: bold;">let</span> ((notifier-path (executable-find <span style="font-style: italic;">"alerter"</span>)))
+    (start-process
+     <span style="font-style: italic;">"Appointment Alert"</span>
+     <span style="font-style: italic;">"*Appointment Alert*"</span> <span style="font-weight: bold; font-style: italic;">; </span><span style="font-weight: bold; font-style: italic;">use `nil` to not capture output; this captures output in background</span>
+     notifier-path
+     <span style="font-style: italic;">"-message"</span> msg
+     <span style="font-style: italic;">"-title"</span> title
+     <span style="font-style: italic;">"-sender"</span> <span style="font-style: italic;">"org.gnu.Emacs"</span>
+     <span style="font-style: italic;">"-activate"</span> <span style="font-style: italic;">"org.gnu.Emacs"</span>)))
+(<span style="font-weight: bold;">defun</span> <span style="font-weight: bold;">ct/appt-display-native</span> (min-to-app new-time msg)
+  (ct/send-notification
+   (format <span style="font-style: italic;">"Appointment in %s minutes"</span> min-to-app) <span style="font-weight: bold; font-style: italic;">; </span><span style="font-weight: bold; font-style: italic;">Title</span>
+   (format <span style="font-style: italic;">"%s"</span> msg))) <span style="font-weight: bold; font-style: italic;">; </span><span style="font-weight: bold; font-style: italic;">Message/detail text</span>
+
+
+<span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">Agenda-to-appointent hooks</span>
+(org-agenda-to-appt) <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">generate the appt list from org agenda files on emacs launch</span>
+(run-at-time <span style="font-style: italic;">"24:01"</span> 3600 'org-agenda-to-appt) <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">update appt list hourly</span>
+(add-hook 'org-finalize-agenda-hook 'org-agenda-to-appt) <span style="font-weight: bold; font-style: italic;">;; </span><span style="font-weight: bold; font-style: italic;">update appt list on agenda view</span>
+</pre>
+</div>
+
+<p>
+你可以看到,我复制了大部分配置代码,删除了 <code>(display-time)</code> 函数调用(因为我不想有一个可见的时钟在我的编辑器中),并创建了 <code>ct/send-notification</code> 函数,它为我找到 <code>alter</code> 的二进制文件(Sarah的代码硬编码了路径),并调用通知辅助程序。
+我添加了 <code>-sender</code> 和 <code>activate</code> 参数调用,这样提醒中的应用程序图标就是sender的图标了,此外在点击通知时 <code>terminal-notifier</code> 也会根据 <code>activate</code> 参数来打开Emacs了( <code>alter</code> 目前没有这个功能,但是也许会有人再次合并这两个在一起…)。
+</p>
+
+<p>
+appointment 数据库每小时刷新一次，而且每次重新构建Org日程时都会刷新。看起来是足够了。
+</p>
+
+<p>
+现在这个Org模式子任务:
+</p>
+<div class="org-src-container">
+<pre class="src src-org"><span style="font-weight: bold; font-style: italic;">** </span><span style="font-weight: bold;">TODO</span><span style="font-weight: bold; font-style: italic;"> Hello World, this is a task due soon!</span>
+<span style="font-weight: bold;">SCHEDULED:</span> <span style="text-decoration: underline;">&lt;2019-12-04 Wed 10:53&gt;</span>
+</pre>
+</div>
+<p>
+将会转换为通知:
+<img src="https://christiantietze.de/posts/2019/12/emacs-notifications/20191204104848_notification.png" alt="20191204104848_notification.png" />
+</p>
+
+<p>
+当有多个项目同一时间到期时，他们的所有信息都塞进同一个通知框中。这本身的用处不大，但它仍然可以作为一个触发器，提醒我查看agenda，看看发生了什么。
+</p>
+
+<p>
+对于本市内的约会，我通常会在原生日历应用中添加提醒，在约会前的45分到60分提醒我打包好东西，准备离开办公桌。
+一开始我不知道怎么实现，但Org其实默认就支持这样操作，只要将 <code>:APPT_WARNTIME: 60</code> 添加到<a href="https://orgmode.org/manual/Drawers.html#Drawer">任务的属性drawer中即可</a>:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-org"><span style="font-weight: bold; font-style: italic;">** </span><span style="font-weight: bold;">TODO</span><span style="font-weight: bold; font-style: italic;"> Hello World, this is a task due in the far future!</span>
+<span style="font-weight: bold;">DEADLINE:</span> <span style="text-decoration: underline;">&lt;2019-12-04 Wed 23:59&gt;</span>
+<span style="font-weight: bold;">:PROPERTIES:</span>
+<span style="font-weight: bold;">:APPT_WARNTIME:</span> 60
+<span style="font-weight: bold;">:END:</span>
+</pre>
+</div>
+
+<p>
+这将在事件发生前60分钟生成通知。然后每5分钟重复一次通知(在我的 <code>app-display-interval</code> 中设置的)。
+这不是最理想的状况，我希望通过一个还差60分、15分、5分的定时器来产生通知。
+</p>
+
+<p>
+我想我会完全禁用间隔通知。不过，我必须首先在实践中检验所有这些操作。
+</p>
+</div>
+</div>
+
+<div id="outline-container-org9ca423c" class="outline-2">
+<h2 id="next-steps"><a id="org9ca423c"></a>下一个步骤</h2>
+<div class="outline-text-2" id="text-next-steps">
+<ul class="org-ul">
+<li><code>alerter</code> 的输出在后台被附加到缓冲区中;我可以处理这个输出，例如当“显示”的行动按钮点击时显示Org议程。这也有助于提供一个 “X分钟后再次提醒” 选项，解决了当我设置 <code>:APPT_WARNTIME: 60</code>. 时在一个小时内梅5分钟通知一次的问题.</li>
+<li>我点击“显示”按钮是, <code>alerter</code> 不会激活Emacs，但 <code>terminal-notifier</code> 有内置的支持。应该可以修复。</li>
+<li>通知标题为“Appointment in X minutes”。如果你有两个预约，一个在5分钟后，一个在10分钟后，标题将会是“Appointment in (10 5) minutes”。这是emacs表示分钟列表的字符串。实际上并没有什么用。</li>
+<li><code>terminal-notifier</code> 和 <code>alerter</code> 无需相互独立，我想知道为什么他们过去重组失败了。也许我能帮上忙。</li>
+<li><code>org-agenda-to-appt</code> 不会清理删除的预约。我不知道我是否想要这样，因为这是一个破坏性的过程。它不是那么的“无状态”，因为它会删除和替换约会提醒; 它不是将所有议程任务映射到新的约会列表的纯函数。如果你通过其他途径将预约添加到列表中，它们将被保留。这很好。但另一方面，在我添加了带有警告的测试事件之后，这些测试时间永远不会消失。 交互式地调用 <code>appt-delete</code> 会检查所有即将到来的提醒并删除任何你不想要的提醒。</li>
+</ul>
+
+<p>
+接收更新。
+</p>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2020-02-10</span>
+            <span title="last modification date" class="post-info">2020-02-18</span>
+            <span title="tags" class="post-info">:<a href="../../../../../tags/org-mode">org-mode</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-41d6db1e-3845-4aad-9d94-32d9db55fc04">lujun9972</a></span>
+        </div>
+    <script src="../../../../../media/js/jquery-2.1.3.min.js"></script>
+    <script src="../../../../../media/js/md5.min.js"></script>
+        <section>
+            <div id="gitalk-container"></div>
+            <script type="text/javascript">
+             var gitalk = new Gitalk({
+                 clientID: 'fdcb5d9da3f4acb4862c',
+                 clientSecret: 'dd0a16312a206782cb7669dcec5e96874ab48170',
+                 repo: 'lujun9972.github.com',
+                 owner: 'lujun9972',
+                 admin: ['lujun9972'],
+                 id: md5(location.pathname),      // Ensure uniqueness and length less than 50
+                 distractionFreeMode: false  // Facebook-like distraction free mode
+             })
+             gitalk.render('gitalk-container')
+            </script>
+        </section>
+    <script src="../../../../../media/js/main.js"></script>
+        <script>
+         var _hmt = _hmt || [];
+         (function() {
+             var hm = document.createElement("script");
+             hm.src = "https://hm.baidu.com/hm.js?7bac4fd0247f69c27887e0d4e3aee41e";
+             var s = document.getElementsByTagName("script")[0]; 
+             s.parentNode.insertBefore(hm, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-41d6db1e-3845-4aad-9d94-32d9db55fc04">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="../../../../../instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>
