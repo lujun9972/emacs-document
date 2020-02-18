@@ -1,0 +1,144 @@
+#+TITLE: Emacs Org 任务和预约的原生 macOS 通知
+#+URL: https://christiantietze.de/posts/2019/12/emacs-notifications/
+#+AUTHOR: lujun9972
+#+TAGS: org-mode
+#+DATE: [2020年 02月 10日 星期一 10:33:25 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+Emacs是一种文本编辑器。但是我会使用它的[[https://orgmode.org/][Org模式]]来“记录笔记，维护待办事项列表，规划项目，以及使用快速有效的纯文本系统编写文档”——它的[[https://orgmode.org/features.html#org700f940][日程表]]是我日常工作的中心。
+日程表是一中日历视图，包含了当天安排的所有事情等信息:由于整个界面是由纯文本组成的，所以很方便(尽管不容易)重新设置你在日程表中看到的所有内容，比如添加子标题、空格、链接、文本等等。
+
+不过我仍然使用macOS的本地日历和提醒。因为它们会在我的Mac电脑上生成通知。
+
+在iOS上，多亏了神奇的[[https://beorgapp.com/][beorg应用]]，beorg能部分理解Org文件并生成相应的通知。
+到目前为止，它似乎能理解我所有的任务死线和约会信息。我强烈推荐这个应用程序。它是一个原生的iOS应用程序，可以解析org文件并显示一个图形用户界面。Emacs则只有文本界面。
+并且只要在MacOS前台上运行的不是Emacs，我敢打赌你肯定会这样，比如浏览web、发消息、收发电子邮件或用Xcode编程时，Emacs内部的弹出窗口就会自动消失。
+所以当我需要一个推送通知(比如起床，出门赴约)时,Emacs Org模式并不是我唯一信任的系统。
+
+直到本周，情况才有所改观。
+
+我找到了一种基于Org任务项中的截止日期和约会时间生成macOS本机通知的简单方法。目前，我收到的所有通知都附有时间和日期，我还不能有选择地启用或禁用类似提醒的通知。但这只是个开始。
+
+** 解决方案 
+:PROPERTIES:
+:CUSTOM_ID: approach-to-a-solution
+:END:
+
+Emacs可以很好地运行shell进程。这意味着只要我能够通过访问命令行程序来生成通知，我就可以完成工作。
+
+- 我知道Julien Blanchard写过一款 [[https://github.com/julienXX/terminal-notifier][=terminal-notifier=]] 来为shell中长时间运行的任务生成banner风格的通知,并且已经在用了。使用它你会收到一个通知，然后过一会儿就消失了。这是个不错的开始，但对于大多数约会提醒我希望提醒不会消失。
+- Valere Jeantet的 [[https://github.com/vjeantet/alerter][=alerter=]] 是 =terminal-notifier= 的复克版本，它可以让通知不再自动消失，经过配置，甚至可以将类似消息的回复发送回进程。我现在就在用它，尽管只用到了默认的“关闭”和“查看”操作。
+
+Emacs附带了一个名为 =appt= (意为 [[https://www.emacswiki.org/emacs/AppointmentMode][Appointment Mode]] )的包。我没有使用这个模式，但这个程序包附带了背景检查，你可以在适当的时候通过hook产生通知。
+
+** 实现代码
+:PROPERTIES:
+:CUSTOM_ID: code-to-implement-this
+:END:
+
+这不是我自己想出来的。我的Emacs Lisp太糟糕了，大多数时候都搞不定。
+
+I did modify [[https://lists.gnu.org/archive/html/emacs-orgmode/2013-02/msg00644.html][a solution by Sarah Bagby]] that is itself a modification of
+我做了修改[[https://lists.gnu.org/archive/html/emacs-orgmode/2013-02/msg00644.html][Sarah Bagby解决方案]],它本身也是修改自 [[http://emacs-fu.blogspot.com/2009/11/showing-pop-ups.html][其他]] [[http://article.gmane.org/gmane.emacs.orgmode/5271][人的]] [[http://article.gmane.org/gmane.emacs.orgmode/5806][代码]] .
+Sarah使用的是 =terminal-notifier=,它生成通知后立即退出。而 =alerter= 会一直运行，且通知是一直可见的，可以接收回复事件;
+因此，Sarah使用 =shell-command= 函数同步调用是不可行的，它会阻塞Emacs。一个明显的替代方法是 =async-shell-command=,但它会拆分窗口并生成一个新的缓冲区来捕获输出，这不是希望的。
+
+幸运的是，我找到了异步运行可执行文件的 =start-process= 函数，你可以指定一个缓冲区名称来捕获输出，并通过将其设置为 =nil= 来简单地丢弃所有输出。
+
+这让我找到了[[https://gist.github.com/justinhj/eb2d354d06631076566f#file-gistfile1-el][Justin Heyes-Jones所做的更改]]，他也使用 =terminal-notifier=,但是通过 =start-process= 函数调用，以及下面一行漂亮的代码:
+
+#+begin_src emacs-lisp
+  (defvar terminal-notifier-command (executable-find "terminal-notifier") "The path to terminal-notifier.")
+#+end_src
+
+ I compiled and installed =alerter= locally in =~/bin=, so I added this path to the lookup list, before the Homebrew binary folder:
+这将查找可执行路径目录列表从而生成一个具有可执行程序完整路径的变量。我编译并在 =~/bin= 目录下安装了 =alerter=,因此我将此路径添加到查找列表中,放在homebrew的二进制文件夹之前:
+
+ #+begin_src emacs-lisp
+   (setq exec-path (append '("/Users/ctm/bin" "/usr/local/bin" "/usr/local/sbin") exec-path))
+ #+end_src
+
+我对Emacs Lisp不太了解，我无法通过 [[https://www.gnu.org/software/emacs/manual/html_node/elisp/File-Name-Expansion.html][=expand-file-name=]] 来扩展 =~/bin=,因此我将路径硬编码为 =/Users/ctm/bin=.你复制代码时必须对它进行调整,很抱歉。
+
+现在调整 =init.el= 中的配置:
+
+#+begin_src emacs-lisp
+  (require 'appt)
+
+  (setq appt-time-msg-list nil) ;; clear existing appt list
+  (setq appt-display-interval '5) ;; warn every 5 minutes from t - appt-message-warning-time
+  (setq
+   appt-message-warning-time '15 ;; send first warning 15 minutes before appointment
+   appt-display-mode-line nil ;; don't show in the modeline
+   appt-display-format 'window) ;; pass warnings to the designated window function
+  (setq appt-disp-window-function (function t/appt-display-native))
+
+  (appt-activate 1) ;; activate appointment notification
+  ; (display-time) ;; Clock in modeline
+
+  (defun ct/send-notification (title msg)
+    (let ((notifier-path (executable-find "alerter")))
+      (start-process
+       "Appointment Alert"
+       "*Appointment Alert*" ; use `nil` to not capture output; this captures output in background
+       notifier-path
+       "-message" msg
+       "-title" title
+       "-sender" "org.gnu.Emacs"
+       "-activate" "org.gnu.Emacs")))
+  (defun ct/appt-display-native (min-to-app new-time msg)
+    (ct/send-notification
+     (format "Appointment in %s minutes" min-to-app) ; Title
+     (format "%s" msg))) ; Message/detail text
+
+
+  ;; Agenda-to-appointent hooks
+  (org-agenda-to-appt) ;; generate the appt list from org agenda files on emacs launch
+  (run-at-time "24:01" 3600 'org-agenda-to-appt) ;; update appt list hourly
+  (add-hook 'org-finalize-agenda-hook 'org-agenda-to-appt) ;; update appt list on agenda view
+#+end_src
+
+你可以看到,我复制了大部分配置代码,删除了 =(display-time)= 函数调用(因为我不想有一个可见的时钟在我的编辑器中),并创建了 =ct/send-notification= 函数,它为我找到 =alter= 的二进制文件(Sarah的代码硬编码了路径),并调用通知辅助程序。
+我添加了 =-sender= 和 =activate= 参数调用,这样提醒中的应用程序图标就是sender的图标了,此外在点击通知时 =terminal-notifier= 也会根据 =activate= 参数来打开Emacs了( =alter= 目前没有这个功能,但是也许会有人再次合并这两个在一起…)。
+
+appointment 数据库每小时刷新一次，而且每次重新构建Org日程时都会刷新。看起来是足够了。
+
+现在这个Org模式子任务:
+#+begin_src org
+  ,** TODO Hello World, this is a task due soon!
+  SCHEDULED: <2019-12-04 Wed 10:53>
+#+end_src
+将会转换为通知:
+[[https://christiantietze.de/posts/2019/12/emacs-notifications/20191204104848_notification.png]]
+
+当有多个项目同一时间到期时，他们的所有信息都塞进同一个通知框中。这本身的用处不大，但它仍然可以作为一个触发器，提醒我查看agenda，看看发生了什么。
+
+对于本市内的约会，我通常会在原生日历应用中添加提醒，在约会前的45分到60分提醒我打包好东西，准备离开办公桌。
+一开始我不知道怎么实现，但Org其实默认就支持这样操作，只要将 =:APPT_WARNTIME: 60= 添加到[[https://orgmode.org/manual/Drawers.html#Drawer][任务的属性drawer中即可]]:
+
+#+begin_src org
+  ,** TODO Hello World, this is a task due in the far future!
+  DEADLINE: <2019-12-04 Wed 23:59>
+  :PROPERTIES:
+  :APPT_WARNTIME: 60
+  :END:
+#+end_src
+
+这将在事件发生前60分钟生成通知。然后每5分钟重复一次通知(在我的 =app-display-interval= 中设置的)。
+这不是最理想的状况，我希望通过一个还差60分、15分、5分的定时器来产生通知。
+
+我想我会完全禁用间隔通知。不过，我必须首先在实践中检验所有这些操作。
+
+** 下一个步骤
+:PROPERTIES:
+:CUSTOM_ID: next-steps
+:END:
+
+- =alerter= 的输出在后台被附加到缓冲区中;我可以处理这个输出，例如当“显示”的行动按钮点击时显示Org议程。这也有助于提供一个 “X分钟后再次提醒” 选项，解决了当我设置 =:APPT_WARNTIME: 60=. 时在一个小时内梅5分钟通知一次的问题.
+- 我点击“显示”按钮是, =alerter= 不会激活Emacs，但 =terminal-notifier= 有内置的支持。应该可以修复。
+- 通知标题为“Appointment in X minutes”。如果你有两个预约，一个在5分钟后，一个在10分钟后，标题将会是“Appointment in (10 5) minutes”。这是emacs表示分钟列表的字符串。实际上并没有什么用。
+- =terminal-notifier= 和 =alerter= 无需相互独立，我想知道为什么他们过去重组失败了。也许我能帮上忙。
+- =org-agenda-to-appt= 不会清理删除的预约。我不知道我是否想要这样，因为这是一个破坏性的过程。它不是那么的“无状态”，因为它会删除和替换约会提醒; 它不是将所有议程任务映射到新的约会列表的纯函数。如果你通过其他途径将预约添加到列表中，它们将被保留。这很好。但另一方面，在我添加了带有警告的测试事件之后，这些测试时间永远不会消失。 交互式地调用 =appt-delete= 会检查所有即将到来的提醒并删除任何你不想要的提醒。
+
+接收更新。
