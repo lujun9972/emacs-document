@@ -1,0 +1,467 @@
+#+TITLE: rx.el: Providing s-expression notation for regular expressions
+#+URL: https://opensourceforu.com/2020/02/rx-el-providing-s-expression-notation-for-regular-expressions/
+#+AUTHOR: lujun9972
+#+TAGS: raw
+#+DATE: [2020年 02月 18日 星期二 20:23:10 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+The rx.el Emacs Lisp module provides s-expression notation for regular expressions. It is a macro that can generate regular expressions from readable s-expressions. This eleventh article in the GNU Emacs series explores the various s-expression counterparts and the regular expressions that get generated with numerous examples.
+
+The rx.el Emacs Lisp module is written by Gerd Moellman and is included as part of GNU Emacs, which is released under the GNU General Public License v3.
+
+*Installation*\\
+The rx.el library is already included as part of GNU Emacs and you can simply require the same as shown below:
+
+#+BEGIN_EXAMPLE
+  (require ‘rx)
+#+END_EXAMPLE
+
+We will use the s.el package available in Milkypostman's Emacs Lisp Package Archive (MELPA) and in the Marmalede repo to demonstrate the examples. In particular, we will use thes-matches-p and s-match-strings-all functions provided by the s.el library. You can install this using the following  command inside GNU Emacs:
+
+#+BEGIN_EXAMPLE
+  M-x package-install s
+#+END_EXAMPLE
+
+Alternatively, you can copy the s.el source file to your Emacs load path to use it. If you are using Cask, then you can add the following to your Cask file:
+
+#+BEGIN_EXAMPLE
+  (depends-on “s”)
+#+END_EXAMPLE
+
+After installation, you can require the s.el package using the following snippet:
+
+#+BEGIN_EXAMPLE
+  (require ‘s)
+#+END_EXAMPLE
+
+*Usage*\\
+Let us now explore the different s-expressions that can be used with the rx macro to generate regular expressions. The any construct matches any character in a SET. The latter may be a character or a string. In the following example ‘[0-9A-Fa-f]' is the regular expression pattern that is generated.
+
+#+BEGIN_EXAMPLE
+  (any SET ...) ;; Syntax
+  
+  (setq alphanumeric-pattern (rx (any "a-f" "A-F" "0-9")))
+  "[0-9A-Fa-f]"
+  
+  (s-matches-p (rx (any "a-f" "A-F" "0-9"))
+  "A")
+  t
+  (s-matches-p (rx (any "a-f" "A-F" "0-9"))
+  ";")
+  nil
+#+END_EXAMPLE
+
+The s-matches-p function in the s.el library takes a regular expression and a string, and returns ‘true' if there is a match and ‘nil' otherwise. If an optional START argument is provided to it, then it starts the search from that index.
+
+#+BEGIN_EXAMPLE
+  (s-matches-p REGEXP S &optional START) ;; Syntax
+#+END_EXAMPLE
+
+You can also use the in construct to generate the same ‘[0-9A-Fa-f]' regular expression pattern as illustrated below:
+
+#+BEGIN_EXAMPLE
+  (in SET ...) ;; Syntax
+  
+  (s-matches-p (rx (in "a-f" "A-F" "0-9"))
+  "A")
+  t
+#+END_EXAMPLE
+
+The and construct can be used to combine multiple s-expressions together. In the following example, line-start generates the ‘^' (caret) character and is combined with zero or more occurrences of alphabets as shown below:
+
+#+BEGIN_EXAMPLE
+  (and SEXP1 SEXP2 ...) ;; Syntax
+  
+  (rx (and line-start (0+ (in "a-z"))))
+  "^[a-z]*"
+#+END_EXAMPLE
+
+If you want to match either of the s-expressions, you can use the or construct as illustrated below:
+
+#+BEGIN_EXAMPLE
+  (or SEXP1 SEXP2 ...) ;; Syntax
+  
+  (s-match-strings-all
+  (rx (or “Mary” “Peter” “John”))
+  “Mary had a little lamb”)
+  ((“Mary”))
+#+END_EXAMPLE
+
+The s-match-strings-all function from the s.el library takes two arguments: a REGEX and a STRING. It returns a list of matches for REGEX in the given input STRING.
+
+#+BEGIN_EXAMPLE
+  (s-match-strings-all REGEX STRING) ;; Syntax
+#+END_EXAMPLE
+
+The not rx-constituent can be used to generate a negative match. In the following example, a regular expression is generated to match a newline followed by anything that is not a blank.
+
+#+BEGIN_EXAMPLE
+  (not SEXP) ;; Syntax
+  
+  (rx (and “\n” (not blank)))
+  “\n[^[:blank:]]”
+#+END_EXAMPLE
+
+You can match for a specific character literally using the char construct. A couple of examples to match for the character ‘;' are given below:
+
+#+BEGIN_EXAMPLE
+  (rx (char ";"))
+  ";"
+  
+  (s-matches-p (rx (char ";"))
+  "ABC")
+  nil
+  (s-matches-p (rx (char ";"))
+  "ABC;")
+  t
+#+END_EXAMPLE
+
+The negate operation to not match a character is provided by the ‘not-char' construct. For example:
+
+#+BEGIN_EXAMPLE
+  (not-char SEXP1 SEXP2 ...) ;; Syntax
+  
+  (rx (not-char "A"))
+  "[^A]"
+  
+  (s-matches-p (rx (not-char "A"))
+  "B")
+  t
+  (s-matches-p (rx (not-char "A"))
+  "A")
+  nil
+#+END_EXAMPLE
+
+The actual code for not-char in rx.el is defined as follows:
+
+#+BEGIN_EXAMPLE
+  (defconst rx-constituents
+  ‘((...
+  (not-char . (rx-not-char 1 nil rx-check-any))
+  ...)))
+  
+  (defun rx-not-char (form)
+  “Parse and produce code from FORM. FORM is `(not-char ...)’.”
+  (rx-check form)
+  (rx-not `(not (in ,@(cdr form)))))
+#+END_EXAMPLE
+
+You can generate regular expressions from s-expressions to match for zero or more, one or more, and zero or one occurrences, as illustrated below:
+
+#+BEGIN_EXAMPLE
+  (zero-or-more SEXP ...) ;; Syntax
+  (one-or-more SEXP ...) ;; Syntax
+  (zero-or-one SEXP ...) ;; Syntax
+  
+  (rx (zero-or-more “x”))
+  “x*”
+  
+  (s-matches-p (rx (zero-or-more “x”))
+  “yz”)
+  t
+  (s-matches-p (rx (zero-or-more “x”))
+  “xyz”)
+  t
+  
+  (rx (one-or-more “x”))
+  “x+”
+  
+  (s-matches-p (rx (one-or-more “x”))
+  “yz”)
+  nil
+  (s-matches-p (rx (one-or-more “x”))
+  “xyz”)
+  t
+  
+  (rx (zero-or-one “x”))
+  “x?”
+  
+  (s-matches-p (rx (zero-or-one “x”))
+  “yz”)
+  t
+  (s-matches-p (rx (zero-or-one “x”))
+  “xyz”)
+  t
+#+END_EXAMPLE
+
+We have already seen the line-start construct that generates the caret symbol (^). Similarly, you can use the line-end construct to signify the end of a line, which is represented by the dollar sign ($). For example:
+
+#+BEGIN_EXAMPLE
+  (rx “end” line-end)
+  “end$”
+  
+  (s-matches-p (rx “end” line-end)
+  “The end.”)
+  nil
+  (s-matches-p (rx “end” line-end)
+  “The end”)
+  t
+#+END_EXAMPLE
+
+A digit can be represented by using either digit, numeric or num constructs. A couple of examples are shown below:
+
+#+BEGIN_EXAMPLE
+  (rx digit)
+  “[[:digit:]]”
+  
+  (rx numeric)
+  “[[:digit:]]”
+  
+  (rx num)
+  “[[:digit:]]”
+  
+  (s-matches-p (rx num)
+  “1234”)
+  t
+  (s-matches-p (rx num)
+  “abcd”)
+  nil
+#+END_EXAMPLE
+
+A control character is a non-printing character and you can use either control or cntrl constructs to generate the regular expression for the same. A few examples are given below:
+
+#+BEGIN_EXAMPLE
+  (rx control)
+  “[[:cntrl:]]”
+  
+  (rx cntrl)
+  “[[:cntrl:]]”
+  
+  (s-matches-p (rx control)
+  “\0”)
+  t
+  (s-matches-p (rx control)
+  “abc”)
+  nil
+#+END_EXAMPLE
+
+A hexadecimal digit can be matched by using either hex-digit, hex, or xdigit rx-constituents as illustrated below:
+
+#+BEGIN_EXAMPLE
+  (rx hex-digit)
+  “[[:xdigit:]]”
+  
+  (rx hex)
+  “[[:xdigit:]]”
+  
+  (rx xdigit)
+  “[[:xdigit:]]”
+  
+  (s-matches-p (rx digit)
+  “1234”)
+  t
+  (s-matches-p (rx digit)
+  “abcd”)
+  nil
+#+END_EXAMPLE
+
+You can match for lower case characters using either lower or lower-case constructs. Similarly, you use upper or upper-case constructs to match for upper case letters. A few examples are shown below:
+
+#+BEGIN_EXAMPLE
+  (rx lower)
+  “[[:lower:]]”
+  
+  (rx lower-case)
+  “[[:lower:]]”
+  
+  (rx upper)
+  “[[:upper:]]”
+  
+  (rx upper-case)
+  “[[:upper:]]”
+  
+  (s-matches-p (rx lower)
+  “abc”)
+  t
+  (s-matches-p (rx lower-case)
+  “;”)
+  nil
+  
+  (s-matches-p (rx upper)
+  “ABC”)
+  t
+  (s-matches-p (rx upper-case)
+  “;”)
+  nil
+#+END_EXAMPLE
+
+If you have escaped characters in your input text, you will need to use either regexp-quote or eval on the input before being able to apply the regular expression to match on the input string. An example is given below:
+
+#+BEGIN_EXAMPLE
+  (eval FORM) ;; Syntax
+  
+  (setq input “\”Hello, world!\””)
+  
+  (not (s-matches-p input input))
+  nil
+  
+  (s-matches-p (regexp-quote input) input)
+  t
+  
+  (s-matches-p (rx (eval input)) input)
+  t
+#+END_EXAMPLE
+
+The rx.el library also provides support for non-ascii characters, such as multi-byte and accented characters. You can match for the same using the non-ascii construct as shown below:
+
+#+BEGIN_EXAMPLE
+  (rx nonascii)
+  “[[:nonascii:]]”
+  
+  (s-matches-p (rx nonascii)
+  “ABC”)
+  nil
+  (s-matches-p (rx nonascii)
+  “È”)
+  t
+#+END_EXAMPLE
+
+The alpha-numeric rx-constituent can be used to match for both alphabets and numerals. A couple of examples are provided below for reference:
+
+#+BEGIN_EXAMPLE
+  (rx alphanumeric)
+  “[[:alnum:]]”
+  
+  
+  (s-matches-p (rx alphanumeric)
+  “abc123”)
+  t
+  (s-matches-p (rx alphanumeric)
+  “;”)
+  nil
+#+END_EXAMPLE
+
+If you want to match for only alphabets, then you can use the alpha construct. A few examples are shown below:
+
+#+BEGIN_EXAMPLE
+  (rx alpha)
+  “[[:alpha:]]”
+  
+  (s-matches-p (rx alpha)
+  “ABC”)
+  t
+  (s-matches-p (rx alpha)
+  “;;”)
+  nil
+#+END_EXAMPLE
+
+You can search for a blank character using the blank construct. For example:
+
+#+BEGIN_EXAMPLE
+  (rx blank)
+  “[[:blank:]]”
+  
+  (s-matches-p (rx blank)
+  “ “)
+  t
+  (s-matches-p (rx blank)
+  “A”)
+  nil
+#+END_EXAMPLE
+
+The space, white and whitespace rx-constituents can be used to match for white space as illustrated below:
+
+#+BEGIN_EXAMPLE
+  (rx space)
+  “[[:space:]]”
+  
+  (rx white)
+  “[[:space:]]”
+  
+  (rx whitespace)
+  “[[:space:]]”
+  
+  
+  (s-matches-p (rx space)
+  “ “)
+  t
+  (s-matches-p (rx space)
+  “abc”)
+  nil
+#+END_EXAMPLE
+
+The punct construct is used to match for punctuation marks. A couple of examples follow:
+
+#+BEGIN_EXAMPLE
+  (rx punct)
+  “[[:punct:]]”
+  
+  (rx punctuation)
+  “[[:punct:]]”
+  
+  (s-matches-p (rx punct)
+  “abc”)
+  nil
+  (s-matches-p (rx punct)
+  “.”)
+  t
+#+END_EXAMPLE
+
+You can match for a word using either the word or wordchar constructs. For example:
+
+#+BEGIN_EXAMPLE
+  (rx word)
+  “[[:word:]]”
+  
+  (rx wordchar)
+  “[[:word:]]”
+  
+  (s-matches-p (rx word)
+  “the”)
+  t
+  (s-matches-p (rx word)
+  “ “)
+  nil
+#+END_EXAMPLE
+
+If you do not want to match for a word, you can use the not-wordchar construct as follows:
+
+#+BEGIN_EXAMPLE
+  (rx not-wordchar)
+  “\\W”
+  
+  (s-matches-p (rx not-wordchar)
+  “abc”)
+  
+  nil
+  (s-matches-p (rx not-wordchar)
+  “ “)
+  t
+#+END_EXAMPLE
+
+The repeat construct takes two arguments: a number N and an s-expression. It repeatedly applies the s-expression N number of times to generate the regular expression. In the following example, we match for two occurrences of the letter ‘x':
+
+#+BEGIN_EXAMPLE
+  (repeat N SEXP) ;; Syntax
+  
+  (rx (repeat 2 "x"))
+  "x\\{2\\}"
+  
+  (s-matches-p (rx (repeat 2 "x"))
+  " ")
+  nil
+  (s-matches-p (rx (repeat 2 "x"))
+  "xxyz")
+  t
+#+END_EXAMPLE
+
+You can use group or group-n rx-constituents to capture groups of regular expressions. The first argument to group-n represents the group number, which is followed by the actual s-expression. In the following example, we create a regular expression to match the date in the MM-DD-YYYY format:
+
+#+BEGIN_EXAMPLE
+  (group SEXP1 SEXP2 ...) ;; Syntax
+  (group-n N SEXP1 SEXP2 ...) ;; Syntax
+  
+  (setq mm-dd-yyyy
+  (rx (group-n 3 (repeat 2 digit))
+  “-”
+  (group-n 2 (repeat 2 digit))
+  “-”
+  (group-n 1 (repeat 4 digit))))
+  
+  (s-match-strings-all mm-dd-yyyy “12-10-2019”)
+  ((“12-10-2019” “2019” “10” “12”))
+#+END_EXAMPLE
+
+The generated regular expression pattern is‘\\(?3:[[:digit:]]\\{2\\}\\)-\\(?2:[[:digit:]]\\{2\\}\\)-\\(?1:[[:digit:]]\\{4\\}\\)'.
+
+You are encouraged to read the information given in https://github.com/typester/emacs/blob/master/lisp/emacs-lisp/rx.el to know more about the available constructs provided by rx.el.
