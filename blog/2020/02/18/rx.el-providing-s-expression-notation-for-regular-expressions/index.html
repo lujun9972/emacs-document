@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>rx.el: Providing s-expression notation for regular expressions - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="raw" />
+  <!-- <link rel="stylesheet" href="../../../../../media/css/main.css" type="text/css"/>
+       <link rel="stylesheet" href="../../../../../media/css/comment.css" type="text/css"/> -->
+  <link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/kognise/water.css@latest/dist/dark.css'>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="../../../../../">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <ul class="trigger">
+        <li><a href="../../../../../years/">Years</a></li>
+        <li><a href="../../../../../authors/">Authors</a></li>
+        <li><a href="../../../../../tags/">Tags</a></li>
+        <li><a href="../../../../../about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="../../../../../rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="https://www.bing.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">rx.el: Providing s-expression notation for regular expressions</h1>
+<p>
+The rx.el Emacs Lisp module provides s-expression notation for regular expressions. It is a macro that can generate regular expressions from readable s-expressions. This eleventh article in the GNU Emacs series explores the various s-expression counterparts and the regular expressions that get generated with numerous examples.
+</p>
+
+<p>
+The rx.el Emacs Lisp module is written by Gerd Moellman and is included as part of GNU Emacs, which is released under the GNU General Public License v3.
+</p>
+
+<p>
+<b>Installation</b><br />
+The rx.el library is already included as part of GNU Emacs and you can simply require the same as shown below:
+</p>
+
+<pre class="example">
+(require ‘rx)
+</pre>
+
+<p>
+We will use the s.el package available in Milkypostman's Emacs Lisp Package Archive (MELPA) and in the Marmalede repo to demonstrate the examples. In particular, we will use thes-matches-p and s-match-strings-all functions provided by the s.el library. You can install this using the following  command inside GNU Emacs:
+</p>
+
+<pre class="example">
+M-x package-install s
+</pre>
+
+<p>
+Alternatively, you can copy the s.el source file to your Emacs load path to use it. If you are using Cask, then you can add the following to your Cask file:
+</p>
+
+<pre class="example">
+(depends-on “s”)
+</pre>
+
+<p>
+After installation, you can require the s.el package using the following snippet:
+</p>
+
+<pre class="example">
+(require ‘s)
+</pre>
+
+<p>
+<b>Usage</b><br />
+Let us now explore the different s-expressions that can be used with the rx macro to generate regular expressions. The any construct matches any character in a SET. The latter may be a character or a string. In the following example ‘[0-9A-Fa-f]' is the regular expression pattern that is generated.
+</p>
+
+<pre class="example">
+(any SET ...) ;; Syntax
+
+(setq alphanumeric-pattern (rx (any "a-f" "A-F" "0-9")))
+"[0-9A-Fa-f]"
+
+(s-matches-p (rx (any "a-f" "A-F" "0-9"))
+"A")
+t
+(s-matches-p (rx (any "a-f" "A-F" "0-9"))
+";")
+nil
+</pre>
+
+<p>
+The s-matches-p function in the s.el library takes a regular expression and a string, and returns ‘true' if there is a match and ‘nil' otherwise. If an optional START argument is provided to it, then it starts the search from that index.
+</p>
+
+<pre class="example">
+(s-matches-p REGEXP S &amp;optional START) ;; Syntax
+</pre>
+
+<p>
+You can also use the in construct to generate the same ‘[0-9A-Fa-f]' regular expression pattern as illustrated below:
+</p>
+
+<pre class="example">
+(in SET ...) ;; Syntax
+
+(s-matches-p (rx (in "a-f" "A-F" "0-9"))
+"A")
+t
+</pre>
+
+<p>
+The and construct can be used to combine multiple s-expressions together. In the following example, line-start generates the ‘^' (caret) character and is combined with zero or more occurrences of alphabets as shown below:
+</p>
+
+<pre class="example">
+(and SEXP1 SEXP2 ...) ;; Syntax
+
+(rx (and line-start (0+ (in "a-z"))))
+"^[a-z]*"
+</pre>
+
+<p>
+If you want to match either of the s-expressions, you can use the or construct as illustrated below:
+</p>
+
+<pre class="example">
+(or SEXP1 SEXP2 ...) ;; Syntax
+
+(s-match-strings-all
+(rx (or “Mary” “Peter” “John”))
+“Mary had a little lamb”)
+((“Mary”))
+</pre>
+
+<p>
+The s-match-strings-all function from the s.el library takes two arguments: a REGEX and a STRING. It returns a list of matches for REGEX in the given input STRING.
+</p>
+
+<pre class="example">
+(s-match-strings-all REGEX STRING) ;; Syntax
+</pre>
+
+<p>
+The not rx-constituent can be used to generate a negative match. In the following example, a regular expression is generated to match a newline followed by anything that is not a blank.
+</p>
+
+<pre class="example">
+(not SEXP) ;; Syntax
+
+(rx (and “\n” (not blank)))
+“\n[^[:blank:]]”
+</pre>
+
+<p>
+You can match for a specific character literally using the char construct. A couple of examples to match for the character ‘;' are given below:
+</p>
+
+<pre class="example">
+(rx (char ";"))
+";"
+
+(s-matches-p (rx (char ";"))
+"ABC")
+nil
+(s-matches-p (rx (char ";"))
+"ABC;")
+t
+</pre>
+
+<p>
+The negate operation to not match a character is provided by the ‘not-char' construct. For example:
+</p>
+
+<pre class="example">
+(not-char SEXP1 SEXP2 ...) ;; Syntax
+
+(rx (not-char "A"))
+"[^A]"
+
+(s-matches-p (rx (not-char "A"))
+"B")
+t
+(s-matches-p (rx (not-char "A"))
+"A")
+nil
+</pre>
+
+<p>
+The actual code for not-char in rx.el is defined as follows:
+</p>
+
+<pre class="example">
+(defconst rx-constituents
+‘((...
+(not-char . (rx-not-char 1 nil rx-check-any))
+...)))
+
+(defun rx-not-char (form)
+“Parse and produce code from FORM. FORM is `(not-char ...)’.”
+(rx-check form)
+(rx-not `(not (in ,@(cdr form)))))
+</pre>
+
+<p>
+You can generate regular expressions from s-expressions to match for zero or more, one or more, and zero or one occurrences, as illustrated below:
+</p>
+
+<pre class="example">
+(zero-or-more SEXP ...) ;; Syntax
+(one-or-more SEXP ...) ;; Syntax
+(zero-or-one SEXP ...) ;; Syntax
+
+(rx (zero-or-more “x”))
+“x*”
+
+(s-matches-p (rx (zero-or-more “x”))
+“yz”)
+t
+(s-matches-p (rx (zero-or-more “x”))
+“xyz”)
+t
+
+(rx (one-or-more “x”))
+“x+”
+
+(s-matches-p (rx (one-or-more “x”))
+“yz”)
+nil
+(s-matches-p (rx (one-or-more “x”))
+“xyz”)
+t
+
+(rx (zero-or-one “x”))
+“x?”
+
+(s-matches-p (rx (zero-or-one “x”))
+“yz”)
+t
+(s-matches-p (rx (zero-or-one “x”))
+“xyz”)
+t
+</pre>
+
+<p>
+We have already seen the line-start construct that generates the caret symbol (^). Similarly, you can use the line-end construct to signify the end of a line, which is represented by the dollar sign ($). For example:
+</p>
+
+<pre class="example">
+(rx “end” line-end)
+“end$”
+
+(s-matches-p (rx “end” line-end)
+“The end.”)
+nil
+(s-matches-p (rx “end” line-end)
+“The end”)
+t
+</pre>
+
+<p>
+A digit can be represented by using either digit, numeric or num constructs. A couple of examples are shown below:
+</p>
+
+<pre class="example">
+(rx digit)
+“[[:digit:]]”
+
+(rx numeric)
+“[[:digit:]]”
+
+(rx num)
+“[[:digit:]]”
+
+(s-matches-p (rx num)
+“1234”)
+t
+(s-matches-p (rx num)
+“abcd”)
+nil
+</pre>
+
+<p>
+A control character is a non-printing character and you can use either control or cntrl constructs to generate the regular expression for the same. A few examples are given below:
+</p>
+
+<pre class="example">
+(rx control)
+“[[:cntrl:]]”
+
+(rx cntrl)
+“[[:cntrl:]]”
+
+(s-matches-p (rx control)
+“\0”)
+t
+(s-matches-p (rx control)
+“abc”)
+nil
+</pre>
+
+<p>
+A hexadecimal digit can be matched by using either hex-digit, hex, or xdigit rx-constituents as illustrated below:
+</p>
+
+<pre class="example">
+(rx hex-digit)
+“[[:xdigit:]]”
+
+(rx hex)
+“[[:xdigit:]]”
+
+(rx xdigit)
+“[[:xdigit:]]”
+
+(s-matches-p (rx digit)
+“1234”)
+t
+(s-matches-p (rx digit)
+“abcd”)
+nil
+</pre>
+
+<p>
+You can match for lower case characters using either lower or lower-case constructs. Similarly, you use upper or upper-case constructs to match for upper case letters. A few examples are shown below:
+</p>
+
+<pre class="example">
+(rx lower)
+“[[:lower:]]”
+
+(rx lower-case)
+“[[:lower:]]”
+
+(rx upper)
+“[[:upper:]]”
+
+(rx upper-case)
+“[[:upper:]]”
+
+(s-matches-p (rx lower)
+“abc”)
+t
+(s-matches-p (rx lower-case)
+“;”)
+nil
+
+(s-matches-p (rx upper)
+“ABC”)
+t
+(s-matches-p (rx upper-case)
+“;”)
+nil
+</pre>
+
+<p>
+If you have escaped characters in your input text, you will need to use either regexp-quote or eval on the input before being able to apply the regular expression to match on the input string. An example is given below:
+</p>
+
+<pre class="example">
+(eval FORM) ;; Syntax
+
+(setq input “\”Hello, world!\””)
+
+(not (s-matches-p input input))
+nil
+
+(s-matches-p (regexp-quote input) input)
+t
+
+(s-matches-p (rx (eval input)) input)
+t
+</pre>
+
+<p>
+The rx.el library also provides support for non-ascii characters, such as multi-byte and accented characters. You can match for the same using the non-ascii construct as shown below:
+</p>
+
+<pre class="example">
+(rx nonascii)
+“[[:nonascii:]]”
+
+(s-matches-p (rx nonascii)
+“ABC”)
+nil
+(s-matches-p (rx nonascii)
+“È”)
+t
+</pre>
+
+<p>
+The alpha-numeric rx-constituent can be used to match for both alphabets and numerals. A couple of examples are provided below for reference:
+</p>
+
+<pre class="example">
+(rx alphanumeric)
+“[[:alnum:]]”
+
+
+(s-matches-p (rx alphanumeric)
+“abc123”)
+t
+(s-matches-p (rx alphanumeric)
+“;”)
+nil
+</pre>
+
+<p>
+If you want to match for only alphabets, then you can use the alpha construct. A few examples are shown below:
+</p>
+
+<pre class="example">
+(rx alpha)
+“[[:alpha:]]”
+
+(s-matches-p (rx alpha)
+“ABC”)
+t
+(s-matches-p (rx alpha)
+“;;”)
+nil
+</pre>
+
+<p>
+You can search for a blank character using the blank construct. For example:
+</p>
+
+<pre class="example">
+(rx blank)
+“[[:blank:]]”
+
+(s-matches-p (rx blank)
+“ “)
+t
+(s-matches-p (rx blank)
+“A”)
+nil
+</pre>
+
+<p>
+The space, white and whitespace rx-constituents can be used to match for white space as illustrated below:
+</p>
+
+<pre class="example">
+(rx space)
+“[[:space:]]”
+
+(rx white)
+“[[:space:]]”
+
+(rx whitespace)
+“[[:space:]]”
+
+
+(s-matches-p (rx space)
+“ “)
+t
+(s-matches-p (rx space)
+“abc”)
+nil
+</pre>
+
+<p>
+The punct construct is used to match for punctuation marks. A couple of examples follow:
+</p>
+
+<pre class="example">
+(rx punct)
+“[[:punct:]]”
+
+(rx punctuation)
+“[[:punct:]]”
+
+(s-matches-p (rx punct)
+“abc”)
+nil
+(s-matches-p (rx punct)
+“.”)
+t
+</pre>
+
+<p>
+You can match for a word using either the word or wordchar constructs. For example:
+</p>
+
+<pre class="example">
+(rx word)
+“[[:word:]]”
+
+(rx wordchar)
+“[[:word:]]”
+
+(s-matches-p (rx word)
+“the”)
+t
+(s-matches-p (rx word)
+“ “)
+nil
+</pre>
+
+<p>
+If you do not want to match for a word, you can use the not-wordchar construct as follows:
+</p>
+
+<pre class="example">
+(rx not-wordchar)
+“\\W”
+
+(s-matches-p (rx not-wordchar)
+“abc”)
+
+nil
+(s-matches-p (rx not-wordchar)
+“ “)
+t
+</pre>
+
+<p>
+The repeat construct takes two arguments: a number N and an s-expression. It repeatedly applies the s-expression N number of times to generate the regular expression. In the following example, we match for two occurrences of the letter ‘x':
+</p>
+
+<pre class="example">
+(repeat N SEXP) ;; Syntax
+
+(rx (repeat 2 "x"))
+"x\\{2\\}"
+
+(s-matches-p (rx (repeat 2 "x"))
+" ")
+nil
+(s-matches-p (rx (repeat 2 "x"))
+"xxyz")
+t
+</pre>
+
+<p>
+You can use group or group-n rx-constituents to capture groups of regular expressions. The first argument to group-n represents the group number, which is followed by the actual s-expression. In the following example, we create a regular expression to match the date in the MM-DD-YYYY format:
+</p>
+
+<pre class="example">
+(group SEXP1 SEXP2 ...) ;; Syntax
+(group-n N SEXP1 SEXP2 ...) ;; Syntax
+
+(setq mm-dd-yyyy
+(rx (group-n 3 (repeat 2 digit))
+“-”
+(group-n 2 (repeat 2 digit))
+“-”
+(group-n 1 (repeat 4 digit))))
+
+(s-match-strings-all mm-dd-yyyy “12-10-2019”)
+((“12-10-2019” “2019” “10” “12”))
+</pre>
+
+<p>
+The generated regular expression pattern is‘\\(?3:[[:digit:]]\\{2\\}\\)-\\(?2:[[:digit:]]\\{2\\}\\)-\\(?1:[[:digit:]]\\{4\\}\\)'.
+</p>
+
+<p>
+You are encouraged to read the information given in <a href="https://github.com/typester/emacs/blob/master/lisp/emacs-lisp/rx.el">https://github.com/typester/emacs/blob/master/lisp/emacs-lisp/rx.el</a> to know more about the available constructs provided by rx.el.
+</p>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2020-02-18</span>
+            <span title="last modification date" class="post-info">2020-02-18</span>
+            <span title="tags" class="post-info">:<a href="../../../../../tags/raw">raw</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-4f19a981-c144-409d-9089-7141be9d24bc">lujun9972</a></span>
+        </div>
+    <script src="../../../../../media/js/jquery-2.1.3.min.js"></script>
+    <script src="../../../../../media/js/md5.min.js"></script>
+        <section>
+            <div id="gitalk-container"></div>
+            <script type="text/javascript">
+             var gitalk = new Gitalk({
+                 clientID: 'fdcb5d9da3f4acb4862c',
+                 clientSecret: 'dd0a16312a206782cb7669dcec5e96874ab48170',
+                 repo: 'lujun9972.github.com',
+                 owner: 'lujun9972',
+                 admin: ['lujun9972'],
+                 id: md5(location.pathname),      // Ensure uniqueness and length less than 50
+                 distractionFreeMode: false  // Facebook-like distraction free mode
+             })
+             gitalk.render('gitalk-container')
+            </script>
+        </section>
+    <script src="../../../../../media/js/main.js"></script>
+        <script>
+         var _hmt = _hmt || [];
+         (function() {
+             var hm = document.createElement("script");
+             hm.src = "https://hm.baidu.com/hm.js?7bac4fd0247f69c27887e0d4e3aee41e";
+             var s = document.getElementsByTagName("script")[0]; 
+             s.parentNode.insertBefore(hm, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-4f19a981-c144-409d-9089-7141be9d24bc">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="../../../../../instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>
