@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Beautify Org mode - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="raw" />
+  <!-- <link rel="stylesheet" href="../../../../../media/css/main.css" type="text/css"/>
+       <link rel="stylesheet" href="../../../../../media/css/comment.css" type="text/css"/> -->
+  <link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/kognise/water.css@latest/dist/dark.css'>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="../../../../../">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <ul class="trigger">
+        <li><a href="../../../../../years/">Years</a></li>
+        <li><a href="../../../../../authors/">Authors</a></li>
+        <li><a href="../../../../../tags/">Tags</a></li>
+        <li><a href="../../../../../about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="../../../../../rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="https://www.bing.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">Beautify Org mode</h1>
+<p>
+In the last months I collected some packages and settings to add eye candy to Org buffers mostly with the help of Unicode tricks. I like to result and want to share as it may be useful for others as well. Here are the settings I built with some explanations. Like the rest of my Emacs config this uses <code>use-package</code>.
+</p>
+
+<p>
+The default fontset setting ensures that all unicode symbols and the like can be displayed. It's also the basis for some of the eye-candy later. I check first if the Symbola font is present.
+</p>
+
+<pre class="example">
+(when (member "Symbola" (font-family-list))
+ (set-fontset-font "fontset-default" nil
+ (font-spec :size 20 :name "Symbola")))
+</pre>
+
+<p>
+I also specify Symbola as the font for all unicode characters
+</p>
+
+<pre class="example">
+(when (member "Symbola" (font-family-list))
+ (set-fontset-font t 'unicode "Symbola" nil 'prepend))
+</pre>
+
+<p>
+I use utf8-encoding everywhere and set it explicitly rather than relying on Emacs defaults
+</p>
+
+<pre class="example">
+(prefer-coding-system 'utf-8)
+(set-default-coding-systems 'utf-8)
+(set-terminal-coding-system 'utf-8)
+(set-keyboard-coding-system 'utf-8)
+(setq default-buffer-file-coding-system 'utf-8)
+</pre>
+
+<p>
+And now on to the Org mode specific settings.
+</p>
+
+<p>
+I want indentation
+</p>
+
+<pre class="example">
+(setq org-startup-indented t
+ org-src-tab-acts-natively t)
+</pre>
+
+<p>
+I like <code>visual-pitch-mode</code> and <code>visual-line-mode</code> for org files
+</p>
+
+<pre class="example">
+(add-hook 'org-mode-hook
+ (lambda ()
+ (variable-pitch-mode 1)
+ visual-line-mode))
+</pre>
+
+<p>
+To start the look of the Org mode buffers let's first use some general settings:
+</p>
+
+<ul class="org-ul">
+<li>don't display the emphasis markers</li>
+<li>change the face of a headline if it is marked DONE</li>
+<li>hide the stars</li>
+<li>show entities as UTF8 characters.</li>
+<li>odd levels only</li>
+</ul>
+
+<p>
+I feel this makes for a cleaner look of the buffer.
+</p>
+
+<pre class="example">
+(setq org-hide-emphasis-markers t
+ org-fontify-done-headline t
+ org-hide-leading-stars t
+ org-pretty-entities t
+ org-odd-levels-only t)
+</pre>
+
+<p>
+The next is a setting to automatically change list bullets. I work quite a lot with bulleted list and I think it emphasises the structure better.
+</p>
+
+<pre class="example">
+(setq org-list-demote-modify-bullet
+ (quote (("+" . "-")
+ ("-" . "+")
+ ("*" . "-")
+ ("1." . "-")
+ ("1)" . "-")
+ ("A)" . "-")
+ ("B)" . "-")
+ ("a)" . "-")
+ ("b)" . "-")
+ ("A." . "-")
+ ("B." . "-")
+ ("a." . "-")
+ ("b." . "-"))))
+</pre>
+
+<p>
+Here is the first package to convert stars into nice looking bullets. Since I only use odd-levels I added a specific one for all even levels to show the odd levels as intended.
+</p>
+
+<pre class="example">
+(use-package org-bullets
+ :custom
+ (org-bullets-bullet-list '("◉" "☯" "○" "☯" "✸" "☯" "✿" "☯" "✜" "☯" "◆" "☯" "▶"))
+ (org-ellipsis "⤵")
+ :hook (org-mode . org-bullets-mode))
+</pre>
+
+<p>
+From <a href="https://zzamboni.org/post/beautifying-org-mode-in-emacs/">https://zzamboni.org/post/beautifying-org-mode-in-emacs/</a> I collected the setting to show bullets instead of a dash in bulleted lists.
+</p>
+
+<pre class="example">
+(font-lock-add-keywords 'org-mode
+ '(("^ *\\([-]\\) "
+ (0 (prog1 () (compose-region (match-beginning 1) (match-end 1) "•"))))))
+(font-lock-add-keywords 'org-mode
+ '(("^ *\\([+]\\) "
+ (0 (prog1 () (compose-region (match-beginning 1) (match-end 1) "◦"))))))
+</pre>
+
+<p>
+The next setting prettifies src blocks. Inspired by a comment in <a href="https://www.reddit.com/r/emacs/comments/9lpupc/i_use_markdown_rather_than_orgmode_for_my_notes/">i use markdown rather than org-mode for my notes : emacs</a> I looked at the now builtin mode <code>prettify-symbols-mode</code>. The configuration follows the example given in <a href="http://endlessparentheses.com/new-in-emacs-25-1-have-prettify-symbols-mode-reveal-the-symbol-at-point.html">New in Emacs 25.1: Have prettify-symbols-mode reveal the symbol at point · En...</a>. This approach can also be used
+to provides some kind of ligatures.
+</p>
+
+<pre class="example">
+(setq-default prettify-symbols-alist '(("#+BEGIN_SRC" . "†")
+ ("#+END_SRC" . "†")
+ ("#+begin_src" . "†")
+ ("#+end_src" . "†")
+ ("&gt;=" . "≥")
+ ("=&gt;" . "⇨")))
+(setq prettify-symbols-unprettify-at-point 'right-edge)
+(add-hook 'org-mode-hook 'prettify-symbols-mode)
+</pre>
+
+<p>
+Even though I prefer <code>variable-pitch</code> I want <code>fixed-pitch</code> for src blocks.
+</p>
+
+<pre class="example">
+(custom-theme-set-faces
+ 'user
+ '(variable-pitch ((t (:family "Source Sans Pro" :height 120 :weight light))))
+ '(fixed-pitch ((t ( :family "Consolas" :slant normal :weight normal :height 0.9 :width normal)))))
+
+(custom-theme-set-faces
+ 'user
+ '(org-block ((t (:inherit fixed-pitch))))
+ '(org-document-info-keyword ((t (:inherit (shadow fixed-pitch)))))
+ '(org-property-value ((t (:inherit fixed-pitch))) t)
+ '(org-special-keyword ((t (:inherit (font-lock-comment-face fixed-pitch)))))
+ '(org-tag ((t (:inherit (shadow fixed-pitch) :weight bold))))
+ '(org-verbatim ((t (:inherit (shadow fixed-pitch))))))
+</pre>
+
+<p>
+<code>pretty-tags</code> is a package to replace the tags by unicode symbols. The name needs to be exactly as in the buffer for this to work.
+</p>
+
+<pre class="example">
+(use-package org-pretty-tags
+ :demand t
+ :config
+ (setq org-pretty-tags-surrogate-strings
+ (quote
+ (("TOPIC" . "☆")
+ ("PROJEKT" . "💡")
+ ("SERVICE" . "✍")
+ ("Blog" . "✍")
+ ("music" . "♬")
+ ("security" . "🔥"))))
+ (org-pretty-tags-global-mode))
+</pre>
+
+<p>
+There's also a package to show fancy priorities instead of the standard ones.
+</p>
+
+<pre class="example">
+(use-package org-fancy-priorities
+ :diminish
+ :demand t
+ :defines org-fancy-priorities-list
+ :hook (org-mode . org-fancy-priorities-mode)
+ :config
+ (unless (char-displayable-p ?❗)
+ (setq org-fancy-priorities-list '("HIGH" "MID" "LOW" "OPTIONAL"))))
+</pre>
+
+<p>
+I like to display an outline numbering as overlays on Org mode headlines. The numbering matches how it would appear when exporting the org file. This file is in the org-mode git repo but not (yet?) part of official orgmode
+</p>
+
+<pre class="example">
+(use-package org-num
+ :load-path "lisp/"
+ :after org
+ :hook (org-mode . org-num-mode))
+</pre>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2020-02-19</span>
+            <span title="last modification date" class="post-info">2020-02-19</span>
+            <span title="tags" class="post-info">:<a href="../../../../../tags/raw">raw</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-8ec4086c-b3cd-4e03-a876-b4477e204f1b">lujun9972</a></span>
+        </div>
+    <script src="../../../../../media/js/jquery-2.1.3.min.js"></script>
+    <script src="../../../../../media/js/md5.min.js"></script>
+        <section>
+            <div id="gitalk-container"></div>
+            <script type="text/javascript">
+             var gitalk = new Gitalk({
+                 clientID: 'fdcb5d9da3f4acb4862c',
+                 clientSecret: 'dd0a16312a206782cb7669dcec5e96874ab48170',
+                 repo: 'lujun9972.github.com',
+                 owner: 'lujun9972',
+                 admin: ['lujun9972'],
+                 id: md5(location.pathname),      // Ensure uniqueness and length less than 50
+                 distractionFreeMode: false  // Facebook-like distraction free mode
+             })
+             gitalk.render('gitalk-container')
+            </script>
+        </section>
+    <script src="../../../../../media/js/main.js"></script>
+        <script>
+         var _hmt = _hmt || [];
+         (function() {
+             var hm = document.createElement("script");
+             hm.src = "https://hm.baidu.com/hm.js?7bac4fd0247f69c27887e0d4e3aee41e";
+             var s = document.getElementsByTagName("script")[0]; 
+             s.parentNode.insertBefore(hm, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-8ec4086c-b3cd-4e03-a876-b4477e204f1b">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="../../../../../instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>

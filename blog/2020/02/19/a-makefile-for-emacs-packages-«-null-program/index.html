@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>A Makefile for Emacs Packages « null program - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="raw" />
+  <!-- <link rel="stylesheet" href="../../../../../media/css/main.css" type="text/css"/>
+       <link rel="stylesheet" href="../../../../../media/css/comment.css" type="text/css"/> -->
+  <link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/kognise/water.css@latest/dist/dark.css'>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="../../../../../">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <ul class="trigger">
+        <li><a href="../../../../../years/">Years</a></li>
+        <li><a href="../../../../../authors/">Authors</a></li>
+        <li><a href="../../../../../tags/">Tags</a></li>
+        <li><a href="../../../../../about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="../../../../../rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="https://www.bing.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">A Makefile for Emacs Packages « null program</h1>
+<div id="table-of-contents">
+<h2>&#30446;&#24405;</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#complex-packages">Complex packages</a></li>
+<li><a href="#dependencies">Dependencies</a></li>
+</ul>
+</div>
+</div>
+<p>
+Each of my Emacs packages has a Makefile to byte-compile all source files, run the tests, build a package file, and, in some cases, run the package in an interactive, temporary, isolated Emacs instance. These <a href="file:///blog/2017/08/20/">portable Makefiles</a> have a similar structure and follow the same conventions. It would require more thought and feedback before I'd try to make it a standard, but these are conventions I'd like to see in other package Makefiles.
+</p>
+
+<p>
+Here's an incomplete list of examples:
+</p>
+
+<ul class="org-ul">
+<li><a href="https://github.com/skeeto/bitpack/blob/master/Makefile">https://github.com/skeeto/bitpack/blob/master/Makefile</a></li>
+<li><a href="https://github.com/skeeto/cplx/blob/master/Makefile">https://github.com/skeeto/cplx/blob/master/Makefile</a></li>
+<li><a href="https://github.com/skeeto/devdocs-lookup/blob/master/Makefile">https://github.com/skeeto/devdocs-lookup/blob/master/Makefile</a></li>
+<li><a href="https://github.com/skeeto/elfeed/blob/master/Makefile">https://github.com/skeeto/elfeed/blob/master/Makefile</a></li>
+<li><a href="https://github.com/skeeto/emacs-aio/blob/master/Makefile">https://github.com/skeeto/emacs-aio/blob/master/Makefile</a></li>
+<li><a href="https://github.com/skeeto/emacs-bencode/blob/master/Makefile">https://github.com/skeeto/emacs-bencode/blob/master/Makefile</a></li>
+<li><a href="https://github.com/skeeto/emacs-memoize/blob/master/Makefile">https://github.com/skeeto/emacs-memoize/blob/master/Makefile</a></li>
+<li><a href="https://github.com/skeeto/emacs-web-server/blob/master/Makefile">https://github.com/skeeto/emacs-web-server/blob/master/Makefile</a></li>
+<li><a href="https://github.com/skeeto/impatient-mode/blob/master/Makefile">https://github.com/skeeto/impatient-mode/blob/master/Makefile</a></li>
+<li><a href="https://github.com/skeeto/lcg128/blob/master/Makefile">https://github.com/skeeto/lcg128/blob/master/Makefile</a></li>
+<li><a href="https://github.com/skeeto/nasm-mode/blob/master/Makefile">https://github.com/skeeto/nasm-mode/blob/master/Makefile</a></li>
+<li><a href="https://github.com/skeeto/skewer-mode/blob/master/Makefile">https://github.com/skeeto/skewer-mode/blob/master/Makefile</a></li>
+<li><a href="https://github.com/skeeto/x86-lookup/blob/master/Makefile">https://github.com/skeeto/x86-lookup/blob/master/Makefile</a></li>
+</ul>
+
+<p>
+You should make a habit of compiling your Emacs Lisp files even if you don't think you need the performance. The byte-compiler, while <a href="file:///blog/2019/02/24/">dumb</a>, does <a href="file:///blog/2016/12/22/">static analysis</a> and may spot bugs and other issues early.
+</p>
+
+<p>
+First things first: Every portable Makefile starts with a special target, <code>.POSIX</code>, to request standard behavior. This is followed by macro definitions. When compiling a C program, the <code>CC</code> macro is the name of the compiler. Analogously, when compiling Emacs packages the <code>EMACS</code> macro is the name of the Emacs program.
+</p>
+
+<pre class="example">
+.POSIX:
+EMACS = emacs
+</pre>
+
+<p>
+Users can now override the macro to specify alternate Emacs binaries. I use this all the time to test my packages under different versions of Emacs.
+</p>
+
+<pre class="example">
+$ make clean
+$ make EMACS=emacs-24.3 check
+$ make clean
+$ make EMACS=emacs-25.1 check
+</pre>
+
+<p>
+Note: It's common to use <code>?=</code> assignment here, but that is both non-standard and unnecessary. If you want to override macro definitions from the environment, use the <code>-e</code> option:
+</p>
+
+<pre class="example">
+$ export EMACS=emacs-24.3
+$ make -e
+</pre>
+
+<p>
+The first non-special target in the Makefile is the default target. For Emacs packages, this target should byte-compile all the source files, including tests. List the byte-compiled file names as the target dependencies:
+</p>
+
+<pre class="example">
+compile: foo.elc foo-test.elc
+</pre>
+
+<p>
+Now for the tedious part: Define the dependencies between your different source files. It would be nice to automate this part somehow, but fortunately most packages just aren't that complicated. You do not need to list trivial dependencies --- i.e. mapping each .el file to its .elc file --- since make will figure that out on its own.
+</p>
+
+<p>
+Since <code>foo-test.elc</code> relies on <code>foo.elc</code> --- it's testing this file after all --- the relationship must be indicated to make. For single file packages (one package file, one test file), this is all that's needed:
+</p>
+
+<pre class="example">
+foo-test.elc: foo.elc
+</pre>
+
+<p>
+I call my testing targets “check” and this target must depend on the byte-compiled files containing tests. It will transiently depend on the other package source files because of the previous section.
+</p>
+
+<pre class="example">
+check: foo-test.elc
+ $(EMACS) -Q --batch -L . -l foo-test.elc -f ert-run-tests-batch
+</pre>
+
+<p>
+The <code>-Q</code> option runs Emacs with “minimum customizations.” The <code>-L .</code> option puts the current directory in the load path so that <code>(require 'foo</code>) will work. Finally it loads the file containing the tests and instructs ERT to run all defined tests.
+</p>
+
+<p>
+A good build can clean up after itself:
+</p>
+
+<pre class="example">
+clean:
+ rm -f foo.elc foo-test.elc
+</pre>
+
+<p>
+Finally we need one more thing to tie it all together: an inference rule to teach make how to compile .elc files from .el files.
+</p>
+
+<pre class="example">
+.SUFFIXES: .el .elc
+.el.elc:
+ $(EMACS) -Q --batch -L . -f batch-byte-compile $&lt;
+</pre>
+
+<p>
+This is similar to the “check” target, but compiles a source file instead of running tests.
+</p>
+
+<p>
+For simple, single source file packages, this is all you need!
+</p>
+
+<div id="outline-container-orgc43919b" class="outline-2">
+<h2 id="complex-packages"><a id="orgc43919b"></a>Complex packages</h2>
+<div class="outline-text-2" id="text-complex-packages">
+<p>
+My most complex package is Elfeed which has 10 source files and 4 test files. It also includes a target to build a package file, which I would upload to Marmalade when it was still functioning. I did a few extra things to keep this tidy.
+</p>
+
+<p>
+First, I define the package version in the Makefile:
+</p>
+
+<pre class="example">
+VERSION = 1.2.3
+</pre>
+
+<p>
+It would be nice to grab this information from a reliable place (Git tag, source file, etc.), but I never found a reliable and satisfactory way to do this. Simple wins.
+</p>
+
+<p>
+To avoid repeating myself, I list the source files in a macro as well:
+</p>
+
+<pre class="example">
+EL = foo-a.el foo-b.el foo-c.el
+DOC = README.md
+TEST = foo-test.el
+</pre>
+
+<p>
+These will still need to have all their interdependencies individually defined for make. For example, if C depends on both A and B, but neither A nor B depend on each other, this is all you'd need:
+</p>
+
+<pre class="example">
+foo-c.elc: foo-a.elc foo-b.elc
+</pre>
+
+<p>
+Done correctly you can perform parallel builds with the non-standard but common <code>-j</code> make option. This is pretty nice since Emacs can't do parallel builds itself.
+</p>
+
+<p>
+I use the file list macros in the “compile” and “check” targets:
+</p>
+
+<pre class="example">
+compile: $(EL:.el=.elc) $(TEST:.el=.elc)
+test: $(TEST:.el=.elc)
+</pre>
+
+<p>
+The “package” target copies everything under a directory and tars it up. The directory is removed first, if it exists, so that any potenntial leftover garbage from doesn't get included.
+</p>
+
+<pre class="example">
+package: foo-$(VERSION).tar
+foo-$(VERSION).tar: $(EL) $(DOC)
+ rm -rf foo-$(VERSION)/
+ mkdir foo-$(VERSION)/
+ cp $(EL) $(DOC) foo-$(VERSION)/
+ tar cf $@ foo-$(VERSION)/
+ rm -rf foo-$(VERSION)/
+</pre>
+
+<p>
+In Elfeed, the target to test in an interactive, temporary Emacs instance is called “virtual”. In Skewer it's called “run”. The name of the target and the specific rules will depend on the package, should you even want this target at all. It's handy to have the option test without my own configuration contaminating Emacs, and vice versa. When people report issues, I can also direct them to reproduce their issue in the clean environment.
+</p>
+
+<p>
+Here's what a simple “run” target might look like:
+</p>
+
+<pre class="example">
+run: $(EL:.el=.elc)
+ $(EMACS) -Q -L . -l foo-c.elc -f foo-mode
+</pre>
+
+<p>
+Make is not really designed to run interactive programs like this, but it works in practice.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org60fe989" class="outline-2">
+<h2 id="dependencies"><a id="org60fe989"></a>Dependencies</h2>
+<div class="outline-text-2" id="text-dependencies">
+<p>
+What about packages with dependencies? I've used <a href="https://github.com/cask/cask">Cask</a> in the past but was never satisfied, especially when integrating it into a Makefile. So, again, I've opted for the dumb-but-reliable option: request that dependencies are cloned in adjacent directories matching the dependency's package name. For example, the <a href="file:///blog/2014/02/06/">EmacSQL</a> Makefile header:
+</p>
+
+<pre class="example">
+# Clone the dependencies of this package in sibling directories:
+# $ git clone https://github.com/cbbrowne/pg.el ../pg
+</pre>
+
+<p>
+I also define a new “linker flags” macro, <code>LDFLAGS</code>. Like with <code>EMACS</code>, this lets users override it if needed:
+</p>
+
+<pre class="example">
+LDFLAGS = -L ../pg
+</pre>
+
+<p>
+Everywhere I use <code>-L .</code> I also include <code>$(LDFLAGS)</code>. For example, in the inference rule:
+</p>
+
+<pre class="example">
+.SUFFIXES: .el .elc
+.el.elc:
+ $(EMACS) -Q --batch -L . $(LDFLAGS) -f batch-byte-compile $&lt;
+</pre>
+
+<p>
+If the dependencies follow these conventions, then these can also be compiled in a recursive way with little effort:
+</p>
+
+<pre class="example">
+$ make -C ../pg
+</pre>
+
+<p>
+I'm not completely satisfied with this solution, particularly since it's an odd burden on anyone using the Makefile, but it's worked well enough for my needs. This is when I wish Emacs had <a href="file:///blog/2020/01/21/#package-management">distributed package management</a>.
+</p>
+</div>
+</div>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2020-02-19</span>
+            <span title="last modification date" class="post-info">2020-02-19</span>
+            <span title="tags" class="post-info">:<a href="../../../../../tags/raw">raw</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-8ec4086c-b3cd-4e03-a876-b4477e204f1b">lujun9972</a></span>
+        </div>
+    <script src="../../../../../media/js/jquery-2.1.3.min.js"></script>
+    <script src="../../../../../media/js/md5.min.js"></script>
+        <section>
+            <div id="gitalk-container"></div>
+            <script type="text/javascript">
+             var gitalk = new Gitalk({
+                 clientID: 'fdcb5d9da3f4acb4862c',
+                 clientSecret: 'dd0a16312a206782cb7669dcec5e96874ab48170',
+                 repo: 'lujun9972.github.com',
+                 owner: 'lujun9972',
+                 admin: ['lujun9972'],
+                 id: md5(location.pathname),      // Ensure uniqueness and length less than 50
+                 distractionFreeMode: false  // Facebook-like distraction free mode
+             })
+             gitalk.render('gitalk-container')
+            </script>
+        </section>
+    <script src="../../../../../media/js/main.js"></script>
+        <script>
+         var _hmt = _hmt || [];
+         (function() {
+             var hm = document.createElement("script");
+             hm.src = "https://hm.baidu.com/hm.js?7bac4fd0247f69c27887e0d4e3aee41e";
+             var s = document.getElementsByTagName("script")[0]; 
+             s.parentNode.insertBefore(hm, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-8ec4086c-b3cd-4e03-a876-b4477e204f1b">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="../../../../../instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>
