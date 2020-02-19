@@ -1,0 +1,413 @@
+#+TITLE: Painless Transition to Portable Dumper
+#+URL: https://archive.casouri.cat/note/2020/painless-transition-to-portable-dumper/index.html
+#+AUTHOR: lujun9972
+#+TAGS: raw
+#+DATE: [2020年 02月 19日 星期三 10:00:41 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+Emacs 27 is coming with many exciting new features including the portable dumper. There has been attempts to use portable dumper to speed up Emacs startup time. I know Spacemacs [[https://github.com/syl20bnr/spacemacs/blob/develop/core/core-dumper.el][does this]] from a long time ago ^{[[#fn.1][1]]}. But I couldn't find any literature on using portable dumper for one's own init.el. Here I record my take on adopting portable dumper, including gotcha's I found, the general design I use, and some fixes, hacks and tricks I used.
+
+With portable dumper, my startup time reduced from 2.47s to 0.76s (3x). (Everybody measures their startup differently. As a common measure, esup gives 0.38s) This is on Mac, it should be even faster on Linux. Even better, all it takes are ~30 lines of code, and the startup without a dump file works like before.
+
+<2020-01-27 Mon>\\
+*Note:* Eli says bug-free dumping of custom emacs is not a goal for Emacs 27^{[[#fn.2][2]]}. However, dumping only packages, selectively, works fine for me.
+
+** 1 General Design
+   :PROPERTIES:
+   :CUSTOM_ID: org3ea95e0
+   :END:
+
+Start a vanilla Emacs, load packages, dump the image out. Then you start Emacs with this dump file. The point is to speed up packages that you can't autoload --- those you want immediately after startup. For example, company, ivy/helm, which-key, use-package, themes, highlight-parentheses. Other parts of init doesn't change.
+
+I create a init file for the dump process, =~/.emacs.d/dump.el=, and dump with
+
+#+BEGIN_EXAMPLE
+  emacs --batch -q -l ~/.emacs.d/dump.el
+#+END_EXAMPLE
+
+Once dumped, I can start Emacs with the dump file ^{[[#fn.3][3]]} (use root path, not =~=!):
+
+#+BEGIN_EXAMPLE
+  emacs --dump-file="/Users/yuan/.emacs.d/emacs.pdmp"
+#+END_EXAMPLE
+
+A minimal =dump.el=:
+
+#+BEGIN_EXAMPLE
+  (require 'package)
+  ;; load autoload files and populate load-path’s
+  (package-initialize)
+  ;; (package-initialize) doens’t require each package, we need to load
+  ;; those we want manually
+  (dolist (package '(use-package company ivy counsel org helpful
+   general helpful use-package general which-key
+   recentf-ext swiper ivy-prescient find-char
+   aggressive-indent windman doom-themes winner
+   elec-pair doom-one-light-theme
+   doom-cyberpunk-theme rainbow-delimiters
+   highlight-parentheses hl-todo buffer-move
+   savehist eyebrowse minions ws-butler
+   expand-region isolate outshine flyspell magit
+   eglot))
+   (require package))
+  ;; dump image
+  (dump-emacs-portable "~/.emacs.d/emacs.pdmp")
+#+END_EXAMPLE
+
+Now let's extend this minimal configuration with fixes and enhancements.
+
+** 2 Gotcha's
+   :PROPERTIES:
+   :CUSTOM_ID: orgfc79eff
+   :END:
+
+So it seems trivial: I =(package-initialize)= and =(require)= every packages in =dump.el=, and everything works, except that it doesn't. For one, =load-path= is not stored in the dump image ^{[[#fn.4][4]]}. You need to store =load-path= in another variable.
+
+#+BEGIN_EXAMPLE
+  ;; in dump.el
+  (package-initialize)
+  (setq luna-dumped-load-path load-path)
+  ...
+  (dump-emacs-portable "~/.emacs.d/emacs.pdmp")
+
+  ;; in init.el
+  (setq load-path luna-dumped-load-path)
+#+END_EXAMPLE
+
+Second, when you start Emacs with a dump file, some default modes are not enabled:
+
+- =transient-mark-mode=
+- =global-font-lock-mode=
+
+And =global-undo-tree-mode= makes Emacs segfault during dumping (didn't verify, Spacemacs says so, but why would you enable it when dumping anyway?) Spacemacs also says =winner-mode= and =global-undo-tree= mode doesn't live through dumping, but I enable them in my =init.el=, not in dump, so that doesn't affect me.
+
+The fix is simple, have something like this in =init.el=:
+
+#+BEGIN_EXAMPLE
+  (global-font-lock-mode)
+  (transient-mark-mode)
+#+END_EXAMPLE
+
+Third, you can't use =~= in the =--dump-file= command line flag. Otherwise Emacs complains about cannot open dump file. So don't use =~/.emacs.d/emacs.pdmp=. The dump file loads in very early stage, many variables are not known yet, so =~= won't expand.
+
+Fourth, scratch buffer behaves differently when Emacs starts with a dump file.
+Re-run mode hook seems to fix it:
+
+#+BEGIN_EXAMPLE
+  (add-hook 'after-init-hook
+   (lambda ()
+   (save-excursion
+   (switch-to-buffer "*scratch*")
+   (lisp-interaction-mode))))
+#+END_EXAMPLE
+
+<2020-01-27 Mon>\\
+As a side note (kindly provided by Damien Cassou), (a relatively new version of) magit uses dynamic modules, which is not dumpable. So don't require magit in your dump. The portable dumper doesn't dump window configurations either, but since I'm dumping only the packages, it doesn't annoy me.
+
+Now the =dump.el= is:
+
+#+BEGIN_EXAMPLE
+  (require 'package)
+  ;; load autoload files and populate load-path’s
+  (package-initialize)
+  ;; store load-path
+  (setq luna-dumped-load-path load-path)
+  ;; (package-initialize) doens’t require each package, we need to load
+  ;; those we want manually
+  (dolist (package '(use-package company ivy counsel org helpful
+   general helpful use-package general which-key
+   recentf-ext swiper ivy-prescient find-char
+   aggressive-indent windman doom-themes winner
+   elec-pair doom-one-light-theme
+   doom-cyberpunk-theme rainbow-delimiters
+   highlight-parentheses hl-todo buffer-move
+   savehist eyebrowse minions ws-butler
+   expand-region isolate outshine flyspell magit
+   eglot))
+   (require package))
+  ;; dump image
+  (dump-emacs-portable "xxx")
+#+END_EXAMPLE
+
+=init.el=:
+
+#+BEGIN_EXAMPLE
+  (global-font-lock-mode)
+  (transient-mark-mode)
+  (add-hook 'after-init-hook
+   (lambda ()
+   (save-excursion
+   (switch-to-buffer "*scratch*")
+   (lisp-interaction-mode))))
+#+END_EXAMPLE
+
+** 3 Tricks
+   :PROPERTIES:
+   :CUSTOM_ID: orgdc871f5
+   :END:
+
+*** 3.1 Keep non-dump-file startup working as before
+    :PROPERTIES:
+    :CUSTOM_ID: orgd0a6044
+    :END:
+
+I want my configuration to still work without a dump file. This is what I do:
+
+#+BEGIN_EXAMPLE
+  ;; in init.el
+  (defvar luna-dumped nil
+   "non-nil when a dump file is loaded (because dump.el sets this variable).")
+
+  (defmacro luna-if-dump (then &rest else)
+   "Evaluate IF if running with a dump file, else evaluate ELSE."
+   (declare (indent 1))
+   `(if luna-dumped
+   ,then
+   ,@else))
+
+  ;; in dump.el
+  (setq luna-dumped t)
+#+END_EXAMPLE
+
+And I use the =luna-if-dump= in =init.el= at where two startup process differs:
+
+#+BEGIN_EXAMPLE
+  (luna-if-dump
+   (progn
+   (setq load-path luna-dumped-load-path)
+   (global-font-lock-mode)
+   (transient-mark-mode)
+   (add-hook 'after-init-hook
+   (lambda ()
+   (save-excursion
+   (switch-to-buffer "*scratch*")
+   (lisp-interaction-mode)))))
+   ;; add load-path’s and load autoload files
+   (package-initialize))
+#+END_EXAMPLE
+
+In a dump-file-startup, we don't need to =(package-initialize)= because it's done during dumping, but we need to load =load-path= and fix other gotcha's.
+
+*** 3.2 Dump packages selectively
+    :PROPERTIES:
+    :CUSTOM_ID: org24c3dcc
+    :END:
+
+Blindly dumping every package is a recipe for weird errors. I only dump those I want immediately on startup (company, ivy/helm) and those are big (org). Not that dumping everything doesn't work, but it takes more energy to get everything right.
+
+*** 3.3 Dumping themes greatly speeds things up
+    :PROPERTIES:
+    :CUSTOM_ID: orgc16bdd3
+    :END:
+
+When profiling my startup with [[https://github.com/jschaf/esup][esup]], I found Emacs spends 70% of the time loading the theme.
+
+#+BEGIN_EXAMPLE
+  Total User Startup Time: 1.063sec Total Number of GC Pauses: 21 Total GC Time: 0.646sec
+
+  doom-one-light-theme.el:5 0.755sec 71%
+  (def-doom-theme doom-one-light
+  "A light theme inspired by Atom One"
+  ...
+#+END_EXAMPLE
+
+Dumping themes is not as simple as adding =(load-theme theme)= to =dump.el=, if you do that, Emacs complains and doesn't load the theme. I guess that's because it's in batch mode. Instead, require your themes like other libraries and loads them /without enabling them/.
+
+#+BEGIN_EXAMPLE
+  ;; in dump.el
+  (require 'doom-themes)
+  (require 'doom-one-light-theme)
+  ;; the two flags are no-confirm and no-enable
+  (load-theme 'doom-one-light-theme t t)
+#+END_EXAMPLE
+
+In =init.el=, we enable the theme, instead of loading it. Unlike require, =load-theme= doesn't check if the theme is already loaded.
+
+#+BEGIN_EXAMPLE
+  ;; in init.el
+  (when window-system
+   (luna-if-dump
+   (enable-theme 'doom-one-light)
+   (load-theme 'doom-one-light)))
+#+END_EXAMPLE
+
+And the speed up is significant.
+
+#+BEGIN_EXAMPLE
+  ...
+  init.el:87 0.034sec 7%
+  (when window-system
+  (luna-if-dump
+  (enable-theme 'doom-one-light)
+  (luna-load-theme nil t)))
+  ...
+#+END_EXAMPLE
+
+*** 3.4 Complete example =dump.el= & =init.el=
+    :PROPERTIES:
+    :CUSTOM_ID: orga887c55
+    :END:
+
+With everything I just talked about:\\
+=dump.el=:
+
+#+BEGIN_EXAMPLE
+  (require 'package)
+  ;; load autoload files and populate load-path’s
+  (package-initialize)
+  ;; store load-path
+  (setq luna-dumped-load-path load-path
+   luna-dumped t)
+  ;; (package-initialize) doens’t require each package, we need to load
+  ;; those we want manually
+  (dolist (package '(use-package company ivy counsel org helpful
+   general helpful use-package general which-key
+   recentf-ext swiper ivy-prescient find-char
+   aggressive-indent windman doom-themes winner
+   elec-pair doom-one-light-theme
+   doom-cyberpunk-theme rainbow-delimiters
+   highlight-parentheses hl-todo buffer-move
+   savehist eyebrowse minions ws-butler
+   expand-region isolate outshine flyspell magit
+   eglot))
+   (require package))
+  ;; pre-load themes
+  (load-theme 'doom-one-light-theme t t)
+  (load-theme 'doom-cyberpunk-theme t t)
+  ;; dump image
+  (dump-emacs-portable "~/.emacs.d/emacs.pdmp")
+#+END_EXAMPLE
+
+=init.el=:
+
+#+BEGIN_EXAMPLE
+  (luna-if-dump
+   (progn
+   (setq load-path luna-dumped-load-path)
+   (global-font-lock-mode)
+   (transient-mark-mode)
+   (add-hook 'after-init-hook
+   (lambda ()
+   (save-excursion
+   (switch-to-buffer "*scratch*")
+   (lisp-interaction-mode)))))
+   ;; add load-path’s and load autoload files
+   (package-initialize))
+  ;; load theme
+  (when window-system
+   (luna-if-dump
+   (enable-theme 'doom-one-light)
+   (luna-load-theme)))
+#+END_EXAMPLE
+
+After everything works, I wrapped dump file's path with variables and added =defvar= for variables I introduced, and did other irrelevant stuff.
+
+** 4 Final notes
+   :PROPERTIES:
+   :CUSTOM_ID: org3a0e5a6
+   :END:
+
+You can be more aggressive and dump /all/ packages and init files. But 1) since current approach is fast enough, the marginal benefit you get hardly justifies the effort; 2) if you dump your init files, you need to re-dump every time you change your configuration. Oh, and there are a bunch of Lisp objects that cannot be dumped, e.g., window configuration. Just think about the work needed to handle those in your init files. If you really care that much about speed, [[https://github.com/hlissner/doom-emacs][Dark Side]] is always awaiting.
+
+** 5 Some fixes and hacks
+   :PROPERTIES:
+   :CUSTOM_ID: org586ab01
+   :END:
+
+Here I record some problems I encountered that's not related to dumping.
+
+*** 5.1 recentf-ext
+    :PROPERTIES:
+    :CUSTOM_ID: orgff3e5f8
+    :END:
+
+When dumping recentf-ext, I found some problems and changed two places in =recentf-ext.el=. It has a =(recentf-mode 1)= as a top level form. That means =recentf-mode= enables whenever =recentf-ext.el= loads. Not good. I removed it. It also has a line requiring for =cl=, although it didn't use it, I removed that as well. My fork is at [[https://github.com/casouri/lunarymacs/blob/master/site-lisp/recentf-ext.el][here]].
+
+*** 5.2 Use esup with dump file
+    :PROPERTIES:
+    :CUSTOM_ID: orgbbe61fe
+    :END:
+
+[[https://github.com/jschaf/esup][esup]] is a great way to see what package is taking most time in startup. It helps me to find what package to dump. However, esup doesn't support loading dump files, and we need to modify it a bit. We also want to know if we are in esup child process, so we don't start an emacs server (and do other things differently, depends on your configuration). Go to =esup= in =esup.el= (by =find-library=), and change the =process-args=:
+
+#+BEGIN_EXAMPLE
+  ("*esup-child*"
+   "*esup-child*"
+   ,esup-emacs-path
+   ,@args
+   "-q"
+   "-L" ,esup-load-path
+   "-l" "esup-child"
+   ;; +++++++++++++++++++++++++++++++++++++++++
+   "--dump-file=/Users/yuan/.emacs.d/emacs.pdmp"
+   "--eval (setq luna-in-esup t)"
+   ;; +++++++++++++++++++++++++++++++++++++++++
+   ,(format "--eval=(esup-child-run \"%s\" \"%s\" %d)"
+   init-file
+   esup-server-port
+   esup-depth))
+#+END_EXAMPLE
+
+** 6 Other speedup tricks
+   :PROPERTIES:
+   :CUSTOM_ID: org8f72c56
+   :END:
+
+*** 6.1 early-init.el
+    :PROPERTIES:
+    :CUSTOM_ID: org6fd8df6
+    :END:
+
+This [[https://www.reddit.com/r/emacs/comments/enmbv4/earlyinitel_reduce_init_time_about_02_sec_and/][post about early-init.el speedup]] is useful. Here is [[https://github.com/casouri/lunarymacs/blob/master/early-init.el][my early-init.el]].
+
+*** 6.2 Start with correct frame size
+    :PROPERTIES:
+    :CUSTOM_ID: orgfe69e64
+    :END:
+
+Normally Emacs starts with a small frame, and if you have =(toggle-frame-maximized)=, it later expands to the full size. You can eliminate this annoying flicker and make Emacs show up with full frame size. I learned it from [[https://emacs-china.org/t/emacs/11271/11?u=casouri][this emacs-china post]]. Basically you use =-g= (for geometry) and =--font= flags together to size the startup frame. I use
+
+#+BEGIN_EXAMPLE
+  ~/bin/emacs -g 151x50 -font "SF Mono-13"
+#+END_EXAMPLE
+
+At the point (<2020-01-18 Sat>) you can't use =--dump-file= with =-g= and =-font= because of a bug, but it should be fixed soon. See [[https://debbugs.gnu.org/cgi/bugreport.cgi?bug=39168][here]].
+
+*** 6.3 Eliminate theme flicker
+    :PROPERTIES:
+    :CUSTOM_ID: orga2025a8
+    :END:
+
+Manateelazycat [[https://github.com/manateelazycat/lazycat-emacs/blob/39a74af15d3343219997a3c7894e9bb87cfc4e6c/site-lisp/config/init.el#L17][sets default background to theme background in custom.el]]. This way Emacs starts with your theme's background color, instead of white.
+
+** Footnotes:
+   :PROPERTIES:
+   :CUSTOM_ID: footnotes
+   :CLASS: footnotes
+   :END:
+
+^{[[#fnr.1][1]]}
+
+And people have been using the old dumping facility for a even longer time, you can found more on EmacsWiki.
+
+^{[[#fnr.2][2]]}
+
+Quote from [[https://www.reddit.com/r/emacs/comments/eqhvt7/use_portable_dumper_in_your_init/fewiwr7?utm_source=share&utm_medium=web2x][reddit]]:
+
+#+BEGIN_QUOTE
+  Caveat emptor: Re-dumping is still not 100% bug-free in the current Emacs codebase (both the emacs-27 release branch and master). There are known issues, and quite probably some unknown ones. Making re-dumping bug-free is not a goal for Emacs 27.1, so this feature should be at this point considered as experimental "use at your own risk" one.
+#+END_QUOTE
+
+^{[[#fnr.3][3]]}
+
+Apart from =--dump-file=, =--dump= also works, even though =emacs --help= didn't mention it. Spacemacs uses =--dump=.
+
+^{[[#fnr.4][4]]}
+
+You can found more about it in Emacs 27's Manual. I was foolish enough to read the online manual (Emacs 26 at the time) and not aware of the =load-path= thing until I read Spacemacs's implementation.
+
+Written by Yuan Fu <[[mailto:casouri@gmail.com][casouri@gmail.com]]>
+
+First Published on 2020-01-17 Fri 23:34
+
+Last modified on 2020-02-03 Mon 23:02
