@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Convert .org to .docx with citations - EMACS-DOCUMENT</title>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <meta name="author" content="lujun9972" />
+  <meta name="keywords" content="raw" />
+  <!-- <link rel="stylesheet" href="../../../../../media/css/main.css" type="text/css"/>
+       <link rel="stylesheet" href="../../../../../media/css/comment.css" type="text/css"/> -->
+  <link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/kognise/water.css@latest/dist/dark.css'>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+  <script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+</head>
+
+  <body><div class="container">
+<div>
+  <header class="masthead">
+    <h1 class="masthead-title"><a href="../../../../../">EMACS-DOCUMENT</a></h1>
+    <p>=============&gt;随便,谢谢</p>
+    <nav class="site-nav">
+      <ul class="trigger">
+        <li><a href="../../../../../years/">Years</a></li>
+        <li><a href="../../../../../authors/">Authors</a></li>
+        <li><a href="../../../../../tags/">Tags</a></li>
+        <li><a href="../../../../../about/">About</a></li>
+        <li><a href="https://github.com/lujun9972/emacs-document.git">Github</a></li>
+        <li><a href="../../../../../rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+    <form method="get" id="searchform" action="https://www.bing.com/search">
+      <input type="text" class="field" name="q" id="s" placeholder="Search">
+      <input type="hidden" name="as_sitesearch" value="lujun9972.github.io/emacs-document">
+    </form>
+  </header>
+</div>
+
+<div>
+<div class="post">
+<h1 class="title">Convert .org to .docx with citations</h1>
+<p>
+Last year around this time, I was working on a paper and it was requested that I submit it to the professor in <code>.docx</code> format for easier commenting. I hadn't really built this into my workflow at the time (always going from <code>.org</code> or <code>.tex</code> straight to <code>.pdf</code>), and so I decided to figure out how to do it. Now exporting to <code>.docx</code> isn't really too much of a problem with Org-mode, since you can export to an LibreOffice <code>.odt</code> format and convert it from there.
+</p>
+
+<p>
+The trouble that I was having with the Org <code>.odt</code> exporter was that it wasn't dealing with my biblatex citations. They would just show up as cite commands or something like that. The solution that I've found is to use <code>pandoc</code> and that works pretty well. But setting the options for this function was tedious, and so I created a function in my bash profile so that I could do this easily with a <code>org2docx</code> command. (Note: You can use this for other types of files (such as markdown), too. I just care about org files here.)
+</p>
+
+<p>
+Here are the steps that I used:
+</p>
+
+<ul class="org-ul">
+<li>First, you will need to install <a href="http://johnmacfarlane.net/pandoc/">pandoc</a>. This is easy with <a href="http://brew.sh/">homebrew</a>: <code>brew install pandoc</code>.</li>
+<li>You should also install <a href="https://github.com/jgm/pandoc-citeproc">pandoc-citeproc</a>: <code>brew install pandoc-citeproc</code></li>
+<li>You should <a href="https://github.com/citation-style-language/styles">download the .csl files from Github</a> and put them in an easy-to-access directory.</li>
+<li>I think it is a good idea to create a <code>reference.docx</code> template for creating a custom style for your new <code>.docx</code> files. There is <a href="https://github.com/jgm/pandoc-templates/issues/20">a short post on that here</a>. You then need to play with the styles in the file to your liking and put it in an easy to reference place.</li>
+<li>After that, you should open <code>~/.bash_profile</code> in your favorite text editor and add the following function with the appropriate modifications (see below for a discussion of the options) for your setup:</li>
+</ul>
+
+<pre class="example">
+org2docx() {
+        pandoc --bibliography=/path/to/your/bibliographyfile.bib --csl=/path/to/your/csl/chicago-fullnote-bibliography.csl --reference-docx=/path/to/your/reference.docx -i $1 -o $1-pandoc.docx
+    }
+</pre>
+
+<ul class="org-ul">
+<li>You will need to run <code>source ~/.bash_profile</code> to load the changes.</li>
+</ul>
+
+<p>
+You can now convert documents like this: <code>org2docx MyPaper.org</code> fairly easily without having to bother with the options every time.
+</p>
+
+<p>
+Here's what the various options do:
+</p>
+
+<ul class="org-ul">
+<li><code>--bibliography=/path/to/your/bibliographyfile.bib</code>. You specify the path to your bibliography file here. Since I maintain a single <code>.bib</code> file for all my references, I don't need to change this across different papers.</li>
+<li><code>--csl=/path/to/your/csl/chicago-fullnote-bibliography.csl</code>. You specify the path to your <code>.csl</code> file here. You can pick any of them in the csl files from Github.
+
+<ul class="org-ul">
+<li>You may want to pick the <code>chicago-fullnote-bibliography-no-ibid.csl</code> for <code>.docx</code> files. Normally when you create a <code>.pdf</code> file with biblatex-chicago, the footnotes go from: full citation in the footnote to short citation in the footnote to “Ibid” citation. Then, on each new page, it starts with the short citation and moves to Ibid. This is so that you don't have to flip back to previous pages to see what the reference is. Not so with the <code>.docx</code> conversion. Not allowing “ibid” citations might be a good idea then.</li>
+</ul></li>
+
+<li><code>--reference-docx=/path/to/your/reference.docx</code> This is optional, but it allows you to have a custom <code>.docx</code> style. You can make this closer, for instance, to whatever LaTeX style you use.</li>
+<li><code>-i $1 -o $1-pandoc.docx</code>. <code>-i $1</code> just says that it'll take the first argument as your input file. <code>-o $1-pandoc.docx</code> just says that it will output the file with the filename but with <code>-pandoc.docx</code> appended.</li>
+<li>If you want to automatically open the <code>.docx</code> file after converting, you will want to include a <code>open $1-pandoc.docx</code> command as well.</li>
+</ul>
+
+</div>
+</div>
+<div>
+        <div class="post-meta">
+            <span title="post date" class="post-info">2020-02-19</span>
+            <span title="last modification date" class="post-info">2020-02-19</span>
+            <span title="tags" class="post-info">:<a href="../../../../../tags/raw">raw</a>:</span>
+            <span title="author" class="post-info"><a href="mailto:travis &lt;at&gt; travis-job-da2bdc1f-546e-4d15-9926-35d24e654b4b">lujun9972</a></span>
+        </div>
+    <script src="../../../../../media/js/jquery-2.1.3.min.js"></script>
+    <script src="../../../../../media/js/md5.min.js"></script>
+        <section>
+            <div id="gitalk-container"></div>
+            <script type="text/javascript">
+             var gitalk = new Gitalk({
+                 clientID: 'fdcb5d9da3f4acb4862c',
+                 clientSecret: 'dd0a16312a206782cb7669dcec5e96874ab48170',
+                 repo: 'lujun9972.github.com',
+                 owner: 'lujun9972',
+                 admin: ['lujun9972'],
+                 id: md5(location.pathname),      // Ensure uniqueness and length less than 50
+                 distractionFreeMode: false  // Facebook-like distraction free mode
+             })
+             gitalk.render('gitalk-container')
+            </script>
+        </section>
+    <script src="../../../../../media/js/main.js"></script>
+        <script>
+         var _hmt = _hmt || [];
+         (function() {
+             var hm = document.createElement("script");
+             hm.src = "https://hm.baidu.com/hm.js?7bac4fd0247f69c27887e0d4e3aee41e";
+             var s = document.getElementsByTagName("script")[0]; 
+             s.parentNode.insertBefore(hm, s);
+         })();
+        </script>
+    <div class="footer">
+        <p>Generated by <a href="http://www.gnu.org/software/emacs/">Emacs</a> 27.x(<a href="http://orgmode.org">Org mode</a> 9.x)</p>
+        <p>
+            Copyright &copy; 2014 - <span id="footerYear"></span> <a href="mailto:travis &lt;at&gt; travis-job-da2bdc1f-546e-4d15-9926-35d24e654b4b">lujun9972</a>
+            &nbsp;&nbsp;-&nbsp;&nbsp;
+            Powered by <a href="https://github.com/emacs-china/ego" target="_blank">EGO</a><br/>
+            <a href="http://creativecommons.org/licenses/by-sa/3.0/" rel="license"><img src="http://i.creativecommons.org/l/by-sa/3.0/88x31.png" style="border-width:0" alt="Creative Commons License" class="center"></a>
+            <script type="text/javascript">document.getElementById("footerYear").innerHTML = (new Date()).getFullYear();</script>
+        </p>
+    </div>
+            </div>
+            <script type="text/javascript"
+                    src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+            </script>
+            <script type="text/x-mathjax-config">
+             MathJax.Hub.Config({ TeX: { equationNumbers: {autoNumber: "AMS"} } });
+            </script>
+</div>
+
+  </div>
+  <!-- https://instant.page/
+       Make your site’s pages instant in 1 minute and improve your conversion rate by 1%  -->
+  <script src="../../../../../instant.page/1.1.0" type="module" integrity="sha384-EwBObn5QAxP8f09iemwAJljc+sU+eUXeL9vSBw1eNmVarwhKk2F9vBEpaN9rsrtp"></script>
+  </body>
+</html>
