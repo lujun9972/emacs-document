@@ -1,0 +1,39 @@
+#+TITLE: Convert .org to .docx with citations
+#+URL: https://www.clarkdonley.com/post/convert-org-to-docx-with-citations/
+#+AUTHOR: lujun9972
+#+TAGS: raw
+#+DATE: [2020年 02月 19日 星期三 09:50:36 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+Last year around this time, I was working on a paper and it was requested that I submit it to the professor in =.docx= format for easier commenting. I hadn't really built this into my workflow at the time (always going from =.org= or =.tex= straight to =.pdf=), and so I decided to figure out how to do it. Now exporting to =.docx= isn't really too much of a problem with Org-mode, since you can export to an LibreOffice =.odt= format and convert it from there.
+
+The trouble that I was having with the Org =.odt= exporter was that it wasn't dealing with my biblatex citations. They would just show up as cite commands or something like that. The solution that I've found is to use =pandoc= and that works pretty well. But setting the options for this function was tedious, and so I created a function in my bash profile so that I could do this easily with a =org2docx= command. (Note: You can use this for other types of files (such as markdown), too. I just care about org files here.)
+
+Here are the steps that I used:
+
+- First, you will need to install [[http://johnmacfarlane.net/pandoc/][pandoc]]. This is easy with [[http://brew.sh/][homebrew]]: =brew install pandoc=.
+- You should also install [[https://github.com/jgm/pandoc-citeproc][pandoc-citeproc]]: =brew install pandoc-citeproc=
+- You should [[https://github.com/citation-style-language/styles][download the .csl files from Github]] and put them in an easy-to-access directory.
+- I think it is a good idea to create a =reference.docx= template for creating a custom style for your new =.docx= files. There is [[https://github.com/jgm/pandoc-templates/issues/20][a short post on that here]]. You then need to play with the styles in the file to your liking and put it in an easy to reference place.
+- After that, you should open =~/.bash_profile= in your favorite text editor and add the following function with the appropriate modifications (see below for a discussion of the options) for your setup:
+
+#+BEGIN_EXAMPLE
+  org2docx() {
+          pandoc --bibliography=/path/to/your/bibliographyfile.bib --csl=/path/to/your/csl/chicago-fullnote-bibliography.csl --reference-docx=/path/to/your/reference.docx -i $1 -o $1-pandoc.docx
+      }
+#+END_EXAMPLE
+
+- You will need to run =source ~/.bash_profile= to load the changes.
+
+You can now convert documents like this: =org2docx MyPaper.org= fairly easily without having to bother with the options every time.
+
+Here's what the various options do:
+
+- =--bibliography=/path/to/your/bibliographyfile.bib=. You specify the path to your bibliography file here. Since I maintain a single =.bib= file for all my references, I don't need to change this across different papers.
+- =--csl=/path/to/your/csl/chicago-fullnote-bibliography.csl=. You specify the path to your =.csl= file here. You can pick any of them in the csl files from Github.
+
+  - You may want to pick the =chicago-fullnote-bibliography-no-ibid.csl= for =.docx= files. Normally when you create a =.pdf= file with biblatex-chicago, the footnotes go from: full citation in the footnote to short citation in the footnote to “Ibid” citation. Then, on each new page, it starts with the short citation and moves to Ibid. This is so that you don't have to flip back to previous pages to see what the reference is. Not so with the =.docx= conversion. Not allowing “ibid” citations might be a good idea then.
+
+- =--reference-docx=/path/to/your/reference.docx= This is optional, but it allows you to have a custom =.docx= style. You can make this closer, for instance, to whatever LaTeX style you use.
+- =-i $1 -o $1-pandoc.docx=. =-i $1= just says that it'll take the first argument as your input file. =-o $1-pandoc.docx= just says that it will output the file with the filename but with =-pandoc.docx= appended.
+- If you want to automatically open the =.docx= file after converting, you will want to include a =open $1-pandoc.docx= command as well.
