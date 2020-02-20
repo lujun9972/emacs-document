@@ -1,0 +1,183 @@
+#+TITLE: 美化 Org mode
+#+URL: https://mstempl.netlify.com/post/beautify-org-mode/
+#+AUTHOR: lujun9972
+#+TAGS: org-mode
+#+DATE: [2020年 02月 19日 星期三 09:51:52 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+在过去的几个月里，我收集了一些软件包和设置来美化Org缓冲区，其中大部分是通过Unicode技巧来实现的。 我觉得这个结果挺不错的，想要分享出来，因为它可能对别人也有用。以下是我设置及其相关解释。与我的其他Emacs配置一样，它使用 =use-package=.
+
+默认的字体设置确保可以显示所有unicode及类似的符号。这也是后面这些浮夸之物的基础。
+首先,我检查Symbola字体是否存在。
+
+#+begin_src emacs-lisp
+  (when (member "Symbola" (font-family-list))
+    (set-fontset-font "fontset-default" nil
+                      (font-spec :size 20 :name "Symbola")))
+#+end_src
+
+我还指定Symbola作为所有unicode字符的字体
+
+#+begin_src emacs-lisp
+  (when (member "Symbola" (font-family-list))
+    (set-fontset-font t 'unicode "Symbola" nil 'prepend))
+#+end_src
+
+我在所有地方都使用utf8编码，并显式地设置它，而不依赖于Emacs默认值
+
+#+begin_src emacs-lisp
+  (prefer-coding-system 'utf-8)
+  (set-default-coding-systems 'utf-8)
+  (set-terminal-coding-system 'utf-8)
+  (set-keyboard-coding-system 'utf-8)
+  (setq default-buffer-file-coding-system 'utf-8)
+#+end_src
+
+现在转到Org模式的设置。
+
+我要缩进
+
+#+begin_src emacs-lisp
+  (setq org-startup-indented t
+        org-src-tab-acts-natively t)
+#+end_src
+
+I like =visual-pitch-mode= and =visual-line-mode= for org files
+我喜欢为org文件开启 =visual-pitch-mode= 和 =visual-line-mode=
+
+#+begin_src emacs-lisp
+  (add-hook 'org-mode-hook
+            (lambda ()
+              (variable-pitch-mode 1)
+              visual-line-mode))
+#+end_src
+
+开始设置Org模式缓冲区的外观，首先让我们做一些一般设置:
+
+- 不要显示强调标记
+- 如果标题被标记为DONE，则更改标题的外观
+- 隐藏标题前的星星
+- 使用UTF8字符显示实体。
+- 只使用奇数级别
+
+我觉得这样会使缓冲区看起来更整洁。
+
+#+begin_src emacs-lisp
+  (setq org-hide-emphasis-markers t
+        org-fontify-done-headline t
+        org-hide-leading-stars t
+        org-pretty-entities t
+        org-odd-levels-only t)
+#+end_src
+
+下一步是设置自动更改列表项。我经常使用项目符号列表，我认为它能更好地突出结构。
+
+#+begin_src emacs-lisp
+  (setq org-list-demote-modify-bullet
+        (quote (("+" . "-")
+                ("-" . "+")
+                ("*" . "-")
+                ("1." . "-")
+                ("1)" . "-")
+                ("A)" . "-")
+                ("B)" . "-")
+                ("a)" . "-")
+                ("b)" . "-")
+                ("A." . "-")
+                ("B." . "-")
+                ("a." . "-")
+                ("b." . "-"))))
+#+end_src
+
+这是第一个将标题前的星星转换成漂亮符号的程序包。因为我只使用奇数级别，所以我为所有偶数级别设置了同一个特定的符号。
+
+#+begin_src emacs-lisp
+  (use-package org-bullets
+    :custom
+    (org-bullets-bullet-list '("◉" "☯" "○" "☯" "✸" "☯" "✿" "☯" "✜" "☯" "◆" "☯" "▶"))
+    (org-ellipsis "⤵")
+    :hook (org-mode . org-bullets-mode))
+#+end_src
+
+从[[https://zzamboni.org/post/beautifying-org-mode-in-emacs/]] 中我收集了这些设置来让符号列表显示这些漂亮符号而不是一个破折号。
+
+#+begin_src emacs-lisp
+  (font-lock-add-keywords 'org-mode
+                          '(("^ *\([-]\) "
+                             (0 (prog1 () (compose-region (match-beginning 1) (match-end 1) "•"))))))
+  (font-lock-add-keywords 'org-mode
+                          '(("^ *\([+]\) "
+                             (0 (prog1 () (compose-region (match-beginning 1) (match-end 1) "◦"))))))
+#+end_src
+
+下一步是美化src块。受 [[https://www.reddit.com/r/emacs/comments/9lpupc/i%5Fuse%5Fmarkdown%5Frather%5Fthan%5Forgmode%5Ffor%5Fmy%5Fnotes/][i use markdown rather than org-mode for my notes : emacs]] 这篇文章的启发，我发现了内置的 =prettify-symbols-mode=.
+其配置遵循  [[http://endlessparentheses.com/new-in-emacs-25-1-have-prettify-symbols-mode-reveal-the-symbol-at-point.html][New in Emacs 25.1: Have prettify-symbols-mode reveal the symbol at point · En...]] 中的示例。
+这种方法也可以用来提供某种程度的美化
+
+#+begin_src emacs-lisp
+  (setq-default prettify-symbols-alist '(("#+BEGIN_SRC" . "†")
+                                         ("#+END_SRC" . "†")
+                                         ("#+begin_src" . "†")
+                                         ("#+end_src" . "†")
+                                         (">=" . "≥")
+                                         ("=>" . "⇨")))
+  (setq prettify-symbols-unprettify-at-point 'right-edge)
+  (add-hook 'org-mode-hook 'prettify-symbols-mode)
+#+end_src
+
+尽管我更喜欢 =可变间距= 的子， 但对于代码块，我更倾向 =固定间距= 的字体.
+
+#+begin_src emacs-lisp
+  (custom-theme-set-faces
+   'user
+   '(variable-pitch ((t (:family "Source Sans Pro" :height 120 :weight light))))
+   '(fixed-pitch ((t ( :family "Consolas" :slant normal :weight normal :height 0.9 :width normal)))))
+
+  (custom-theme-set-faces
+   'user
+   '(org-block ((t (:inherit fixed-pitch))))
+   '(org-document-info-keyword ((t (:inherit (shadow fixed-pitch)))))
+   '(org-property-value ((t (:inherit fixed-pitch))) t)
+   '(org-special-keyword ((t (:inherit (font-lock-comment-face fixed-pitch)))))
+   '(org-tag ((t (:inherit (shadow fixed-pitch) :weight bold))))
+   '(org-verbatim ((t (:inherit (shadow fixed-pitch))))))
+#+end_src
+
+=pretty-tags= 是一个用unicode符号替换标签的包。标签的名称必须与缓冲区中的名称完全相同才行。
+
+#+begin_src emacs-lisp
+  (use-package org-pretty-tags
+    :demand t
+    :config
+    (setq org-pretty-tags-surrogate-strings
+          (quote
+           (("TOPIC" . "☆")
+            ("PROJEKT" . "💡")
+            ("SERVICE" . "✍")
+            ("Blog" . "✍")
+            ("music" . "♬")
+            ("security" . "🔥"))))
+    (org-pretty-tags-global-mode))
+#+end_src
+
+还有一个程序包可以显示特别的优先级，而不是标准的优先级。
+
+#+begin_src emacs-lisp
+  (use-package org-fancy-priorities
+    :diminish
+    :demand t
+    :defines org-fancy-priorities-list
+    :hook (org-mode . org-fancy-priorities-mode)
+    :config
+    (unless (char-displayable-p ?❗)
+      (setq org-fancy-priorities-list '("HIGH" "MID" "LOW" "OPTIONAL"))))
+#+end_src
+
+我喜欢在Org模式标题上显示大纲编号。编号与导出Org文件时的显示方式相匹配。这个文件在Org mode所属的git 仓库中，但是不是官方Org mode的一部分
+
+#+begin_src emacs-lisp
+  (use-package org-num
+    :load-path "lisp/"
+    :after org
+    :hook (org-mode . org-num-mode))
+#+end_src
