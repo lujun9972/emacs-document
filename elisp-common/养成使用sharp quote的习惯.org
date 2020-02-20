@@ -1,0 +1,37 @@
+#+TITLE: 养成使用sharp quote的习惯
+#+URL: https://endlessparentheses.com/get-in-the-habit-of-using-sharp-quote.html
+#+AUTHOR: lujun9972
+#+TAGS: elisp-common
+#+DATE: [2020年 02月 19日 星期三 09:53:39 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+
+sharp quote(又名function quote，或可以简单地用 =#'= 表示)是 [[https://doc.endlessparentheses.com/Fun/function][=function=]] 语句的缩写。
+它本质上是一种支持字节码编译的 [[https://doc.endlessparentheses.com/Fun/quote][=quote=]] (也可以表示为 ='=)，不过它的实际用途在这些年里已经发生了变化。
+
+二十多年前，它被用来引用[[https://doc.endlessparentheses.com/Fun/lambda][=lambda=]]语句。你知道的, ='(lambda (x) (* x x))= 对字节编译器来说只是一个单纯的列表，但 =#'(lambda (x) (* x x))= 是一个可以编译的实际函数。
+如今-或者更确切地说，近十年里,lambda语句生成的就是sharp-quote引起来的自己，也就是是一个普通的 =(lambda (x) (* x x))= 与它的 =#'= 版本 [[http://www.gnu.org/software/emacs/manual/html_node/elisp/Anonymous-Functions.html][是相同的]]。事实上，你 /永远不应该/ 用任何一种引号引用你的lambdas。
+
+另一方面，你可能正觉得shartp quote对elisp程序员来说是多余的，结果它又有了新的用途。
+当编译器注意到你使用了一个未定义的函数时，它就会抛出一个警告，比如 =(not-defined “oops”)=, 但是对于像 =(mapcar 'not-defined some-list)= 这样来调用的函数，它却不会这样做，因为它不知道这个符号是一个函数的名称。
+sharp quote是向编译器传递信息的一种方式，因此如果它遇到 =(mapcar #'not-defined some-list)=,就会抛出相应的警告。
+
+因此，对指代函数名每个符号使用sharp quote是一种很好的做法，无论它是在 =mapcar=, =apply=, =funcall= 还是其他任何地方。
+坚持这样做还让我在一个包中发现了一个小错误。
+
+当然，我们可以让加上sharp quote这件事变得更方便一些。
+
+#+begin_src emacs-lisp
+  (defun endless/sharp ()
+    "Insert #' unless in a string or comment."
+    (interactive)
+    (call-interactively #'self-insert-command)
+    (let ((ppss (syntax-ppss)))
+      (unless (or (elt ppss 3)
+                  (elt ppss 4)
+                  (eq (char-after) ?'))
+        (insert "'"))))
+
+  (define-key emacs-lisp-mode-map "#" #'endless/sharp)
+#+end_src
