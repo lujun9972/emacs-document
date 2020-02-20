@@ -1,0 +1,46 @@
+#+TITLE: 将org文件转换为带引用的docx文件
+#+URL: https://www.clarkdonley.com/post/convert-org-to-docx-with-citations/
+#+AUTHOR: lujun9972
+#+TAGS: org-mode
+#+DATE: [2020年 02月 19日 星期三 09:50:36 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+去年这个时候，我正在写一篇论文，有人要求我把论文以 =.docx= 格式交给的教授,以便进行注释。
+我当时并没有真正地把这个过程构建到我的工作流中(我总是先写 =.org= 或 =.tex= 然后转换成 =.pdf=),为此，我决定弄清楚如何实现这一转换。
+现在导出成 =.docx= 对于Org模式来说并不是什么大问题，因为你可以导出成LibreOffice的 =.odt= 格式化并通过LibreOffice转换成 =.docx=。
+
+Org =.odt= 导出的问题在于它没有处理我的文献引用。
+它们只会以引用命令或类似的形式出现。我找到的解决方案是使用 =pandoc= 进行转换而且效果很好。
+但是它的设置选项非常繁琐，因此我在bash配置文件中创建了一个函数，这样我就可以使用 =org2docx= 命令轻松地完成这项工作。
+(注意:您也可以将其用于其他类型的文件(如markdown)。我这里只关心org文件)
+
+以下是我使用的步骤:
+
+- 首先，您需要安装[[http://johnmacfarlane.net/pandoc/][pandoc]]。用 [[http://brew.sh/][homebrew]] 安装很容易: =brew install pandoc=.
+- 你还需要安装[[https://github.com/jgm/pandoc-citeproc][pandoc-citeproc]]: =brew install pandoc-citeproc=
+- 你需要 [[https://github.com/citation-style-language/styles][从github上下载.csl文件]] 并将它们放在一个易于访问的目录中。
+- 我认为我 =.docx= 文件创建一个客户样式模板 =reference.docx= 是一个好主意。[[https://github.com/jgm/pandoc-templates/issues/20][此处有一篇相关的短文]]。然后，你需要按照自己的喜好处理文件中的样式，并将其放在一个容易引用的位置。
+- 之后，用你喜欢的文本编辑器打开 =~/.bash_profile=,并添加以下函数(可能要修改有关选项，关于参数的讨论请参见下面):
+
+  
+#+begin_src shell
+  org2docx() {
+      pandoc --bibliography=/path/to/your/bibliographyfile.bib --csl=/path/to/your/csl/chicago-fullnote-bibliography.csl --reference-docx=/path/to/your/reference.docx -i $1 -o $1-pandoc.docx
+  }
+#+end_src
+
+- 你需要运行 =source ~/.bash_profile= 来加载更改。
+
+现在，您只需要运行: =org2docx MyPaper.org= 就能转换文档了，相当容易，不必再为那些选项费心了。
+
+以下是各种选项的作用:
+
+- =--bibliography=/path/to/your/bibliographyfile.bib= 指定文献文件的路径。因为我为所有的参考文献维护同一个 =.bib= 文件，因此不同的论文无需修改。
+- =--csl=/path/to/your/csl/chicago-fullnote-bibliography.csl=.指定 =.csl= 文件的路径。你可以从Github的csl文件中任何选择一个。
+
+- 你可以为 =.docx= 文件选择 =chicago-fullnote-bibliograp-no-ibid.csl=. 
+
+- =--reference-docx=/path/to/your/reference.docx= 是可选项, 但pandoc允许你自定义 =.docx= 风格. 比如，你可以让它看起来跟你的LaTeX风格很接近.
+- =-i $1 -o $1-pandoc.docx=. =-i $1= 的意思是使用第一个参数作为输入文件. =-o $1-pandoc.docx= 的意思是它会输出一个文件名一致但添加了 =-pandoc.docx= 后缀的文件.
+- 如果你想在转换后自动打开 =.docx=,只需要包含一个 =open $1-pandoc.docx= 文件即可。
