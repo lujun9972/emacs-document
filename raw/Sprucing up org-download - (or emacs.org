@@ -1,0 +1,66 @@
+#+TITLE: Sprucing up org-download · (or emacs
+#+URL: https://oremacs.com/2015/01/18/sprucing-up-org-download/
+#+AUTHOR: lujun9972
+#+TAGS: raw
+#+DATE: [2020年 02月 21日 星期五 20:17:52 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+* Sprucing up org-download
+  :PROPERTIES:
+  :CUSTOM_ID: sprucing-up-org-download
+  :CLASS: post-title
+  :END:
+
+My interest in [[https://github.com/abo-abo/org-download][org-download]] was renewed today with [[http://thread.gmane.org/gmane.emacs.orgmode/93964][this thread]] on =org-mode='s mailing list.
+
+=org-download= allows you to drag-and-drop an image from e.g. Firefox or your own file system to an =org-mode= buffer. When I originally wrote it, I was taking a Chemistry course on [[https://www.edx.org/][edX]], which included homework and exams with a lot of images. Doing the homework in a literate style with =org-mode=, I wanted the problems to be completely self-contained, and for that I needed to save all the images from the website, preferably quickly, to an =org-mode= buffer. With a few hacks and some advice and contributions from more experienced hackers, =org-download= came to be.
+
+** Today's commits
+   :PROPERTIES:
+   :CUSTOM_ID: todays-commits
+   :END:
+
+The main contribution from today's commits was adding the code that un-aliases images that point to HTML. I see a lot of these from the people that I'm following on my Twitter, [[https://twitter.com/_abo_abo][@_abo_abo]]. Here's the code:
+
+#+BEGIN_EXAMPLE
+  (defcustom org-download-img-regex-list
+   '("<img +src=\"" "<img +\\(class=\"[^\"]+\"\\)? *src=\"")
+   "This regex is used to unalias links that look like images.
+  The html to which the links points will be searched for these
+  regexes, one by one, until one succeeds. The found image address
+  will be used."
+   :group 'org-download)
+#+END_EXAMPLE
+
+and in =(org-download-image link)=:
+
+#+BEGIN_EXAMPLE
+  (unless (image-type-from-file-name link)
+   (with-current-buffer
+   (url-retrieve-synchronously link t)
+   (let ((regexes org-download-img-regex-list)
+   lnk)
+   (while (and (not lnk) regexes)
+   (goto-char (point-min))
+   (when (re-search-forward (pop regexes) nil t)
+   (backward-char)
+   (setq lnk (read (current-buffer)))))
+   (if lnk
+   (setq link lnk)
+   (error "link %s does not point to an image" link)))))
+#+END_EXAMPLE
+
+Here, =image-type-from-file-name= is a built-in from =image.el= that decides if =link= looks like an image file or not.
+
+As you can see, since I intend to use =link= right after to be transformed right now, I'm using =url-retrieve-synchronously=, instead of the asynchronous =url-retrieve=. The other one is used by default to download the actual image.
+
+Note the use of the =while= / =pop= combination for traversing a list. I've seen it used in some places in the Emacs core, and I think it's pretty neat.
+
+Arranging the regular expressions into a list is necessary to give priority to some regexes. For instance, the first element of =org-download-img-regex-list= should match e.g. an actual referred image on Twitter, while the second element will match at least a profile picture in the case when there is no referred image.
+
+** Visual demo
+   :PROPERTIES:
+   :CUSTOM_ID: visual-demo
+   :END:
+
+I think that I might have over-engineered the custom options of =org-download= a bit. Just to keep you motivated enough to figure them out, here's a link to [[https://www.youtube.com/watch?v=dAojpHR-6Uo][a Youtube demo]] of the fast clickety-clicking (the mouse usage), that comes after some clackety-clacking (the customization).
