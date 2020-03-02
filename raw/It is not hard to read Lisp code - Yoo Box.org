@@ -1,0 +1,839 @@
+#+TITLE: It is not hard to read Lisp code | Yoo Box
+#+URL: https://yoo2080.wordpress.com/2014/07/04/it-is-not-hard-to-read-lisp-code/
+#+AUTHOR: lujun9972
+#+TAGS: raw
+#+DATE: [2020年 03月 02日 星期一 19:47:09 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+It is natural for someone who sees Lisp code for the first time to have the impression that Lisp might have poor readability. On the other hand, you know there are people who have been reading and writing Lisp code fine. With this post, I hope I can convince you that /you/ can read Lisp code with ease. The context of this post is that this post is a module of [[https://yoo2080.wordpress.com/2013/08/07/living-with-emacs-lisp/][Living with Emacs Lisp]] series, intended for beginning users of Emacs.
+
+Most of this post is about how to read Lisp code in general, and then there is one section about how to read Emacs Lisp in particular.
+
+** 1. Intro
+   :PROPERTIES:
+   :CUSTOM_ID: sec-1
+   :END:
+
+*Alice:* “How can you read Lisp code written by others? How do you do that?”\\
+*Bob:* “You can see the nesting structure from how the code is indented. ”\\
+*Alice:* “Yes, I heard that Lisp programmers don't actually count parens (a.k.a parentheses) but still how do you read from indentation? ”\\
+*Bob:* “Look at it this way. To me, Lisp code looks like an expanded [[http://en.wikipedia.org/wiki/Tree_view][tree view]]. You look at the vertical alignment here and there to see the structure of the code. Give me some Lisp code and let's see.”\\
+*Alice:* “OK. Here is some Emacs Lisp code I got from someone long time ago. I'm going to indent this now.”^{[[#fn.1][1]]}
+
+#+BEGIN_EXAMPLE
+  (when (eq system-type 'windows-nt)
+  (defvar my-gs-exe-list
+  (list "C:/Program Files/gs/gs9.14/bin/gswin32c.exe"
+  "c:/Program Files/gs/gs9.10/bin/GSWIN64C.EXE"
+  "C:/Program Files/gs/gs9.06/bin/GSWIN32C.EXE"))
+  (dolist (exe my-gs-exe-list)
+  (if (file-exists-p exe)
+  (setq preview-gs-command exe)))
+  ;; (setq preview-image-type 'pnm)
+  )
+#+END_EXAMPLE
+
+*Bob:* “I don't use Emacs, but I'm curious, how do you indent in your text editor?”\\
+*Alice:* “In Emacs? I select the text and then I press =C-M-\= (=indent-region=). Done. Discoverable through the menu interface too.”
+
+#+BEGIN_EXAMPLE
+  (when (eq system-type 'windows-nt)
+   (defvar my-gs-exe-list
+   (list "C:/Program Files/gs/gs9.14/bin/gswin32c.exe"
+   "c:/Program Files/gs/gs9.10/bin/GSWIN64C.EXE"
+   "C:/Program Files/gs/gs9.06/bin/GSWIN32C.EXE"))
+   (dolist (exe my-gs-exe-list)
+   (if (file-exists-p exe)
+   (setq preview-gs-command exe)))
+   ;; (setq preview-image-type 'pnm)
+   )
+#+END_EXAMPLE
+
+*Bob:* “There you see. You can see the nested structure now. Do you see it?”
+
+** 2. Tree view
+   :PROPERTIES:
+   :CUSTOM_ID: sec-2
+   :END:
+
+Let's take an example from the Wikipedia article on [[http://en.wikipedia.org/wiki/Tree_view][tree view]]:
+
+- Smiles
+
+  - Happy
+  - Sad
+  - Neither
+
+- Vehicles
+
+  - Parts
+
+    - Wheel
+
+  - Whole
+
+    - Truck
+    - Car
+
+You can see the nesting structure from how much each item is indented. Same is true with Lisp code:
+
+#+BEGIN_EXAMPLE
+  (smiles
+   happy
+   sad
+   neither)
+  (vehicles
+   (parts
+   wheel)
+   (whole
+   truck
+   car))
+#+END_EXAMPLE
+
+Notice how the lines =(smiles= and =(vehicles= have zero indent (hence the same level: the top level), and how the three lines =happy=, =sad=, =neither)= share the same one level deep indent.
+
+** 3. Terminology
+   :PROPERTIES:
+   :CUSTOM_ID: sec-3
+   :END:
+
+Before moving on to more examples, let's establish some terminology.
+
+I'll assume you are familiar with the term “statement” and “expression” in other programming languages. Recall that expressions can contain other expressions in them. In some languages, statements always return some value, making the distinction between statements and expressions void. Lisp is one of such, and when you see something in Lisp code and you think “this looks like a block” or “this looks like a statement”, you can actually simply assume that what you are seeing is just an *expression* (playing the role of “block” or “statement” in some sense of course). Put simple, expressions everywhere. They are often specifically called *symbolic expressions* in Lisp speak, and they are also called *s-expressions*, or just *expressions*, for short. Sometimes they are called *s-exps* or *sexps*, for even shorter.
+
+For example, let's take a look at this code again:
+
+#+BEGIN_EXAMPLE
+  (when (eq system-type 'windows-nt)
+   (defvar my-gs-exe-list
+   (list "C:/Program Files/gs/gs9.14/bin/gswin32c.exe"
+   "c:/Program Files/gs/gs9.10/bin/GSWIN64C.EXE"
+   "C:/Program Files/gs/gs9.06/bin/GSWIN32C.EXE"))
+   (dolist (exe my-gs-exe-list)
+   (if (file-exists-p exe)
+   (setq preview-gs-command exe)))
+   ;; (setq preview-image-type 'pnm)
+   )
+#+END_EXAMPLE
+
+That code contains lots of expressions. That entire code can be considered one big expression =(when ....)=, which we usually call a =when= form. The first line contains some short expression, namely, =(eq system-type 'windows-nt)=. We say that this expression is an =eq= form.
+
+The lines 2 to 5 contain an expression which is a =defvar= form. The lines 3 to 5 contains an expression which is a =list= form.
+
+Also, =when= itself is an expression. You can actually verify that because when you enter =when= alone to the Lisp interpreter, it won't say “Syntax error! That's not a valid expression!” (but it will say something like “you did not define that variable!”.)
+
+You can check that the following is an expression too:
+
+#+BEGIN_EXAMPLE
+  'windows-nt
+#+END_EXAMPLE
+
+which contains the following smaller expression
+
+#+BEGIN_EXAMPLE
+  windows-nt
+#+END_EXAMPLE
+
+The following is an expression too.
+
+#+BEGIN_EXAMPLE
+  "C:/Program Files/gs/gs9.14/bin/gswin32c.exe"
+#+END_EXAMPLE
+
+This is not an expression:
+
+#+BEGIN_EXAMPLE
+  "C:/Program
+#+END_EXAMPLE
+
+Neither this:
+
+#+BEGIN_EXAMPLE
+  (+ 1 1
+#+END_EXAMPLE
+
+Nor this:
+
+#+BEGIN_EXAMPLE
+  (+ 1 1))
+#+END_EXAMPLE
+
+But it does contain an expression, namely:
+
+#+BEGIN_EXAMPLE
+  (+ 1 1)
+#+END_EXAMPLE
+
+which in turn contains smaller expressions like
+
+#+BEGIN_EXAMPLE
+  +
+#+END_EXAMPLE
+
+and
+
+#+BEGIN_EXAMPLE
+  1
+#+END_EXAMPLE
+
+So we learned:
+
+- what (symbolic) expressions are
+- usage of the phrase “blah form”
+- how to check if some part of code is an expression, when not sure
+
+.
+
+*** 3.1. Emacs Lisp note
+    :PROPERTIES:
+    :CUSTOM_ID: sec-3-1
+    :END:
+
+If you an Emacs user and want to know whether something in Emacs Lisp code is an expression, you enter that something into the buffer created by:
+
+#+BEGIN_EXAMPLE
+  M-x ielm
+#+END_EXAMPLE
+
+Try entering each of the non-examples in this section and see what happens.
+
+*** 3.2. Common Lisp note
+    :PROPERTIES:
+    :CUSTOM_ID: sec-3-2
+    :END:
+
+If you are an Emacs user and want to access the Common Lisp interpreter via Emacs, you might want to look into any of the SLIME starting guides or [[https://yoo2080.wordpress.com/2013/08/18/how-to-install-common-lisp-and-slime-on-ms-windows/][this guide in particular]].
+
+If you are using other editors, you probably can get help from that editor's community.
+
+Recall that the interpreter can be accessed from command line even before you set up integration with your editor.
+
+** 4. Variations
+   :PROPERTIES:
+   :CUSTOM_ID: sec-4
+   :END:
+
+Sometimes this code (two big expressions):
+
+#+BEGIN_EXAMPLE
+  (smiles
+   happy
+   sad
+   neither)
+  (vehicles
+   (parts
+   wheel)
+   (whole
+   truck
+   car))
+#+END_EXAMPLE
+
+is alternatively written as:
+
+#+BEGIN_EXAMPLE
+  (smiles happy
+   sad
+   neither)
+  (vehicles (parts wheel)
+   (whole truck
+   car))
+#+END_EXAMPLE
+
+That way is more vertically squeezed, and horizontally spread out. You'll also encounter code that is differently squeezed like:
+
+#+BEGIN_EXAMPLE
+  (smiles happy sad neither)
+  (vehicles
+   (parts wheel)
+   (whole truck car))
+#+END_EXAMPLE
+
+So I have shown three different styles. The issue of which style to use in which case is a matter I will not go into, For now, just notice that each style is readable to you. In each of the three cases, you can see the nesting structure easily from indentation alone.
+
+** 5. How to find where the expression ends.
+   :PROPERTIES:
+   :CUSTOM_ID: sec-5
+   :END:
+
+Some code taken from the =dash.el= library:
+
+#+BEGIN_EXAMPLE
+  (defmacro --split-with (pred list)
+   "Anaphoric form of `-split-with'."
+   (declare (debug (form form)))
+   (let ((l (make-symbol "list")) ;; <-- the outermost let form starts here
+   (r (make-symbol "result"))
+   (c (make-symbol "continue")))
+   `(let ((,l ,list)
+   (,r nil)
+   (,c t))
+   (while (and ,l ,c)
+   (let ((it (car ,l))) ;; <-- the innermost let form starts here
+   (if (not ,pred)
+   (setq ,c nil)
+   (!cons it ,r)
+   (!cdr ,l))))
+   (list (nreverse ,r) ,l))))
+
+  (defun -split-with (pred list)
+   "Returns a list of ((-take-while PRED LIST) (-drop-while PRED LIST)), in no more than one pass through the list."
+   (--split-with (funcall pred it) list))
+#+END_EXAMPLE
+
+Quiz: That code has three =let= forms in it. The third =let= form (the innermost one) spans how many lines?
+
+The answer is? There is a way to figure that out. The four lines following the beginning line of the let form are indented deeper than the beginning line, so you conclude that these four lines belong to the let form. So we conclude that the let form occupies 5 lines (including the beginning line).
+
+Now, how many lines does the /first/ let form (the outermost one) occupy?
+
+In general, the algorithm to figure that out is like this:
+
+1. Set D to the indent depth of the beginning line (of the form you are interested)
+2. Start with the beginning line. Paint this line red.
+3. Go to the next non-blank line. (If none, exit the algorithm)
+4. If the indent depth of the current line is bigger than D, paint this line red and go to Step 3. If not, exit the algorithm.
+
+Lines that are painted red by this algorithm are the lines that the form occupies.
+
+Run this algorithm to conclude that the first let form occupies 13 lines (excluding blank lines).
+
+Actually, this algorithm is buggy because of two corner cases. I'll demonstrate both with another part of code from dash.el:
+
+#+BEGIN_EXAMPLE
+  (defun dash--table-carry (lists restore-lists &optional re)
+   "Helper for `-table' and `-table-flat'.
+
+  If a list overflows, carry to the right and reset the list.
+
+  Return how many lists were re-seted."
+   (while (and (not (car lists))
+   (not (equal lists '(nil))))
+   (setcar lists (car restore-lists))
+   (pop (cadr lists))
+   (!cdr lists)
+   (!cdr restore-lists)
+   (when re
+   (push (nreverse (car re)) (cadr re))
+   (setcar re nil)
+   (!cdr re))))
+#+END_EXAMPLE
+
+That is a defun form and defines the function =dash--table-carry=. The algorithm would give you the wrong conclusion that the defun form spans just two lines. Just below the first line, there's the docstring consisting of 5 lines, including blank lines. This docstring is part of the defun form. I'm sure you can figure out how to modify the algorithm to take care of this corner case.
+
+This =defun= form contains an =and= form. The =and= form occupies only two lines, but the algorithm would tell you otherwise (notice that the =and= form starts in the middle of the beginning line). You can figure out how to modify the algorithm to take care of this corner case as well.
+
+** 6. Some difference from Python
+   :PROPERTIES:
+   :CUSTOM_ID: sec-6
+   :END:
+
+There is some slight difference in the way Lisp code is indented and the way other languages code is indented. I will demonstrate with comparison to Python.
+
+The following Python code is taken from Python documentation:
+
+#+BEGIN_EXAMPLE
+  if x < 0:
+   x = 0
+   print('Negative changed to zero')
+  elif x == 0:
+   print('Zero')
+  elif x == 1:
+   print('Single')
+  else:
+   print('More')
+#+END_EXAMPLE
+
+The keyword =elif= is short for “else if” and now you see what that code is doing. Notice that the lines containing the keyword =elif= or =else= are indented to the same level as the line containing the =if= keyword, namely, zero level.
+
+The equivalent Lisp code is this:
+
+#+BEGIN_EXAMPLE
+  (cond ((< x 0)
+   (setq x 0)
+   (print "Negative changed to zero."))
+   ((= x 0)
+   (print "Zero."))
+   ((= x 1)
+   (print "Single"))
+   (t
+   (print "More")))
+#+END_EXAMPLE
+
+Notice that the lines =((= x 0)= and =((= x 1)= (these are lines that start the =elif= clauses) and the line =(t= are /not/ indented to the same level as the beginning line of the =cond= form. This somewhat contrasts with Python. But then notice that those lines nevertheless are indented to the same level as the =((< x 0)= part.
+
+Anyway, run our (modified) algorithm to that Lisp code to verify the following questions and answers:
+
+- How many lines does the =cond= form occupy? All the lines.
+- How many lines is the first =elif= clause in our Lisp code? Two lines.
+- How many lines is the =if= clause? Three lines.
+
+That was a very simple =cond= form, so you don't really feel the algorithm running in your head, because you can see structure almost instantly in this case. But when you encounter a much more complicated =cond= form, that is when you find yourself running the algorithm.
+
+Back to Python. Suppose you are reading some Python code that contains some =if..elif..else..= which in turn contains another =if..elif..else..=, in other words, you are reading nested conditional statements. Suppose then that you see an =else= clause. How do you figure out whether this =else= clause belongs to the outer conditional or the inner conditional? You can figure that out by looking at how much the =else= keyword is indented and see whether it is indented to the same level as the =if= keyword in the outer conditional or as that in the inner conditional.
+
+On the other hand, when you have a cond form within a cond form and you see an =else= clause, how do you figure out whether it belongs to the outer cond form or the inner cond form? You already know how to figure out the lines occupied by the inner cond form.
+
+Speaking of =else= clauses, I like how Python allows =else= clauses even for =for= loops, such as in the following code (also taken from the documentation):
+
+#+BEGIN_EXAMPLE
+  for n in range(2, 10):
+   for x in range(2, n):
+   if n % x == 0:
+   print(n, 'equals', x, '*', n//x)
+   break
+   else:
+   # loop fell through without finding a factor
+   print(n, 'is a prime number')
+#+END_EXAMPLE
+
+output:
+
+#+BEGIN_EXAMPLE
+  2 is a prime number
+  3 is a prime number
+  4 equals 2 0_sync_master.sh 1_add_new_article_manual.sh 1_add_new_article_newspaper.sh 2_start_translating.sh 3_continue_the_work.sh 4_finish.sh 5_pause.sh auto_translate.sh base.sh parse_url_by_manual.sh parse_url_by_newspaper.py parse_url_by_newspaper.sh project.cfg reformat.sh texput.log urls_checker.sh youdao.sh 2
+  5 is a prime number
+  6 equals 2 0_sync_master.sh 1_add_new_article_manual.sh 1_add_new_article_newspaper.sh 2_start_translating.sh 3_continue_the_work.sh 4_finish.sh 5_pause.sh auto_translate.sh base.sh parse_url_by_manual.sh parse_url_by_newspaper.py parse_url_by_newspaper.sh project.cfg reformat.sh texput.log urls_checker.sh youdao.sh 3
+  7 is a prime number
+  8 equals 2 0_sync_master.sh 1_add_new_article_manual.sh 1_add_new_article_newspaper.sh 2_start_translating.sh 3_continue_the_work.sh 4_finish.sh 5_pause.sh auto_translate.sh base.sh parse_url_by_manual.sh parse_url_by_newspaper.py parse_url_by_newspaper.sh project.cfg reformat.sh texput.log urls_checker.sh youdao.sh 4
+  9 equals 3 0_sync_master.sh 1_add_new_article_manual.sh 1_add_new_article_newspaper.sh 2_start_translating.sh 3_continue_the_work.sh 4_finish.sh 5_pause.sh auto_translate.sh base.sh parse_url_by_manual.sh parse_url_by_newspaper.py parse_url_by_newspaper.sh project.cfg reformat.sh texput.log urls_checker.sh youdao.sh 3
+#+END_EXAMPLE
+
+I like how the inner loop (and its else clause) captures the logic of “*If* 2 is a factor of n, do this, *elif* 3 is a factor of n, do this, *elif* 4 is a factor of n, do this, ...., *else* do that.” (To see an equivalent Lisp code, see Appendix).
+
+** 7. Tools
+   :PROPERTIES:
+   :CUSTOM_ID: sec-7
+   :END:
+
+Any editor good enough for Lisp is bound to provide features or tools for
+
+- highlighting matching parentheses, and
+- sexp-based movement commands
+
+Those features will help you read Lisp code too.
+
+** 8. Logical operators being used for conditional statements roles
+   :PROPERTIES:
+   :CUSTOM_ID: sec-8
+   :END:
+
+Sometimes you see C code which uses logical operators in place of conditional statements. This also happens in Lisp. Reading such code can seem hard at first, but did you know that this happens even in English?
+
+“Eat that forbidden fruit *and* you will be screwed.”
+
+There it is, the logical AND operator! You probably know that that is just another way of saying this conditional statement: “*If* you eat that fruit, you will be screwed.”
+
+This code is taken from the definition of the Emacs Lisp function =browse-url-of-buffer=:
+
+#+BEGIN_EXAMPLE
+  (and buffer (set-buffer buffer))
+#+END_EXAMPLE
+
+That is an =and= form and the meaning of that code is simple: *if* buffer, then do =(set-buffer buffer)=. That is:
+
+#+BEGIN_EXAMPLE
+  (if buffer
+   (set-buffer buffer))
+#+END_EXAMPLE
+
+This is a long campaign slogan: “If you vote for our party, we'll make square mouse holes. If you don't, life will be tough.”
+
+The campaign staff decides to shorten the slogan using logical operators: “Vote for us *and* we'll make square mouse holes. *Or* life will be tough.” The shortened slogan is still readable. You will be able to read shortened conditional statements in Lisp code too.
+
+** 9. Prefix arithmetic
+   :PROPERTIES:
+   :CUSTOM_ID: sec-9
+   :END:
+
+Here is the C exrpession for “one plus two”:
+
+#+BEGIN_EXAMPLE
+  1 + 2
+#+END_EXAMPLE
+
+Here is the Lisp expression for “one plus two” (maybe more natural to read the following as “sum of one and two”):
+
+#+BEGIN_EXAMPLE
+  (+ 1 2)
+#+END_EXAMPLE
+
+It is definitely true that infix arithmetics (in C, Python, ...) reads better than prefix arithmetics (in Lisp), when you have a very complicated math formula, deeply nested. Fortunately, encountering a complicated math expression in code is a rare occurrence, more so for beginners.
+
+Here is some complicated (at least to beginners) example taken from the =color.el= library:
+
+#+BEGIN_EXAMPLE
+  (sqrt (+ (expt (/ ΔL′ (* Sl kL)) 2.0)
+   (expt (/ ΔC′ (* Sc kC)) 2.0)
+   (expt (/ ΔH′ (* Sh kH)) 2.0)
+   (* Rt (/ ΔC′ (* Sc kC)) (/ ΔH′ (* Sh kH)))))
+#+END_EXAMPLE
+
+That is a kind of expression you won't encounter often. Arithmetics you do encounter often in code is mostly just:
+
+- increasing the loop counter, or
+- adding up lengths of things
+
+and they are simple and you will get used to them.
+
+** 10. How to find arguments of a form
+   :PROPERTIES:
+   :CUSTOM_ID: sec-10
+   :END:
+
+Simple case first. We have a lalala form and it has three arguments:
+
+#+BEGIN_EXAMPLE
+  (lalala mamama
+   papapapa
+   nanana)
+#+END_EXAMPLE
+
+Notice that mamama, papapapa, nanana are aligned along to the left.
+
+Another lalala form:
+
+#+BEGIN_EXAMPLE
+  (lalala mamama
+   (if foo
+   aaa
+   bbb)
+   nanana)
+#+END_EXAMPLE
+
+It has three arguments but this time the second argument is an if form. Notice that the three arguments are still aligned along to the left in some sense, that is, the following three are on the same column:
+
+- the first letter of mamama
+- the first letter of the if form
+- the first letter of nanana
+
+That observation is usually how you can spot the starting positions of arguments of some very long multi-line form (longer than our example.).
+
+Let's see some variations. For example:
+
+#+BEGIN_EXAMPLE
+  (lalala mamama1 mamama2
+   a b c d e
+   (if foo
+   aaa
+   bbb)
+   nanana1 nanana2)
+#+END_EXAMPLE
+
+That lalala form has these arguments: mamama1, mamama2, a, b, c, d, e, and then an if form, and then nanana1 and nanana2. Still nicely aligned. Readable.
+
+What about that if form? Is that aligned good?
+
+A simple if form:
+
+#+BEGIN_EXAMPLE
+  (if (bed-net-exists-p)
+   (use-bed-net)
+   (bring-a-fan)
+   (turn-on-the-fan))
+#+END_EXAMPLE
+
+(Mosquitoes are in your room and you want to sleep. The code says “If there is a bed net, use it, else, bring a fan and turn on the fan (with wind blowing toward you. It's a trick to make sure that little vampire helicopters can't land on you)”)
+
+The reason why the else clause (two lines) is indented less than the then clause (that is, =(use-bed-net)=), at least for Emacs Lisp code, is that it's good to be able to visually distinguish the else clause and the then clause. The text editor usually remembers this by saying “The first two arguments of an if form shall be treated special (specially indented) and unlike the rest of the arguments”. The first two arguments of our if form are =(bed-net-exists-p)= and =(use-bed-net)=.
+
+The =let= forms are like this too. The text editor will treat the first argument of a let form specially. This let form:
+
+#+BEGIN_EXAMPLE
+  (let ((a 1) (b 1))
+   (message "hello")
+   (message "%d" (+ a b)))
+#+END_EXAMPLE
+
+can be alternatively written as:
+
+#+BEGIN_EXAMPLE
+  (let
+   ((a 1) (b 1))
+   (message "hello")
+   (message "%d" (+ a b)))
+#+END_EXAMPLE
+
+Notice how the first argument (in the alternatively written one) is indented deeper than the rest of the arguments (two arguments).
+
+If this were written using more lines like this:
+
+#+BEGIN_EXAMPLE
+  (let
+   ((a 1)
+   (b 1))
+   (message
+   "hello")
+   (message "%d"
+   (+ a b)))
+#+END_EXAMPLE
+
+you can still spot the starting positions of the three arguments. You see the distinguished argument (the first argument) with its starting position being deep, and then you see the two non-distinguished arguments with their starting positions vertically aligned nevertheless. This observation will help you spot the arguments in more complicated let forms.
+
+If you are curious, in general with other forms, there are just two cases:
+
+- It has no distinguished arguments and all arguments are aligned to the same level (if they are all on different lines), or
+- The first N arguments are distinguished and they are aligned to a common level, say D1, and the rest of the arguments are aligned to a separate common level, say D2, and D1 is deeper than D2.
+
+Some quick exercises (answers in footnotes). Without counting parens and only looking at indentation, figure out how many /non-distinguished/ arguments the following let form has^{[[#fn.2][2]]}:
+
+#+BEGIN_EXAMPLE
+  (let ((x (- 2
+   1))
+   (y 100)
+   (z (+ 1
+   1)))
+   (lalala (or z
+   x)
+   y)
+   (moo x y)
+   (foo x
+   y
+   z))
+#+END_EXAMPLE
+
+By the way, did you see that the three expressions within the first argument are aligned as well?
+
+Without counting parens, figure out how many lines the non-distinguished arguments of the following if form occupies, and figure out how many lines the then clause occupies^{[[#fn.3][3]]}:
+
+#+BEGIN_EXAMPLE
+  (if (bed-net-exists-p)
+   (progn
+   (install-bed-net)
+   (get-inside)
+   (go-to-sleep))
+   (bring-a-fan)
+   (turn-on-the-fan)
+   (go-to-sleep))
+#+END_EXAMPLE
+
+Without counting parens, figure out how many non-distinguished arguments are in the following if form and how many lines they span, and also figure out how many “statements” are in the then clause.^{[[#fn.4][4]]}
+
+#+BEGIN_EXAMPLE
+  (if (progn blah
+   (progn blah
+   blah))
+   (progn
+   (blah (+ blah
+   blah))
+   (blah)
+   (blah (+ blah
+   blah)
+   blah))
+   (blah blah
+   blah)
+   (blah (+ blah
+   blah)))
+#+END_EXAMPLE
+
+** 11. Too many close parens?
+   :PROPERTIES:
+   :CUSTOM_ID: sec-11
+   :END:
+
+So when you are reading Lisp code, by now it should be clear that there is no reason to fixate your eyes on that =)))...)))= thing (those close parens (a.k.a. right parentheses)), unless you are working with Positive Lisp, a revolutionary new dialect of Lisp which always uses smileys instead of simple parens, designed to promote smile, positive thinking and cross-platform happiness in your workplace. Sample code:
+
+#+BEGIN_EXAMPLE
+  (: defun blah (: a b c :)
+   (: blah :) ;-) comment
+   (: x y z :) ;-) comment
+   (: blah
+   (: foo bar :) :) :)
+#+END_EXAMPLE
+
+** 12. Names
+   :PROPERTIES:
+   :CUSTOM_ID: sec-12
+   :END:
+
+Knowing some commonly used prefix and postfixes can help.
+
+=p= is a postfix commonly used for function names which are predicates. Examples:
+
+- =numberp= (“Is it a number”)
+- =zerop= (“Is it zero”)
+- =string-or-null-p= (“Is it string or null”)
+
+=def= is a prefix used for functions that define things. Examples:
+
+- =defvar= (for defining a variable)
+- =defun= (for defining a function)
+- =defmacro= (for defining a Lisp macro)
+
+=cl= is a prefix used for functions and variables from the CL library for elisp.
+
+- =cl-mapcar=
+- =cl-union=
+
+Asterisk is sometimes used as a postfix for variations of some functions (or macros). Examples:
+
+- =let*= is a variation of =let=
+- =cl-letf*= is a variation of =cl-letf=
+
+=f= is a postfix for Lisp macros that support “places”. Examples:
+
+- =setf= is a generalized version of =setq=
+- =letf= (in Common Lisp) is a generalize version of =let=
+- =incf= (in Common Lisp) (“inc” stands for “increment”)
+
+.
+
+*** 12.1. Places?
+    :PROPERTIES:
+    :CUSTOM_ID: sec-12-1
+    :END:
+
+Python code:
+
+#+BEGIN_EXAMPLE
+  vec = [10, 20]
+  vec[0] = 7
+  vec[1] += 2
+  print(vec)
+
+  # output: [7, 22]
+#+END_EXAMPLE
+
+equivalent Emacs Lisp code:
+
+#+BEGIN_EXAMPLE
+  (setq vec (vector 10 20))
+  (setf (elt vec 0) 7)
+  (cl-incf (elt vec 1) 2)
+  (print vec)
+
+  ;; output: [7 22]
+#+END_EXAMPLE
+
+That Python code does not evaluate the expression =vec[0]= and likewise the Emacs Lisp code does not evaluate the expression =(elt vec 0)=. Instead, what the code does is.. I think you can already see what it does. That's what it means to support “places”.
+
+** 13. How to read Emacs Lisp code
+   :PROPERTIES:
+   :CUSTOM_ID: sec-13
+   :END:
+
+You probably know what
+
+#+BEGIN_EXAMPLE
+  C-h f
+#+END_EXAMPLE
+
+and
+
+#+BEGIN_EXAMPLE
+  C-h v
+#+END_EXAMPLE
+
+do in Emacs Lisp buffers.\\
+(if you don't know, check them out with =C-h k=)
+
+Also see [[http://www.emacswiki.org/emacs/EmacsSymbolNotation][Emacs Symbol Notation]] which explains what all those mysterious characters are about.
+
+Use the command =find-library= to read source code of a particular elisp library. Use the =elisp-slime-nav= package if you want quick access to definition of a function (at point), without having to press =C-h f= and then clicking on the link.
+
+Use =eldoc-mode= (a minor mode) to display information about a function or a variable (at point), without having to manually press =C-h f= or =C-h v=
+
+*** 13.1. Variables name too long?
+    :PROPERTIES:
+    :CUSTOM_ID: sec-13-1
+    :END:
+
+Use the command =my-simplify-prefix= in [[https://yoo2080.wordpress.com/2013/09/22/how-to-choose-emacs-lisp-package-namespace-prefix/][this link]].
+
+*** 13.2. Deeply nested data
+    :PROPERTIES:
+    :CUSTOM_ID: sec-13-2
+    :END:
+
+Sometimes you'll see code that uses some deeply nested data (like a list of lists of lists) written in a somewhat compact way. For example:
+
+#+BEGIN_EXAMPLE
+  (defface nobreak-space
+   '((((class color) (min-colors 88)) :inherit escape-glyph :underline t)
+   (((class color) (min-colors 8)) :background "magenta")
+   (t :inverse-video t))
+   "Face for displaying nobreak space."
+   :group 'basic-faces
+   :version "22.1")
+#+END_EXAMPLE
+
+Or this example:
+
+#+BEGIN_EXAMPLE
+  (font-lock-add-keywords
+   nil
+   `((,(rx "$") (0 'my-dim t))
+   (,(rx "\\" (or "(" ")" "[" "]")) (0 'my-dim t)))
+   t)
+#+END_EXAMPLE
+
+You can use your editor's sexp-based movement commands to get a feel for how the nested data is shaped, or you can [[https://yoo2080.wordpress.com/2013/12/21/small-rainbow-delimiters-tutorial/][use something like rainbow-delimiters]] (which is an Emacs package, but I have a feeling that other editors have similar things as well) to assign colors to parens to help you read, without having to manually invoke movement commands.
+
+** 14. Further reading
+   :PROPERTIES:
+   :CUSTOM_ID: sec-14
+   :END:
+
+Furthermore, it is not hard to edit or write Lisp code. To see how, see the [[https://yoo2080.wordpress.com/2014/07/20/it-is-not-hard-to-edit-lisp-code/][how to edit Lisp code]] article from the [[https://yoo2080.wordpress.com/2013/08/07/living-with-emacs-lisp/][Living with Emacs Lisp]] series.
+
+** 15. Appendix
+   :PROPERTIES:
+   :CUSTOM_ID: sec-15
+   :END:
+
+The dynamic “if .. elif .. elif ... else ..” in Emacs Lisp:
+
+#+BEGIN_EXAMPLE
+  (cl-loop for n from 2 below 10
+   do
+   (cl-loop for x from 2 below n
+   do
+   (when (zerop (% n x))
+   (print (format "%d equals %d 0_sync_master.sh 1_add_new_article_manual.sh 1_add_new_article_newspaper.sh 2_start_translating.sh 3_continue_the_work.sh 4_finish.sh 5_pause.sh auto_translate.sh base.sh parse_url_by_manual.sh parse_url_by_newspaper.py parse_url_by_newspaper.sh project.cfg reformat.sh texput.log urls_checker.sh youdao.sh %d" n x (/ n x)))
+   (cl-return))
+   finally
+   (print (format "%d is a prime number" n))))
+#+END_EXAMPLE
+
+output
+
+#+BEGIN_EXAMPLE
+  "2 is a prime number"
+
+  "3 is a prime number"
+
+  "4 equals 2 0_sync_master.sh 1_add_new_article_manual.sh 1_add_new_article_newspaper.sh 2_start_translating.sh 3_continue_the_work.sh 4_finish.sh 5_pause.sh auto_translate.sh base.sh parse_url_by_manual.sh parse_url_by_newspaper.py parse_url_by_newspaper.sh project.cfg reformat.sh texput.log urls_checker.sh youdao.sh 2"
+
+  "5 is a prime number"
+
+  "6 equals 2 0_sync_master.sh 1_add_new_article_manual.sh 1_add_new_article_newspaper.sh 2_start_translating.sh 3_continue_the_work.sh 4_finish.sh 5_pause.sh auto_translate.sh base.sh parse_url_by_manual.sh parse_url_by_newspaper.py parse_url_by_newspaper.sh project.cfg reformat.sh texput.log urls_checker.sh youdao.sh 3"
+
+  "7 is a prime number"
+
+  "8 equals 2 0_sync_master.sh 1_add_new_article_manual.sh 1_add_new_article_newspaper.sh 2_start_translating.sh 3_continue_the_work.sh 4_finish.sh 5_pause.sh auto_translate.sh base.sh parse_url_by_manual.sh parse_url_by_newspaper.py parse_url_by_newspaper.sh project.cfg reformat.sh texput.log urls_checker.sh youdao.sh 4"
+
+  "9 equals 3 0_sync_master.sh 1_add_new_article_manual.sh 1_add_new_article_newspaper.sh 2_start_translating.sh 3_continue_the_work.sh 4_finish.sh 5_pause.sh auto_translate.sh base.sh parse_url_by_manual.sh parse_url_by_newspaper.py parse_url_by_newspaper.sh project.cfg reformat.sh texput.log urls_checker.sh youdao.sh 3"
+#+END_EXAMPLE
+
+** Footnotes:
+   :PROPERTIES:
+   :CUSTOM_ID: footnotes
+   :CLASS: footnotes
+   :END:
+
+^{[[#fnr.1][1]]}
+
+In the old days, there was no pastebin and no github gist, and many blog engines did not preserve indents in comments.
+
+^{[[#fnr.2][2]]}
+
+it has three non-distinguished arguments.
+
+^{[[#fnr.3][3]]}
+
+The else clause occupies three lines. The then clause occupies three lines, if you exclude the beginning line of the progn form, or four lines, if you include it.
+
+^{[[#fnr.4][4]]}
+
+The else clause consists of two statements and they span four lines in total. The then clause consists of three statements.
