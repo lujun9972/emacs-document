@@ -1,0 +1,89 @@
+#+TITLE: Connecting to twitch chat from emacs.
+#+URL: https://onurcyukruk.github.io/2020-02-20-twitch-chat-within-emacs/
+#+AUTHOR: lujun9972
+#+TAGS: raw
+#+DATE: [2020年 03月 02日 星期一 19:51:40 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+* Twitch chat IRC server connection from within emacs.
+  :PROPERTIES:
+  :CUSTOM_ID: twitch-chat-irc-server-connection-from-within-emacs
+  :END:
+
+The credits for this post goes to [[https://github.com/mplscorwin][mplscorwin]] and [[https://github.com/emacsomancer][emacsomancer]] especially Corwin was very patient with an elisp noob like me. Thanks.
+
+I started broadcasting my web application hacking & learning adventures on [[https://www.twitch.tv/onurcyukruk][twitch]] not long ago. On twitch, your channel has a chat panel where viewers may comment or ask questions. But there is a problem. If you want to see the chat you should open your own channel and this causes echoing your sound if you enabled desktop audio for background music. What i wanted was connecting to twitch chat from within emacs and being notified on my desktop with libnotify, when someone messaged in my channel, regardless of the message. The channel is not so busy yet, so i want all messages to show up on my desktop. The config is working on my own [[https://www.twitch.tv/onurcyukruk][channel]] and my favorite which is [[https://www.twitch.tv/nahamsec][nahamsec]] but there are channels which doesn't work and i couldn't figure out why. If you happen to debug those problems please do message me on [[https://twitter.com/onurcyukruk][twitter]]. There may be some channel specific settings which block irc clients somehow. Below are the steps taken for my mostly working configuration:
+
+Be sure that libnotify is installed and notify-send command is working.
+
+Get your *oauth* key from this [[https://twitchapps.com/tmi/][link]] which is referenced on twitch's own dev [[https://dev.twitch.tv/docs/irc/guide][site]] which made the app trustable enough for me.
+
+Do remember to change “onurcyukruk” to your nickname.
+
+Now i assume you have a working [[https://www.gnu.org/software/emacs/manual/html_mono/erc.html][erc]] configuration. Mine is something like this:
+
+#+BEGIN_EXAMPLE
+  (defun start-irc ()
+   "Connect to IRC."
+   (interactive)
+   (erc-tls :server "irc.chat.twitch.tv"
+   :port 6697
+   :nick "onurcyukruk"
+   :password (password-store-get "twitch/ircpass"))
+   )
+  (setq erc-kill-buffer-on-part t)
+  (setq erc-kill-server-buffer-on-quit t)
+#+END_EXAMPLE
+
+The important part here is this -> :password (password-store-get “twitch/ircpass”)) -> for password you should use the oauth key which you got from the link above. I'm using command line password store utility pass. I don't recommend it but you may put your oauth key in your config file.
+
+Now after installing [[https://github.com/djcb/sauron][sauron]] and [[https://github.com/jwiegley/alert][alert]] from emacs gurus [[https://github.com/djcb/][djcb]] and [[https://github.com/jwiegley/][jwiegley]] just add the below snippet to your “init.el” file.
+
+#+BEGIN_EXAMPLE
+  ;; alert
+  (use-package alert
+   :ensure t
+   :config
+   (require 'alert)
+   (setq alert-default-style 'libnotify)
+   (setq alert-fade-time 4))
+
+  ;;; sauron
+  (use-package sauron
+   :ensure t
+   :config
+   (require 'sauron-org) 
+   (setq sauron-modules '(sauron-erc
+   sauron-dbus
+   sauron-org
+   sauron-notifications
+   sauron-jabber
+   sauron-identica))
+   (setq sauron-dbus-cookie t)
+   (setq sauron-debug t)
+   (setq
+   sauron-max-line-length 144
+   sauron-watch-patterns
+   '("@")
+   sauron-watch-nicks
+   '("onurcyukruk"))
+
+   (add-hook 'sauron-event-added-functions #'sauron-alert-el-adapter)
+   (global-set-key (kbd "\C-c1") 'sauron-start))
+
+  (setq sauron-separate-frame nil) 
+
+  (alert-add-rule :mode 'erc-mode
+   :predicate
+   #'(lambda (info)
+   (string-match (concat "\\`[^&].*onurcyukruk\\'")
+   (erc-format-target-and/or-network)))
+   :style 'libnotify
+   :continue t)
+#+END_EXAMPLE
+
+Eval your buffer or restart your emacs. M-x sauron-start && M-x start-irc. Now you should be good to go.
+
+Here is a screenshot from my config.
+
+[[/img/emacs-irc-twitch.png]]
