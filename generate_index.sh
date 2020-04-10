@@ -42,7 +42,7 @@ function generate_links()
         if [[ -n "$modify_date" ]];then # 没有修改日期的文件没有纳入仓库中,不予统计
             postname=$(basename $post)
             url="$(grep '^#+URL:' ${post} |sed 's/^#+URL: *//')"
-            echo "+ [[https://github.com/lujun9972/emacs-document/blob/master/$post][$postname]] [[${url}][原文地址]]		<$modify_date>"
+            echo "+ [[https://github.com/lujun9972/emacs-document/blob/master/$post][$postname]]		<$modify_date>	 [[${url}][原文地址]]"
         fi
     done|sort -k 2
     IFS=$old_ifs
