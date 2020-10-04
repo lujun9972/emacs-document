@@ -1,0 +1,409 @@
+#+TITLE: 怎么用 Emacs Org mode 写博客 | Opensource.com
+#+URL: https://opensource.com/article/20/3/blog-emacs
+#+AUTHOR: CHxin
+#+CATEGORY: Org mode
+#+DATE: [2020年 10月 04日 星期六 16:37:21 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t \n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+在最开始的几年，我使用过 WordPress 写博客，但我真的想完全使用 [[https://www.gnu.org/software/emacs/][GNU Emacs]] 来发布博客。我尝试过 [[https://github.com/org2blog/org2blog][Org2Blog]]， 但有些东西仍然不能使用，并且这种方式感觉不满意。我尝试过创建一个网站来发布 Emacs 配置，最先使用 [[https://www.djangoproject.com/][Django]]，之后改为 [[https://jekyllrb.com/][Jekyll]]，这个网站叫做 [[https://github.com/psachin/haqiba][Haqiba]] （我知道，一个不常见的名字）。 Jekyll 很酷，提供了更多的对内容和发布的控制，但是我仍然不能直接在 Emacs 中写博客，并且 [[https://orgmode.org/][Org mode]] 仍然不能用。尽管我尝试过使用 [[https://github.com/eggcaker/jekyll-org][Jekyll-org]] 来使 Jekyll 支持 Org mode，这个框架看起来怪异。
+
+当我开始使用 [[https://orgmode.org/manual/Publishing.html][org-publish]]，我终于找到了我一直在寻找的解决方法。在我调研的早期，我曾在 org-publish 蹒跚起步，但最初我认为用它写博客太复杂。但是我再次尝试了它并从此开始了愉快的经历。
+
+很多的网站，包括这个[[https://pages.gitlab.io/org-mode/post3.html][列表]]中的，都使用 org-publish。举例，Bernt Hansen 的 [[http://doc.norang.ca/org-mode.html][Org mode---Organize your life in plain text]]，不仅使用 org-publish 来发布内容，也提供了大量信息来帮助你更深入理解 Org mode。
+
+** org-publish 的优势
+   :PROPERTIES:
+   :CUSTOM_ID: advantages-of-org-publish
+   :END:
+
+在org-publish 的所有特色中，它提供了：
+- 对设置，CSS，多媒体内容，和发布的良好控制
+- 支持 [[https://orgmode.org/guide/][Org mode formatting]]
+- 产生静态文件
+- 容易使用 [[https://pages.gitlab.io/org-mode/post2.html][GitLab]] 和 GitHub CI/CD进行部署
+- 容易在 Apache/Nginx/file-server 部署，如果你更喜欢把文件放在远程服务器而不是使用 [[https://docs.gitlab.com/ee/user/project/pages/][GitLab Pages]] 或者 GitHub Pages。
+- 版本控制
+- 所有事情都在 GNU Emacs。耶！
+
+** 基础设置
+   :PROPERTIES:
+   :CUSTOM_ID: basic-setup
+   :END:
+
+Org-publish tutorial 提供了基础的模板来帮你开始。我鼓励你浏览这份指南，因为指南中的基础设置足够给你一个对 org-publish 的简单理解。最开始，设置 *myblog/* 项目目录中的 *publish.el* 文件中的 *org-publish-project-alist* 变量。把以下内容放在 *publish.el* 中。
+
+#+BEGIN_EXAMPLE
+  (require 'ox-publish)
+
+  (setq org-publish-project-alist
+
+        '(("posts"
+
+           :base-directory "posts/"
+
+           :base-extension "org"
+
+           :publishing-directory "public/"
+
+           :recursive t
+
+           :publishing-function org-html-publish-to-html
+
+           :auto-sitemap t)
+
+          ("all" :components ("posts"))))
+#+END_EXAMPLE
+
+第一行是一个重要的语句。变量 *org-publish-project-alist* 有一个列表表示要发布目录，控制发布行为。第一个元素 *posts* ，所有的专用于 posts 目录的设置都在这里完成。举例，属性 *:base-directory* 设置目录放置所有的发布文件（ Org 格式）。类似的， *:publishing-directory* 设置目录放置从 Org 文件产生的 HTML 文件。设置 *:recursive* 属性为 *t* 会递归地从 *posts/* 和它子目录的 Org 文件生成 HTML 文件。 *:auto-sitemap* 属性生成 *sitemap.html* 记录你的 posts（下面你会调整这个设置）。最后， *:publishing-function org-html-publish-to-html* 把所有的 Org 文件转为 HTML 文件。然而，你也可以定义自己的转换函数，为了更好的举例，我使用了内置的由 *ox-publish* 提供的转换函数。
+
+你需要一些帖子来测试，所以创建一个名为 *posts/post_one.org* 的文件并包含基本的头部和一些正文。使用 *C-c C-e # default* 和 *C-c C-e # html* 来包含对应的默认的和 HTML 模板。
+
+[[https://gitlab.com/psachin/myblog/-/blob/master/posts/post_one.org][你的文件]]应该看起来像这样：
+
+#+BEGIN_EXAMPLE
+  #+title: Post One
+
+  #+date: <2020-02-12 Wed>
+
+  #+author: John Doe
+
+  #+email: john.doe@example.com
+
+  Lorem Ipsum is simply dummy text of the printing and typesetting industry.
+#+END_EXAMPLE
+
+基本设置基本就完成了。你可以用 *M-x org-publish-all* 来产生 HTML 并用 *make* 来发布。下面是 *Makefile* 的内容：
+
+#+BEGIN_EXAMPLE
+  # Makefile for myblog
+
+  .PHONY: all publish publish_no_init
+
+  all: publish
+
+  publish: publish.el
+
+          @echo "Publishing... with current Emacs configurations."
+
+          emacs --batch --load publish.el --funcall org-publish-all
+
+  publish_no_init: publish.el
+
+          @echo "Publishing... with --no-init."
+
+          emacs --batch --no-init --load publish.el --funcall org-publish-all
+
+  clean:
+
+          @echo "Cleaning up.."
+
+          @rm -rvf *.elc
+
+          @rm -rvf public
+
+          @rm -rvf ~/.org-timestamps/*
+#+END_EXAMPLE
+
+这是整个项目的目前的结构：
+
+#+BEGIN_EXAMPLE
+  myblog
+
+  ├── Makefile
+
+  ├── posts
+
+  │   └── post_one.org
+
+  └── publish.el
+#+END_EXAMPLE
+
+执行 *make* 会在 *public/* 目录产生 *sitemap.html* 和 *post_one.html* 。
+
+#+BEGIN_EXAMPLE
+  myblog
+
+  ├── Makefile
+
+  ├── posts
+
+  │   ├── post_one.org
+
+  │   └── sitemap.org
+
+  ├── public
+
+  │   ├── post_one.html
+
+  │   └── sitemap.html
+
+  └── publish.el
+#+END_EXAMPLE
+
+** 为你的博客增加 CSS
+   :PROPERTIES:
+   :CUSTOM_ID: add-css-to-your-post
+   :END:
+你可增强 *publish.el* 文件来包括 CSS 或图片元素。为了尝试这个，增加 CSS。修改后的 *publish.el* 应该看起来像这样：
+
+#+BEGIN_EXAMPLE
+  (require 'ox-publish)
+
+  (setq org-publish-project-alist
+
+        '(("posts"
+
+            :base-directory "posts/"
+
+            :base-extension "org"
+
+            :publishing-directory "public/"
+
+            :recursive t
+
+            :publishing-function org-html-publish-to-html
+
+            :auto-sitemap t)
+
+           ("css"
+
+            :base-directory "css/"
+
+            :base-extension "css"
+
+            :publishing-directory "public/css"
+
+            :publishing-function org-publish-attachment
+
+            :recursive t)
+
+           ("all" :components ("posts" "css"))))
+#+END_EXAMPLE
+
+创建一个新的名为 *css/* 的目录，把 [[https://gitlab.com/psachin/myblog/-/raw/master/css/site.css][site.css]] 拷进去。现在创建[[https://gitlab.com/psachin/myblog/-/raw/master/css/site.css][第二个帖子]]来测试 CSS。
+
+#+BEGIN_EXAMPLE
+  #+title: Post Two
+
+  #+date: <2020-02-12 Wed>
+
+  #+author: John Doe
+
+  #+email: john.doe@example.com
+
+  #+HTML_HEAD: <link rel="stylesheet" type="text/css" href="../css/site.css" />
+
+  Lorem Ipsum is simply dummy text of the printing and typesetting industry.
+#+END_EXAMPLE
+
+在这个例子中，CSS文件通过 *#+HTML_HEAD:* 被包含进去。[[https://orgmode.org/worg/org-tutorials/org-publish-html-tutorial.html#org376932a][org-publish tutorial]] 推荐使用 *#+STYLE:* 来包含CSS，但是我没有成功。我使用 *#+HTML_HEAD:* ，因为CSS support 在 Org mode 手册中建议这样使用 [[https://orgmode.org/worg/org-tutorials/org-publish-html-tutorial.html#org376932a][CSS]]。
+
+这是 *css/* 目录的结构：
+
+#+BEGIN_EXAMPLE
+  myblog
+
+  ├── css
+
+  │   └── site.css
+
+  ├── Makefile
+
+  ├── posts
+
+  │   ├── post_one.org
+
+  │   └── post_two.org
+
+  └── publish.el
+#+END_EXAMPLE
+
+不得不包含 *#+HTML_HEAD:* 在每一个帖子中很快就变得乏味，在一个网站中也会有多个 CSS。为了解决这个问题，使用 *#+SETPUPFILE:* 选项：
+
+#+BEGIN_EXAMPLE
+  #+title: Post Two
+
+  #+date: <2020-02-12 Wed>
+
+  #+author: John Doe
+
+  #+email: john.doe@example.com
+
+  #+SETUPFILE: ../org-template/style.org
+
+  Lorem Ipsum is simply dummy text of the printing and typesetting industry.
+#+END_EXAMPLE
+
+这个 *org-template/style.org* 文件包含了 CSS 文件路径：
+
+#+BEGIN_EXAMPLE
+  #+HTML_HEAD: <link rel="stylesheet" type="text/css" href="../css/site.css" />
+#+END_EXAMPLE
+
+下面是最终的结构：
+
+#+BEGIN_EXAMPLE
+  myblog
+
+  ├── css
+
+  │   └── site.css
+
+  ├── Makefile
+
+  ├── org-template
+
+  │   └── style.org
+
+  ├── posts
+
+  │   ├── post_one.org
+
+  │   └── post_two.org
+
+  └── publish.el
+#+END_EXAMPLE
+
+** 修改 sitemap
+   :PROPERTIES:
+   :CUSTOM_ID: tweak-the-sitemap
+   :END:
+最后一项设置是生成 *index.html* 而不是 *sitemap.html* 。重命名标题并设置网站的作者和邮箱。下面是最终的 *publish.el* 文件：
+
+#+BEGIN_EXAMPLE
+  (require 'ox-publish)
+
+  (setq org-publish-project-alist
+
+        '(("posts"
+
+           :base-directory "posts/"
+
+           :base-extension "org"
+
+           :publishing-directory "public/"
+
+           :recursive t
+
+           :publishing-function org-html-publish-to-html
+
+           :auto-sitemap t
+
+           :sitemap-title "Blog Index"
+
+           :sitemap-filename "index.org"
+
+           :sitemap-style list
+
+           :author "John Doe"
+
+           :email "john.doe@example.com"
+
+           :with-creator t)
+
+          ("css"
+
+           :base-directory "css/"
+
+           :base-extension "css"
+
+           :publishing-directory "public/css"
+
+           :publishing-function org-publish-attachment
+
+           :recursive t)
+
+           ("all" :components ("posts" "css"))))
+#+END_EXAMPLE
+
+如果你在配置项目的时候遇到困难，可以在 [[https://gitlab.com/psachin/myblog][GitLab page]] 参考我的项目。
+
+** 使用已有的 org-publish 配置
+   :PROPERTIES:
+   :CUSTOM_ID: use-an-existing-org-publish-setup
+   :END:
+
+从零开始用 org-publish 建立博客很乏味。为了简化，你可以使用我的仓库作为基础模板来使用 org-publish 发布你的博客。
+
+为使用它，克隆 *blog_template* 分支：
+
+#+BEGIN_EXAMPLE
+  git clone https://gitlab.com/psachin/psachin.gitlab.io -b blog_template --single-branch myblog
+#+END_EXAMPLE
+
+使用 *make* 来导出 Org 文件为 HTML 文件。 *public/* 目录会有所有的要发布的文件
+
+#+BEGIN_EXAMPLE
+  cd myblog
+
+  make
+#+END_EXAMPLE
+
+在 *posts/template.org* 有一个模板博客供参考。你可用 *.gitlab-ci.yaml* 文件来发布 *public/* 中的内容到 GitLab Page。
+
+** 小建议1
+执行完 *make* 指令后， *public/* 目录会有所有的以供发布的静态文件。你所要做的就是设置服务器来服务这个目录，或者你可以使用 Python 的内置 *http.server* 模块本地渲染博客。
+
+在 Python 3.6，使用：
+
+#+BEGIN_EXAMPLE
+  cd myblog/public
+
+  python -m http.server
+#+END_EXAMPLE
+
+如果你用 Python 3.7，使用：
+
+#+BEGIN_EXAMPLE
+  cd myblog
+
+  python -m http.server --directory=public
+#+END_EXAMPLE
+
+在浏览器中打开 [[http://localhost:8000/]] 来本地查看网站
+
+** 小建议2
+
+这是我最喜欢的方式。如果一个新的想法出现在我脑海中但我没有时间去处理，我用 org capture template 快速创建一个草稿。按下 *C-c c p*，打开一个缓冲窗口，使用下面定义的模板。当我完成了，按下 *C-c C-c* 来保存草稿。
+
+把下面代码片段放到你现有的 Emacs 配置文件中（但是务必修改文件路径）：
+
+#+BEGIN_EXAMPLE
+  (defun create-blog-post ()
+
+          "Create an org file in ~/source/myblog/posts."
+
+          (interactive)
+
+          (let ((name (read-string "Filename: ")))
+
+          (expand-file-name (format "%s.org" name) "~/source/myblog/posts/")))
+
+  (setq org-capture-templates
+
+          '(("p" "Post" plain
+
+                  (file create-blog-post)
+
+                  (file "~/.emacs.d/org-templates/post.orgcaptmpl"))))
+#+END_EXAMPLE
+
+下面是 *~/.emacs.d/org-templates/post.orgcaptmpl* 的内容：
+
+#+BEGIN_EXAMPLE
+  #+title: %^{Name}
+
+  #+date: <%<%Y-%m-%d>>
+
+  #+keywords: draft
+
+  #+setupfile: ../org-templates/post.org
+
+  %?
+
+  #+INCLUDE: "../disquss.inc"
+#+END_EXAMPLE
+
+想要更加透彻的 Org capture 模板的理解，可以看我的视频。
+
+你曾用过 Org mode 发布网站或博客吗，或者你打算这样做吗？请在评论区中让我们知道你的经历。
