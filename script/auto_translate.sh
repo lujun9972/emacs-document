@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 source base.sh
-export PATH=$PATH:${CFG_PATH}/youdao.sh
+export PATH=$PATH:${CFG_PATH}
 while getopts :rf: OPT; do
     case $OPT in
         r|+r)
@@ -19,7 +19,7 @@ shift $(( OPTIND - 1 ))
 OPTIND=1
 
 if [[ "${replace_flag}" == "True" ]];then
-    dest_file="${source_file}"
+    dest_file="${source_file}.autotranslated"
 else
     dest_file="/dev/tty"
 fi
@@ -39,31 +39,46 @@ function do_translate()
             fi
         fi
 
-        if [[ "${position}" != "属性" && "${line}" == *([ \t])':PROPERTIES:' ]];then
+        if [[ "${position}" != "属性" && "${line^^}" =~ ^[[:blank:]]*':PROPERTIES:' ]];then
             position="属性"
             continue
         fi
 
-        if [[ "${position}" == "属性" && "${line}" == *([ \t])':END:' ]];then
+        if [[ "${position}" == "属性" && "${line^^}" =~ ^[[:blank:]]*':END:' ]];then
             position="正文"
             continue
         fi
 
-        if [[ "${position}" != "引用" && "${line}" == *([ \t])'#+BEGIN_EXAMPLE' ]];then
+        if [[ "${line}" =~ ^\*+[[:blank:]] ]];then # 标题不翻译
+                continue
+        fi
+
+
+        if [[ "${position}" != "引用" && "${line^^}" =~ ^[[:blank:]]*'#+BEGIN_EXAMPLE' ]];then
                 position="引用"
                 continue
         fi
 
-        if [[ "${position}" == "引用" && "${line}" == *([ \t])'#+END_EXAMPLE' ]];then
+        if [[ "${position}" == "引用" && "${line^^}" =~ ^[[:blank:]]*'#+END_EXAMPLE' ]];then
+            position="正文"
+            continue
+        fi
+
+        if [[ "${position}" != "引用" && "${line^^}" =~ ^[[:blank:]]*'#+BEGIN_SRC' ]];then
+                position="引用"
+                continue
+        fi
+
+        if [[ "${position}" == "引用" && "${line^^}" =~ ^[[:blank:]]*'#+END_SRC' ]];then
             position="正文"
             continue
         fi
 
         if [[ "${position}" == "正文" && "${line}" == *[a-zA-Z]*  ]];then
-            youdao.sh "${line}" # 至少包含一个英文字母才需要翻译
+            printf "翻译:"
+            fanyi.sh  "${line}" # 至少包含一个英文字母才需要翻译
         fi
     done < <(cat "${article}")
 }
 
-translated_content="$(do_translate "${source_file}")"
-echo "${translated_content}" > "${dest_file}"
+do_translate "${source_file}"|tee "${dest_file}"
