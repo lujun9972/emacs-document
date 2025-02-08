@@ -1,0 +1,452 @@
+#+TITLE: Radix trees, Dash and Company mode
+#+URL: http://justinhj.github.io/2018/10/24/radix-trees-dash-and-company-mode.html
+#+AUTHOR: lujun9972
+#+TAGS: raw
+#+DATE: [2018年 11月 01日 星期四 12:02:18 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+* Radix trees
+*根树
+:PROPERTIES:
+属性:
+:CUSTOM_ID: radix-trees
+:CUSTOM_ID radix-trees
+:END:
+结束:
+
+In the [[https://www.gnu.org/software/emacs/news/NEWS.26.1][Emacs 26.1 release notes]] there's a reference to a new library:
+翻译:在[[https://www.gnu.org/software/emacs/news/NEWS.26.1][Emacs 26.1发行说明]]中提到了一个新的库：
+在[[https://www.gnu.org/software/emacs/news/NEWS.26.1][Emacs 26.1发布说明]]中有一个对新库的引用:
+翻译:在[[GNU Emacs 26.1新闻发布页面][Emacs 26.1发布说明]]中提到了一个新的库：
+
+New Elisp data-structure library ‘radix-tree'
+翻译:新的Elisp数据结构库‘基数树’
+新的Elisp数据结构库“radix-tree”
+翻译:新的Elisp数据结构库“基数树”（Radix Tree）
+
+I checked and the radix-tree data structure does not yet appear in the info documentation, but there is of course documentation for each of the functions in the implementation =radix-tree.el=. In this post I'll show how to use radix trees, along with company mode (an auto complete library, the name comes from COMplete ANYthing), to implement a custom dictionary of words that you would like to be able to auto-complete when typing.
+翻译:我检查了一下，基数树数据结构尚未出现在信息文档中，但实现中的每个函数都有相应的文档=radix-tree.el=。在本文中，我将展示如何使用基数树以及公司模式（一个自动完成库，名称来源于COMplete ANYthing），来实现一个自定义字典，这样你在输入时就可以自动完成了。
+我检查了一下，发现info文档中还没有出现radix-tree数据结构，但是实现=radix-tree.el=中的每个函数当然都有文档。在这篇文章中，我将展示如何使用基数树，以及公司模式(一个自动完成库，名字来自于完成任何东西)来实现一个自定义的单词字典，你可以在打字时自动完成。
+翻译:我检查了一下，发现info文档中还没有出现基数树（radix tree）数据结构，但是在实现=radix-tree.el=中的每个函数当然都有文档。在这篇文章中，我将展示如何使用基数树，以及公司模式（一个自动完成库，名字来自于完成任何东西）来实现一个自定义的单词字典，你可以在打字时自动完成。
+
+[[http://justinhj.github.io/images/autocomplete.png]]
+翻译:[[http://justinhj.github.io/images/autocomplete.png|自动完成功能]]
+[[http://justinhj.github.io/images/autocomplete.png]]
+翻译:[[http://justinhj.github.io/images/autocomplete.png|自动完成功能]]
+
+The source code and dictionary used in this post can be found in this bitbucket [[https://bitbucket.org/justinhj/company-custom-dictionary/src/master/][repo]]
+翻译:源代码和字典用于此帖可以在这个bitbucket[[https://bitbucket.org/justinhj/company-custom-dictionary/src/master/][仓库]]找到
+本文使用的源代码和字典可以在这个bitbucket中找到[[https://bitbucket.org/justinhj/company-customdictionary/src/master/][repo]]
+翻译:本文使用的源代码和字典可以在以下Bitbucket仓库中找到：[https://bitbucket.org/justinhj/company-customdictionary/src/master/](repo)。
+
+** What are radix trees?
+什么是基树?
+:PROPERTIES:
+属性:
+:CUSTOM_ID: what-are-radix-trees
+:CUSTOM_ID what-are-radix-trees
+:END:
+结束:
+
+Rather than go into the implementation and detailed explanation of Radix trees check them out on [[https://en.wikipedia.org/wiki/Radix_tree][Wikipedia]] or your favourite algorithms textbook . For the purposes of this post let's go with a super imprecise explanation. When you store a map of keys that are associated with some value there are a number of ways to represent that as a data structure. What Radix Trees offer is that when the key is a sequence of some kind (say a string of characters or a list of numbers) we can store the keys in a much abbreviated format, taking advantage of the shared prefixes amongst many keys. For example most Vancouver phone numbers begin with 778 or 604. Most of the numbers in a radix tree can be stored under one of those three digit prefixes rather than in three levels of tree (7,7,8...). If that's confusing never mind, it will become clear as we progress...
+翻译:与其深入探讨Radix树的实现和详细解释，不如在[[https://en.wikipedia.org/wiki/Radix_tree][维基百科]]或您最喜欢的算法教科书中查看它们。为了本帖的目的，让我们用一个极其不准确的方式来解释一下。当您存储一个与某些值相关联的键映射时，有许多方法可以将其表示为数据结构。Radix树提供的优势是，当键是一种序列（例如字符字符串或数字列表）时，我们可以以非常简化的格式存储键，利用许多键之间的共享前缀。例如，大多数温哥华电话号码都以778或604开头。在基数树中的大多数数字都可以存储在这三个数字前缀下，而不是在树的三层中（7,7,8...）。如果这很令人困惑，那就不用担心了，随着我们的进展，它会变得清楚的……
+你可以在[[https://en.wikipedia.org/wiki/Radix_tree][维基百科]]或你最喜欢的算法教科书中查看它们，而不是深入研究基数树的实现和详细解释。出于这篇文章的目的，我们来做一个超级不精确的解释。当您存储与某个值关联的键的映射时，有许多方法可以将其表示为数据结构。基数树所提供的是，当键是某种序列(比如一串字符或一串数字)时，我们可以以非常简短的格式存储键，利用许多键之间共享的前缀。例如，大多数温哥华的电话号码以778或604开头。基数树中的大多数数字都可以存储在其中一个三位前缀下，而不是存储在三层树中(7,7,8…)。如果这是令人困惑的，没关系，它会变得清楚，因为我们的进展…
+翻译:你可以在[[https://zh.wikipedia.org/wiki/%E5%9F%BA%E6%95%B0%E6%A0%91][维基百科]]或你最喜欢的算法教科书中查看它们，而不是深入研究基数树的实现和详细解释。出于这篇文章的目的，我们来做一个超级不精确的解释。当您存储与某个值关联的键的映射时，有许多方法可以将其表示为数据结构。基数树所提供的是，当键是某种序列(比如一串字符或一串数字)时，我们可以以非常简短的格式存储键，利用许多键之间共享的前缀。例如，大多数温哥华的电话号码以778或604开头。基数树中的大多数数字都可以存储在其中一个三位前缀下，而不是存储在三层树中(7,7,8…)。如果这是令人困惑的，没关系，它会变得清楚，因为我们的进展…
+
+翻译结果：
+
+你可以在[[https://zh.wikipedia.org/wiki/%E5%9F%BA%E6%95%B0%E6%A0%91][维基百科]]或你最喜欢的算法教科书中查看它们，而不是深入研究基数树的实现和详细解释。出于这篇文章的目的，我们来做一个超级不精确的解释。当您存储与某个值关联的键的映射时，有许多方法可以将其表示为数据结构。基数树所提供的是，当键是某种序列(比如一串字符或一串数字)时，我们可以以非常简短的格式存储键，利用许多键之间共享的前缀。例如，大多数温哥华的电话号码以778或604开头。基数树中的大多数数字都可以存储在其中一个三位前缀下，而不是存储在三层树中(7,7,8…)。如果这是令人困惑的，没关系，它会变得清楚，因为我们的进展…
+
+
+** Exploring radix trees in Emacs
+**在Emacs中探索板蓝根树
+翻译:在Emacs中探索板蓝根树
+:PROPERTIES:
+属性:
+:CUSTOM_ID: exploring-radix-trees-in-emacs
+:CUSTOM_ID exploring-radix-trees-in-emacs
+:END:
+结束:
+
+A small example... say we want to store the following keys in a key value store: application, appetizer, applicative, apple.
+翻译:一个小例子……比如说，我们想在键值存储中存储以下键：应用程序、开胃菜、应用、苹果。
+一个小例子…假设我们想要在密钥值存储中存储以下密钥:应用程序、开胃菜、应用程序、苹果。
+
+To start with we need an empty radix tree, which is just defined as nil:
+翻译:首先，我们需要一个空的基数树，它仅仅被定义为nil：
+首先我们需要一个空的基数树，它被定义为nil:
+翻译:首先我们需要一个空的基数树，它被定义为 nil：
+
+#+BEGIN_EXAMPLE
+(require 'radix-tree)
+
+radix-tree-empty
+#+END_EXAMPLE
+
+You add key/values to the map like this:
+翻译:您像这样向映射中添加键/值：
+你添加键/值到地图，像这样:
+
+#+BEGIN_EXAMPLE
+(setq tree-1 (radix-tree-insert radix-tree-empty "application" t))
+;; (("application" . t))
+#+END_EXAMPLE
+
+Note that inserting returns a new tree that contains just the single key “application”. For the purposes of our program we don't need to store an actualy value, we're just interested in the keys which represent valid English words, so we just store `t' which is true in Emacs Lisp.
+翻译:请注意，插入操作返回一个仅包含单个键“application”的新树。就我们程序的目的而言，我们不需要存储实际值，我们只对表示有效英文单词的键感兴趣，所以我们只需存储`t'，在Emacs Lisp中这是真值。
+注意，插入将返回一个新树，其中只包含单个键“application”。出于程序的目的，我们不需要存储一个实际值，我们只对表示有效英语单词的键感兴趣，所以我们只存储“t”，这在Emacs Lisp中是正确的。
+翻译:注意：插入将返回一个仅包含单个键“application”的新树。出于编程目的，我们不需要存储实际值；我们只关心表示有效英文单词的键，因此我们只需存储“t”，这在Emacs Lisp中是正确的。
+
+Next we'll make a new tree by inserting the next word into `tree-1':
+翻译:然后我们将通过将下一个词插入到`tree-1'中创建一个新的树：
+接下来，我们将插入下一个单词到“tree-1”来创建一个新树:
+翻译:然后，我们将把下一个单词加入到“tree-1”中，以此来生成一个新的树：
+
+#+BEGIN_EXAMPLE
+(setq tree-2 (radix-tree-insert tree-1 "appetizer" t))
+
+;; (("app" ("lication" . t) ("etizer" . t)))
+#+END_EXAMPLE
+
+As you can see the radix tree split the key up into the shared prefixes between the two words. We can query how many words the tree has in total like this:
+翻译:正如您所见，基数树将键分割成了两个单词之间的共享前缀。我们可以这样查询树中共有多少个单词：
+可以看到，基数树将键分成两个单词之间的共享前缀。我们可以查询这个树总共有多少个这样的单词:
+
+#+BEGIN_EXAMPLE
+(radix-tree-count tree-2)
+
+;; 2 (#o2, #x2, ?C-b)
+#+END_EXAMPLE
+
+** Reducing a list and the Dash list API
+**减少列表和Dash列表API
+翻译:减少列表和 Dash 列表 API
+:PROPERTIES:
+属性:
+:CUSTOM_ID: reducing-a-list-and-the-dash-list-api
+:CUSTOM_ID reducing-a-list-and-the-dash-list-api
+:END:
+结束:
+
+We've seen how to add elements one at a time to the tree, but our goal is to take a list of words and add them to a dictionary. For that we will need to use the `seq-reduce' function; a functional programming construct for reducing a sequence to a single value using some function that accumulates results:
+翻译:我们已经看到了如何逐个向树中添加元素，但是我们的目标是接受一个单词列表并将它们添加到字典中。为此，我们将需要使用`seq-reduce`函数；这是一个用于使用某个累积结果的函数将序列减少为一个值的函数式编程结构：
+我们已经了解了如何一次向树中添加一个元素，但是我们的目标是获取单词列表并将它们添加到字典中。为此，我们需要使用“seq-reduce”函数;一种函数式编程结构，用于使用一些累积结果的函数将序列缩减为单个值:
+翻译:我们已经学会了如何一次性向树中添加一个元素，但我们的目标是获取单词列表并将它们添加到字典中。为此，我们需要使用“seq-reduce”函数；这是一种函数式编程结构，它使用一个将累积结果作为参数的函数来将序列缩减为一个值：
+
+#+BEGIN_EXAMPLE
+(seq-reduce (lambda (acc it) (radix-tree-insert acc it t)) '("application" "appetizer" "applicative" "apple") radix-tree-empty)
+
+;; (("app" ("l" ("icati" ... ...) ("e" . t)) ("etizer" . t)))
+#+END_EXAMPLE
+
+In the output you can see that the four words have been neatly split into their shared and non-shared parts.
+翻译:在输出中可以看到，四个单词已经被整齐地拆分成了它们的共享和非共享部分。
+在输出中，您可以看到这四个单词被整齐地划分为它们的共享部分和非共享部分。
+
+=seq-reduce= is fine for our purposes, but when working with Emacs lisp lists I prefer to use [[https://github.com/magnars/dash.el][Dash]] which is a package providing a more modern list API. All Dash functions begin with a dash hence the name. We can replace the code above using Dash as follows:
+翻译:“=seq-reduce=”对于我们的目的来说是可以的，但是当处理Emacs Lisp列表时，我更喜欢使用[[https://github.com/magnars/dash.el][Dash]]这个包，它提供了一个更现代的列表API。所有的Dash函数都以一个短横线开头，因此得名。我们可以用以下方式用Dash替换上面的代码：
+=seq-reduce=对于我们的目的是好的，但是当使用Emacs lisp列表时，我更喜欢使用[[https://github.com/magnars/dash.el][Dash]]，它是一个提供更现代的列表API的包。所有的短横线函数都以短横线开头，因此得名。我们可以用下面的Dash替换上面的代码:
+翻译:"seq-reduce" 对于我们的目的来说是有益的，但是在使用 Emacs Lisp 列表时，我更倾向于使用 [[https://github.com/magnars/dash.el][Dash]]，这是一个提供了更为现代化的列表 API 的库。所有的短划线函数都是以短划线开头的，因此而得名。我们可以用以下的 Dash 替换上述的代码：
+
+#+BEGIN_EXAMPLE
+(require 'dash)
+(-reduce-from (lambda (tree word) (radix-tree-insert tree word t)) radix-tree-empty '("application" "appetizer" "applicative" "apple"))
+
+;; (("app" ("l" ("icati" ... ...) ("e" . t)) ("etizer" . t)))
+#+END_EXAMPLE
+
+In English when you refer to a word used earlier in the conversation you will say “it” instead, and this is called anaphora. Dash provides “anaphoric” versions of many of its functions that begin with two dashes that let you abbreviate the lambda form we used above and refer to each item as it. In the case of the =--reduce-from= we get both it and acc (for the accumulated result):
+翻译:在英语中，当你引用对话中先前的单词时，你会说“it”，这称为指代。Dash为其许多以双短横线开头的功能提供了“指代性”版本，让我们能够缩写上面使用的lambda形式，并按顺序引用每个项目。“=--reduce-from=”函数同时获取了it和acc（用于累积结果）：
+在英语中，当你提到之前在对话中使用的一个单词时，你会说“it”，这被称为回指。Dash提供了许多函数的“回指”版本，它们以两个破折号开头，允许您缩写我们在上面使用的lambda形式，并将每个项目称为它。在=——reduce-from=的情况下，我们得到了它和acc(对于累积的结果):
+翻译:在英语中，当你提及之前在对话中提到的某个词时，你会使用“it”，这在语法上被称为指代。Dash库为许多函数提供了所谓的“指代”版本，这些版本以双短横线开头，使得你可以简化我们在前面使用的lambda表达式，并称呼每一个元素为“it”。例如，在`=——reduce-from=`的情况下，我们就得到了`it`和`acc`（用于累积结果）。
+
+#+BEGIN_EXAMPLE
+(--reduce-from (radix-tree-insert acc it t) radix-tree-empty '("application" "appetizer" "applicative" "apple"))
+
+;; (("app" ("l" ("icati" ... ...) ("e" . t)) ("etizer" . t)))
+#+END_EXAMPLE
+
+That's nicer! Now we need a function that takes a sequence of words and adds them to a radix tree:
+翻译:现在我们需要一个函数，它接受一系列单词并将它们添加到基数树中：
+这是更好的!现在我们需要一个函数，采取一个序列的单词，并将它们添加到一个基数树:
+
+#+BEGIN_EXAMPLE
+(defun list-to-radix-tree(l)
+(--reduce-from (radix-tree-insert acc it t) radix-tree-empty l))
+
+(setq small (list-to-radix-tree '("application" "appetizer" "applicative" "apple")))
+
+;; (("app" ("l" ("icati" ... ...) ("e" . t)) ("etizer" . t)))
+#+END_EXAMPLE
+
+** Reading words from a file and making a radix tree
+**从文件中读取单词并生成基数树
+:PROPERTIES:
+属性:
+:CUSTOM_ID: reading-words-from-a-file-and-making-a-radix-tree
+:CUSTOM_ID reading-words-from-a-file-and-making-a-radix-tree
+:END:
+结束:
+
+Our next step is to load the words for our custom dictionary from a file. The one in the github repo =dictionary.txt= contains 172k words. We can load it and turn it into a list of words, and finally build a radix tree as follows:
+翻译:我们的下一步是加载自定义词典中的单词文件。GitHub仓库中的=dictionary.txt=文件包含了172000个单词。我们可以加载数据并将其转换为单词列表，然后按照以下步骤构建基数树：
+我们的下一步是从一个文件中为我们的自定义字典加载单词。github repo =字典里的那个。txt=包含172k个单词。我们可以加载它，把它变成一个单词列表，最后建立一个基数树如下:
+翻译:我们的下一步是从一个文件中为我们的自定义字典加载单词。GitHub仓库包含了那个.txt文件，其中含有172,000个单词。我们可以加载数据，将其转换为一个单词列表，并最终构建出一个基数树如下所示：
+
+#+BEGIN_EXAMPLE
+(defun radix-tree-from-file(file-path)
+(->
+(with-temp-buffer
+(insert-file-contents-literally file-path)
+(buffer-substring-no-properties (point-min) (point-max)))
+split-string
+list-to-radix-tree))
+
+(radix-tree-from-file "dictionary.txt")
+#+END_EXAMPLE
+
+Note the use of “->” which is a threading macro from Dash. It lets us put a list of operations together and “threads” the result from one step to the next, making things a bit easier to read. You'll see a similar operator in Clojure.
+翻译:注意使用“->”，这是Dash中的一个线程宏。它让我们能够将一系列操作放在一起，并将上一步的结果“穿线”到下一步，使事情阅读起来稍微容易一些。您将在Clojure中看到类似的运算符。
+注意“->”的使用，这是一个线程宏从短跑。它让我们把一个操作列表放在一起，然后“线程”从一个步骤到下一个步骤的结果，使事情更容易阅读。您将在Clojure中看到类似的操作符。
+翻译:请注意，“->”用于表示函数链。它允许我们将一系列操作组合在一起，然后让“thread”从一个步骤的结果跳转到下一个步骤，从而使代码更易于阅读。您在Clojure等编程语言中也会看到类似的功能。
+
+** Speeding it up
+加快速度
+:PROPERTIES:
+属性:
+:CUSTOM_ID: speeding-it-up
+:CUSTOM_ID:加速
+:END:
+结束:
+
+Hmm, that was kinda slow. When we start using the Company mode we need to load the file and we don't want a delay like that. Let's use the emacs benchmark facility to see just how slow it is:
+翻译:嗯，那有点慢。当我们开始使用公司模式时，我们需要加载文件，我们不想有那样的延迟。让我们使用emacs基准测试功能来看看它有多慢：
+嗯，有点慢。当我们开始使用公司模式时，我们需要加载文件，我们不希望出现那样的延迟。让我们使用emacs基准测试工具来看看它有多慢:
+翻译:嗯，有点慢。当我们开始使用公司模式时，我们需要加载文件，我们不希望出现那样的延迟。让我们使用emacs基准测试工具来看看它有多慢：
+
+#+BEGIN_EXAMPLE
+(require 'benchmark)
+(benchmark-elapse (radix-tree-from-file "dictionary.txt"))
+
+;; 6.021951
+#+END_EXAMPLE
+
+Six seconds is a bit too much. How about we just write the radix tree to a file instead, then load that? First we need to write the tree to a string using =print1-to-string=, then we can stick that in a buffer and write it to a file.
+翻译:六秒钟有点多了。我们不如直接把基数树写入文件，然后再加载它？首先我们需要使用 =print1-to-string= 将树写入字符串中，然后我们可以把它放在缓冲区中并写入文件。
+六秒钟有点太长了。不如直接把基数树写入文件，然后再载入?首先，我们需要使用=print1-to-string=将树写入字符串，然后我们可以将其放入缓冲区并将其写入文件。
+翻译:六秒钟有点太长了。不如直接把基数树写入文件，然后再载入？首先，我们需要使用 = print1-to-string = 将树写入字符串，然后我们可以将其放入缓冲区并将其写入文件。
+
+#+BEGIN_EXAMPLE
+(defun write-text-to-file(text file-path)
+(save-excursion
+(let ((buffer (find-file file-path)))
+(switch-to-buffer buffer)
+(erase-buffer)
+(insert text)
+(save-buffer)
+(kill-buffer))))
+
+(setq dictionary (radix-tree-from-file "dictionary.txt"))
+
+(write-text-to-file (prin1-to-string dictionary) "dictionary.el")
+
+;; (write-text-to-file (prin1-to-string small) "dictionary.el")
+#+END_EXAMPLE
+
+Now let's see how much faster it is to simply load the data structure rather than build it:
+翻译:现在让我们看看，仅仅加载数据结构而不是构建它，速度会有多快：
+现在让我们看看加载数据结构比构建它要快多少:
+
+#+BEGIN_EXAMPLE
+(defun tree-from-file(file-path)
+(save-excursion
+(let* ((buffer (find-file file-path))
+(tree (read buffer)))
+(kill-buffer buffer)
+tree)))
+
+(benchmark-elapse
+(progn
+(setq loaded-dictionary (tree-from-file "dictionary.el"))
+t))
+
+;; 0.198365
+#+END_EXAMPLE
+
+Great! The first time we run the program it will take 6 seconds to build, but subsequently we can load the radix tree data from disk which takes 0.2 seconds. That means if we prepare the =dictionary.el= file we can simply load that when the system starts without a noticable slowdown. The next step is to be able to find all the keys given a prefix. =radix-tree-subtree= does the job, returning a subtree rooted at the given prefix. Given the relevant subtree we can then iterate all of the keys and values using the function =radix-tree-iter-mappings=. Here we use the destructive =!cons= (also from Dash) to build up a list of all the keys, which we then return. This is now all the functionality we need to return for our auto-complete functionality:
+翻译:第一次运行程序时，它需要6秒钟来构建，但随后我们可以从磁盘加载基数树数据，这只需0.2秒。这意味着如果我们准备了=dictionary.el=文件，我们可以在系统启动时简单地加载它而不会造成明显的减速。下一步是能够根据前缀找到所有键。=radix-tree-subtree=完成了这项工作，返回以给定前缀为根的子树。有了相关的子树后，我们就可以使用函数=radix-tree-iter-mappings=迭代所有的键和值。在这里，我们使用了破坏性的=!cons=(也来自Dash)来建立一个包含所有键的列表，然后我们返回这个列表。现在我们已经拥有了实现自动完成功能所需的所有功能：
+太棒了!第一次运行该程序将需要6秒的时间来构建，但随后我们可以从磁盘加载基数树数据，这需要0.2秒。这意味着如果我们准备=dictionary。我们可以简单地加载时，系统启动没有明显的放缓。下一步是能够找到给定前缀的所有键。=radix-tree-subtree=执行此工作，返回在给定前缀处扎根的子树。对于相关的子树，我们可以使用=radix-tree- mappings=函数来迭代所有的键和值。这里我们使用了毁灭性的=!cons=(也来自Dash)构建所有键的列表，然后返回这些键。这是现在所有的功能，我们需要返回我们的自动完成功能:
+翻译:太棒了！第一次运行该程序将需要6秒钟的时间来构建，但随后我们可以从磁盘加载基数树数据，这需要0.2秒。这意味着如果我们提前准备好字典，我们可以简单地加载它，而不会明显地减慢系统启动的速度。下一步是能够找到给定前缀的所有键。`radix-tree-subtree` 函数执行这项工作，返回以给定前缀为根的子树。对于相关的子树，我们可以使用 `radix-tree-mappings` 函数来迭代所有的键和值。在这里，我们使用了破坏性的 `!cons`（也来自 Dash）来构建所有键的列表，然后返回这些键。这就是我们现在所有的功能；我们需要返回我们的自动完成功能：
+
+#+BEGIN_EXAMPLE
+(defun radix-tree-keys(subtree prefix)
+(let (keys '())
+(radix-tree-iter-mappings (radix-tree-subtree subtree prefix)
+(lambda (key val)
+(!cons (concat prefix key) keys)))
+keys))
+
+(radix-tree-keys loaded-dictionary "antidi")
+
+;; ("antidiscrimination" "antidilution" "antidiarrheal" "antidiabetic")
+#+END_EXAMPLE
+
+* Company Mode
+*公司模式
+:PROPERTIES:
+属性:
+:CUSTOM_ID: company-mode
+:CUSTOM_ID company-mode
+:END:
+结束:
+
+[[http://company-mode.github.io][Company Mode]] is one of the two most popular completion frameworks for emacs (the other being [[https://github.com/auto-complete/auto-complete][Auto-Complete]]). In order to make our own custom dictionary auto completion we just need to implement a single function to implement a “backend”.
+翻译:[[公司模式官网][公司模式]] 是emacs中最受欢迎的两个补全框架之一（另一个是 [[https://github.com/auto-complete/auto-complete][自动完成]]）。为了实现我们自己的自定义字典自动补全功能，我们只需实现一个“后端”函数即可。
+[[http://company-mode.github。io][Company Mode]]是emacs中两个最流行的完成框架之一(另一个是[[https://github.com/auto-complete/auto-complete][Auto-Complete]])。为了使我们自己的自定义字典自动完成，我们只需要实现一个功能来实现一个“后端”。
+翻译:[[http://company-mode.github.io][公司模式]]是Emacs中最受欢迎的两个完成框架之一（另一个是[[https://github.com/auto-complete/auto-complete][自动完成]]）。为了使我们的自定义字典能够自动完成，我们只需要实现一个“后端”功能。
+
+The best documentation for how to write a backend is in the docstring for `company-backends' so I'd recommend reading that in full to see the capabilities of Company mode.
+翻译:后端开发的最佳文档在`company-backends`的字符串注释中，我建议您全文阅读以了解公司模式的功能。
+关于如何编写后端，最好的文档是“Company -backends”的文档字符串，所以我建议您阅读完整的文档，以了解Company模式的功能。
+翻译:如果您想了解有关编写后端的信息，“Company - backends”模块的文档字符串提供了最佳指导。我建议您仔细阅读整个文档，以便充分理解Company模式的功能。
+
+First, the code, I'll explain each part below:
+翻译:首先，代码，我下面会逐部分解释：
+首先，代码，我将解释每个部分如下:
+
+=C-h v company-backends=
+翻译:公司后台
+v company-backends = =碳氢键
+翻译:您上传的内容似乎包含了一些乱码或者无法识别的文字。"v company-backends = =碳氢键" 并不是一个有效的文本字符串，因此我无法直接将其翻译为中文。
+
+如果您能提供更多的上下文或者是想要翻译的具体句子或段落，我会很乐意帮助您进行翻译。
+
+#+BEGIN_EXAMPLE
+(require 'company)
+
+(defun get-candidates (prefix)
+"Given a prefix return a list of matching words that begin with it"
+(when (> (length prefix) 2)
+(radix-tree-keys company-custom-dictionary--words-tree (downcase prefix))))
+
+(defun company-custom-dictionary (command &optional arg &rest ignored)
+"Company mode backend for a custom dictionary stored as a radix tree."
+(case command
+('init
+(unless (boundp 'company-custom-dictionary--words-tree)
+(setq company-custom-dictionary--words-tree (tree-from-file "dictionary.el"))))
+('prefix
+(company-grab-word))
+('candidates
+(radix-tree-keys company-custom-dictionary--words-tree (downcase arg)))
+('ignore-case
+'keep-prefix)))
+
+;; (provide 'company-custom-dictionary)
+
+;; Push the mode to the list of company backends
+(push 'company-custom-dictionary company-backends)
+
+;; If you want to change the dictionary, rewrite dictionary.el and unintern the symbol
+;; (unintern 'company-custom-dictionary--words-tree)
+#+END_EXAMPLE
+
+The few lines above are, believe it or not, all you need to make our custom dictionary backend work! We are just making a callback which implements the Company mode API by sending us commands for us to handle. Let's look at each one:
+翻译:上面的几行代码，信不信由你，就是你所需要的全部内容来使我们的自定义字典后端工作！我们只是创建了一个回调函数，该函数通过发送命令来实现公司模式API，让我们逐个来看一下这些命令：
+上面的几行，信不信由你，所有你需要使我们的自定义字典后端工作!我们只是做一个回调，它通过向我们发送命令让我们处理来实现Company模式API。让我们看看每一个:
+翻译:不管你信不信，你需要让我们的自定义字典后端运行起来！我们只需进行一个回调，它会通过向我们发送命令来让我们实现Company模式的API。让我们来看看每一个：
+
+- =init= Init is called when company mode is initially enabled. This could be when emacs loads, or if you enable manually it will be called whenever you enable it. It could be called multiple times in a session so keep that in mind when implementing. In this case our implementation checks whether we loaded the dictionary or not. If we did then nothing happens, otherwise we load it.
+翻译:初始化函数在启用公司模式时被调用。这可能是当emacs加载时，或者如果您手动启用它，那么每次您启用时都会被调用。在同一会话中可能会多次调用它，因此在实现时请注意这一点。在这种情况下，我们的实现检查我们是否已经加载了字典。如果已加载，则什么都不会发生；否则，我们将加载它。
+- =init= init在最初启用公司模式时调用。这可能是emacs加载时的情况，或者如果您手动启用它，则无论何时启用它都会调用它。它可以在一个会话中被多次调用，因此在实现时请记住这一点。在本例中，我们的实现检查是否加载了字典。如果我们这样做，那么什么也不会发生，否则我们加载它。
+翻译:初始化函数 init 在首次启动公司模式时被调用。这可能发生在 Emacs 加载期间，或者当您手动启用它时。在一个会话中，该函数可能会被多次调用，因此实现时应考虑到这一点。在这个例子中，我们的实现首先检查字典是否已经加载。如果已加载，则什么都不做；否则，我们将加载它。
+- =prefix= - This is the text the user has typed so far that we want to complete. I call the built in function =company-grab-word= which does what you'd expect in most cases. You can write your own depending on your needs. I also check if there are any potential candidates. If not we should return nil that enables other company backends further on in the list to try and match.
+翻译:- =前缀= - 这是用户到目前为止输入的文字，我们需要完成它。我调用内置函数 =公司抓词=，在大多数情况下都会按预期工作。您可以根据自己的需求编写自己的函数。我还检查是否有任何潜在候选人。如果没有，我们应该返回nil，这样列表中更靠后的其他公司后端就可以尝试匹配了。
+- =prefix= -这是用户输入的文本，我们需要完成。我调用内建的函数=company-grab-word=它在大多数情况下都是这样的。你可以根据自己的需要来写。我也会检查是否有潜在的候选人。如果不是，我们应该返回nil，使其他公司后端在列表上进一步尝试和匹配。
+翻译:- 前缀 -
+这是用户输入的文本，我们需要完成。我调用内建的函数 company-grab-word ，它在大多数情况下都是这样的。你可以根据自己的需要来写。我也会检查是否有潜在的候选人。如果不是，我们应该返回 nil ，使其他公司后端在列表上进一步尝试和匹配。
+- =candidates= - We are given =arg= which contains the word to be completed and must return the list of candidates that will show up in the menu for the user to pick from. We simply use radix-tree-keys to get the list of words based on the prefix. Note that we make the completion to lower case as we want to match words ignoring that the user may have capitalized the word.
+翻译:- 应聘者 - 我们被赋予了包含要完成的单词的参数，必须返回用户可以从菜单中选择的一组候选词列表。我们简单地使用基数树键来获取基于前缀的单词列表。请注意，我们将完成转换为小写，因为我们希望忽略用户可能大写字符的情况，以匹配单词。
+- =candidate = -我们得到=arg=，它包含要完成的单词，并且必须返回将出现在菜单中供用户选择的候选单词列表。我们只需使用radix-tree-keys来获得基于前缀的单词列表。请注意，我们将补全改为小写，因为我们想匹配单词，而忽略了用户可能已将单词大写。
+翻译:- 候选人 - 我们得到了 arg ，它包含了需要完成的单词，并且我们必须返回将出现在菜单中以供用户选择的候选单词列表。我们只需使用 radix-tree-keys 来获取基于前缀的单词列表。请注意，我们将补全改为小写，因为我们要匹配单词，而忽略了用户可能已经将单词大写。
+- =ignore-case= - We return a special response `keep-prefix' which maintains the users original capitalization.
+翻译:我们返回一个特殊的响应`保持前缀`，以保留用户的原始大小写。
+- =ignore-case= -我们返回一个特殊的响应' keep-prefix'，它保持用户原始大小写。
+翻译:- 忽略大小写的响应：我们返回一个特殊的响应 'keep-prefix'，它保留用户原始的大小写。
+
+Note that we don't want the performance penalty of returning the entire dictionary when matching an empty string, or a couple of characters, so the function =get-candidates= handles only words greater than 3 in length.
+翻译:我们不想在匹配空字符串或几个字符时返回整个字典的性能惩罚，所以函数=get-candidates>只处理长度大于3的单词。
+注意，我们不希望在匹配一个空字符串或几个字符时返回整个字典而导致性能损失，因此函数=get-candidate =只处理长度大于3的单词。
+翻译:您可以使用Python中的`re`模块来实现正则表达式匹配，以筛选出长度大于3个字符的单词。以下是一个示例代码：
+
+```python
+import re
+
+def get_candidate(text):
+    # 使用正则表达式匹配长度大于3个字符的单词
+    pattern = r'\b\w{4,}\b'
+    matches = re.findall(pattern, text)
+    
+    return matches
+
+# 测试代码
+text = "这是一个测试句子，其中包含一些单词：hello world，1234567890"
+candidates = get_candidate(text)
+print(candidates)
+```
+
+这段代码定义了一个函数`get_candidate`，它接受一个字符串作为输入，并使用正则表达式来查找所有长度大于等于4个字符的单词。然后，它会将这些单词作为列表返回。
+
+请注意，这个例子假设您的输入文本是英文。如果您需要处理的是中文或其他语言的文本，您可能需要对正则表达式进行相应的调整。
+
+* A note on case matching
+*关于大小写匹配的说明
+:PROPERTIES:
+属性:
+:CUSTOM_ID: a-note-on-case-matching
+:CUSTOM_ID a-note-on-case-matching
+:END:
+结束:
+
+In this example I wanted the user dictionary to use only lower case letters. Capitalization is up to then up to the user; if you want to capitalize a word you can do so and it will match correctly. If instead you want a dictionary where case is important (perhaps function calls in a camel case API) you can set =ignore-case= to =nil= and remove the call to =downcase= when generating the candidates.
+翻译:在这个例子中，我希望用户字典只使用小写字母。大小写由用户决定；如果您想将单词大写，您可以这样做，并且它会正确匹配。相反，如果您想要一个区分大小写的字典（例如在驼峰命名法的API中的函数调用），您可以设置=ignore-case=为=nil=，并在生成候选词时删除对=downcase=的调用。
+在本例中，我希望用户字典只使用小写字母。资本化由用户决定;如果你想大写一个词，你可以这样做，它将正确匹配。相反，如果您想要一个大小写重要的字典(可能是驼峰大小写API中的函数调用)，您可以设置=ignor -case= to =nil=，并在生成候选时删除对=downcase=的调用。
+翻译:在这个例子中，我希望用户字典仅使用小写字母。大小写转换由用户自行决定；如果您想将一个单词大写，您可以这样做，它会正确地进行匹配。相反，如果您需要一个区分大小写的字典（可能是在驼峰命名法API中的函数调用），您可以设置`ignore_case`为`nil`，并在生成候选时移除对`downcase`的调用。
+
+* Final notes
+*最后指出
+:PROPERTIES:
+属性:
+:CUSTOM_ID: final-notes
+:CUSTOM_ID:结语
+:END:
+结束:
+
+So that's all folks! This is a fairly simple auto complete mode, but you can easily modify the code to come up with your own based on your needs. For example:
+翻译:所以就这样了大家！这是一个相当简单的自动完成模式，但是你可以轻松修改代码来根据自己的需求创建自己的版本。例如：
+这就是所有人!这是一个相当简单的自动完成模式，但是您可以根据自己的需要轻松地修改代码。例如:
+
+- Common mispelled words list (Do you have trouble with necessary or disappoint? Add all your most hated words to the list)
+翻译:常见拼写错误列表（你在necessary还是disappoint上遇到困难吗？把你最讨厌的所有单词都加到列表中）
+-常见错别字列表(你有麻烦的必要或失望?把你最讨厌的单词都加到列表里)
+- Domain words. Do you work in a domain with specialist terminology not in a dictionary?
+翻译:领域词汇。你是否在一个有专业术语的领域中工作，而这些术语不在词典中？
+——域的话。你从事的领域里的专业术语不是字典里的吗?
+- Phone numbers, server names, IP addresses and so on
+翻译:电话号码、服务器名称、IP地址等等
+-电话号码、服务器名称、IP地址等
+翻译:电话号码、服务器名称、IP地址等
+
+* Corrections
+*修正
+:PROPERTIES:
+属性:
+:CUSTOM_ID: corrections
+:CUSTOM_ID:修正
+:END:
+结束:
+
+Thanks to Reddit user MCHerb for pointing out a couple of things including a typo which have been corrected in this update, and Herbert Jones for noticing and fixing a potential bug with matching words not in the dictionary. See the comments below for more.
+翻译:感谢Reddit用户MCHerb指出了包括一个拼写错误在内的一些问题，这些问题在这次更新中得到了修正，还要感谢Herbert Jones发现了并修复了一个潜在的问题，即匹配不在字典中的单词。有关更多信息，请参阅下面的评论。
+感谢Reddit用户MCHerb指出了一些问题，包括在这次更新中更正的一个拼写错误，以及Herbert Jones注意到并修复了一个潜在的错误，这个错误与字典中没有匹配的单词有关。更多信息请参见下面的评论。
+翻译:感谢Reddit用户MCHerb指出了几个问题，包括本次更新中修正的一个拼写错误，以及Herbert Jones发现并修复了一个潜在的错误，该错误与字典中找不到匹配的单词有关。更多详情请参阅以下评论。

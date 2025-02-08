@@ -1,0 +1,310 @@
+#+TITLE: a.el: Emacs Lisp Functions for Associative Data Structures
+#+URL: https://opensourceforu.com/2020/03/a-el-emacs-lisp-functions-for-associative-data-structures/
+#+AUTHOR: lujun9972
+#+TAGS: raw
+#+DATE: [2020年 03月 09日 星期一 16:38:57 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+The a.el Emacs Lisp library contains functions for handling associative lists and hash tables. It provides an API in a consistent and functional way, which is greatly influenced by Clojure, dash.el and seq.el. The package is written by Arne Brasseur.
+翻译:Emacs Lisp库中的a.el包含了处理关联列表和哈希表的功能函数。它提供了一个由Clojure、dash.el和seq.el影响的一致且功能性的API。此包是由Arne Brasseur编写的。
+
+The latest tagged release of the a.el Emacs Lisp library is v0.1.1. You can use association lists, or hash tables and even vectors with certain functions. The implemented functions are pure and hence do not mutate objects. The library is released under the GNU General Public License v3.0 and it requires Emacs version 25 or later.
+翻译:a.el Emacs Lisp库的最新标记版本是v0.1.1。您可以使用关联列表、哈希表甚至某些函数向量。已实现的函数是纯函数，因此不会修改对象。该库遵循GNU通用公共许可证v3.0发布，并且需要Emacs版本25或更高版本。
+
+You can include the a.el source file to your Emacs load path and use the following Emacs Lisp code snippet to load it on to the existing running environment:
+翻译:你可以将a.el源文件包含到Emacs的加载路径中，并使用以下emacs lisp代码片段来将其加载到现有的运行环境中：
+
+#+BEGIN_EXAMPLE
+(load-file “/path/to/a.el”)
+#+END_EXAMPLE
+
+*Usage*\
+翻译:使用方法
+We shall now explore the various functions provided by a.el using examples for both associative lists and hash tables.\
+翻译:我们现在将通过关联列表和哈希表的例子来探索a.el提供的各种功能。
+You can define an associative list using the a-list function, and a hash table using the a-hash-table function. A few examples are given below to illustrate their usage:
+翻译:您可以使用a-list函数定义关联列表，使用a-hash-table函数定义哈希表。下面给出一些示例来说明它们的用法：
+
+#+BEGIN_EXAMPLE
+(a-list key-value-pairs) ;; Syntax
+
+(a-list :foo 1 :bar 2)
+((:foo . 1) (:bar . 2))
+
+(setq x (a-list :foo 1 :bar 2))
+((:foo . 1) (:bar . 2))
+
+(a-hash-table key-value-pairs) ;; Syntax
+
+(setq h (a-hash-table :a 1 :b 2))
+(:a 1 :b 2)
+#+END_EXAMPLE
+
+The a-associative function will return true if the object passed to it is either an associative list or hash table, and nil otherwise. For example:
+翻译:关联函数如果传递给它的对象是关联列表或哈希表，则返回true，否则返回nil。例如：
+
+#+BEGIN_EXAMPLE
+(a-associative? object) ;; Syntax
+
+(a-associative? x)
+t
+(a-associative? h)
+t
+
+(a-associative? :foo)
+nil
+(a-associative? ‘(1 2 3))
+nil
+#+END_EXAMPLE
+
+The Emacs Lisp source code for the a-associative function is provided below:
+翻译:下面提供了a-associative函数的Emacs Lisp源代码：
+
+#+BEGIN_EXAMPLE
+(defun a-associative-p (obj)
+(or (not obj)
+(hash-table-p obj)
+(and (consp obj) (consp (car obj)))))
+
+(defalias ‘a-associative? ‘a-associative-p)
+#+END_EXAMPLE
+
+You can retrieve a value for a specific key using the ‘a-get' function as shown below:
+翻译:你可以使用下面的‘a-get’函数来获取特定键的值：
+
+#+BEGIN_EXAMPLE
+(a-get map key) ;; Syntax
+
+(a-get x :foo)
+1
+(a-get x :bar)
+2
+(a-get h :a)
+1
+(a-get h :notexist)
+nil
+#+END_EXAMPLE
+
+The keys in the associative list or hash table can be obtained using the a-keys function, while the values can be retrieved using the a-vals function, as illustrated below:
+翻译:在关联列表或哈希表中，可以使用a-keys函数获取键，而使用a-val s函数检索值，如下所示：
+
+#+BEGIN_EXAMPLE
+(a-keys collection) ;; Syntax
+
+(a-keys x)
+(:foo :bar)
+
+(a-keys h)
+(:a :b)
+
+(a-vals collection) ;; Syntax
+
+(a-vals x)
+(1 2)
+
+(a-vals h)
+(1 2)
+#+END_EXAMPLE
+
+All the functions in a.el provide implementation for both associative lists and hash tables. As an example, the a-keys function definition is given below:
+翻译:a.el中的所有函数都为关联列表和哈希表提供了实现。以下是一个例子，展示了a-keys函数的定义：
+
+#+BEGIN_EXAMPLE
+(defun a-keys (coll)
+“Return the keys in the collection COLL.”
+(cond
+((listp coll)
+(mapcar #’car coll))
+
+((hash-table-p coll)
+(hash-table-keys coll))))
+#+END_EXAMPLE
+
+You can check if two collections are the same using the a-equal function. A few examples are as follows:
+翻译:你可以使用a-equal函数来检查两个集合是否相同。以下是一些示例：
+
+#+BEGIN_EXAMPLE
+(a-equal collectionA collectionB) ;; Syntax
+
+(a-equal x (a-list :alpha 1 :bar 2))
+nil
+(a-equal x (a-list :foo 1 :bar 2))
+t
+
+(a-equal h (a-hash-table :a 1 :b 2))
+t
+#+END_EXAMPLE
+
+The a-has-key? API takes two arguments -- a collection and a key, and returns true if the key is present and nil otherwise:
+翻译:a-has-key？API接受两个参数--一个集合和一个键，如果键存在则返回true，否则返回nil：
+
+#+BEGIN_EXAMPLE
+(a-has-key? collection key) ;; Syntax
+(a-has-key? x :foo)
+t
+(a-has-key? x :gamma)
+nil
+
+(a-has-key? h :a)
+t
+
+(a-has-key? h :foo)
+nil
+#+END_EXAMPLE
+
+You can count the number of key-value pairs in a collection using the a-count function, as shown below:
+翻译:你可以使用a-count函数来计算集合中键值对的数量，如下所示：
+
+#+BEGIN_EXAMPLE
+(a-count collection) ;; Syntax
+
+(a-count x)
+2
+
+(a-count h)
+2
+#+END_EXAMPLE
+
+The source code of the a-count function is as follows:
+翻译:a-count函数的源代码如下：
+
+#+BEGIN_EXAMPLE
+(defun a-count (coll)
+
+“Count the number of key-value pairs in COLL.
+
+Like length, but can also return the length of hash tables.”
+
+(cond
+((seqp coll)
+(length coll))
+
+((hash-table-p coll)
+(hash-table-count coll))))
+#+END_EXAMPLE
+
+The a-assoc function takes a collection and key-value pairs, and returns an updated collection with the associated values. A couple of examples are shown below:
+翻译:a-assoc函数接受一个集合和键值对，并返回一个带有关联值的更新后的集合。下面展示了一些示例：
+
+#+BEGIN_EXAMPLE
+(a-assoc collection key-value-pairs) ;; Syntax
+
+(a-assoc x :gamma 3)
+((:gamma . 3) (:foo . 1) (:bar . 2))
+
+(a-assoc h :c 3)
+(:a 1 :b 2 :c 3)
+#+END_EXAMPLE
+
+The a-dissoc function, on the other hand, removes the keys passed as an argument to it and returns a new collection. Examples for the associative list and hash tables are as follows:
+翻译:另一方面，a-dissoc 函数会移除传递给它的键并返回一个新的集合。关联列表和哈希表的示例如下：
+
+#+BEGIN_EXAMPLE
+(a-dissoc collection keys) ;; Syntax
+
+(a-dissoc x :bar)
+((:foo . 1))
+
+(a-dissoc h :b)
+(:a 1)
+#+END_EXAMPLE
+
+You can associate new values in a collection for specific keys using the a-assoc-in function, as illustrated below:
+翻译:您可以使用a-assoc-in函数为集合中的特定键关联新值，如下所示：
+
+#+BEGIN_EXAMPLE
+(a-assoc-in collection keys value) ;;
+
+Syntax
+
+(a-assoc-in x [:foo] 10)
+((:foo . 10) (:bar . 2))
+
+(a-assoc-in h [:a] 100)
+(:a 100 :b 2)
+#+END_EXAMPLE
+
+The a-merge function allows you to merge multiple associative collections. The return type is the type of the first collection. A couple of examples are provided below:
+翻译:合并函数允许您合并多个关联集合。返回类型是第一个集合的类型。下面提供了几个示例：
+
+#+BEGIN_EXAMPLE
+(a-merge collections) ;; Syntax
+
+(a-merge x (a-list :gamma 5))
+((:gamma . 5) (:foo . 1) (:bar . 2))
+
+(a-merge h (a-hash-table :c 3))
+(:a 1 :b 2 :c 3)
+#+END_EXAMPLE
+
+You can apply a function while merging multiple collections using the a-merge-with function. In the following associative list example, the initial value for the key foo is 1, and its value is incremented by 3. For the hash-table example, the initial value for b is 2 and is incremented by 1.
+翻译:在合并多个集合的同时应用一个函数可以使用a-merge-with函数实现。以下关联列表示例中，键foo的初始值为1，其值通过3进行增量。对于哈希表示例来说，键b的初始值为2，并通过1进行增量。
+
+#+BEGIN_EXAMPLE
+(a-merge-with function collections) ;; Syntax
+
+(a-merge-with ‘+ x (a-list :foo 3))
+((:foo . 4) (:bar . 2))
+
+(a-merge-with ‘+ h (a-hash-table :b 1))
+(:a 1 :b 3)
+#+END_EXAMPLE
+
+The a-update function takes four arguments --- a collection, a key, a function and additional arguments to the function. It applies the function with its arguments to the specified key and returns a new collection. A couple of examples are provided below:
+翻译:a-update函数接受四个参数---一个集合、一个键、一个函数以及传递给函数的附加参数。它使用其参数对指定的键应用函数并返回一个新的集合。下面提供了几个示例：
+
+#+BEGIN_EXAMPLE
+(a-update collection key function arguments) ;; Syntax
+
+(a-update (a-list :name “Mr. “) :name ‘concat “Jack”)
+((:name . “Mr. Jack”))
+
+(a-update (a-hash-table :name “The Big “) :name ‘concat “Bang Theory”)
+(:name “The Big Bang Theory”)
+#+END_EXAMPLE
+
+The a-update-in function is similar to the a-update function, except that it can update a value in a nested collection. An example each for an association list and a hash table is given below:
+翻译:a-update-in 函数类似于 a-update 函数，但它可以更新嵌套集合中的一个值。下面分别给出关联列表和哈希表的示例：
+
+#+BEGIN_EXAMPLE
+(a-update-in collection keys function arguments) ;; Syntax
+
+(a-update-in x [:foo] ‘+ 1)
+((:foo . 2) (:bar . 2))
+
+(a-update-in h [:a] ‘+ 1)
+(:a 2 :b 2)
+#+END_EXAMPLE
+
+*Tests*\
+翻译:测试
+The a.el project contains tests that you can run with Cask and ert-runner. You need to first clone the source code repository using the following command:
+翻译:a.el项目中包含了你可以使用Cask和ert-runner运行的测试。你需要首先使用以下命令克隆源代码仓库：
+
+#+BEGIN_EXAMPLE
+$ git clone https://github.com/plexus/a.el
+Cloning into ‘a.el’...
+remote: Enumerating objects: 118, done.
+remote: Total 118 (delta 0), reused 0 (delta 0), pack-reused 118
+Receiving objects: 100% (118/118), 44.86 KiB | 740.00 KiB/s, done.
+Resolving deltas: 100% (62/62), done.
+#+END_EXAMPLE
+
+If you do not have Cask, install the same using the instructions provided in its README file at https://github.com/cask/cask.
+翻译:如果您还没有安装Cask，请按照其README文件中的说明进行安装：https://github.com/cask/cask 。
+
+You can then change directory into the cloned a.el folder and run cask install. This will locally install the required dependencies for running the tests.\
+翻译:然后切换到克隆的a.el文件夹中，运行cask install。这将本地安装运行测试所需的依赖项。
+You can now simply run cask exec ert-runner from the top-level sources directory to execute the tests as shown below:
+翻译:现在，您可以从顶级源代码目录中运行cask exec ert-runner以执行如下所示的测试：
+
+#+BEGIN_EXAMPLE
+$ cask exec ert-runner
+Running tests on Emacs 26.3
+Loading /tmp/a.el/a.el (source)...
+.................
+Ran 17 tests in 0.003 seconds
+#+END_EXAMPLE
+
+You are encouraged to read the source code at https://github.com/plexus/a.el/blob/master/a.el to know more about the available functions provided by a.el.
+翻译:你可以阅读https://github.com/plexus/a.el/blob/master/a.el 中的源代码以了解更多关于a.el提供的可用功能。
