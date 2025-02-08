@@ -19,7 +19,7 @@ selector=".choices[0].message.content| @text"
 # echo $messages
 curl -s "${BASEURL}/chat/completions" \
      -H "Content-Type: application/json" \
-     -H "Authorization: Bearer ${KEY}" \
+     -H "Authorization: Bearer ${LLMKEY}" \
   -d "{
         \"model\": \"${MODEL}\",
         \"messages\": ${messages},
