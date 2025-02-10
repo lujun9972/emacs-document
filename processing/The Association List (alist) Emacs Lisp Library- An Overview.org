@@ -1,0 +1,144 @@
+#+TITLE: The Association List (alist) Emacs Lisp Library: An Overview
+#+URL: https://opensourceforu.com/2019/12/the-association-list-alist-emacs-lisp-library-an-overview/
+#+AUTHOR: lujun9972
+#+TAGS: raw
+#+DATE: [2020年 02月 10日 星期一 10:35:47 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+The Association List Emacs Lisp library provides a comprehensive API to work with alists. It has been written by Troy Pracy and the latest release is 0.6.1. This eighth article in the GNU Emacs series explores the regular and anaphoric function variants for creating, retrieving and updating alists. It also reviews the constructs for mapping, filtering, folding and looping of alists.
+翻译:关联列表Emacs Lisp库提供了一个全面的API来处理alist。它是由Troy Pracy编写的，最新版本是0.6.1。这是GNU Emacs系列的第八篇文章，探讨了用于创建、检索和更新alist的正则表达式和反身函数变体。还回顾了映射、过滤、折叠和循环alist的结构。
+
+The source code featured in this article is available at https://github.com/troyp/asoc.el and released under the GNU General Public License v2.
+翻译:这篇文章中展示的源代码可以在https://github.com/troyp/asoc.el找到，并且已经发布了GNU通用公共许可证v2版本。
+
+*Installation*\
+翻译:安装
+The asoc.el source file can be obtained from https://github.com/troyp/asoc.el and added to your Emacs init configuration file so that it gets loaded on startup.\
+翻译:asoc.el 源文件可以从 https://github.com/troyp/asoc.el 获取，并将其添加到您的 Emacs 初始配置文件中，以便在启动时加载。
+You can then use the library with the following Emacs Lisp code snippet:
+翻译:你可以使用以下emacs lisp代码片段来使用这个库：
+
+#+BEGIN_EXAMPLE
+(require ‘asoc)
+#+END_EXAMPLE
+
+*Usage*\
+翻译:使用方法
+We will begin with the constructor API available in asoc.el for creating association lists.
+翻译:我们将从asoc.el中用于创建关联列表的构造函数API开始。
+
+*Constructors*\
+翻译:构造函数
+The asoc-make function takes a set of keys and returns an association list. If you give a default value, then all the keys are initialised with this value, as shown below:
+翻译:asoc-make 函数接受一组键并返回一个关联列表。如果您提供一个默认值，则所有键都将被初始化为这个值，如下所示：
+
+#+BEGIN_EXAMPLE
+(asoc-make &optional keys default) ;; Syntax
+
+(asoc-make ‘(a b c d e))
+((a) (b) (c) (d) (e))
+
+(asoc-make ‘(a b c d e) ‘(0))
+((a 0) (b 0) (c 0) (d 0) (e 0))
+#+END_EXAMPLE
+
+The asoc-copy function returns a shallow copy of an alist that is passed to it as an argument. For example:
+翻译:作为ocopy函数返回一个通过参数传递给它的alist的浅拷贝。例如：
+
+#+BEGIN_EXAMPLE
+(asoc-copy alist) ;; Syntax
+
+(let ((foo (asoc-copy ‘((a 1) (b 2) (c 3) (d 4) (e 5)))))
+foo)
+((a 1) (b 2) (c 3) (d 4) (e 5))
+#+END_EXAMPLE
+
+You can combine keys and values together to create an association list using the asoc-zip API. If there are more keys than values, then these additional keys have a nil value. A couple of examples are given below:
+翻译:您可以使用asoc-zip API将键和值组合起来创建一个关联列表。如果键的数量多于值的数量，那么这些多余的键将具有nil值。下面给出了几个示例：
+
+#+BEGIN_EXAMPLE
+(asoc-zip keys values) ;; Syntax
+
+(asoc-zip ‘(a b c) ‘(1 2 3))
+((a . 1) (b . 2) (c . 3))
+
+(asoc-zip ‘(a b c d e) ‘(1 2 3))
+((a . 1) (b . 2) (c . 3) (d) (e))
+#+END_EXAMPLE
+
+If you want to return an alist with the duplicate keys removed, you can use the asoc-uniq function. In the following example, only the first value for the key b is returned.
+翻译:如果你想要返回一个去除了重复键的alist，你可以使用asoc-uniq函数。在下面的例子中，只返回了键b的第一个值。
+
+#+BEGIN_EXAMPLE
+(asoc-uniq alist) ;; Syntax
+
+(asoc-uniq ‘((a 1) (b 2) (b 3) (c 4) (d 5)))
+((a 1) (b 2) (c 4) (d 5))
+#+END_EXAMPLE
+
+The asoc-merge function helps you to merge multiple alists. If the same keys are present in multiple lists, the key in the latter alist takes precedence. If identical keys are present in the same alist, then the first occurrence is given the preference. A few examples are shown below:
+翻译:asoc-merge 函数有助于合并多个关联列表（alist）。如果在多个列表中出现相同的键，则后者关联列表中的键优先。如果同一关联列表中存在相同的关键字，则第一个出现的位置具有优先权。下面展示了几个示例：
+
+```lisp
+(asoc-merge '(("a" . 1) ("b" . 2)) '(("c" . 3) ("d" . 4)))
+;; => (("a" . 1) ("b" . 2) ("c" . 3) ("d" . 4))
+
+(asoc-merge '(("a" . 1) ("b" . 2)) '(("b" . 3) ("c" . 4)))
+;; => (("a" . 1) ("b" . 3) ("c" . 4))
+
+(asoc-merge '(("a" . 1) ("b" . 2)) '(("a" . 3) ("c" . 4)))
+;; => (("a" . 3) ("b" . 2) ("c" . 4))
+```
+
+在上面的例子中，第一个示例显示了两个不同的关联列表被合并成一个单一的关联列表。第二个示例显示了一个关联列表中的键 "b" 覆盖了另一个关联列表中的键 "b"。第三个示例显示了一个关联列表中的键 "a" 覆盖了另一个关联列表中的键 "a"。
+
+#+BEGIN_EXAMPLE
+(asoc-merge alists) ;; Syntax
+
+(asoc-merge ‘((a 1) (b 2)) ‘((c 3) (d 4)))
+((c 3) (d 4) (a 1) (b 2))
+
+(asoc-merge ‘((a 1) (b 2)) ‘((b 3) (c 3)))
+((b 3) (c 3) (a 1))
+
+(asoc-merge ‘((a 1) (b 2) (a 3)) ‘((c 3) (d 4)))
+((c 3) (d 4) (a 1) (b 2))
+#+END_EXAMPLE
+
+You can use the asoc-sort-keys function to return a list with the elements sorted by the keys. For example:
+翻译:你可以使用`asoc-sort-keys`函数来根据键对元素进行排序并返回一个列表。例如：
+
+#+BEGIN_EXAMPLE
+(asoc-sort-keys alist) ;; Syntax
+
+(let ((alphabets ‘((b . 2) (a . 1) (e . 5) (d . 4) (c . 3))))
+(asoc-sort-keys alphabets))
+((a . 1) (b . 2) (c . 3) (d . 4) (e . 5))
+#+END_EXAMPLE
+
+*Filters*\
+翻译:过滤器
+The asoc-filter function takes a predicate function and an alist. It returns an alist with those elements that only satisfy the predicate function. In the following example, all elements whose values are less than three are returned.
+翻译:作为过滤器函数，asoc-filter接受一个谓词函数和一个关联列表（alist）。它返回一个新的关联列表，其中只包含那些满足谓词函数条件的元素。在下面的例子中，所有值小于3的元素的值都被返回了。
+
+#+BEGIN_EXAMPLE
+(asoc-filter predicate alist) ;; Syntax
+
+(let ((alphabets ‘((b . 2) (a . 1) (e . 5) (d . 4) (c . 3))))
+(asoc-filter (lambda (k v) (< v 3)) alphabets))
+((b . 2) (a . 1))
+#+END_EXAMPLE
+
+The anaphoric variant of the asoc-filter function is asoc--filter. It returns alist elements for which the form is true. An example written using asoc--filter is given below:
+翻译:关联过滤器函数的指代变体是asoc--filter。它返回形式为真的alist元素。下面给出一个使用asoc--filter编写的示例：
+
+#+BEGIN_EXAMPLE
+(asoc--filter form alist) ;; Syntax
+
+(asoc--filter (< value 3)
+`((b . 2) (a . 1) (e . 5) (d . 4) (c . 3)))
+((b . 2) (a . 1))
+#+END_EXAMPLE
+
+You can apply a predicate function to the keys using the asoc-filter-keys function. The alist elements whose keys satisfy the predicate function alone are returned. For example:
+翻译:
