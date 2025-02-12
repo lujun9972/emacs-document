@@ -10,71 +10,50 @@
 :CUSTOM_ID: automatic-gtags-integration-for-emacs-using-git
 :END:
 
-It's fairly common to see automatic ctags hooks setup for Vim, but until recently I haven't been able to get it working in Emacs. Here's how to do it.
-翻译:在Vim中设置自动ctags钩子是比较常见的，但直到最近，我还没有能够在Emacs中得到它的工作。下面是如何做到这一点的步骤。
+在Vim中设置自动ctags钩子是比较常见的，但直到最近，我才能够在Emacs中实现这一点。下面是如何做到这一点的步骤。
 
-First, create a directory to contain the git hooks to be added in all new repos.
 翻译:首先，创建一个目录来存放将要添加到所有新仓库中的git钩子。
 
-#+BEGIN_EXAMPLE
-git config --global init.templatedir '~/.git_template'
-mkdir -p ~/.git_template/hooks
-#+END_EXAMPLE
+#+begin_src shell
+  git config --global init.templatedir '~/.git_template'
+  mkdir -p ~/.git_template/hooks
+#+end_src
 
-Next, add the main script. Place this in =~/.git_template/hooks/gtags= and mark as executable:
-翻译:下一步，添加主脚本。将其放置在 `~/.git_template/hooks/` 目录下的 `gtags` 文件中，并标记为可执行：
+下一步，添加main脚本。将其放置在 =~/.git_template/hooks/gtags= 文件中，并标记为可执行：
 
-#+BEGIN_EXAMPLE
-#!/bin/sh
-set -o errexit -o nounset
+#+begin_src shell
+  #!/bin/sh
+  set -o errexit -o nounset
 
-PATH="/usr/local/bin:$PATH"
+  PATH="/usr/local/bin:$PATH"
 
-main() (
-root_dir="$(git rev-parse --show-toplevel)"
-git_dir="$(git rev-parse --git-dir)"
+  main() (
+  root_dir="$(git rev-parse --show-toplevel)"
+  git_dir="$(git rev-parse --git-dir)"
 
-cd "$root_dir"
-trap 'rm -f GPATH GRTAGS GTAGS gtags.files' EXIT
-git grep --cached --files-with-matches "" > gtags.files
-gtags --gtagslabel=pygments
-rm gtags.files
-mv GPATH GRTAGS GTAGS "$git_dir/"
+  cd "$root_dir"
+  trap 'rm -f GPATH GRTAGS GTAGS gtags.files' EXIT
+  git grep --cached --files-with-matches "" > gtags.files
+  gtags --gtagslabel=pygments
+  rm gtags.files
+  mv GPATH GRTAGS GTAGS "$git_dir/"
 
-echo "gtags index created at $git_dir/GTAGS"
-)
+  echo "gtags index created at $git_dir/GTAGS"
+  )
 
-main
-#+END_EXAMPLE
+  main
+#+end_src
 
-Note that the generated tags file is in placed in the =.git= directory, to avoid cluttering up the directory tree and having to add another entry in =.gitignore=. This is the key feature for me --- it makes it feel truly automatic and seamless.
-翻译:生成的标签文件放置在 =.git= 目录中，以避免扰乱目录树并在 =.gitignore= 中添加另一个条目。这是我最重要的特点---它让我感觉真正的一体化和无缝。
+请注意生成的标签文件汇放置在 =.git= 目录中，从而避免扰乱目录树并且无需在 =.gitignore= 中添加另一个条目。对我来说，这是最重要的特点---它让我感觉到真正的一体化和无缝连接。
 
-Next, add hooks that wrap this script. The first three are =post-commit=, =post-merge=, and =post-checkout= and should contain the following:
-翻译:接下来，为这个脚本添加钩子。前三个是 `post-commit`、`post-merge` 和 `post-checkout`，并且应该包含以下内容：
+接下来，添加包含该脚本的钩子。最重要的三个钩子是 =post-commit=、=post-merge= 和 =post-checkout= ，并且应该包含以下内容：
 
-```bash
-#!/bin/bash
+#+begin_src shell
+  #!/bin/sh
+  .git/hooks/gtags >/dev/null 2>&1 &
+#+end_src
 
-# post-commit hook
-git update-ref refs/heads/master $(cat .commit-id)
-
-# post-merge hook
-echo "Merge completed" > /dev/null
-
-# post-checkout hook
-echo "Checkout completed" > /dev/null
-```
-
-请注意，`.commit-id` 文件应包含你要设置的提交 ID。
-
-#+BEGIN_EXAMPLE
-#!/bin/sh
-.git/hooks/gtags >/dev/null 2>&1 &
-#+END_EXAMPLE
-
-Lastly, add one for =post-rewrite=:
-翻译:最后，为=post-rewrite:=添加一个。
+翻译:最后，为 =post-rewrite= 添加如下内容。
 
 #+BEGIN_EXAMPLE
 #!/bin/sh
@@ -83,48 +62,41 @@ rebase) exec .git/hooks/post-merge ;;
 esac
 #+END_EXAMPLE
 
-Once finished, use =git init= and =git gtags= in existing repositories to copy the hooks in and generate tags. New repositories will do this automatically.
-翻译:一旦完成，请在现有仓库中使用 =git init= 和 =git gtags= 命令来复制钩子并生成标签。新仓库将会自动执行此操作。
+一旦完成，请在现有仓库中使用 =git init= 和 =git gtags= 命令来复制钩子并生成标签。新仓库将会自动执行此操作。
 
-To get this working in Emacs depends on which gtags package you have installed. Unfortunately, =global= does not have an option to directly change where the tags file is read from, and neither do any of the gtags packages I've seen. However, it is possible to set two environment variables to attain this functionality instead, =GTAGSROOT= and =GTAGSDBPATH=.
-翻译:要让Emacs使用这个功能取决于您安装了哪个gtags包。不幸的是，=global=没有直接更改从哪里读取标签文件的功能选项，我所见过的任何gtags包都没有。然而，可以通过设置两个环境变量来实现这一功能，分别是=GTAGSROOT=和=GTAGSDBPATH=。
+Emacs能否使用改功能取决于您安装了哪个gtags包。不幸的是， =global= 包没有直接更改从哪里读取tag文件的功能选项，而且我所见过的任何gtags包都没有这个选项。好在，可以通过设置两个环境变量来实现这一功能，分别是 =GTAGSROOT= 和 =GTAGSDBPATH= 。
 
-#+BEGIN_EXAMPLE
-(defun gtags-env-patch (orig &rest args)
-(if-let* ((project-root (file-truename (locate-dominating-file "." ".git")))
-(git-dir (expand-file-name ".git" project-root))
-(process-environment (append
-(list (format "GTAGSROOT=%s" project-root)
-(format "GTAGSDBPATH=%s" git-dir))
-process-environment)))
-(apply orig args)
-(apply orig args)))
-#+END_EXAMPLE
+#+begin_src emacs-lisp
+  (defun gtags-env-patch (orig &rest args)
+    (if-let* ((project-root (file-truename (locate-dominating-file "." ".git")))
+              (git-dir (expand-file-name ".git" project-root))
+              (process-environment (append
+                                    (list (format "GTAGSROOT=%s" project-root)
+                                          (format "GTAGSDBPATH=%s" git-dir))
+                                    process-environment)))
+        (apply orig args)
+      (apply orig args)))
+#+end_src
 
-Then, you can wrap the appropriate functions using [[https://www.gnu.org/software/emacs/manual/html_node/elisp/Advising-Functions.html][=advice=]].
-翻译:然后，您可以使用[[https://www.gnu.org/software/emacs/manual/html_node/elisp/Advising-Functions.html][建议函数]]来包装适当的功能。
+然后，您可以使用[[https://www.gnu.org/software/emacs/manual/html_node/elisp/Advising-Functions.html][advice]] 来包装适当的函数
 
-For [[https://github.com/syohex/emacs-counsel-gtags][counsel-gtags]] (i.e., ivy completion):
-翻译:对于[[https://github.com/syohex/emacs-counsel-gtags][counsel-gtags]]（即ivy完成）：
+对于[[https://github.com/syohex/emacs-counsel-gtags][counsel-gtags]]（即ivy completion）：
 
-#+BEGIN_EXAMPLE
-(advice-add #'counsel-gtags-find-reference :around #'gtags-env-patch)
-(advice-add #'counsel-gtags-find-symbol :around #'gtags-env-patch)
-(advice-add #'counsel-gtags-find-definition :around #'gtags-env-patch)
-(advice-add #'counsel-gtags-dwim :around #'gtags-env-patch)
-#+END_EXAMPLE
+#+begin_src emacs-lisp
+  (advice-add #'counsel-gtags-find-reference :around #'gtags-env-patch)
+  (advice-add #'counsel-gtags-find-symbol :around #'gtags-env-patch)
+  (advice-add #'counsel-gtags-find-definition :around #'gtags-env-patch)
+  (advice-add #'counsel-gtags-dwim :around #'gtags-env-patch)
+#+end_src
 
-For [[https://github.com/syohex/emacs-helm-gtags][helm-gtags]]:
-翻译:对于[[https://github.com/syohex/emacs-helm-gtags][helm-gtags]]：
+对于[[https://github.com/syohex/emacs-helm-gtags][helm-gtags]]：
 
-#+BEGIN_EXAMPLE
-(advice-add #'helm-gtags-find-tag :around #gtags-env-patch)
-(advice-add #'helm-gtags-dwim :around #'gtags-env-patch)
-(advice-add #'helm-gtags-find-tag-other-window #'gtags-env-patch)
-#+END_EXAMPLE
+#+begin_src emacs-lisp
+  (advice-add #'helm-gtags-find-tag :around #gtags-env-patch)
+  (advice-add #'helm-gtags-dwim :around #'gtags-env-patch)
+  (advice-add #'helm-gtags-find-tag-other-window #'gtags-env-patch)
+#+end_src
 
-That's it. Now any new repositories will be automatically indexed whenever they are checked out, committed, or rebased, and the tags file will be found seamlessly without any user input.
-翻译:就是这样。现在，每当检出、提交或变基新的仓库时，它们将被自动索引，标签文件也将无缝地被找到，无需任何用户输入。
+就是这样。现在，每当新的仓库检出、提交或变基时，它们都会被自动索引，标签文件也将无缝地被找到，无需任何用户输入。
 
-A working example can be found [[https://github.com/msanders/setup/blob/master/symlinks/git/.git_template/hooks][here]] in my setup repo.
-翻译:一个工作示例可以在我的设置仓库中找到[[https://github.com/msanders/setup/blob/master/symlinks/git/.git_template/hooks][这里]]。
+一个工作示例可以在我的配置仓库的 [[https://github.com/msanders/setup/blob/master/symlinks/git/.git_template/hooks][这里]] 中找到
