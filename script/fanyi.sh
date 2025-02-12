@@ -1,7 +1,7 @@
 #!/usr/bin/bash
 
 set -o errexit
-content="请将我的非中文文字翻译成中文!注意翻译时保持源文本格式不变，另外不要做无畏的演绎！:$*"
+content="请将我的非中文文字翻译成中文!注意翻译时保持源文本格式不变，遇到不认识的单词那可能是专有词汇，保持源文不翻译。另外不要做无畏的演绎！:$*"
 # BASEURL="https://api.deepseek.com"
 # MODEL="deepseek-chat"
 # messages="[{\"role\": \"system\", \"content\": \"你是一个好用的翻译助手，请将我的非中文文字翻译成中文。\"},

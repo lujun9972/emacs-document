@@ -1,0 +1,424 @@
+#+TITLE: The Association List (alist) Emacs Lisp Library: An Overview
+#+URL: https://opensourceforu.com/2019/12/the-association-list-alist-emacs-lisp-library-an-overview/
+#+AUTHOR: lujun9972
+#+TAGS: raw
+#+DATE: [2020年 02月 10日 星期一 10:35:47 HKT]
+#+LANGUAGE:  zh-CN
+#+OPTIONS:  H:6 num:nil toc:t n:nil ::t |:t ^:nil -:nil f:t *:t <:nil
+
+Emacs Lisp的关联列表（Association List）库提供了全面的应用程序编程接口（API），用于处理关联列表。这个库是由Troy Pracy编写的，最新版本是0.6.1。本文为GNU Emacs系列文章的第八篇，探讨了创建、检索和更新关联列表的常规和变体函数。此外，还回顾了映射、筛选、折叠和循环关联列表的结构。
+
+这篇文章中展示的源代码可以在https://github.com/troyp/asoc.el 中找到，并且遵循GNU通用公共许可证v2发布。
+
+*安装*
+可以从 https://github.com/troyp/asoc.el 获取asoc.el 源文件，并将其添加到您的Emacs初始化配置文件中，以便在启动时加载。
+
+你可以使用以下emacs lisp代码片段来使用这个库：
+
+#+begin_src emacs-lisp
+  (require 'asoc)
+#+end_src
+
+*使用方法*
+我们将从asoc.el中可用的构造函数API开始，用于创建关联列表。
+
+*构造函数*
+~asoc-make~ 函数接受一组键并返回一个关联列表。如果您提供了一个默认值，则所有键都将初始化为这个值，如下所示：
+
+#+begin_src emacs-lisp
+  (asoc-make &optional keys default) ;; Syntax
+
+  (asoc-make '(a b c d e))
+  ((a) (b) (c) (d) (e))
+
+  (asoc-make '(a b c d e) '(0))
+  ((a 0) (b 0) (c 0) (d 0) (e 0))
+#+end_src
+
+asoc-copy函数返回一个通过参数传递给它的alist的浅拷贝。例如：
+
+#+begin_src emacs-lisp
+  (asoc-copy alist) ;; Syntax
+
+  (let ((foo (asoc-copy '((a 1) (b 2) (c 3) (d 4) (e 5)))))
+  foo)
+  ((a 1) (b 2) (c 3) (d 4) (e 5))
+#+end_src
+
+您可以使用asoc-zip API将键和值组合起来创建一个关联列表。如果键的数量多于值的数量，那么这些多余的键将具有nil值。下面给出了几个示例：
+
+#+begin_src emacs-lisp
+  (asoc-zip keys values) ;; Syntax
+
+  (asoc-zip '(a b c) '(1 2 3))
+  ((a . 1) (b . 2) (c . 3))
+
+  (asoc-zip '(a b c d e) '(1 2 3))
+  ((a . 1) (b . 2) (c . 3) (d) (e))
+#+end_src
+
+如果您想返回一个删除了重复键的alist，您可以使用asoc-uniq函数。在下面的示例中，只返回键b的第一个值。
+
+#+begin_src emacs-lisp
+  (asoc-uniq alist) ;; Syntax
+
+  (asoc-uniq '((a 1) (b 2) (b 3) (c 4) (d 5)))
+  ((a 1) (b 2) (c 4) (d 5))
+#+end_src
+
+~asoc-merge~  函数帮助您合并多个alist。如果多个列表中存在相同的键，则后者alist中的键更优先。如果在同一个alist中存在相同的键，则首选第一个键对应的值。下面展示了一些示例：
+
+#+begin_src emacs-lisp
+  (asoc-merge alists) ;; Syntax
+
+  (asoc-merge '((a 1) (b 2)) '((c 3) (d 4)))
+  ((c 3) (d 4) (a 1) (b 2))
+
+  (asoc-merge '((a 1) (b 2)) '((b 3) (c 3)))
+  ((b 3) (c 3) (a 1))
+
+  (asoc-merge '((a 1) (b 2) (a 3)) '((c 3) (d 4)))
+  ((c 3) (d 4) (a 1) (b 2))
+#+end_src
+
+你可以使用 ~asoc-sort-keys~ 函数来返回一个按照键排序的元素列表。例如：
+
+#+begin_src emacs-lisp
+  (asoc-sort-keys alist) ;; Syntax
+
+  (let ((alphabets '((b . 2) (a . 1) (e . 5) (d . 4) (c . 3))))
+  (asoc-sort-keys alphabets))
+  ((a . 1) (b . 2) (c . 3) (d . 4) (e . 5))
+#+end_src
+
+*过滤器*
+~asoc-filter~ 函数接受一个谓词函数和一个关联列表（alist）。它返回一个新的关联列表，其中只包含那些满足谓词函数条件的元素。在下面的例子中，所有值小于3的元素的值都被返回了。
+
+#+begin_src emacs-lisp
+(asoc-filter predicate alist) ;; Syntax
+
+(let ((alphabets '((b . 2) (a . 1) (e . 5) (d . 4) (c . 3))))
+(asoc-filter (lambda (k v) (< v 3)) alphabets))
+((b . 2) (a . 1))
+#+end_src
+
+~asoc-filter~ 函数的变体是 ~asoc--filter~ 函数。它返回使 form 结果为 true 的关联列表元素。下面是一个使用 ~asoc--filter~ 的例子：
+#+begin_src emacs-lisp
+(asoc--filter form alist) ;; Syntax
+
+(asoc--filter (< value 3)
+'((b . 2) (a . 1) (e . 5) (d . 4) (c . 3)))
+((b . 2) (a . 1))
+#+end_src
+
+您可以使用 ~asoc-filter-keys~ 函数来通过谓词函数对键进行筛选。仅其键满足谓词函数的alist元素将被返回。例如：
+
+#+begin_src emacs-lisp
+(asoc-filter-keys predicate alist) ;; Syntax
+
+(let ((alphabets '((b . 2) (a . 1) (e . 5) (d . 4) (c . 3))))
+(asoc-filter-keys (lambda (k) (eq k 'a)) alphabets))
+((a . 1))
+#+end_src
+
+另一方面， ~asoc-filter-values~ 函数将对alist元素的值应用谓词函数。在下面的示例中，只有值大于3的alist元素被返回。
+
+#+begin_src emacs-lisp
+(asoc-filter-values predicate alist) ;; Syntax
+
+(let ((alphabets '((b . 2) (a . 1) (e . 5) (d . 4) (c . 3))))
+(asoc-filter-values (lambda (v) (> v 3)) alphabets))
+((e . 5) (d . 4))
+#+end_src
+
+~asoc-remove~ 函数移除满足谓词函数条件的元素，并返回其余alist元素。例如：
+
+#+begin_src emacs-lisp
+(asoc-remove predicate alist) ;; Syntax
+
+(let ((alphabets '((b . 2) (a . 1) (e . 5) (d . 4) (c . 3))))
+(asoc-remove (lambda (k v) (< v 3)) alphabets))
+((e . 5) (d . 4) (c . 3))
+#+end_src
+
+类似于asoc-filter-keys和asoc-filter-values函数，您还有执行相反操作的asoc-remove-keys和asoc-remove-values函数。下面给出了这些函数的语法和使用示例：
+
+#+begin_src emacs-lisp
+(asoc-remove-keys predicate alist) ;; Syntax
+(asoc-remove-values predicate alist) ;; Syntax
+
+(let ((alphabets '((b . 2) (a . 1) (e . 5) (d . 4) (c . 3))))
+(asoc-remove-keys (lambda (k) (eq k 'b)) alphabets))
+((a . 1) (e . 5) (d . 4) (c . 3))
+
+(let ((alphabets '((b . 2) (a . 1) (e . 5) (d . 4) (c . 3))))
+(asoc-remove-values (lambda (v) (> v 3)) alphabets))
+((b . 2) (a . 1) (c . 3))
+#+end_src
+
+~asoc-partition~ 函数可以接受一个扁平化包含键和值的关联列表作为参数，并返回一个新的alist。例如：
+
+#+begin_src emacs-lisp
+(asoc-partition flatlist) ;; Syntax
+(asoc-partition '(a 1 b 2 c 3 d 4 e 5 f 6))
+((a . 1) (b . 2) (c . 3) (d . 4) (e . 5) (f . 6))
+#+end_src
+
+*谓词函数*
+~asoc-contains-key~ 函数接受两个参数——一个关联列表（alist）和一个键（key）——并返回一个布尔值。如果键在关联列表中存在，则返回 'True'；否则返回 'nil'。下面展示了一些示例：
+
+#+begin_src emacs-lisp
+(asoc-contains-key? alist key) ;; Syntax
+
+(asoc-contains-key? '((a 1) (b 2) (c 3)) 'a)
+t
+(asoc-contains-key? '((a 1) (b 2) (c 3)) 'd)
+nil
+#+end_src
+
+你可以使用 ~asoc-contains-pair?~ 函数来确认给定的alist中是否存在键值对。如果键值对存在，它返回True；否则返回nil。例如：
+
+#+begin_src emacs-lisp
+(asoc-contains-pair? alist key value) ;; Syntax
+
+(asoc-contains-pair? '((a . 1) (b . 2) (c . 3)) 'a 1)
+t
+(asoc-contains-pair? '((a . 1) (b . 2) (c . 3)) 'a 2)
+nil
+#+end_src
+
+*访问函数*
+
+~asos-get~ 函数从alist中检索一个键。如果找不到键，则返回nil。下面显示了一些示例：
+
+#+begin_src emacs-lisp
+(asoc-get alist key) ;; Syntax
+
+(asoc-get '((b . 2) (a . 1) (e . 5) (d . 4) (c . 3)) 'a)
+1
+(asoc-get '((b . 2) (a . 1) (e . 5) (d . 4) (c . 3)) 'f)
+nil
+#+end_src
+
+如果你想排除一个列表中的所有键并返回一个alist，你可以使用 ~asoc-dissoc~ 函数。例如：
+
+#+begin_src emacs-lisp
+(asoc-dissoc alist keys) ;; Syntax
+
+(asoc-dissoc '((b . 2) (a . 1) (e . 5) (d . 4) (c . 3)) 'a 'b)
+((e . 5) (d . 4) (c . 3))
+#+end_src
+
+您可以使用asoc-put!函数给现有的列表添加一个键值对，该函数接受一个alist（关联列表）、一个键和一个值作为参数。如果键已经存在且replace为true，则替换旧的条目。如果replace是nil，则新的条目将被添加到alist的前面。下面给出了一些示例：
+
+#+begin_src emacs-lisp
+(asoc-put! alist key value &optional replace) ;; Syntax
+
+(let ((alphabets (list (cons 'a 1) (cons 'b 2))))
+(asoc-put! alphabets 'c 3)
+alphabets)
+((c . 3) (a . 1) (b . 2))
+
+(let ((alphabets (list (cons 'a 1) (cons 'b 2))))
+(asoc-put! alphabets 'b 3 nil)
+alphabets)
+((b . 3) (a . 1) (b . 2))
+
+(let ((alphabets (list (cons 'a 1) (cons 'b 2))))
+(asoc-put! alphabets 'b 3 t)
+alphabets)
+((b . 3) (a . 1))
+#+end_src
+
+~asoc-pop!~ 函数从一个alist中移除一个键，并返回如下结果：
+
+#+begin_src emacs-lisp
+(asoc-pop! alist key) ;; Syntax
+
+(let ((alphabets (list (cons 'a 1) (cons 'b 2))))
+(asoc-pop! alphabets 'b))
+(b . 2)
+#+end_src
+
+asoc-find API返回给定alist中满足谓词函数的第一个元素。例如：
+
+#+begin_src emacs-lisp
+(asoc-find predicate alist) ;; Syntax
+(asoc-find (lambda (k v) (< v 3)) '((b . 2) (a . 1) (e . 5) (d . 4) (c . 3)))
+(b . 2)
+#+end_src
+
+The anaphoric variant of the asoc-find function is the asoc--find function, which is demonstrated below:
+翻译:asoc-find 函数的变体是 ~asoc--fin~d 函数，下面是其演示：
+
+#+begin_src emacs-lisp
+(asoc--find form alist) ;; Syntax
+
+(asoc--find (lambda (k v) (< v 3)) '((b . 2) (a . 1) (e . 5) (d . 4) (c . 3)))
+(b . 2)
+#+end_src
+
+~asoc-find-key~ 函数接受两个参数——一个键和一个关联列表（alist）。它返回第一个与键匹配的alist元素，否则返回nil。例如：
+
+#+begin_src emacs-lisp
+(asoc-find-key key alist) ;; Syntax
+
+(asoc-find-key 'c '((b . 2) (a . 1) (e . 5) (d . 4) (c . 3)))
+(c . 3)
+(asoc-find-key 'f '((b . 2) (a . 1) (e . 5) (d . 4) (c . 3)))
+nil
+#+end_src
+
+If you want the list of unique keys in an alist, you can use the asoc-keys function as illustrated below:
+翻译:如果你想获取alist中唯一键的列表，你可以使用asoc-keys函数，示例如下：
+
+#+begin_src emacs-lisp
+(asoc-keys alist) ;; Syntax
+
+(asoc-keys '((b . 2) (a . 1) (e . 5) (d . 4) (c . 3)))
+(b a e d c)
+(asoc-keys '((b . 2) (a . 1) (e . 5) (d . 4) (c . 3) (a . 2) (b . 6)))
+(b a e d c)
+#+end_src
+
+另一方面，如果您想获取alist中唯一值的列表，可以使用asoc-values函数。下面展示了一些示例：
+
+#+begin_src emacs-lisp
+(asoc-values alist) ;; Syntax
+
+(asoc-values '((b . 2) (a . 1) (e . 5) (d . 4) (c . 3)))
+(2 1 5 4 3)
+(asoc-values '((b . 2) (a . 1) (e . 5) (d . 4) (c . 3) (a . 2) (b . 6)))
+(2 1 5 4 3 6)
+#+end_src
+
+asoc-unzip 函数执行与 asoc-zip 相反的操作。它返回一个关联列表中的所有键和值。以下提供了一个示例：
+
+#+begin_src emacs-lisp
+  (asoc-unzip '(("a" . 1) ("b" . 2)))
+  ;; => (("a" "b") (1 2))
+#+end_src
+
+#+begin_src emacs-lisp
+(asoc-unzip alist) ;; Syntax
+
+(asoc-unzip '((a . 1) (b . 2) (c . 3)))
+((a b c) (1 2 3))
+#+end_src
+
+*循环*
+以下部分讨论了与asoc.el相关的几个循环结构。您可以使用asoc-do对alist中的每个键值遍历执行一段代码。在下面的示例中，计算所有值的总和并将其作为结果返回。
+
+#+begin_src emacs-lisp
+(asoc-do ((key value) alist [result] body ...)) ;; Syntax
+
+(let ((sum 0)
+(alphabets '((b . 2) (a . 1) (e . 5) (d . 4) (c . 3))))
+(asoc-do ((key value) alphabets sum)
+(when (symbolp key)
+(setf sum (+ sum value))))
+sum)
+15
+#+end_src
+
+The anaphoric variant of the asoc-do function is the asoc--do construct and is illustrated below:
+翻译:asoc-do的变体函数是 asoc--do，例子如下所示：
+
+#+begin_src emacs-lisp
+(asoc--do (alist &rest body)) ;; Syntax
+
+(let ((alphabets '((b . 2) (a . 1) (e . 5) (d . 4) (c . 3))))
+(asoc--do alphabets
+
+(when (symbolp key)
+(setf result (+ (or result 0) value)))))
+15
+#+end_src
+
+*映射函数*
+asoc-map函数接受两个参数---一个函数和一个alist。它将此函数应用于alist中的每一个元素。在下面的示例中，检查alist中每个元素的键是否为符号，然后返回其值。
+
+#+begin_src emacs-lisp
+(asoc-map function alist) ;; Syntax
+
+(asoc-map (lambda (k v) (when (symbolp k) v))
+'((b . 2) (a . 1) (e . 5) (d . 4) (c . 3)))
+(2 1 5 4 3)
+#+end_src
+
+asoc-map函数的变体是asoc--map函数，以下通过一个示例进行演示：
+
+#+begin_src emacs-lisp
+(asoc--map form alist) ;; Syntax
+
+(asoc--map (format "%s=%d;" key value)
+'((b . 2) (a . 1) (e . 5) (d . 4) (c . 3)))
+("b=2;" "a=1;" "e=5;" "d=4;" "c=3;")
+#+end_src
+
+您可以使用asoc-map-keys函数对给定alist中的键进行转换。在下面的例子中，键被转换为字符串：
+
+#+begin_src emacs-lisp
+(asoc-map-keys function alist) ;; Syntax
+
+(asoc-map-keys #'symbol-name '((b . 2) (a . 1) (e . 5) (d . 4) (c . 3)))
+(("b" . 2) ("a" . 1) ("e" . 5) ("d" . 4) ("c" . 3))
+#+end_src
+
+如果您想对值进行转换，您可以使用如下所示的'asoc-map-values'函数：
+
+#+begin_src emacs-lisp
+(asoc-map-values function alist) ;; Syntax
+
+(let ((alphabets '((b . 2) (a . 1) (e . 5) (d . 4) (c . 3))))
+(asoc-map-values #'list alphabets))
+((b 2) (a 1) (e 5) (d 4) (c 3))
+#+end_src
+
+*折叠*
+翻译:折叠操作是对关联列表的一种缩减。 ~asoc-fold~ 函数接受三个参数——一个缩减函数、一个关联列表和一个初始值（累加器）。在下面的例子中，值被添加到累加器中，并返回值的总和。
+
+#+begin_src emacs-lisp
+(asoc-fold function alist init) ;; Syntax
+
+(let ((alphabets '((b . 2) (a . 1) (e . 5) (d . 4) (c . 3))))
+(asoc-fold (lambda (k v acc) (+ v acc))
+alphabets 0))
+15
+#+end_src
+
+The anaphoric variant of the asoc-fold function is the asoc--fold function. Its syntax and usage are demonstrated with the following example:
+翻译:关联折叠函数的指代变体是关联--折叠函数。以下示例演示了其语法和用法：
+
+#+begin_src emacs-lisp
+(asoc--fold form alist init) ;; Syntax
+
+(let ((alphabets '((b . 2) (a . 1) (e . 5) (d . 4) (c . 3))))
+(asoc--fold (+ value acc) alphabets 0))
+15
+#+end_src
+
+你可以使用'asoc-merge-values’函数合并多个alist。例如：
+
+#+begin_src emacs-lisp
+(asoc-merge-values alists) ;; Syntax
+
+(let ( (vowels '((a . 1) (e . 5) (i . 9)))
+(consonants '((b . 2) (c . 3) (d . 4))))
+(asoc-merge-values vowels consonants))
+((a 1) (e 5) (i 9) (b 2) (c 3) (d 4))
+#+end_src
+
+如果你有重复的键，那么你可以使用'asoc-merge-values-no-dups'函数，它会将每个键的多个唯一值合并到一个alist中。下面给出了一个示例：
+
+#+begin_src emacs-lisp
+(asoc-merge-values-no-dups alists) ;; Syntax
+
+(let ( (vowels '((a . 1) (e . 5) (i . 9) (a . 1)))
+
+(consonants '((b . 2) (c . 3) (d . 4) (d . 4))))
+(asoc-merge-values-no-dups vowels consonants))
+((a 1) (e 5) (i 9) (b 2) (c 3) (d 4))
+#+end_src
+
+请探索位于https://github.com/troyp/asoc.el 的README以了解更多关于上述关联列表函数及其用法的信息。
