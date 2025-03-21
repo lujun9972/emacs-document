@@ -1,92 +1,92 @@
-#+TITLE: Emacs-Lisp-coding-thoughts
-#+URL: http://www.nongnu.org/emacs-tiny-tools/elisp-coding/index-body.html
-#+AUTHOR: lujun9972
-#+CATEGORY: raw
-#+DATE: [2016-07-16 六 12:34]
-#+OPTIONS: ^:{}
---------------------------------------------------------------------------------------------------------------
+#+title: Emacs-Lisp-coding-thoughts
+#+url: http://www.nongnu.org/emacs-tiny-tools/elisp-coding/index-body.html
+#+author: lujun9972
+#+category: raw
+#+date: [2016-07-16 六 12:34]
+#+options: ^:{}
+-----
 
-* 1.0 Document id
+* 1.0 文档编号
 
-Copyright © 1995-2007 Jari Aalto
+© 1995-2007 贾里·阿尔托
 
-License: This material may be distributed only subject to the terms and conditions set forth in GNU General Public License v2 or later; or, at your option, distributed under the terms of GNU Free Documentation License version 1.2 or later (GNU FDL).
+许可证： 本材料仅能按照GNU通用公共许可证第二版或更高版本的条款和条件分发；或者，您可选择按照GNU自由文档许可证1.2或更高版本（GNU FDL）的条款分发。
 
-This document contains Unix Emacs Lisp programming information. It addresses the coding style of Emacs lisp and also presents notes about Emacs lisp byte compiler. Emacs Lisp code profiling is also examined and some profiling result presented.
+本文档包含Unix Emacs Lisp编程信息。它讨论了Emacs Lisp的编码风格，并提供了有关Emacs Lisp字节编译器的详细说明。还探讨了Emacs Lisp代码的性能分析，并展示了一些性能分析结果。
 
-** 1.1 What this document is not
+** 1.1 本文档未涵盖的内容
 
-This document won't introduce you to lisp, you must have basic knowledge about lisp programming beforehand: functions, local, global variables and various forms used in lisp. Mainly, this contains no ready solutions, functions, that you could use. There may be case studies though.
+本文档不会对Lisp进行介绍，你需事先具备Lisp编程的基础知识：函数、局部变量、全局变量，以及Lisp中使用的各种语法形式。主要内容不提供现成的解决方案或函数。然而，可能会包含一些案例分析。
 
-** 1.2 What is this document?
+** 1.2 本文档是什么？
 
-This document contains some guidelines that were found handy. There have also appeared also very good articles in the Usenet Emacs newsgroups and many good articles may have passed by, but hope you find those included interesting. It is recommended that you first read some elementary lisp reference before reading this paper.
+本文档包含一些实用的指南。Usenet Emacs新闻组中也有一些非常优秀的文章，可能还有许多好文章已经错过了，但希望您会对其中包含的内容感兴趣。建议您在阅读本文前先参考一些Lisp基础资料，相信这些内容会对您有所帮助。
 
-Read this document as recommendations, not as strict rules. Adapt ideas that seem reasonable to you, and discard the others you feel, don't serve your needs.
+请把这份文件当作建议，而不是硬性规定。采纳你认为合理的想法，并舍弃那些你觉得对你无用的部分。
 
-The Elp (lisp profiling tool) results in the page are mainly for curious reader, when he needs some reference how to write tight loops, time critical functions. But normally there is not much need for optimization in Emacs: you run into performance problems very rarely. Be very skeptical when reading the results and do not put your blind trust on them.
+页面中的Elp（Lisp性能分析工具）结果主要为好奇的读者提供参考，当他们需要了解如何编写高效循环或对时间要求严格的函数时。但通常情况下，Emacs并不需要太多优化：性能问题很少出现。阅读结果时务必保持怀疑，切勿盲目信赖。
 
-Used Abbreviations
+所用缩写
 
-[jari] Jari Aalto
-[kai] Kai Grossjohann
-[vladimir] Vladimir Alexiev
---------------------------------------------------------------------------------------------------------------
+[jari] 雅里·阿尔托  
+[kai] 凯·格罗斯约翰  
+[vladimir] 弗拉基米尔·阿列克谢夫
+-----
 
-* 2.0 The basic coding suggestions
+* 2.0 基本编码建议
 
-** 2.1 Major rule1 – comment as much as possible
+** 2.1 主要规则1 – 尽量多注释
 
-Someone else reading your code will appreciate any extra explanation that you may have written. Someday the code may also be maintained by someone else than you, so bear in mind that the would-be-maintainer can take over your code, when you no longer are around.
+别人在阅读你的代码时，会感激你可能提供的任何额外解释。未来，代码可能会由他人维护，因此，务必记住，当你不再负责时，潜在维护者将能够接手你的代码。
 
-** 2.2 Major rule2 – maintenance comes first
+** 2.2 主要规则2——维护优先
 
-Maintenance and readability comes first, never write tight code. Functions are easier to read if they are "airy" instead. Your code doesn't run any faster, no matter how much you shrink it. Some people like to delete all white spaces from their functions so that the code lines are stuck together; but that is not necessarily the best practice.
+维护性和可读性优先，永远不要编写密集的代码。函数如果结构“宽松”一些，会更容易阅读。无论你如何压缩代码，运行速度都不会提升。有些人喜欢删除函数中的所有空白字符，使代码行紧贴在一起；但这未必是最佳实践。
 
-Organize parts that belong together, into groups and add dashes or anything to make it visible that something important is happening (function or condition)
+将相关联的部分组织成组，并添加破折号或其他标记符号，以便明确标识重要内容（如功能或条件）。
 
-** 2.3 Major rule3 – don't spare variables
+** 2.3 主要规则三 — 不要吝惜变量
 
-Don't be afraid of using many variables. Especially in functions, that need local variables. A variable can "self document" the code if named properly. Use XEmacs byte compiler to check is you have defined variables that you haven't actually used, so that the byte compilation results are clean. (Note: The XEmacs byte compiler can better catch programming errors than Emacs byte compiler.)
+不要害怕使用多个变量。尤其是在需要局部变量的函数中。如果命名得当，变量可以“自我说明”代码。使用XEmacs字节编译器来检查是否定义了未实际使用的变量，以确保字节编译结果无错误或无警告。（注意：XEmacs字节编译器在捕捉编程错误方面优于Emacs字节编译器。）
 
-In most cases the possible minor performance penalty of using many variables doesn't matter. See the profiling results later in this document.
+在大多数情况下，使用多个变量可能带来的轻微性能损失并不重要。请参考本文档后文的性能分析结果（即性能测试数据）。
 
-** 2.4 Major rule4 – document your functions and variables well
+** 2.4 主要规则四：详细且清晰地文档化函数和变量
 
-Document your variables and functions well. If functions sets globals, say it in the docs (use "References:" tag). Every function and variable should have DOC-STRING, because when you do describe-symbols, it'll print out the SYMBOL and DOC-STRING. And one can even search through the doc strings with super-apropos Don't forget that the first line of the doc string should be a complete sentence.
+请为你的变量和函数编写详细的文档。如果函数设置了全局变量，请在文档中说明（使用“References:”标签）。每个函数和变量都应该有文档字符串（DOC-STRING），因为当你使用describe-symbols时，它会打印出符号（SYMBOL）和文档字符串（DOC-STRING）。你甚至可以使用super-apropos来搜索这些文档字符串。别忘了，文档字符串的第一行应该是一个完整的句子。
 
-Don't you feel frustrated too if staring at this?
+盯着这个你不也觉得沮丧吗？
 
 #+begin_src emacs-lisp
   (defconst foo-list-storage nil)
 #+end_src
 
-Now you have to skim the code to understand how and where the variable is used. The original Emacs recommendation has been that you do need to document package private variables, like the one above. However this recommendation is old and dates back to 18.xx days where the doc-strings memory space was a limited resource. In new Emacs releases there is dynamic byte compilation option which reduces the docstring memory consumption. There is no need to "hand optimise" the doc-strings away.
+现在你需要浏览代码，了解变量的使用方式和位置。Emacs最初的建议是你确实需要记录包内私有变量，如上所述。然而，这一建议已经过时，可以追溯到18.xx版本时期，当时文档字符串的内存空间非常有限。在新的Emacs版本中，有动态字节编译功能，能够减少文档字符串的内存消耗。无需“手动优化”文档字符串。
 
-** 2.5 Major rule5 – don't use tricks
+** 2.5 第五条主要规则：不要耍手段
 
-Think about new comers when you program, who know nothing about lisp. Try to code clearly. Avoid tricks, which is not very frienly for readers of your code. At least document well why the code at that point looks so complex.
+编程时应考虑到新手，他们对Lisp一无所知。尽量编写清晰易懂的代码。避免使用晦涩的技巧，这对代码的可读性不利。至少要详细说明代码为何在此处显得复杂。
 
-** 2.6 Major rule6 – use byte compiler to check leaks
+** 2.6 规则6：使用字节码编译器检查内存泄露
 
-Check your code for variable leaks in fresh emacs "emacs -q" by running M-x byte-compile-file XXX.el. If possible use XEmacs's for checking because it reports warnings better.
+在全新的 Emacs（使用 'emacs -q' 启动）中，通过运行 `M-x byte-compile-file XXX.el` 来检查代码是否存在变量泄露问题。如果可能，建议使用 XEmacs 进行检查，因为它在警告报告方面表现更为详尽。
 
-** 2.7 Use the error function.
+** 2.7 使用误差函数。
 
-Use error command if you cannot continue, or if you think that some other program may depend on your code, it is best that the other program cannot continue. Don't try unnecerrarily handle erorr conditions - it won't work in general with Emacs Lisp, like if you have got used to Java's or C++'s throw staements.
+如果您无法继续，或者认为其他程序可能依赖于您的代码，最好使用错误命令，确保其他程序也无法继续。不要试图不必要地处理错误条件——这在Emacs Lisp中通常行不通，就像您习惯了Java或C++中的throw语句一样。
 
-** 2.8 Make function as general as possible
+** 2.8 尽可能使函数通用化
 
-But not so general that it can eat apples and cars. It's "good", when the function doesn't get excessive long: still long cond statements are ok. Sometimes you just can't split the task into smaller parts or it makes no sense to split the function, oh well...use your best judgement.
+但不要过于笼统，以至于它既适用于苹果也适用于汽车。当函数不会变得过长时，它就是“好的”：即使条件判断语句较长，也是可以接受的。有时任务无法拆分，或拆分函数毫无意义，好吧……那就凭你的直觉判断吧。
 
-Still, a long function raises always thoughts about bad coding. Usually there may be reusable parts, which can be separated, but then, perhaps no. Just make sure you are convinced you need that long function, and that's it.
---------------------------------------------------------------------------------------------------------------
+尽管如此，一个很长的函数总是会让人想到不良的编码实践。通常可能会有一些可重用的部分，可以将其分离出来，但也许并非如此。只要确信你需要那个很长的函数，就这样吧。
+-----
 
-* 3.0 Coding style issues
+* 3.0 编码风格问题
 
-** 3.1 Function's variable definitions
+** 3.1 函数的变量声明
 
-Unclear code:
+难以理解的代码
 
 #+begin_src emacs-lisp
   (defun xx (arg1 arg2 &optional arg3 )
@@ -94,7 +94,7 @@ Unclear code:
      ...
 #+end_src
 
-Maybe better written as:
+也许可以写成：
 
 #+begin_src emacs-lisp
   (defun xx (arg1 arg2 &optional arg3 )
@@ -105,16 +105,16 @@ Maybe better written as:
     ...
 #+end_src
 
-Tip: To "line up" variables nicely in the let statement use some package that can do it, like tinytab.el, which is tab minor mode.
+提示：要在编程中的 `let` 语句中整齐对齐变量，可以使用一些具备此功能的包，比如 `tinytab.el`（一个用于对齐代码的工具），这是一个 tab 辅助模式。
 
-  * Put initialisations first, then variables that do not need initialisations. Here foo and bar are defined before baz-flag and point
-  * Put each one in separate lines and comment their usages when needed.
-  * Try to choose descriptive names for variables. Help reader and choose "buffer" instead of "b" or "buf".
-  * Long names are almost always better.
+- 先将初始化部分放在前面，然后是不需要初始化的变量。这里，foo 和 bar（示例变量）在 baz-flag 和 point 之前定义。
+- 将每个项目放在单独的行中，并在需要时对其用法进行详细注释。
+- 建议为变量选择描述性的名称，例如在编程中使用“buffer”而非“b”或“buf”，以便帮助读者更好地理解代码的含义。
+- 使用长名称几乎总是更好。
 
-** 3.2 Let with initialised empty values
+** 3.2 使用空值初始化的变量
 
-Let's start with example code:
+让我们从示例代码开始：
 
 #+begin_src emacs-lisp
   (let* ((foo '())    ;; A list
@@ -122,272 +122,271 @@ Let's start with example code:
          test)        ;; A scratch variable.
 #+end_src
 
-This effectively causes foo, bar, test to be nil. Don't give the extra stuff fool you. The programmers intention was to clarify, that the foo is a list and by initialising it with () would signify a list context... and so on..
+这实际上会使 foo、bar、test 变为 nil。不要让多余的东西迷惑你。程序员的意图是澄清 foo 是一个列表，并通过用 () 初始化它来表示列表上下文……诸如此类。
 
-But it can be done it more cleanly. The more symbols there are in the view, the less easily can human eye focus to important things. Let's try this instead:
-
-#+begin_src emacs-lisp
-      (let* (foo-list     ;; A list
-             bar-flag     ;; A truth value
-             test)        ;; A scratch variable.
-#+end_src
-In this case, the variable names itself tell where they are used, and the missing symbols greatly improve the layout. You know, that variable is nil by default, so there is no point of assigning an empty list. Less is more, in most cases. In addition, when you use these variables inside function body, it's clear all the time what that stand for because the names tell them.
-
-** 3.3 There are alternatives to `progn'
-
-progn indents code right very fast and that makes writer to code in a tight space. All code examples below give exactly the same results.
+但可以更简洁地完成。视图中符号越多，人眼就越难聚焦于重要的事物。不如试试这样：
 
 #+begin_src emacs-lisp
-      (if variable                    ;test here
-          (progn
-             ...it was non-nil , do something))
-
+  (let* (foo-list     ;; A list
+         bar-flag     ;; A truth value
+         test)        ;; A scratch variable.
 #+end_src
-Sometimes 'cond' statement can be used similarly. It has an implicit progn form:
+在这种情况下，变量名本身就表明了它们的用途，而省略的符号极大地改善了布局。你知道，该变量默认情况下为nil，因此无需分配一个空列表。大多数情况下，少即是多。此外，当你在函数体内使用这些变量时，由于变量名的提示，它们的含义始终清晰明了。
+
+** 3.3 存在替代 `progn` 的方案
+
+progn 能够非常快速地将代码向右缩进，这使得程序员在有限的空间内编写代码。以下所有代码示例都会产生完全相同的结果。
 
 #+begin_src emacs-lisp
-      (cond
-       (variable                      ;test here
-        ...code..
-        ...code..))
+  (if variable                    ;test here
+      (progn
+         ...it was non-nil , do something))
 #+end_src
-And there is also and command, but it requires that all the statements you want to execute return non-nil.  This may not be exactly usable every time.
+有时'cond'语句也可以以类似的方式使用。它隐含了progn形式（一种隐含的代码块形式）。
 
 #+begin_src emacs-lisp
-      (and variable
-           ..code..
-           ..code..)
+  (cond
+   (variable                      ;test here
+    ...code..
+    ...code..))
 #+end_src
-Common lisp library, cl.el offers doing the same more cleanly. This is even more nicer. Prefer this one:
+还有一个 `and` 命令，但它要求所有你想执行的语句都必须返回非 `nil` 值。这可能在某些情况下并不适用。
 
 #+begin_src emacs-lisp
-      (eval-when-compile (require 'cl))
-
-      (when variable
-        ...code..
-        ...code..)
+  (and variable
+       ..code..
+       ..code..)
 #+end_src
-[vladimir] ...There are other even worse cases. The worst I can think of is mapcar with an inlined function:
+Common Lisp 库 cl.el 提供了更为简洁的实现方式。这种方式确实更加简洁优雅。建议优先使用这个：
 
 #+begin_src emacs-lisp
-      (mapcar (function (lambda (e)
-                          (do stuff)))
-            '(1 2 3))
+  (eval-when-compile (require 'cl))
+
+  (when variable
+    ...code..
+    ...code..)
 #+end_src
-This leaves too few columns for (do stuff). Especially if it contains another mapcar. This is much better:
+[vladimir] ...还有更糟糕的情况。我能想到最糟糕的是带有内联函数的mapcar。
 
 #+begin_src emacs-lisp
-      (mapcar
-       (function
-        (lambda (e)
-          (do stuff)))
-       '(1 2 3))
+  (mapcar (function (lambda (e)
+                      (do stuff)))
+        '(1 2 3))
 #+end_src
---------------------------------------------------------------------------------------------------------------
+这导致可用于（执行操作）的列太少。特别是如果它包含另一个mapcar（一种Lisp函数）。这种方式更为理想：
 
-* 4.0 Using global variables
+#+begin_src emacs-lisp
+  (mapcar
+   (function
+    (lambda (e)
+      (do stuff)))
+   '(1 2 3))
+#+end_src
+-----
 
-** 4.1 Thoughts on globals
+* 4.0 使用全局变量
 
-Because you will be using globals a lot in Emacs lisp packages, couple of words may be in place You probably are shocked by the fact that lisp programs use globals (actually prefixed or namespace globals) all the time, when you have learned that using globals is totally wrong and should be avoided at any costs.
+** 4.1 全局变量思考
 
-The class variables behave quite alike to global variables especially if the class derivation chain is long.  Hm, to be strict, the scope of the variable just gets larger.
+由于在Emacs Lisp包中会频繁使用全局变量，因此可能需要解释几句。你可能会对Lisp程序总是使用全局变量（实际上是带前缀或命名空间全局变量）感到震惊，尤其是当你已经知道使用全局变量是完全错误的，应该不惜一切代价避免时。
+
+类变量的行为与全局变量非常相似，尤其是在类的继承链较长时。严格来说，变量的作用范围仅仅是扩大了。
 
 #+begin_example
   BASE        -->C1 -->C2 -->C3
   public var1               sees BASE's var1
 #+end_example
-                  derived classes
+派生类
 
-var1 is not real global, because it ceases to exist if the class is deleted. But, When you see code like this, where variable is "seen" outside of function, the instincts say that we should treat var1 like global. It's temptating to think that local is something that is inside function or function block, and variables outside of a function, while they may be actually packaged within class, are all "globals". Admittedly this is not very accurate distinction, but a practical point of view. In Emacs lisp, the variable scope is whole package and the variables are true globals because any other packages can see them too.
+var1 不是真正的全局变量，因为如果类被删除，它就不复存在了。但是，当你看到这样的代码时，变量在函数外部“可见”，直觉上，我们会将 var1 视为全局变量。人们很容易认为局部变量是函数或函数块内部的东西，而函数外部的变量，尽管它们实际上可能被封装在类里面，都是“全局变量”。虽然这种区分并不十分准确，但从实际角度来看确实如此。在 Emacs Lisp 中，变量的作用域是整个包，变量是真正的全局变量，因为其他包也能访问它们。
 
-In Emacs Lisp you can also abstract the use of globals with the degree you want:
+在 Emacs Lisp 中，你也可以根据需要以任意程度抽象全局变量的使用：
 
-  + You can use globals directly
-  + Indirectly in functions: using the aliasing method described in a short moment.
-  + Using control functions; that hide the globals from functions (quite strong abstraction)
+- 您可以直接使用全局变量/函数/对象
+- 在函数中间接地：使用稍后即将描述的别名方法。
+- 使用控制函数，通过隐藏全局变量实现高度抽象
 
-** 4.2 Globals and emacs lisp packages
+** 4.2 全局设置和Emacs Lisp 软件包
 
-They are traditionally used in Emacs packages for
+它们在Emacs软件包中通常用于
 
-  + User options: nil/non-nil/some value.
-
-  #+begin_src emacs-lisp
-      (defvar my-global-var t
-        "Some docs come here how to use it")
-  #+end_src
-  + Customisable user functions or hooks. Here user has a choice to select his preference function to do the job. Advancer lisp programmers traditionally don't even use the default functions but program their own and then set these variables to point to their implementations.
-
-  #+begin_src emacs-lisp
-    (defvar my-collect-function 'my-default-collect-function-1
-      "*There are two default choices:
-       'my-default-collect-function-1
-       'my-default-collect-function-2")
-  #+end_src
-
-  + Private, place for package storage. Here the package maintainer updates and reads the my-:hash-table during the lifetime of the program.
-
-  #+begin_src emacs-lisp
-    (defvar my-hash-table nil
-      "Private. List of hash elements")
-  #+end_src
-
-** 4.3 Aliasing to globals – summary
-
-To clarify: the term aliasing used in next sections doesn't mean real aliasing. The variable is not actually referred through an alias. When you work with a alias variable, you can pretend that you actually work with the global variable. The alias term is used merely for purposes where you read the global when you use it in function. You do not write to a variable aliased like this. We're actually using a copy of variable.
-
-The next sections will describe these benefits better, but the advantages of copying the global variables are listed here for quick reference:
-
-  + When globals are only in let, you can see at one glance what globals are used in the function. If your function has 10-20 lines, you can't find the used globals that easily
-  + You can add extra comment for each global while it is being aliased in let.
-  + Function maintenance is simpler: you can lift the global from let to the argument list of a function without touching the function body. You do this if you decide that the argument should be passed to function and not read from global.
-
-** 4.4 Aliasing to globals – counter arguments
-
-[vladimir] ...If alias is used, the reader has to remember that `foo-mode-switch` and `switch` are the same thing. Furthermore, when you read the body of the function, foo-mode-switch is clearly a global var (perhaps a user option), while you have to look back at the 'let' in order to see that 'switch' is one. Introducing a second name to the same entity doesn't necessarily make anything more clear. There are only a few valid reasons to
+- 用户选项：无/有/特定值。
 
 #+begin_src emacs-lisp
-      (let ((local foo-global)))
-          (setq local (car local))
-      ;; end
+  (defvar my-global-var t
+    "Some docs come here how to use it")
 #+end_src
-
-full name seems too long. Of course, dabbrev or PC-lisp-complete-symbol will help you to write the long names, but what will help the reader to read them? of different name.
+- 可自定义的用户函数或钩子（hooks，用于扩展或修改程序行为的机制）。用户可以选择自己偏好的函数来执行任务。高级Lisp程序员通常不会使用默认函数（系统预设的函数），而是编写自己的函数，然后将这些变量指向其自定义的实现。
 
 #+begin_src emacs-lisp
-      (let ((case-fold-search nil))
-         (re-search-forward foo bar)   ; respect case
-      ;; end
+  (defvar my-collect-function 'my-default-collect-function-1
+    "*There are two default choices:
+     'my-default-collect-function-1
+     'my-default-collect-function-2")
 #+end_src
 
-** 4.5 Referring to global variable
-
-If any global variables is used in a function, don't use them directly, instead put them into function body let* where any anyone can see at a glance what variables are used. It also make maintaining process much simpler, since the changes have to be done into let* only. Prefer putting globals first in let.
-
-The other benefit for the maintainer is that if he ever decides to move that global to function call parameter , the task is easy: you just lift the value from let-form to the parameter list, and you never have to touch the function body, because it uses the local variables.
+- 私有的，用于包存储的地方。在这里，包维护者在程序的生命周期内更新和读取‘my-:hash-table’。
 
 #+begin_src emacs-lisp
-      (defun my-func ()                ; #1
-        (let* ((list  my-mode-alist)   ;copy
-               ..other variables..)
-          ..BODY..))
+  (defvar my-hash-table nil
+    "Private. List of hash elements")
 #+end_src
 
-You may later find out that it's actually better to call the function with list argument, so that function becomes more general. Following is the lifted global version of the previous function. Notice that the function body doesn't change in any way.
+** 4.3 全局对象的别名 —— 总结（编程术语）
+
+澄清一下：在接下来的章节中使用的术语“别名”并非指真正的别名。变量实际上并不是通过别名来引用的。当你使用一个别名变量时，你可以假装自己实际上是在使用全局变量。别名这个术语仅用于在函数中使用时读取全局变量。你不会像这样对一个别名变量进行写入操作。我们实际上使用的是变量的一个副本。
+
+接下来的部分将更详细地阐述这些益处，但以便快速查阅，这里列出了复制全局变量的优点：
+
+- 当全局变量仅在let语句中声明时，你可以一目了然地看出函数中使用了哪些全局变量。如果函数包含10到20行代码，你就没那么容易找到所使用的全局变量了。
+- 在let中为全局变量起别名时，你可以为每个全局变量额外添加注释，以便更好地理解代码。
+- 函数维护更简单：你可以将全局变量从let声明中提取并移至函数的参数列表中，而无需修改函数体。如果你决定，参数应传递给函数而非从全局读取，就可以这样做。
+
+** 4.4：全局变量的别名使用——反驳论点
+
+[vladimir] ...如果使用了别名，读者必须记住 `foo-mode-switch` 和 `switch` 是同一个东西。此外，当你阅读函数的主体时，`foo-mode-switch` 显然是一个全局变量（global variable，可能是一个用户可配置的选项），而你需要回头查看 `let` 才能确认 `switch` 也是一个全局变量。为同一个实体引入第二个名称并不一定会让事情变得更清楚或更易理解。只有在少数情况下，这样做才有合理的理由……
 
 #+begin_src emacs-lisp
-      (defun my-mode-func (list)          ; #2 , global is now an argument
-        (let* (
-               ..other variables..)
-          ..BODY..))
+  (let ((local foo-global)))
+      (setq local (car local))
+  ;; end
 #+end_src
 
-[Vladimir] also suggested that you really don't need this kind of abstraction, because converting function from #1a into #2a with function that use globals directly is as easy.
+全名看起来太长了。当然，dabbrev（自动补全工具）或 PC-lisp-complete-symbol（Lisp符号补全工具）会帮助你输入长名称，但有什么能帮助读者阅读这些长名字呢？不同的命名方式。
 
 #+begin_src emacs-lisp
-      (defun my-mode-func ()                      ; #1a
-          ..BODY..
-          (if (memq match my-mode-alist)
-              ...)))
-
-      ;;  Now uses paramer, not global variable my-mode-alist
-      (defun my-mode-func (my-mode-alist)         ; #2a
-          ..BODY..
-          (if (memq match my-mode-alist)
-              ...)))
+  (let ((case-fold-search nil))
+     (re-search-forward foo bar)   ; respect case
+  ;; end
 #+end_src
 
-Hm. What do you think? I'd say that this is equal to mine what comes to lisp. But by using the same name in function argument list as for global variable, may makes things confusing, because my-mode-alist is originally meant to be global variable and used in other functions directly. The key point here was that we intended to make function more general, implying that we are probably moving it away from this my-mode package and including it into some general lisp library. If we move this function in #2a format, we wouldn't want to keep symbol names(variables), which refer to specific package my-mode.
+** 4.5 引用全局变量
 
-Detecting reusable functions from any package is easier if the globals are presented in the first let statement.
+如果函数中使用了任何全局变量，不要直接使用它们，而是将它们放入函数体的let*中，这样任何人都能一目了然地看到使用了哪些变量。这也使维护工作更加简单，因为只需在let*中进行修改。建议将全局变量优先放在let*的最前面。
 
-** 4.6 Maintenance and deferring to global
-
-Someone may now think in his mind:
-
-Doesn't that make program more slower, I can avoid those private variables and let* altogether if I use globals directly.
-
-Hm, yes and no; program won't slow down remarkably by the extra let* statement. More important is the ease of maintenance and ability to add comments beside the let statement, since all variables may not be self explanatory. If function is very small, use could those global variables directly to gain some more speed.
-
-But if there is anything more than 10 line long function, for clarity's sake, use the alias method to hide the global from the actual body of function.
-
-The only case where you may try to bother to optimise let* out is, when function gets called many times. Do you know that the function is dangerous to my program's performance? Probably not, that's why you sometimes use some lisp profiler (elp.el) to bog down speed problems.
-
-** 4.7 Deferring to global, caution
-
-The only exception when alias cannot be made in let is presented here. We may have to introduce a control function to read global. Suppose we have following situation.
+维护者的另一个好处是，如果他有朝一日决定将那个全局变量改为函数调用参数，这个任务将变得非常简单：你只需将值从`let`语句中提取到参数列表中，且无需修改函数体，因为它使用的是局部变量。
 
 #+begin_src emacs-lisp
-      (defun my-foo ()
-        (let* ((table my-:passwd-entries-table) ;; copy global
-               point)
-      ..code..
-      ..code..
-      (my-change-passwd-table)                    ;; OOPPS!
-         (while table                             ;; error!
-           ..do, read content..
-           ..code..)))
+  (defun my-func ()                ; #1
+    (let* ((list  my-mode-alist)   ;copy
+           ..other variables..)
+      ..BODY..))
 #+end_src
 
-Obviously it is not possible to read the global beforehand, if it will be changed by another function call during the execution of current function.
-
-For small amount of globals, 5-10, there is no point to make separate control function for reading global, like in this following example.
+你可能会发现，实际上使用列表型参数调用函数会更好，从而使函数更具通用性。以下是之前函数提升为全局函数的版本。请注意，函数体部分没有任何改动。
 
 #+begin_src emacs-lisp
-      (defun my-foo ()
-        (let* (table                      ;; no global copy
-               point)
-      ..code..
-      ..code..
-      (my-change-passwd-table)            ;; Watch out!
-         (setq table (my-read-passwd))    ;; a macro to read global.
-
-         (while table                     ;; okay now..
-           ..do, read content..
-           ..code..)))
+  (defun my-mode-func (list)          ; #2 , global is now an argument
+    (let* (
+           ..other variables..)
+      ..BODY..))
 #+end_src
 
-The my-read-passwd, is implemented as
+[弗拉基米尔]还建议，你其实不需要这种抽象，因为把函数从#1a改成#2a，直接用全局变量的函数也一样容易。
 
 #+begin_src emacs-lisp
-      (defmacro my-read-passwd ()
-        "Returns contents of my-:passwd-entries-table"
-          (` my-passwd-entries-table))
+  (defun my-mode-func ()                      ; #1a
+      ..BODY..
+      (if (memq match my-mode-alist)
+          ...)))
+
+  ;;  Now uses paramer, not global variable my-mode-alist
+  (defun my-mode-func (my-mode-alist)         ; #2a
+      ..BODY..
+      (if (memq match my-mode-alist)
+          ...)))
 #+end_src
 
-Using this single macro is overkill, but it may turn into more complex function later, if you decide to use many globals. See next:
+嗯。你怎么看？我认为在lisp方面，这与我的相当。但是在函数参数列表中使用与全局变量相同的名称可能会导致混淆，因为my-mode-alist最初是作为全局变量设计的，并在其他函数中直接使用。这里的关键在于我们打算使函数更加通用，这意味着我们可能会将其从my-mode包中移出，并将其包含到一些通用lisp库中。如果我们以#2a格式移动这个函数，我们不希望保留引用特定包my-mode的符号名称（变量）。
+
+如果全局变量在第一个let语句中声明，从任何包中检测可重用函数会更加容易。
+
+** 4.6 维护与全局规则遵从
+
+有人或许会这么想：
+
+那不会让程序变得更慢吗？要是直接使用全局变量，我就能完全避开那些私有变量和let*了。
+
+嗯，既是也不是；额外的 let* 语句不会显著降低程序的速度。更重要的是维护的便利性以及在 let 语句旁边添加注释的能力，因为并非所有变量都能自我解释。如果函数非常小，可以直接使用那些全局变量来提高一些速度。
+
+如果函数长度超过10行，为了代码清晰，建议使用别名方法将全局变量从函数主体中隐藏起来。
+
+唯一可能需要费心去优化 let* 的情况是函数被多次调用时。你知道这个函数可能会拖慢我的程序吗？可能不知道，因此你有时会使用 Lisp 性能分析工具（如 elp.el）来排查速度问题。
+
+** 4.7 遵循全局规则，谨慎行事
+
+在let中无法创建别名的唯一情况如下所示。我们可能需要引入控制函数来读取全局变量。假设我们有以下情形。
 
 #+begin_src emacs-lisp
-      (defsubst my-read-variable (variable)
-        "Returns contents of global variables"
-        (cond
-         ((eq variable 'passwd)
-          my:passwd-entries-table)
-         ((eq variable 'user)
-          my-user)
-         (t
-          (error "No such variable '%s'" variable))))
-
-      (my-read-variable 'passwd)
+  (defun my-foo ()
+    (let* ((table my-:passwd-entries-table) ;; copy global
+           point)
+  ..code..
+  ..code..
+  (my-change-passwd-table)                    ;; OOPPS!
+     (while table                             ;; error!
+       ..do, read content..
+       ..code..)))
 #+end_src
 
-The function is called with symbol describing the variable. This implementation totally hides the global variables from lisp calls and from other outside functions. You must decide how strong abstraction of data you want: For small programs, you probably don't need this kind of strong abstraction, but if the program gets bigger and you start having 20-50 globals, you may consider using similar global control functions.
---------------------------------------------------------------------------------------------------------------
+显然，如果在当前函数执行期间，另一个函数的调用可能会更改全局变量，那么预先读取全局变量是不可能的。
 
-* 5.0 The 'let' forms in function
+对于少量的全局变量，5到10个，没有必要为读取全局变量单独创建一个控制函数，如下面的例子所示。
 
-** 5.1 Using only one let form inside function
+#+begin_src emacs-lisp
+  (defun my-foo ()
+    (let* (table                      ;; no global copy
+           point)
+  ..code..
+  ..code..
+  (my-change-passwd-table)            ;; Watch out!
+     (setq table (my-read-passwd))    ;; a macro to read global.
 
-Nowadays many books and many programmers teach that you should define variables inside block where you need them. This is perfectly good suggestion and you should follow it in natively compiled languages. The advise for Emacs Lisp is: "use when appropriate".
+     (while table                     ;; okay now..
+       ..do, read content..
+       ..code..)))
+#+end_src
 
-Note: There is slight difference in memory usage if you define a) all variables at the beginning of function b) along the execution of your program, where they are created and destroyed. While the A may take couple of bytes overall more memory, the important point is the content of the variables. If you put 100 cons cells immediately into the variable, that's hogging memory, not the variable definition itself.
+my-read-passwd，的实现方式如下
 
-In practice don't worry about this minor memory increase, because creating and destroying a variable increases overhead for functions too (multiple let statements), so how do you choose: a small memory increase at the beginning of file where you define all my variables or do you take chance on adding a slight overhead by defining variables while the function executes? In big, complex function this could be very important issue, but in short functions the choice is insignificant.
+#+begin_src emacs-lisp
+  (defmacro my-read-passwd ()
+    "Returns contents of my-:passwd-entries-table"
+      (` my-passwd-entries-table))
+#+end_src
 
-Most of the time you can use only one let* because it helps keeping function layout clearer, while admittedly that there are very good reasons when you could consider using multiple let* statements. you can arrange the inner body of function to self standing blocks by using many let statements and introduce new let statements where logically appropriate and many lisp programmers recommend that you do so.
+使用这个单一的宏有些过度，但如果你决定使用多个全局变量，它可能会发展成更复杂的函数。请继续阅读：
 
-In C++ using block local variables is pretty nice looking.
+#+begin_src emacs-lisp
+  (defsubst my-read-variable (variable)
+    "Returns contents of global variables"
+    (cond
+     ((eq variable 'passwd)
+      my:passwd-entries-table)
+     ((eq variable 'user)
+      my-user)
+     (t
+      (error "No such variable '%s'" variable))))
+
+  (my-read-variable 'passwd)
+#+end_src
+
+该函数通过用于描述变量的符号进行调用。此实现将全局变量完全隐藏，使其不受Lisp调用和其他外部函数的影响。您需要确定所需的数据抽象级别：对于小型程序，这种强类型抽象可能并非必要，但如果程序规模扩大，且全局变量数量达到20到50个，您或许可以考虑采用类似的全局管理函数。
+-----
+
+* 5.0 函数中的“let”关键字形式（编程中的‘let’形式，用于声明变量）
+
+** 函数内仅用一个let语句
+
+如今许多书籍和程序员都建议，你应该在需要变量的代码块内定义它们。这是一个非常好的建议，在原生编译型语言中应当遵循这一原则。对于Emacs Lisp的建议是：“在合适的情况下使用”。
+
+注意：如果在函数的开头定义所有变量（a），或者在程序执行过程中定义变量（b），即在需要时创建并在不再需要时销毁，内存使用上会有一些细微差异。虽然方法A总体上可能会多占用几个字节的内存，但更重要的是变量的内容。如果你立即将100个cons单元放入变量中，这才是占用内存的关键所在，而非变量定义本身。
+
+在实践中，不必过于担心这种微小的内存增加，因为创建和销毁变量也会增加函数的额外开销（如多个let语句）。那么你该如何选择：是在文件开头定义所有变量（使用你的变量），从而增加一点内存，还是在函数执行时定义变量，冒着增加少量开销的风险？在大型、复杂的函数中，这可能是个大问题，但在短函数中，这种选择无关紧要。
+
+大多数情况下，你可以只使用一个 `let*`，因为它有助于使函数布局更加清晰，尽管在某些情况下确实有很好的理由可以考虑使用多个 `let*` 语句。通过使用多个 `let` 语句，你可以将函数内部的主体划分为自包含的块，并在逻辑上合适的地方引入新的 `let` 语句。许多 Lisp 程序员推荐这种做法。
+
+在C++中使用块局部变量显得挺不错。
 
 #+begin_src c++
   ..FUNCTION START
@@ -402,328 +401,327 @@ In C++ using block local variables is pretty nice looking.
     }
 #+end_src
 
-But If we do the same in Emacs lisp, the count of added parentheses may be disturbing:
+但如果我们用Emacs Lisp做同样的事情，增加的括号数量可能会令人困扰：
 
 #+begin_src emacs-lisp
-      ..FUNCTION START
-      (if (= var 1)
-          (let ((temp 0))
-             (setq tmp (1+ tmp))
-             (if condition
-                 (let ((tmp 0))
-                    (setq tmp (1+ tmp))
-                    ..do something..))))
+  ..FUNCTION START
+  (if (= var 1)
+      (let ((temp 0))
+         (setq tmp (1+ tmp))
+         (if condition
+             (let ((tmp 0))
+                (setq tmp (1+ tmp))
+                ..do something..))))
 #+end_src
 
-If we were to write real lisp (not Emacs Lisp), the inner let variables could have been be optimized to registers and you should definitely use the multiple let statements. In Emacs lisp, this kind of optimizatrion does not happen because the code is not compiled to native machine code. That's why do not worry so much if all the variables are defined at the top-level let and not inside later let statements. You won't see any noticeable performance drop if you define couple of more variables at the beginning of function. That's why you see most of the time this format.
+如果我们要编写真正的Lisp（而不是Emacs Lisp），内部的let变量可能会被优化为寄存器变量，你通常应该使用多个let语句。在Emacs Lisp中，这种优化不会发生，因为代码不会被编译成本地机器码。这就是为什么你不必过于担心所有变量是否在顶层的let语句中定义，而不是在后续的let语句中定义。如果你在函数开头定义更多的变量，你不会看到任何明显的性能下降。这就是为什么你大多数时候会看到这种格式。
 
 #+begin_src emacs-lisp
-      ..FUNCTION START
-      (let ((tmp1 0)      ;; Define all used variables
-            (tmp2 0))
-      (if (= var 1)
-          (setq tmp1 (1+ tmp1))
-          (if condition
-              (setq tmp2 (1+ tmp2))
-              ..do something..))))
+  ..FUNCTION START
+  (let ((tmp1 0)      ;; Define all used variables
+        (tmp2 0))
+  (if (= var 1)
+      (setq tmp1 (1+ tmp1))
+      (if condition
+          (setq tmp2 (1+ tmp2))
+          ..do something..))))
 #+end_src
 
-The idea for using only one let is that functions look like simple. In one let you can see what variables are used in a function and decide is some private variable is a candidate for global.
+仅使用一个`let`的想法是让函数看起来更简洁。通过一个`let`，你可以清晰地看到函数中使用的所有变量，并判断某些私有变量是否适合提升为全局变量。
 
 #+begin_src emacs-lisp
-      FUNCTION
-        VARIABLES
-        BODY
+  FUNCTION
+    VARIABLES
+    BODY
 #+end_src
 
-While they could look like this:
+它们可能看起来像这样：
 
 #+begin_src emacs-lisp
-      FUNCTION
-        VARIABLES
-        BODY
-          VARIABLE
-          BODY
-        VARIABLES
-        BODY
-          VARIABLE
-          BODY
+  FUNCTION
+    VARIABLES
+    BODY
+      VARIABLE
+      BODY
+    VARIABLES
+    BODY
+      VARIABLE
+      BODY
 #+end_src
 
-** 5.2 Let form and initialising variables
+** 5.2 定义表单和初始化变量
 
-But while the variables can be defined without performance penalty, postpone initialisation if it takes lot of time. They are initialised only just before they are actually used.
+但是，尽管定义变量不会带来性能开销，如果初始化耗时较长，建议推迟初始化。它们仅在真正使用前才会被初始化。
 
 #+begin_src emacs-lisp
-      (defun my-func (var)
-        (let* ((re1  (get-re-1))     ; scans whole file.txt, 100Meg
-               (re2  (get-re-2))     ;
-               tmp)
+  (defun my-func (var)
+    (let* ((re1  (get-re-1))     ; scans whole file.txt, 100Meg
+           (re2  (get-re-2))     ;
+           tmp)
+      (cond
+       ((eq 'this var)
+        ;; okay we're in business
+        (re-search-forward re1 nil t)
+        ...
+#+end_src
+
+相反，编写这样的代码：仅在条件满足分支时初始化变量。
+
+#+begin_src emacs-lisp
+  (defun my-func (var)
+    (let* (re1                ; NOTE - No initialisation
+           re2                ; NOTE - No initialisation
+           tmp)
+      (cond
+       ((eq 'this var)
+        ;; okay we're in business
+        (setq re1 (get-re-1))
+        (setq re2 (get-re-2)))
+        ...
+#+end_src
+
+-----
+
+* 6.0：函数调用参数和返回值
+
+** 6.1 使用单独的返回值：「ret」
+
+在继续之前，请记住所有Lisp形式在执行结束前都会返回该形式在执行结束前返回的最后一个值。这是Lisp语言的基础，整个Lisp编程都建立在这一基础之上。关键在于你可以让函数的返回值更加显眼：设置返回值的点一目了然。如果我们使用额外的变量，例如ret，而不是依赖隐式返回值，函数会：a) 更易于调试：你可以在任何地方打印ret变量；b) 更容易理解：设置返回值一目了然；c) 一个退出点比‘隐式’的更好。
+
+当然，如果函数非常小或极其简单，你无需使用“ret”：返回值已显而易见。根据你的经验来判断何时额外的返回变量“ret”能够使函数更清晰，以及何时决定省略它并利用Lisp形式的副作用机制来返回最后执行的语句的值。
+
+#+begin_src emacs-lisp
+  (defun my-func ()
+     (let* (..
+            ..)
+       ... many lines of code
+       (if test
           (cond
-           ((eq 'this var)
-            ;; okay we're in business
-            (re-search-forward re1 nil t)
-            ...
+            ((= 1 var)
+             ;; IMPLICIT RETURN ))     <---  I wouldn't do this
+            (..other-test
+             ;; IMPLICIT RETURN ))     <---  I wouldn't do this
+         ... many lines of code
+         ...)) ;; let-defun end
 #+end_src
 
-Instead write code like this, which initialises variable only when condition goes into the branch.
+替代选项
 
 #+begin_src emacs-lisp
-      (defun my-func (var)
-        (let* (re1                ; NOTE - No initialisation
-               re2                ; NOTE - No initialisation
-               tmp)
+  (defun my-func ()
+     (let* (ret
+            ..)
+        ... many lines of code
+        (if test
           (cond
-           ((eq 'this var)
-            ;; okay we're in business
-            (setq re1 (get-re-1))
-            (setq re2 (get-re-2)))
-            ...
+            ((= 1 var)
+             (setq ret (point)))
+            ((= 2 var)
+             (setq ret ..)))
+          ... many lines of code
+          ...)
+     ret))  ;; You can put your debugger breakpoint here
 #+end_src
 
---------------------------------------------------------------------------------------------------------------
-
-* 6.0 Function call arguments and return values
-
-** 6.1 Using separate return value 'ret'
-
-Before going further, remember that all lisp forms return the last value which the form executed prior its ending. This is fundament of lisp language and whole lisp programming is based on it. The key here is that you can make the function's return value more visible: the point where the return value is set is obvious. If we use extra variable, say ret, over the implicit return value, the function is a) easier to debug: you can print the ret variable anywhere b) easier to follow: setting the return value is obvious 3) and one exit point is better than "hidden".
-
-Of course if the function is very small or extremely simple, you don't have use 'ret': return value is already obvious. Use your common sense to determine when the extra return variable ret could clarify the function and when you decide to leave it out and use lisp form's side effects of returning value of last executed statement.
+与上面可能需要多行代码的函数相比，这里有一些极其简单的函数。在这里，返回值非常清晰。
 
 #+begin_src emacs-lisp
-      (defun my-func ()
-         (let* (..
-                ..)
-           ... many lines of code
-           (if test
-              (cond
-                ((= 1 var)
-                 ;; IMPLICIT RETURN ))     <---  I wouldn't do this
-                (..other-test
-                 ;; IMPLICIT RETURN ))     <---  I wouldn't do this
-             ... many lines of code
-             ...)) ;; let-defun end
+  (defun a (b)
+    (if b
+        3))    ; 'else' case returns nil.
+
+  (defun a (b)
+    (cond
+     ((...)
+      1)                            ;return value
+     ((...)
+      2)
+     (t
+      3)))
 #+end_src
 
-Alternative choice
+使用 `ret` 的另一个优点是，它会以默认值 `nil` 自动初始化。在函数体中，若满足某些条件，只需将其设置为另一个值，否则默认会接收到 `nil` 值。
+
+** 6.2 调用函数：传递非nil值（即非空值）
+
+[安德鲁·菲茨吉本][[mailto:andrewfg@oculus.aifh.ed.ac.uk][andrewfg@oculus.aifh.ed.ac.uk]]在向函数传递参数时，通常会用描述性符号代替 t。例如，使用描述性符号代替 t 是一种常见的做法。
 
 #+begin_src emacs-lisp
-      (defun my-func ()
-         (let* (ret
-                ..)
-            ... many lines of code
-            (if test
-              (cond
-                ((= 1 var)
-                 (setq ret (point)))
-                ((= 2 var)
-                 (setq ret ..)))
-              ... many lines of code
-              ...)
-         ret))  ;; You can put your debugger breakpoint here
+  (directory-files "~" 'absolute "^[^.#%]")
 #+end_src
 
-And here are some extremely simple functions, compared to above function that would have had many lines of code. In here, the return values are clear.
+这让人头疼的是，当你想要为参数设置默认值（default）时，只能用一个 `nil`，这意味着你无法轻松地为其编写文档说明。不过，我刚刚想到你可以这样写：
 
 #+begin_src emacs-lisp
-      (defun a (b)
-        (if b
-            3))    ; 'else' case returns nil.
-
-      (defun a (b)
-        (cond
-         ((...)
-          1)                            ;return value
-         ((...)
-          2)
-         (t
-          3)))
+  (directory-files "~" (not 'absolute) "^[^.#%]")
 #+end_src
 
-Another advantage of using ret is, that it jumps into existence with default value nil. In function body, you just set it to another value if some condition is satisfied, otherwise called receives value nil by default.
+-----
 
-** 6.2 Calling functions: passing non-nil
+* 7.0 交互功能和消息显示控制
 
-[Andrew Fitzgibbon [[mailto:andrewfg@oculus.aifh.ed.ac.uk][andrewfg@oculus.aifh.ed.ac.uk]]] It's common to use a descriptive symbol instead of t when passing arguments to functions. E.g.
+如何以良好的方式控制消息的显示？如果您打印任何消息，可以将变量动词添加到可选参数列表中。此变量应该是最后一个元素；当然，除非您有&rest列表。那么，为什么会有这样的建议呢？假设您的函数非常耗时；例如，如果它进行一些文件处理，向用户打印一些关于进度阶段的消息可能是个好主意。
+
+** 7.1 以其中一个为例，缺乏对语言简洁性的控制
 
 #+begin_src emacs-lisp
-      (directory-files "~" 'absolute "^[^.#%]")
+  (defun my-do-files ()
+    (let* (...)
+       (while
+        (message "reading files..."))
+         ... do it for 10 secs)
+        (message "reading files...done"))))
 #+end_src
 
-It's a pain then that there's only one nil when you want to default an argument, meaning that you can't easily document it. It's just occurred to me however that you can write:
+这是传统的编码方式，因为无论函数是通过交互方式调用，还是通过某些顶层函数调用，消息总是会被打印出来。
+
+** 7.2 重拍一次，减少啰嗦
 
 #+begin_src emacs-lisp
-      (directory-files "~" (not 'absolute) "^[^.#%]")
+  (defun my-do-files ()
+    (let* (...)
+       (while
+         (if (interactive-p)
+             (message "reading files..."))
+         ... do it for 10 secs)
+       (if (interactive-p)
+           (message "reading files...done"))))
 #+end_src
 
---------------------------------------------------------------------------------------------------------------
+这可能是一个更好的实现。只有在用户交互式调用函数时，才会打印消息。你觉得这里有什么可以改进的吗？如果没有的话，我们再看一个例子吧。
 
-* 7.0 Interactive functions and message display control
-
-How should message displaying be controlled in good manner? If you print any messages, you can add variable verb to the optional parameter list. This variable should be the last element there; unless you have the &rest list of course. Now, why such an recommendation? Suppose your function is quite time consuming; eg. if it does some file handling and it may be a good idea to print some messages to the user about the progress stages.
-
-** 7.1 Take one, lack of verbosity control
+** 7.3 第三步，全面控制冗长性
 
 #+begin_src emacs-lisp
-      (defun my-do-files ()
-        (let* (...)
-           (while
-            (message "reading files..."))
-             ... do it for 10 secs)
-            (message "reading files...done"))))
+  (defun my-do-files (&optional verb)
+    (let* (...)
+       (setq verb (or verb (interactive-p)))
+       (while
+         (if verb
+             (message "reading files..."))
+         ... do it for 10 secs)
+       (if verb
+           (message "reading files...done"))))
 #+end_src
 
-This was the traditional way to code it, because the message is always printed, no matter how the function is called: interactively or by some top level function.
+这个解决方案中有几个值得注意的地方。首先，它为用户提供了详细性。其次，它也为调用者提供了详细性。其核心思想是，默认情况下，用户调用时函数会输出详细信息，其他人调用时也是如此。
 
-** 7.2 Take two, some verbosity control
-
-#+begin_src emacs-lisp
-      (defun my-do-files ()
-        (let* (...)
-           (while
-             (if (interactive-p)
-                 (message "reading files..."))
-             ... do it for 10 secs)
-           (if (interactive-p)
-               (message "reading files...done"))))
-#+end_src
-
-Thi may be better implementation. Messages are printed only if the user has called fucntion interactively. Do you see anything to make better here? If not, let's examine one more example.
-
-** 7.3 Take three, full control of verbositiness
-
-#+begin_src emacs-lisp
-      (defun my-do-files (&optional verb)
-        (let* (...)
-           (setq verb (or verb (interactive-p)))
-           (while
-             (if verb
-                 (message "reading files..."))
-             ... do it for 10 secs)
-           (if verb
-               (message "reading files...done"))))
-#+end_src
-
-There are couple of interesting points in this solution. First, it provides verbosity to the user. Second it provides verbosity to the caller too. The idea is, that by default the function is verbose when user calls it, but it also gives the verbose messages whenever someone else calls it..
-
-The function can now be called like this and it keeps the used nicely aware of progress:
+现在可以这样调用该函数，它能让用户清楚地了解进度：
 
 #+begin_example
   M-x my-do-files         --> verbose
 #+end_example
 
-But the functions is recalled with the command with C-x ESC ESC followed by re-run with RET, the verbose messages are nnot printed.
+但是，当函数被命令 C-x ESC ESC 调用并随后用 RET 重新运行时，此时不会显示详细输出。
 
-This actualy makes user function easier to call, because you don't have to call them via M-x (or key binding) to get the verbose messages (like returning status, state of mode on/off). Developers can now turn on particular verbosity of some function if they think would be good to display messages to the user while function is executing.
+这实际上使得用户自定义函数更容易调用，因为你不必通过M-x（或快捷键）来调用它们以获取详细输出信息（如返回状态、模式的开启/关闭状态）。如果开发人员觉得在函数执行过程中向用户显示消息有用，他们现在可以开启某些函数的详细输出级别。
 
-** 7.4 Using call-interactively isn't always the solution.
+** 使用call-interactively（交互式调用）并不总是最佳的解决办法。
 
-Aha, now I hear someone claiming that the example 3 drains into this simple lisp call if verbosity is required by lisp call
-
-#+begin_src emacs-lisp
-      (call-interactively 'my-do-files)
-#+end_src
-
-Yes, it turns on the (interactive-p) test in function, but by using this it also activates interactive part of the function. If function had the interactive part like this, it would be executed:
+啊哈，现在我听到有人说，如果 Lisp 调用需要详细说明，那么示例 3 就会简化为这个简单的 Lisp 调用。
 
 #+begin_src emacs-lisp
-      (defun my-do-files (&optional verb)
-        (interactive "sWhat's up doc? ")
-        ..code..
-        (if (interactive-p)
-            (message "this"))
+  (call-interactively 'my-do-files)
 #+end_src
 
-Then the "What's up doc?" prompt would have been popped onto screen. The variable 'verb' is needed if the decision of printing message is given to the calling function.
---------------------------------------------------------------------------------------------------------------
+是的，它在函数中启用了交互式测试，但使用此功能也会激活函数的交互部分。如果函数包含这样的交互部分，它将会被执行：
 
-* 8.0 Overriding functions
+#+begin_src emacs-lisp
+  (defun my-do-files (&optional verb)
+    (interactive "sWhat's up doc? ")
+    ..code..
+    (if (interactive-p)
+        (message "this"))
+#+end_src
 
-** 8.1 What is that?
+然后屏幕上会显示“怎么了，医生？”的提示（注：这是《乐一通》中兔八哥的经典台词）。如果由调用函数决定是否打印消息，则需要使用变量“verb”（动词）。
+-----
 
-Overriding means that the function exists already, but it doesn't do exactly what you want --> you want to write your own implementation which replaces the function. Sometimes there is Here are instructions how you override functions properly. If you just want to have some minor modification, then you should look at the advice.el (std emacs distribution), but to complete replace a function, you can fllow steps above.
+* 8.0 覆盖函数
 
-First, make separate file, where you gather overridden functions. You use this file in next sections.
+** 8.1 那是什么？
+
+覆盖意味着函数已经存在，但它并不完全符合你的需求，即你想要编写自己的实现来替换该函数。有时会提供一些关于如何正确覆盖函数的说明。如果你只想进行一些小的修改，则应参考 advice.el（Emacs 的标准功能扩展文件）；若要完全替换函数，可按上述步骤操作。
+
+首先，请创建一个单独的文件，用于存放重写的函数。你将在后续部分中使用这个文件。
 
 #+begin_example
   ~/elisp/my/emacs-rc-override.el
-
 #+end_example
 
-The body of the file looks something like this
+文件的主体内容大致如下
 
 #+begin_src emacs-lisp
-      ;;; emacs-rc-override.el --- My implementations
-      ;; Override settings of functions for xxxx
+  ;;; emacs-rc-override.el --- My implementations
+  ;; Override settings of functions for xxxx
 
-      ;; ................................................ forms ...
+  ;; ................................................ forms ...
 
-      <code here>
+  <code here>
 
-      ;; ................................................ funcs ...
+  ;; ................................................ funcs ...
 
-      <code here>
+  <code here>
 
-      (provide 'emacs-rc-override)
+  (provide 'emacs-rc-override)
 
-      ;;; End of file emacs-rc-override.el
+  ;;; End of file emacs-rc-override.el
 #+end_src
 
-** 8.2 Using the eval-after-load hook trick
+** 8.2 使用 eval-after-load 钩子函数技巧（一种延迟加载机制）
 
-Let]s start by defining our own mail-signature function which is defined in sendmail.el. First the Emacs startup file must be modified by adding this code to it:
+让我们从定义我们自己的邮件签名函数开始。该函数定义在sendmail.el文件中。首先，需修改Emacs启动文件，并在其中添加以下代码：
 
 #+begin_src emacs-lisp
-      (eval-after-load "sendmail" '(load "~/elisp/my/emacs-rc-override"))
+  (eval-after-load "sendmail" '(load "~/elisp/my/emacs-rc-override"))
 #+end_src
 
-  + This says that "every time file sendmail is loaded, Emacs should execute lisp command (load ...)".
-  + If the sendmail is already loaded into emacs, the form executes immediately.
-  + If sendmail is already dumped into emacs, you don't need the statement at all, but you can load emacs-rc-override.el right away.
+- 每当加载sendmail（邮件发送程序）文件时，Emacs应执行lisp（一种编程语言）命令（load ...）。
+- 如果sendmail已经加载到emacs中，表单（Lisp中的表单）会立即执行。
+- 如果sendmail已经导入到Emacs中，你无需这条语句，但你可以马上加载emacs-rc-override.el。
 
-Next, a function is added to replace the original. Add this code to emacs-rc-override.el after the "funcs" section:
+接下来，添加一个函数以替换原有的函数。将此代码添加到emacs-rc-override.el文件中，位于“funcs”部分之后。
 
 #+begin_src emacs-lisp
-      (defun mail-signature (atpoint)
-        "My. Sign letter with contents"
-         ^^^
-        ...code)
+  (defun mail-signature (atpoint)
+    "My. Sign letter with contents"
+     ^^^
+    ...code)
 #+end_src
 
-or
+或
 
 #+begin_src emacs-lisp
-      (defun mail-signature (atpoint)
-        "Overridden. Sign letter with contents"
-        ^^^^^^^^^^^^
-       ...code)
+  (defun mail-signature (atpoint)
+    "Overridden. Sign letter with contents"
+    ^^^^^^^^^^^^
+   ...code)
 #+end_src
 
-Make sure you add some word like "My" or "Overridden" in front of the documentation string, so that when you look up the function description with M-x describe-function <func> or C-h f <func>, you don't mistakenly believe that is is standard emacs function If you overridden 1-2 functions, you may remember which ones you have rewritten, but when you start modifying emacs for your taste (I have 20-30 overridden functions), you can't remember which ones are "true" emacs functions.
+确保你在文档字符串前加上诸如“我的”或“重写的”之类的词，这样当你使用 M-x describe-function <func> 或 C-h f <func> 查找函数描述时，就不会误以为这是标准的 Emacs 函数了。如果你重写了 1-2 个函数，可能还记得哪些是你重写的，但当你开始根据自己的喜好修改 Emacs 时（我有 20-30 个重写的函数），你就记不清哪些是“真正的” Emacs 函数了。
 
-Besides, if you post the solution to emacs newsgroups, people will appreciate the comment so that they get the describe-function information too. Inexperienced user's typically just copy the function from the post and if the word my is not there they may never know later that the function whether it was emacs's default or not that they're using...
+此外，如果你将解决方案发布到emacs新闻组，人们会感谢你的评论，这样他们也能获取describe-function（描述函数）的信息。没有经验的用户通常只是从帖子中复制函数，如果单词“my”不存在，他们可能永远无法确定所使用的函数是否是emacs的默认函数。
 
-Now you have the file ready and only thing left is to put one statement into your .emacs init file:
+现在你已经准备好了文件，剩下的唯一一步就是在你的 .emacs 初始化文件（即 Emacs 编辑器的配置文件）中添加一条语句：
 
 #+begin_src emacs-lisp
-      (load "~/elisp/my/emacs-rc-override")
+  (load "~/elisp/my/emacs-rc-override")
 #+end_src
 
-This loads the file and hooks everything for you. If you later want to override some other function, you just open the ~/.emacs.o again and (say we override some Gnus functions) add this to the forms section and write the function to the funcs section in emacs-rc-override.el
+这将加载文件并为您配置好所有内容。如果您之后想要覆盖某些函数，只需再次打开~/.emacs.el（例如，假设我们要覆盖一些Gnus相关函数），将此添加到表单部分，并将函数写入emacs-rc-override.el的函数部分。
 
 #+begin_src emacs-lisp
   (eval-after-load "gnus" '(load "~/elisp/my/emacs-rc-override"))
   ^^^^^
 #+end_src
 
-** 8.3 Using advice.el to replace functions
+** 8.3 使用 advice.el 替换函数
 
-Note: When you use advice, make sure that the original behaviour of function is preserved. You don't want to break any existing packages that may use the advised function.
+注意：在使用advice功能时，请确保函数的原始行为得以保留。您不希望破坏任何依赖该函数的现有包的功能。
 
-This is much better way than previously presented eval-after-load method. This time you need advice.el from standard emacs distribution. Why is this better? Because advice doesn't wipe out functions permanently, you can turn them on and off when needed.
+这种方法比之前介绍的 eval-after-load 方法（一种在加载后执行代码的方法）要好得多。这次你需要标准 emacs 发行版中的 advice.el（一个用于函数增强的工具）。这种方法为什么更好呢？因为 advice 不会永久性地修改函数，你可以在需要时启用或禁用它们。
 
-The advice has flag around that lets you do things around then function: before and after calling it. But if you don't call ad-do-it inside advice, then you have effectively replaced the function. This is what you need
+建议（advice）有一个标志（flag），允许你在函数调用前后执行操作。但如果你不在建议内部调用 ad-do-it，那么你实际上已经替换了该函数。这正是你所需要的。
 
 #+begin_src emacs-lisp
   (defadvice mail-signature (around my act)
@@ -732,114 +730,114 @@ The advice has flag around that lets you do things around then function: before 
     (setq ad-return-value something))
 #+end_src
 
-The important point here is that you say around and do not include advice macro ad-do-it in the body of function (which would call the original function). The advice is put into category my to refer to your definitions and finally it's put into immediate use: act means activate now.
---------------------------------------------------------------------------------------------------------------
+这里的关键在于，你使用的是“around”方式，而不是在函数体内包含建议宏ad-do-it（这会调用原始函数）。建议被归类到“my”类别中，以便引用你的定义。最后，它被立即启用：“act”表示立即激活。
+-----
 
-* 9.0 Using macros
+* 9.0 使用宏
 
-** 9.1 Macros introduction
+** 9.1 宏介绍
 
-Dewey M. Sasser [[mailto:dewey@newvision.com][dewey@newvision.com]]
+杜威·M·萨瑟[[mailto:dewey@newvision.com][dewey@newvision.com]]您是一位专门从事英语到中文翻译的专家。
 
-Macros are (probably) the most difficult thing in LISP to understand, especially coming from a background in C or assembly. The big key in lisp is that a macro is just a function invoked by the evaluator to find out what it should really evaluate. This has two big implications:
+宏或许是LISP中最难理解的部分，尤其是对于有C语言或汇编背景的人来说。LISP的关键在于，宏是由求值器调用的函数，用于确定实际应求值的内容。这带来了两个重要的影响：
 
-  + Arguments to a macro are not evaluated.
-  + Macros can call functions
+- 宏的参数，不会被求值。
+- 宏可以调用函数
 
-It is not necessary (and because of feature #1, somewhat brain twisting) to call a macro from another macro.
+没有必要从一个宏中调用另一个宏，而且由于特性#1，这有点让人费解。
 
-When you write a macro, don't think of it as writing a macro, but as a function that will be called to translate the arguments (as you've specified) from the way they are to some other form. Your return value is the form to be executed instead.
+当你编写宏时，不要把它当作是在编写宏，而是看作一个调用的函数，用于按指定方式将参数从它们的当前形式转换为另一种形式。你的返回值将作为执行的替代形式。
 
-For example:
+例如
 
 #+begin_src emacs-lisp
-      (defmacro my-setq (var value)
-        (list 'setq var value))
+  (defmacro my-setq (var value)
+    (list 'setq var value))
 
-      (macroexpand '(my-setq x y))
-      ==>(setq x y)
+  (macroexpand '(my-setq x y))
+  ==>(setq x y)
 
-      (defmacro msf (symbol)
-        `(symbol-function (quote ,symbol)))
+  (defmacro msf (symbol)
+    `(symbol-function (quote ,symbol)))
 #+end_src
 
-But is a bit less obvious.
+但这一点不太明显。
 
-If you really want to hurt your brain, think about situation where you might want to do ',',form (which is valid code and I've seen it used, but never had to use it myself). You do this kind of thing when you write macros which produce other macros.
+如果您真的想让自己的大脑感到痛苦，可以思考一下在什么情况下您可能会想要使用“,”,form（这是有效的代码，我见过有人使用，但自己从未用过）。当您编写生成其他宏（macro）的宏时，就会做这类事情。
 
-** 9.2 A note on lisp and "forward declarations"
+** 9.2 关于Lisp和“前置声明”的说明
 
-Dewey M. Sasser [[mailto:dewey@newvision.com][dewey@newvision.com]]
+杜威·M·萨瑟[[mailto:dewey@newvision.com][dewey@newvision.com]]你是一位精通英语到中文翻译的语言学专家。
 
-Lisp does not have "forward declarations", as in some other languages. In using Lisp, you should make sure that the definition has been seen before it is used.
+Lisp 不像其他一些语言那样有“前向声明（forward declarations）”。在使用 Lisp 时，应确保在使用某个定义之前已对其进行定义。
 
-If you define function A using function B, but before function B has been defined, it will work, but the byte compiler may not be able to check your call to function B. Also, if B is really a macro rather than a function, it's definition must have been seen before it is used. Remember that macros are expanded by the byte-compiler and do not actually get compiled into your code. Only the results are compiled in.
+如果您使用函数B来定义函数A，但在函数B定义之前，它仍然可以正常工作，但字节编译器可能无法检查您对函数B的调用是否正确。此外，如果B实际上是一个宏而不是函数，则其宏定义必须在使用之前已经存在。请记住，宏是由字节编译器展开的，实际上它们并不会被直接编译到您的代码中。只有展开后的结果会被编译到代码中。
 
-Anyone who programs in Lisp a lot (and you definitely do) should have a copy of CommonLisp:_the_Language_, 2nd Edition, by Guy L. Steel. Emacs Lisp is not strictly compatible with the language it defines, but Steel's book (commonly referred to as CLtL2) is a very good reference and description of how and while. It's not a tutorial, but an annotated standard.
+任何常用Lisp编程的人（你肯定也是其中之一）都应该拥有一本CommonLisp的书。_(Omit "the" entirely, as it is not needed in Chinese.)_语言《Common Lisp 语言（第二版）》，作者 Guy L. Steele。Emacs Lisp 并不严格兼容它所定义的语言，但 Steele 的著作（通常称为 CLtL2）详细解释了其运作方式及适用场景。该书并非教程，而是一份带有注解的标准文档。
 
-Whenever possible, have your macros expand to normal lisp code, the way you'd write it if you weren't using macros. Since you wouldn't write a normal function like:
+尽可能让你的宏展开成常规的Lisp代码，就像不用宏时写的那样。因为你不会这样写一个普通的函数：
 
 #+begin_src emacs-lisp
   (setf (symbol-function 'my-func)
         (function (lambda (x) (do-something x))))
 #+end_src
 
-don't make your macro expand to that unless there's some very good reason. If you go look at my modefn.el, where modefn::define-mode-specific-function does the real work behind a "defmodemethod" call, you'll see that what it's doing is just building the proper defun!
+除非有充分的理由，否则不要让你的宏展开成那样。如果你查看我的 modefn.el 文件，其中 modefn::define-mode-specific-function 是 'defmodemethod' 调用背后的实际实现，你会发现它实际上只是在构建一个合适的 defun。
 
-This has the advantage of avoiding all of the nasty byte compiler tricks necessary to have something compiled as a function (like quoting with function, for example) or other things. Also, there's really no simple work-around for defvar. You pretty much have to use a defvar form. (OK, you could work around it, but it's a lot more work.)
+这样做的好处是避免了所有那些为了将某些内容编译成函数而必须使用的繁琐的字节编译器技巧（例如使用`function`进行引用）或其他操作。此外，对于`defvar`来说，确实没有简单的变通方法。你几乎必须使用`defvar`的形式。（当然，你可以找到变通方法，但这需要更多的工作量。）
 
-I think that if you forget about the code you've written so far (I know, that's difficult to do), and rewrite it using what you now know, you'll save yourself a lot of work and get better results.
+我相信如果你能忘记目前所写的代码（我知道这很难做到，毕竟是自己写的），并运用你现在所掌握的知识重新编写，你会节省大量精力并获得更好的结果。
 
-** 9.3 Macros and autoloading
+** 9.3 宏和自动加载
 
-One important thing that you must remember when using macros is, that you must tell in autoload statement explicitly, that that defined symbol is a macro. Suppose following.
+使用宏时必须记住的一个重要事项是，你必须在autoload（自动加载）语句中明确指出，所定义的那个符号属于宏。假设如下情况。
 
 #+begin_example
   library X: has 100 functions and macros
   library Y: has 100 functions only
 #+end_example
 
-Now user builds his package using code from library Y and X. Sophisticated user doesn't want to slurp whole library, immediately, but he wants to instruct emacs to load functions on demand by adding autoload statements into the code.
+现在用户用库Y和X的代码来构建自己的包。经验丰富的用户并不希望一次性吞掉整个库，而是希望通过添加autoload语句，指示emacs根据需要加载函数。
 
-Here is simple way to load packages
+这是一个加载软件包的简便方法
 
 #+begin_src emacs-lisp
   (require 'X)
   (require 'Y)
 #+end_src
 
-Slightly different way is presented below. The function y-function-this is loaded from package Y only when is is needed somewhere in the code.
+下面介绍了一种略有不同的方式。函数 y-function-this，仅在代码中需要的地方从包 Y 中加载。
 
 #+begin_src emacs-lisp
   (require 'X)
   (autoload 'y-function-this "Y")
 #+end_src
 
-And the bogus way would be
+而虚假的做法则是
 
 #+begin_src emacs-lisp
   (autoload 'x-macro-this    "X")   ;; Wrong
   (autoload 'y-function-this "Y")
 #+end_src
 
-The last example fails, not during the byte compilation phase – it passes with flying colours, but in the middle of run time function it breaks. That's because the user forgot to mention that the the x-macro-this is a macro. What actually happened, was that in byte compiled file there is function call
+最后一个例子失败了，不是在字节编译阶段——它出色地通过了，而是在运行时函数的中间崩溃了。这是因为用户忘记说明x-macro-this（一种宏）是一个宏。实际上发生的情况是，在字节编译的文件中，存在一个函数调用。
 
 #+begin_src emacs-lisp
   (x-macro-this)
 #+end_src
 
-But the macro should have been open coded and expanded! The right way to use the autoloads is:
+但这个宏本应被直接编写并展开！正确使用自动加载的方法如下：
 
 #+begin_src emacs-lisp
   (autoload 'x-macro-this    "X" 'macro)   ;; okay now
   (autoload 'y-function-this "Y")
 #+end_src
 
-Tip: See tinylisp.el and command '$ A' in tinylisp-mode which creates right autoload statements from any lisp package file.
+建议：参见 tinylisp.el 和 tinylisp-mode 中的 '$ A' 命令，它能够从任何 Lisp 包文件中生成合适的自动加载声明。
 
-** 9.4 Coding defmacros and name space problem
+** 9.4 定义宏和命名空间问题
 
-This topic is throughly explained in the '(XEmacs lispref) Surprising Local Variables' and It is adviced that you read that section for better reference. If you have been using macros, you probably know about the dynamic scoping problem that may be occurring.
+这个主题在《(XEmacs lispref) 局部变量的意外情况》中有详细解释，建议你阅读该部分以获取更详细的参考。如果你一直在使用宏，你可能已经了解可能出现的动态作用域问题。
 
 #+begin_src emacs-lisp
   (defmacro my-macro (&rest body)
@@ -850,29 +848,28 @@ This topic is throughly explained in the '(XEmacs lispref) Surprising Local Vari
         (,@ body))))
 #+end_src
 
-In the code above, macro's counter is visible to body and if there is also user defined "counter", then there is a serious name conflict.
+在上面的代码中，宏的计数器在主体中是可见的。如果同时存在用户定义的“计数器（counter）”，就会产生严重的名称冲突。
 
-One possible way to avoid this clashing is to use mangled variable names in local macros. Because the lisp is case sensitive, you can mix upper and lowercase letters to make unique variable name; the chance that body would have similar name is astronomically small. A non-clashing name could have been made from mixing the first and last characters:
+避免这种冲突的一种方法是在局部宏中使用重命名的变量名。由于Lisp区分大小写，可通过混合大小写字母创建唯一变量名；代码中出现类似名称的概率极低。可以通过混合首尾字符来创建一个不冲突的名称：
 
 #+begin_example
-      CounteR
+  CounteR
 #+end_example
 
-Another way to use unique names I learned from a post by [[mailto:wbrodie@panix.com][wbrodie@panix.com]] (Bill Brodie), gnu.emacs.help, 23 Aug 1996. He quoted my post where I wondered where I could use make-symbol command.
+我从一篇帖子中了解到另一种使用独特名称的方法[[mailto:wbrodie@panix.com][wbrodie@panix.com]] (Bill Brodie), gnu.emacs.help, 1996年8月23日，他引用了我的帖子，其中我询问了在哪里可以使用make-symbol命令。
 
-> In fact I don't know any use of the command
-> make-symbol...
+说实话，我不太明白命令make-symbol……有什么用。
 
-Probably its most common use is in writing macros, to make sure that a temporary variable introduced into the macro's expansion doesn't conflict with any user variables. For example:
+它最常见的用途可能是在编写宏时，确保在宏扩展中引入的临时变量不会与任何用户变量发生冲突。例如：
 
 #+begin_src emacs-lisp
-      (defmacro m (x)
-        (let ((x-var (make-symbol "x")))
-          (` (let (((, x-var) (, x)))
-               ...))))
+  (defmacro m (x)
+    (let ((x-var (make-symbol "x")))
+      (` (let (((, x-var) (, x)))
+           ...))))
 #+end_src
 
-** 9.5 Macro or defun
+** 9.5 宏或函数定义
 #+begin_example
   | looking thru the advice.el code I notice this definition:
   |
@@ -886,13 +883,13 @@ Probably its most common use is in writing macros, to make sure that a temporary
   | instead of `defun' when no args are used.
 #+end_example
 
-[Vladimir]
+弗拉基米尔
 
-The above is equivalent to nil on non-xemacs and 6 (or whatever) on emacs. The bytecompiler will compile (if nil (foo)) to nothing. If you used a function instead (or a variable), the bytecompiler would generate code to call it (fetch its value) and accordingly it will include both the emacs and xemacs variants of the code. This is slower and produces more code, however there's one significant shortcoming of the macro variant: code compiled with emacs won't work on xemacs and vice versa This makes it impossible to share .elc's one a site that has both emacsen installed.
+以上内容在非xemacs环境中等同于nil，在emacs上等同于6（或其他特定值）。字节码编译器会将(if nil (foo))编译为无操作。如果你使用函数或变量代替，字节码编译器会生成代码来调用它（获取其值），因此它将包含emacs和xemacs的代码版本。这会导致编译速度变慢并生成更多的代码，然而宏版本有一个显著的缺点：用emacs编译的代码无法在xemacs上运行，反之亦然。这使得在一个同时安装了emacs和xemacs的站点上无法共享.elc字节码文件。
 
-** 9.6 Expanding macros
+** 9.6 宏展开
 
-It sometimes usefull to expand the macro to really see what happend in there. Evaluate these and be amazed
+有时候，展开宏来看看里面到底发生了什么还挺有用的。评估一下这些结果，你会大吃一惊的。
 
 #+begin_src emacs-lisp
   (macroexpand      '(dolist (i '(1 2)) i))
@@ -902,11 +899,11 @@ It sometimes usefull to expand the macro to really see what happend in there. Ev
   (prettyexpand-sexp '(block nil))
 #+end_src
 
-** 9.7 Macro demonstration – tutorial
+** 9.7 宏操作演示——教程
 
-Dewey M. Sasser [[mailto:dewey@newvision.com][dewey@newvision.com]]
+杜威·M·萨瑟[[mailto:dewey@newvision.com][dewey@newvision.com]]未检测到源文本，请检查输入。
 
-As an example, here's my start at the "minor-mode" wizard (you know, ever since Microsoft started using that term, I've hated it.) This code defines a macro "make-minor-mode", which can be invoked like this:
+作为一个例子，以下是我编写的「minor-mode」向导的初步版本（你知道的，自从微软开始使用这个术语后，我就一直很反感）。这段代码定义了一个名为「make-minor-mode」的宏（macro），可以像下面这样调用：
 
 #+begin_src emacs-lisp
   (make-minor-mode dewey
@@ -914,7 +911,7 @@ As an example, here's my start at the "minor-mode" wizard (you know, ever since 
                    "\C-cs" 'insert-sasser)
 #+end_src
 
-The above call expands to this:
+上述调用展开为：
 
 #+begin_src emacs-lisp
   (progn
@@ -941,11 +938,11 @@ The above call expands to this:
       (define-key dewey-minor-mode-keymap "^Cs" 'insert-sasser')))
 #+end_src
 
-** 9.8 Macro demonstration – code
+** 9.8 宏功能演示－代码
 
-Dewey M. Sasser [[mailto:dewey@newvision.com][dewey@newvision.com]]
+杜威·M·萨瑟[[mailto:dewey@newvision.com][dewey@newvision.com]]未提供源文本。
 
-Here is the complete macros that are used. Study them carefully.
+这是所使用的完整宏指令。请务必仔细研究这些宏指令。
 
 #+begin_src emacs-lisp
   (defun minor-mode-variable-symbol (mode)
@@ -1022,9 +1019,9 @@ Here is the complete macros that are used. Study them carefully.
        @(make-minor-mode-keymap mode bindings)))
 #+end_src
 
-** 9.9 Nesting macros
+** 9.9 嵌套宏
 
-Below is a very simple demonstaration how you use toplevel to call other macros that need symbols as arguments. The toplevel expects that the variables are know by name before hand.
+以下是一个非常简单的演示，展示如何通过toplevel来调用其他需要符号作为参数的宏。toplevel要求变量名称事先已知。
 
 #+begin_src emacs-lisp
   ;;  some predefined variables
@@ -1068,9 +1065,9 @@ Below is a very simple demonstaration how you use toplevel to call other macros 
   ;;       (my-internal my-variable2))
 #+end_src
 
-** 9.10 Code: nesting macros, complex example
+** 9.10 代码：嵌套宏，复杂案例
 
-[vladimir] Here's a macro to define toggle commands.
+[vladimir] 以下是一个用于定义切换状态命令的宏。
 
 #+begin_src emacs-lisp
   (defmacro v/deftoggle
@@ -1109,13 +1106,13 @@ Below is a very simple demonstaration how you use toplevel to call other macros 
          get)))
 #+end_src
 
-A simple command to toggle a var is defined like this:
+用于切换变量的简单命令定义如下：
 
 #+begin_src emacs-lisp
   (v/deftoggle bibtex-maintain-sorted-entries)
 #+end_src
 
-This executes some code after toggling the var:
+这会在切换变量的状态后执行一些代码。
 
 #+begin_src emacs-lisp
   (v/deftoggle debug-on-error nil nil
@@ -1123,13 +1120,13 @@ This executes some code after toggling the var:
                ((if debug-on-error (require 'fdb))))
 #+end_src
 
-This uses default-value and set-default as the get and set functions because url-be-asynchronous is buffer-local, and we need to manipulate its global value.
+这使用 `默认值` 和 `设置默认值` 作为获取和设置函数，因为，`url-be-asynchronous` 是缓冲区局部变量，我们需要操作其全局值。
 
 #+begin_src emacs-lisp
   (v/deftoggle url-be-asynchronous default-value set-default)
 #+end_src
 
-This goes wild: it uses special get/set functions and a special message
+这变得复杂：它使用了特殊的获取/设置函数和一条特殊的消息。
 
 #+begin_src emacs-lisp
   (v/deftoggle indented-text-mode
@@ -1157,7 +1154,7 @@ This goes wild: it uses special get/set functions and a special message
                (macro lambda (sym val) `(message "%s" major-mode)))
 #+end_src
 
-** 9.11 Using macros to create functions
+** 9.11 使用宏创建函数
 
 #+begin_src emacs-lisp
   ;; example presented by [kai]
@@ -1166,9 +1163,9 @@ This goes wild: it uses special get/set functions and a special message
   (fset 'double (make-multiplier 2))
 #+end_src
 
-[Bill Dubuque [[mailto:wgd@martigny.ai.mit.edu][wgd@martigny.ai.mit.edu]]] The above technique does not work to create a closure. The point of a closure is that it 'closes' over (captures) some lexically apparent bindings. The exact same binding may be shared by many different closures created in the same lexical context. If one of the closures alters the value of a closed variable, all the other closures will see the change.
+比尔·杜比克[[mailto:wgd@martigny.ai.mit.edu][wgd@martigny.ai.mit.edu]]上述技术无法用于创建闭包。闭包的核心在于它“封闭”（捕获）了一些词法上明显的绑定。相同的绑定可能被同一词法上下文中创建的多个闭包共享。如果其中一个闭包改变了闭包变量的值，所有其他闭包都会观察到这一变化。
 
-E.g. one can use closures to implement data abstractions where the closed bindings essentially are state that is hidden by the abstraction. Here is a toy example that implements a counter with READ and INCREMENT methods:
+例如，可以使用闭包来实现数据抽象，其中封闭的绑定（即闭包中的变量）本质上是由抽象隐藏的状态。以下是一个简单的示例，展示了如何实现带有读取和递增方法的计数器：
 
 #+begin_src emacs-lisp
   (defun make-counter (value)
@@ -1186,11 +1183,11 @@ E.g. one can use closures to implement data abstractions where the closed bindin
   => 3
 #+end_src
 
-Note how the same lexical binding of 'value' was captured in both the READ and INCREMENT closures returned by make-counter.
+注意，在make-counter返回的READ和INCREMENT闭包中，捕获了相同的'value'词法绑定值（即变量在闭包创建时的值）。
 
-Dewey M. Sasser [[mailto:dewey@newvision.com][dewey@newvision.com]] comments:
+杜威·M·萨瑟[[mailto:dewey@newvision.com][dewey@newvision.com]] 评论:
 
-Actually, I found when experimenting that the fset line is byte compiled. I suppose what that means is that byte-compiler is smart enough to treat the argument to "fset" as a function.
+实际上，我在实验中发现 `fset` 这一行是字节编译的。我认为这意味着字节编译器足够聪明，能够将 `fset` 的参数视为函数。
 
 #+begin_src emacs-lisp
   (defmacro make-multiplier (n)
@@ -1202,21 +1199,21 @@ Actually, I found when experimenting that the fset line is byte compiled. I supp
   (fset 'double (make-multiplier 2))
 #+end_src
 
-However, if you do a
+然而，如果你做某事...
 
 #+begin_src emacs-lisp
   (setq some-var (make-multiplier 2))
   (fset 'double some-var)
 #+end_src
 
-I don't think it will be compiled; maybe you have to write
+我觉得它不会被编译；也许你需要写一些代码。
 
 #+begin_src emacs-lisp
   (setq some-var (make-multiplier 2))
   (fset 'double (byte-compile-sexp some-var))
 #+end_src
 
-Here is another possibility
+这是另一种可能
 
 #+begin_src emacs-lisp
   (defun make-multiplier (func-sym n)
@@ -1228,51 +1225,51 @@ Here is another possibility
   ;; --> (defun double (x) (* 2 x))
 #+end_src
 
-[*Dewey* comments more]
+杜威进一步评论道
 
-However, while the real function is installed there, the autoload won't notice it. Autoload is a magic text thing. When the ;;;###autoload token is read, the autoload library uses (read) to read the next form. Read does not expand macros (well, only reader macros like #', and evidently ` is a reader macro that expands to the old-style (` (,a)) syntax). It the above example you get nothing (autoload should really be rewritten to be extensible).
+然而，尽管真正的函数已经安装在那里，自动加载功能却不会察觉到它。自动加载是一种基于文本的神奇机制。当读取到 `;;;###autoload` 标记时，自动加载库会使用 `(read)` 函数来读取下一个表达式。`read` 不会展开宏（确切地说，只有像 `#'` 这样的读取宏会被展开，而 `` ` `` 是一个读取宏，它会展开为旧式的 `` (` (,a)) `` 语法）。在上面的例子中，你什么也得不到（自动加载功能确实应该重写，使其具有可扩展性）。
 
-If you know the form will expand into "blah-func", which is a function, you can use:
+如果你知道这个形式会扩展成blah-func，即一个函数，可使用：
 
 #+begin_src emacs-lisp
   ;;;###autoload (autoload 'blah-func "this-file" "docs")
 #+end_src
 
-or whatever the actual call to autoload that you want.
+或者你需要的任何具体的自动加载的调用。
 
-** 9.12 How to read the macros
+** 9.12 如何理解宏
 
-When you see some exiting new styled macro, you can convert it back to old format with trick presented by [dewey]
+当你看到一些新颖的宏样式时，你可以利用[dewey]提供的技巧将其转换回旧格式。
 
 #+begin_src emacs-lisp
   (setq  foo (read (current-buffer)))
   (print foo (current-buffer)) C-u C-x C-e
 #+end_src
 
---------------------------------------------------------------------------------------------------------------
+-----
 
-* 10.0 Using lambda notation – some thoughts
+* 10.0 使用lambda表达式—若干思考
 
-** 10.1 Clarification
+** 10.1 澄清
 
-lambda is same as function, it is just "anonymous" function. So everything you can do with real function, you can do with lambda.
+其实，lambda（匿名函数）和函数是一样的，它只是“匿名”函数。所以，凡是能用常规函数完成的任务，都可以用 lambda 来完成。两者功能完全相同。
 
-Lisp programmers use lambda functions very often, but many times it would be better to see real functions instead. The lambdas have their places in lisp, eg. for mapcar and inside macros they are often used. But overall, lambdas are not that good.
+Lisp程序员经常使用lambda函数，但很多时候，使用真正的函数会更好。Lambda在Lisp中有其特定的用途，例如在mapcar（一种Lisp函数）和宏内部经常被使用。但总体而言，lambda并不那么理想。
 
-[Vladimir] also comments: There are several important things about using anon functions:
+[弗拉基米尔]还评论道：使用匿名函数有几个重要的事情：
 
-  + They can be constructed at run-time, returned from functions, stored in structures, etc. Not having to have a name for a function can sometimes be a boon, because you don't have to divine one for it!
-  + They can use the environment of the form they're embedded in. Eg they can use the local 'let' variables of the containing function without having to pass them as args, use dynamically scoped variables, or make them globals.
+- 它们可以在运行时被构造，从函数中返回，存储在结构里，等等。不需要给函数起名字有时可能是个好事，因为你不用为它想名字！
+- 它们可以利用其所嵌入的环境。例如，它们可以直接使用包含函数的局部‘let’变量，而无需将它们作为参数传递，也可以使用动态作用域变量，或将它们声明为全局变量。
 
-** 10.2 Motivation to not to use lambdas all the time
+** 10.2 避免总是使用 lambda 的原因
 
-  + Real function is cleaner, easy to hand to someone, more easily removed from hooks, more... than a lambda form.
-  + You can test functions, because you can call them. You can't easily test lambdas, because they have no name to call at.
-  + You can put functions in separate file; it can be collection of useful functions found from the net. For speed reasons you can byte compile this separate file. Many lambdas in your .emacs just make it look messy, separate function file is more convenient way.
+- 实函数更加简洁，更容易传递，更容易从钩子上移除，比lambda表达式更...
+- 你可以测试函数，因为你可以调用它们。你无法轻松测试lambda表达式，因为它们没有可供调用的名称。
+- 你可以将函数放在单独的文件中；它可以是一个从网上收集的有用函数的集合。为了提高速度，你可以对这个单独的文件进行字节码编译。你的 .emacs 文件中的大量 lambda 表达式会让它显得杂乱无章，使用单独的函数文件会更加方便。
 
-Let's see an example. Suppose we want to add some more regexps to error identification regexp list when the compile.el gets loaded.
+让我们看一个例子，假设我们想在加载 compile.el 时向错误识别的正则表达式列表中添加更多正则表达式。
 
-Bad choice:
+糟糕的选择
 
 #+begin_src emacs-lisp
   (eval-after-load
@@ -1286,11 +1283,11 @@ Bad choice:
               compilation-error-regexp-alist))))
 #+end_src
 
-While looking perfectly valid, it has some problems. How do you post this answer to someone else? Maybe he already has used some other way and he doesn't like this approach. How do you change this setup afterwards, especially when your're experimenting with right regexps. Gosh! How do I remove the entry from the variable eval-after-load ?
+虽然看起来完全有效，但它存在一些问题。你如何将这个答案分享给其他人？也许他已经使用了其他方法，并且不喜欢这种方案。你如何在此之后更改此设置，尤其是在你正在尝试正确的正则表达式时。哎呀！我如何从变量 eval-after-load 中删除条目？
 
-In here things are simple. Easily modifiable. And easily handed to anyone else.
+在这里，事情很简单，修改和转交都很方便。
 
-Possibly better choice:
+可能是更好的选择：
 
 #+begin_src emacs-lisp
   (defvar my-compile-eval-after-form
@@ -1327,7 +1324,7 @@ Possibly better choice:
            compilation-error-regexp-alist)))
 #+end_src
 
-Now, there is much more code involved here, but it is more portable. Remember the rule: space is cheap, ease of use comes first. Now you can also delete the entry easily from the eval-after-form.
+现在，这里涉及的代码更多了，但可移植性也更强了。记住这一点：空间成本低，易用性最重要。现在你也可以轻松地从 eval-after-form 中删除条目了。
 
 #+begin_src emacs-lisp
   (defun my-delete-eval-after-form (file form)
@@ -1339,9 +1336,9 @@ Now, there is much more code involved here, but it is more portable. Remember th
   (my-delete-eval-after-form "compile" my-compile-eval-after-form)
 #+end_src
 
-** 10.3 Putting lambdas into hooks
+** 10.3 将 lambda 表达式应用于钩子（hooks）中
 
-The same lambda talk applies to global-set-key and add-hook cases It's much cleaner to have function than the lambda. If you post the solution, people will appreciate function more than lambda solution. Let's try it this way first:
+同样的关于 lambda 的讨论也适用于 `global-set-key` 和 `add-hook` 的情况。使用函数比使用 lambda 更简洁明了。如果你发布解决方案，人们会更倾向于使用函数而非 lambda 的解决方案。我们先这样试试看：
 
 #+begin_src emacs-lisp
   (add-hook 'write-file-hooks
@@ -1354,7 +1351,7 @@ The same lambda talk applies to global-set-key and add-hook cases It's much clea
                      .. else))))
 #+end_src
 
-Two obvious notes raise immediately: a) the indentation is disturbing, and limits more complex programming b) how do you use remove-hook for this ? Not very nice job... Turn this into a function and you're back to clear waters.
+两个明显的问题立即浮现：a) 缩进让人感到困扰，限制了复杂编程 b) 你怎么用 remove-hook 来处理这个问题？这活儿干得不怎么样……将其转换为函数，问题就迎刃而解了。
 
 #+begin_src emacs-lisp
   (add-hook 'write-file-hooks 'my-write-file-hooks)
@@ -1363,15 +1360,15 @@ Two obvious notes raise immediately: a) the indentation is disturbing, and limit
     .. whatever)
 #+end_src
 
-Advantages: no more lambda, no more indentation problems, you can use remove-hook easily, and you can print the hook contents nicely with the following. If there were lambdas, the output wouldn't be so nice.
+优点：不再需要 lambda（匿名函数），不再有缩进问题，你可以轻松使用移除钩子功能，并且你可以通过以下方式清晰地展示钩子内容。如果使用了 lambda，输出效果就不会如此理想。
 
-(Be in scratch buffer, make sure lisp-mode is on, write the variable and Hit the C-u .. keys behind a variable)
+（在暂存缓冲区中，确保 Lisp 模式已启用，将变量写入缓冲区后按下 C-u 及后续键）
 
 #+begin_example
   write-file-hooks C-u C-x C-e
 #+end_example
 
-[Vladimir] For short functions to put in hooks/define-keys, I prefer to put the function like below. Then I can remove-hook it if I need, or re-eval the above to redefine the function, and whatnot.
+[弗拉基米尔] 对于要放入钩子函数/按键定义的简短函数，我更喜欢以下面的方式定义函数。这样，在需要时，我就可以移除钩子函数，或者重新求值上面的代码以重新定义函数，以及其他操作。
 
 #+begin_src emacs-lisp
   ;; Defun returns the symbol just defined: the function name
@@ -1382,15 +1379,15 @@ Advantages: no more lambda, no more indentation problems, you can use remove-hoo
   ;; End
 #+end_src
 
---------------------------------------------------------------------------------------------------------------
+-----
 
-* 11.0 Keeping your code organised
+* 11.0 保持代码的有序性
 
-** 11.1 Use function separation dash lines
+** 11.1 使用功能分隔虚线
 
-If you have loaded lisp packages from the net, you probably see many functions that are there "as is". Instead of just coding them there, you can ease the visibility of the functions by adding separator line before every function.
+如果你从网络加载了Lisp包，可能会看到许多“原封不动”的函数。与其仅仅在那里编写代码，不如在每个函数前添加分隔线，让函数更易于查看。
 
-Traditional:
+传统方式
 
 #+begin_src emacs-lisp
   (defun my-func1 ()
@@ -1404,7 +1401,7 @@ Traditional:
         ..)))
 #+end_src
 
-More visible choice:
+更明显的选择
 
 #+begin_src emacs-lisp
   ;;; ---------------------------------------------------------
@@ -1422,84 +1419,84 @@ More visible choice:
         ..)))
 #+end_src
 
-The comments use ";;;", although ";;" would suffice when the comment is outside of function body. According to lisp commenting rules the ";;" would have parked to the left hand too. The reason is that, when every comment outside of function has ";;;", I can grep my files for "outside" comments. The ";;" style I leave to function bodies.
+尽管在函数体外部使用“;;”就足够了，但注释仍使用“;;;”。根据Lisp的注释规则，“;;”也会被放置在左侧。原因是，当函数外部的注释都使用“;;;”时，我就可以在文件中用grep搜索这些“外部”注释。而“;;”这种风格，我则留给函数体使用。
 
-Few packages which might interest you, they all keep your code better organised.
+少数几个你可能会感兴趣的包，它们能让你的代码更有条理哦。
 
-+ folding.el Included in latest XEmacs uses folders {{{ }}}
+- folding.el 已包含在最新的 XEmacs 中，使用文件夹语法 {{{ }}}
 
-+ tinybookmark.el (b)ook(m)ark package "straight lines with names" provides also X-popup for bookmarks
+- tinybookmark.el (b)ook(m)ark 包 "带有名称的直线" 还提供书签的X弹窗功能。
 
-+ imenu.el finding specific funtion, more detailed control.  Included in Emacs and XEmacs
+- imenu.el（Emacs 的菜单插件）查找特定函数，提供更详细的函数查找控制。内置于 Emacs 和 XEmacs 中。
 
-** 11.2 Add autoload statements
+** 11.2 添加自动加载语句
 
-When you're making a package, don't forget to include those important autoload directives to key functions. If your package is expected to be put through the emacs build process when update-file-autoloads will add your autoloads to loaddefs.el, and subsequent dumping of that file with emacs will make them a permanent part of the emacs executable. (Usually loaddefs.el is dumped, so simply updating it and bytecompiling it won't cause it to be loaded at startup time.) Some sysadm may decide to keep your packages permanently in his emacs installation and he can rip the autoloads from your file with M-x generate-file-autoloads (function is defined in autoload.el).
+在制作包时，别忘了包含那些关键函数的自动加载指令。如果你的包预计会通过Emacs的构建流程，当update-file-autoloads将你的自动加载指令添加到loaddefs.el中时，随后使用Emacs加载该文件将使它们成为Emacs可执行文件的永久部分。（通常loaddefs.el会被转储，因此，简单地更新并字节编译它不会导致它在启动时被加载。）一些系统管理员可能会决定将你的包永久保留在其Emacs安装中，他可以使用M-x generate-file-autoloads从你的文件中生成自动加载指令（该函数定义于autoload.el中）。
 
 #+begin_src emacs-lisp
   ;;;###autoload
   (defun my-func ()
 #+end_src
 
---------------------------------------------------------------------------------------------------------------
+-----
 
-* 12.0 About lisp symbol naming
+* 12.0 关于 Lisp 符号命名
 
-Common idiom in lisp programs has been that the names contain only [-a-zA-Z] characters and so case chosen isn't generally mixed: My-Var is bad variable name. Also the traditional package definition convention has been:
+Lisp程序中常见的习惯是名称仅包含[-a-zA-Z]字符，因此通常不会混用大小写：My-Var这样的变量名是不好的。此外，传统的包定义惯例是：
 
 #+begin_src emacs-lisp
   (defun  csh-mode-yyy ...
     (defvar csh-mode-xxx ...
 #+end_src
 
-Here the first 'words' always specifies the package that is using the name space bucket, here csh-mode.  Remember that symbol names are put to global name space, so each function and each variable must be unique.
+这里的第一个“words”总是指定使用命名空间容器的包，这里是csh-mode。请记住，符号名称会被分配到全局命名空间，因此每个函数和变量都必须是唯一的。
 
-** 12.1 Don't use your initials
+** 12.1 避免使用姓名首字母
 
-In comp.lang.emacs, comp.emacs.xemacs and gnu.emacs.help where people are likely to post their own solution to other peoples, it seems that only few are aware of how they should name their symbols properly. The problem is that if you post code that has function name:
+在comp.lang.emacs、comp.emacs.xemacs和gnu.emacs.help这些论坛中，人们可能会发布自己的解决方案来帮助他人解决问题。然而，似乎没多少人意识到应该如何正确地为符号（如函数名、变量名等）命名。问题是，如果你发布的代码中包含函数名，可能会遇到以下情况：
 #+begin_example
   fill-matched
 #+end_example
 
-How do you know afterwards (when you just grab the code and save it somewhere in your .emacs or personal "snippet" lib) when you start writing code using that function, that it wasn't a Emacs distributed function or variable?
+你怎么知道以后（当你只是抓取代码并将其保存在你的.emacs文件或个人‘片段’库中时），当你开始使用该函数编写代码时，它不是Emacs自带的函数或变量？
 
-The problem arises too, if you name the functions so, that they start with your initials:
+问题也会出现，如果你以这样的方式命名函数：让它们以你的名字首字母开头。
 #+begin_example
   joe-fill-matched
 #+end_example
 
-Now, what's wrong with that? Well, if you're going to post such code that have lot's of functions and variables starting with prefix joe- , people get upset when they save the functions and notice that there is someone other's initials involved. They just wanted to have some general function to solve current task.
+现在，这有什么不妥呢？嗯，如果你打算发布这样的代码，其中有很多函数和变量以joe-为前缀（即以joe-开头的命名），当人们保存这些函数并发现其中使用了别人的首字母时，他们会觉得不悦。他们只是想要一些通用的函数来完成手头的任务。
 
-Now, when they ask help again, someone else posts his own functions and they end up gathering functions:
+现在，当他们又一次请求帮助时，其他人会发布自己的编程函数，他们最终积累了这些函数。
 #+begin_example
   joe-funcs ..
   mike-funcs ..
   bill-funcs ..
 #+end_example
 
-Putting those into .emacs doesn't look pretty.
+把这些放到 .emacs 里看起来不太好看。
 
-** 12.2 Use prefix my for private symbols
+** 12.2 使用前缀 my 表示私有变量（通常用于编程中的私有标识符）
 
-It becomes obvious that it would be nice if everybody would use common naming convention, so that the code can be handed to anybody without changes. The best way to achieve this is that people use prefix:
+显而易见，如果每个人都使用通用的命名规范，代码就可以直接交给任何人而无需修改。这将非常理想。实现这一目标的最好办法是使用前缀：
 
 #+begin_example
   my-
 #+end_example
 
-To denote everything that they own: own variables own functions, maps.. Now it's very simple to post that code to someone else, and believe me everybody is happy when they receive good and clean code without someone else's initial involved. They feel that it's "my" code too, to solve "my" problems.
+为了表示他们所拥有的一切：自己的变量、自己的函数、映射……现在将这些代码分享给其他人非常简单。相信我，当人们收到没有他人参与的干净且良好的代码时，每个人都会感到高兴。他们会觉得这也是“我的”代码，用来解决“我的”问题。
 
-To extend this naming more, people should also use convention:
+为了进一步扩展这种命名规则，人们还应遵循命名约定：
 
 #+begin_example
-      my-csh-mode-do-this...
+  my-csh-mode-do-this...
 #+end_example
 
-If it has anything to do with the csh-mode.el, so in general add the word my- + possible LIB-ID if you write some special functions for elisp packages. This way you can easily find all functions related to "csh-" package with describe-symbol function (available in tinyliby.el ), including your own.
+如果它与 csh-mode.el 有关，因此，通常在你为 elisp 包编写一些特殊函数时，添加 my- + 可能的库标识符（LIB-ID）。这样，你可以通过 describe-symbol 函数（该函数在 tinyliby.el 中可用）轻松找到与 "csh-" 包相关的所有函数，包括你自定义的函数。
 
-** 12.3 Naming variables differently?
+** 12.3 变量命名方式是否不同？
 
-There is still a matter of style with the variable naming. While it is possible to program like the "lisp" way, that may not be the best bet. In Emacs Lisp, variable and function names do not need to differ in any way, so it's perfectly legal to have same name for a variable and for a function and for a keymap and .. you name it.
+变量命名还涉及一个风格问题。虽然可以按照‘Lisp’风格编程，但这未必是最佳选择。在Emacs Lisp中，变量名和函数名无需以任何方式加以区分，因此，变量、函数、键盘映射等使用相同名称是完全合法的，诸如此类。
 
 #+begin_src emacs-lisp
   (defun  csh-mode ()
@@ -1509,28 +1506,28 @@ There is still a matter of style with the variable naming. While it is possible 
     "Mode on/off variable")
 #+end_src
 
-This is both a good and a bad idea. The good part of it is, that when you're working with MODES or KEYMAPS, it's very desirable to have same name, so that you know what's going on in the code.
+这既有利也有弊。好的部分是，当你在处理模式或键映射时，使用相同的名称是非常有益的，这样你就能清楚地了解代码的运行情况。
 
-But in the other hand, if you're not using modes, the naming convention is .. hmpf, confusing. In practical terms it's lot more easier to look at the code if the symbol itself denotes the CLASS where it belongs. If everything looks the same, as lisp does due to its nature, it would be welcomed if there were something that separate variables from function elements.
+但另一方面，如果你不使用模式，命名规则就……嗯……令人困惑。实际上，如果符号本身能表示它所属的类，那么查看代码会容易很多。如果所有东西看起来都一样，就像Lisp由于其特性那样，那么如果有某种方式能将变量与函数组成部分区分开来，那将会非常有用。
 
-** 12.4 Separate naming of variables
+** 12.4 变量的独立命名
 
-In Tiny Tools you have seen another convention. Some has said that it "looks ugly", "I don't like it", and admittedly it can give that impression to the reader of the code.
+在Tiny Tools中，你会看到另一种惯例。有人说它“看起来不太好看”，“我不太中意它”，诚然，这可能会给代码的读者留下这样的印象。
 
-But managing lisp code gets complicated and hard to maintain if you don't develop some aids. A different symbol naming according to their CLASSES does help to read my code better and help maintainer to see where the variables are and where the functions are. Here is one possibility:
+但是，如果不开发一些辅助工具或方法，管理Lisp代码会变得复杂且难以维护。根据它们的类别（CLASSES）采用不同的符号命名方式确实有助于更清晰地阅读代码，并帮助维护者快速定位变量和函数的位置。以下是一个可能的解决方案：
 
 #+begin_src emacs-lisp
   (defun my-function () ..
          (defvar my-:variable 100)
 #+end_src
 
-There is another benefit from this: it is now possible to grep all symbols referring to variables, and there is no false hits, It is also posisble to run a program to do the name replacement and it succeeds 100%.  Variables fromcan be searched from the buffer by give my-: prefix to search engine. All in all, navigating in lisp code is much more easier.
+此外，还有另一个好处：现在可以使用grep命令查找所有引用变量的符号，而且没有误匹配。还可以运行程序进行名称替换，且成功率为100%。变量可以从缓冲区中搜索，只需在搜索功能中使用my-:前缀即可。总之，在lisp代码中浏览变得简单多了。
 
-Have you ever tried to complete the lisp symbols? It's lot nicer when you car write my-: prefix and hit lisp-complete-symbol command to give you listing of all variables. No false hits concerning functions.
+你有没有试过补全 Lisp 中的符号？当你输入 `my-:` 前缀并按下 `lisp-complete-symbol` 命令（Lisp 中的符号补全命令）时，它会列出所有变量，这样会方便得多。不会出现与函数相关的误匹配。
 
-Why ":" ? Well, that is familiar to a C++ and Perl programmer and The ':' character seems neutral and visible enough to be used in the code.
+为什么用“:”？因为这对C++和Perl程序员来说很熟悉，而且“:”这个字符看起来中立且足够显眼，适合在代码中使用。
 
-There are also alternative choices, like using "--", double dash to denote variables:
+此外，还有其他选择，比如使用“--”（双破折号）来表示变量：
 
 #+begin_src emacs-lisp
   (defconst my--var1 "some" "*tmp var")
@@ -1538,50 +1535,50 @@ There are also alternative choices, like using "--", double dash to denote varia
   (defconst my--var3 "some" "*tmp var")
 #+end_src
 
-Note: The colon character is by default in the same syntax class as the dash, so your lisp commands like backward-sexp work as usual. You can verify this with commands
+注：默认情况下，冒号字符与破折号在语法上属于同一类别，因此像 `backward-sexp`（Lisp 中的 `backward-sexp` 命令）这样的 Lisp 命令仍可正常执行。你可以通过以下命令来验证这一点。
 
 #+begin_src emacs-lisp
   (char-to-string (char-syntax ?:)) and
   (char-to-string (char-syntax ?-)) in lisp-mode.
 #+end_src
 
---------------------------------------------------------------------------------------------------------------
+-----
 
-* 13.0 Lisp code notes
+* 13.0：Lisp 代码笔记
 
-** 13.1 Call-interactively
+** 13.1 交互式调用函数
 
 #+begin_example
-      > If I define a kbd macro, and then name it `say-hi', and I
-      > make the kbd
-      > macro map to the letters "HI", then that macro is a command.
-      >
-      > (defalias 'say-hi (read-kbd-macro "HI"))
-      >
-      > should end up being interactive. In fact, the expression:
-      > (commandp 'say-hi)
-      >
-      > evals to TRUE.
+  > If I define a kbd macro, and then name it `say-hi', and I
+  > make the kbd
+  > macro map to the letters "HI", then that macro is a command.
+  >
+  > (defalias 'say-hi (read-kbd-macro "HI"))
+  >
+  > should end up being interactive. In fact, the expression:
+  > (commandp 'say-hi)
+  >
+  > evals to TRUE.
 #+end_example
 
-Hrvoje Niksic [[mailto:hniksic@srce.hr][hniksic@srce.hr]], comp.emacs.xemacs, 13 Apr 1997
+Hrvoje Niksic[[mailto:hniksic@srce.hr][hniksic@srce.hr]], comp.emacs.xemacs, 1997年4月13日
 
-It is, but for a different reason. commandp returns t for interactive compiled functions, interactive lambda expressions, autoloads with fourth argument non-nil and *string and vectors*.
+确实如此，但原因不同。commandp（命令判断函数）对于交互式编译函数、交互式 lambda 表达式（即交互式匿名函数）以及第四个参数为非 nil 的自动加载函数会返回 t。*字符串和向量*
 
 #+begin_src emacs-lisp
   (commandp [some vector])
 #+end_src
 
-yields t not because [some vector] is a valid command, but because it can be callable through execute-kbd-macro or such. Documentation for commandp never guarantees that you'll be able to call-interactively the objects it blesses with t.
+返回 t 并不是因为 [某个向量] 是有效命令，而是因为它可以通过 execute-kbd-macro 或类似函数调用。commandp 的文档从未保证你可以交互调用那些被赋予 t 标记的对象。
 
 #+begin_example
-      > The error is when I do this:
-      > (call-interactively 'say-hi)
-      > I get :
-      > wrong type of argument: commandp, say-hi
+  > The error is when I do this:
+  > (call-interactively 'say-hi)
+  > I get :
+  > wrong type of argument: commandp, say-hi
 #+end_example
 
-That is only a lousy-stated error message. You can call macros with execute-kbd-macro.
+那只是一个表述不清的错误信息。你可以通过 execute-kbd-macro（执行键盘宏）来调用宏。
 
 #+begin_src emacs-lisp
   (defun maybe-macro-call-interactively (def &rest junk)
@@ -1597,13 +1594,13 @@ That is only a lousy-stated error message. You can call macros with execute-kbd-
   ;; End
 #+end_src
 
-** 13.2 Condition-case vs. unwind-protect ?
+** 13.2 Condition-case 和 unwind-protect 的对比
 
-Steven L Baur [[mailto:steve@miranova.com][steve@miranova.com]]
+史蒂文·L·鲍尔[[mailto:steve@miranova.com][steve@miranova.com]]中文：
 
-unwind-protect executes the clean up forms whenever the stack is unwound by either a throw (non-local exit), or by a signal (error condition). Condition-case handles only the error condition and can be bypassed by a non-local exit.
+unwind-protect 当堆栈因 throw（非局部退出）或 signal（错误条件）而展开时，执行清理操作。Condition-case 仅处理错误条件，且可通过非局部退出绕过。
 
-Here's some sample code that illustrates the differences: (tested on Emacs 19.34 and XEmacs 19.15)
+以下是一些示例代码，展示了这些差异：（已在Emacs 19.34和XEmacs 19.15上测试）
 
 #+begin_src emacs-lisp
   (defun test-func (foo)
@@ -1629,15 +1626,15 @@ Here's some sample code that illustrates the differences: (tested on Emacs 19.34
   ;; End
 #+end_src
 
-If you call (wrapper-1 t), the "Caught Error..." message is never executed, but if you call (wrapper-2 t) it will be.
+如果你调用 (wrapper-1 t)，"捕获的错误..." 信息永远不会被执行，但如果你调用 (wrapper-2 t)，它将会被执行。
 
-In the error signaling case, (wrapper-1 nil) will cause the error to be caught and never signalled up.  Unwind-protect (wrapper-2 nil), the error condition does get propagated up. Since this appears to be what you want anyway, use unwind-protect.
+在错误信号处理的情况下，(wrapper-1 nil) 会导致错误被捕获且不会向上传递，而使用 unwind-protect（一种保护机制）(wrapper-2 nil) 则会使错误条件向上传播。既然这似乎是您所需的功能，建议使用 unwind-protect。
 
-I hope that makes it a little clearer.
+我希望，这能让情况更清楚一些。
 
 ** 13.3 Dolist
 
-The dolist command loops through a list and it is defined int the cl package; you can stop the loop with return command. Below you see example and the expansion with cl-prettyexpand.
+dolist 命令，会遍历一个列表，它定义在 cl 包中；你可以通过 return 命令来停止循环。下面你将看到一个示例以及使用 cl-prettyexpand 展开的结果。
 
 #+begin_src emacs-lisp
   (dolist (elt '(1 2))
@@ -1654,7 +1651,7 @@ The dolist command loops through a list and it is defined int the cl package; yo
            nil))
 #+end_src
 
-macroexpand to find out the real expansion
+使用宏展开来找出实际的展开结果。
 
 #+begin_src emacs-lisp
   (cl-block-wrapper
@@ -1668,17 +1665,17 @@ macroexpand to find out the real expansion
        nil)))
 #+end_src
 
-Dave Gillespie [[mailto:daveg@thymus.synaptics.com][daveg@thymus.synaptics.com]] comments:
+戴夫·吉莱斯皮[[mailto:daveg@thymus.synaptics.com][daveg@thymus.synaptics.com]] 评论
 
-Common Lisp loops use the Common Lisp block mechanism, not the catch mechanism. The Emacs CL package implements block in terms of catch, but there is a catch, so to speak.
+Common Lisp 的循环使用的是块机制，而非捕获机制。Emacs CL 包使用捕获机制来实现块功能，但这里可以说有一个‘小陷阱’。
 
-The CL package treats block specially in order to optimize it. Catch blocks are expensive at run-time, so I wanted to make sure the compiler could eliminate them when the body code didn't actually call return. (This is especially important since many Common Lisp constructs include implicit blocks whether you use those blocks or not.)
+CL包为了优化而特别处理了块结构。Catch块结构在运行时的开销较大，因此我希望确保编译器能够在主体代码实际上没有调用return时消除它们。（这一点尤其重要，因为许多Common Lisp结构都包含隐式块结构，无论你是否使用这些块结构。）
 
-There were technical reasons, which I don't remember exactly, why the optimization was best done in the compiler itself instead of in the block macro. Therefore, the CL package has some hacks to modify or delay the expansion of block under certain circumstances. But this will always be invisible unless you deliberately peek at the macro expansions. If you actually try using return or return-from in your code, you will find that it works properly.
+有一些技术上的原因，具体是什么我记不清了，为什么优化最好在编译器本身进行，而不是在块宏中。因此，CL 包有一些机制，可以在某些情况下修改或延迟块的展开。但除非你特意去查看宏展开，否则这通常是不可见的。如果你在代码中实际使用 `return` 或 `return-from`，你会发现它们工作正常。
 
-** 13.4 Narrow-to-region – don't use it always
+** 13.4 局部区域——不建议始终使用该功能
 
-The narrow-to-region lisp form is great if you create functions that should do their job in restricted area.  Say:
+如果创建的函数需要在特定区域内执行任务，那么使用窄区域Lisp形式（即限定在特定区域内执行的Lisp形式）会非常有效。比如说：
 
 #+begin_src emacs-lisp
   (defun my-find-a-region-1 (beg end)
@@ -1694,7 +1691,7 @@ The narrow-to-region lisp form is great if you create functions that should do t
   ;; End
 #+end_src
 
-There is also another way to write this function by not using the narrow at all. I would prefer this another alternative and avoid the narrow, because you can take advantage of the END parameter of re-search-forward.
+还有一种完全不使用narrow函数来编写此函数的方法。我更喜欢这种替代方法，因为它可以避免使用narrow函数，同时还能利用re-search-forward函数的END参数。
 
 #+begin_src emacs-lisp
   (defun my-find-a-region-2 (beg end)
@@ -1709,23 +1706,23 @@ There is also another way to write this function by not using the narrow at all.
   ;; End
 #+end_src
 
-** 13.5 Obarray: length and efficiency
+** 13.5 Obarray：长度与效率
 
-[Jamie Zawinski [[mailto:jwz@netscape.com][jwz@netscape.com]]] ...A vector of length 0 can't be used as an obarray. And for performance reasons, an obarray should have a length which is prime, and which is roughly the size of the number of elements you're going to put into it; The larger the ratio of elements/length, the more time lookups will take.
---------------------------------------------------------------------------------------------------------------
+杰米·扎温斯基[[mailto:jwz@netscape.com][jwz@netscape.com]]...长度为0的向量不能用作obarray。出于性能考虑，obarray的长度应为质数（质数长度有助于减少哈希冲突，从而提高性能），且大致等于将要放入其中的元素数量；元素数量与长度的比值越大，查找操作所需时间就越长。
+-----
 
-* 14.0 Optimizing and byte compiler tips
+* 14.0 优化与字节码编译器技巧
 
-** 14.1 Use eq instead of =
+** 14.1 使用 eq（表示等于）而不是 =
 
-[24 Jan 1996, [[mailto:terra@diku.dk][terra@diku.dk]] (Morten Welinder)] If you're not an Emacs wizzard you should skip these patches for now. You may benefit later. I have discovered that lots of Emacs Lisp code uses equal and = where they could have used eq or even null.
+1996年1月24日[[mailto:terra@diku.dk][terra@diku.dk]] (Morten Welinder) 如果你不是Emacs专家，现在应该暂时跳过这些补丁。日后你可能会从中获益。我发现很多Emacs Lisp代码在可以使用eq甚至null的地方，却使用了“equal”和“=”。
 
-+ `equal' is slow and uses a function call.
-+ `='     is fair but does unnecessary check if we can decide in advance that the arguments are integers.
-+ `eq'    is almost as fast as...
-+ `null'  ...which is best.
+- `equal' 很慢，并且使用了函数调用。
+- `=` 是合理的，但如果我们能提前确定参数是整数，它仍会进行不必要的检查。
+- `eq' 几乎和……一样快
+- 「null」...哪一个最好。
 
-Examples. Often you see something like these expressions:
+例子。你经常会看到类似的表达方式：
 
 #+begin_src emacs-lisp
   (= (point) (point-min))
@@ -1735,7 +1732,7 @@ Examples. Often you see something like these expressions:
   (eq arg nil)
 #+end_src
 
-which from a functional (and style) point of view are perfectly ok. But they're not as efficient as they could be. The ones below are better because they use the available type information about the arguments.
+从功能（和风格）的角度来说，这些是完全可行的。但它们并未达到最佳效率。下面这些方法更佳，因为它们利用了关于参数的类型信息。
 
 #+begin_src emacs-lisp
   (eq (point) (point-min))
@@ -1745,23 +1742,23 @@ which from a functional (and style) point of view are perfectly ok. But they're 
   (null arg)
 #+end_src
 
-** 14.2 About setq and set
+** 14.2 关于 setq 和 set
 
-Simon Marshall [[mailto:Simon.Marshall@esrin.esa.it][Simon.Marshall@esrin.esa.it]] Jan 1997 in gnu.emacs.help mentined that ...One difference not mentioned is that they are byte-compiled differently. I think
+西蒙·马歇尔[[mailto:Simon.Marshall@esrin.esa.it][西蒙.马歇尔@esrin.esa.it]] 1997年1月，在gnu.emacs.help中提到…一个未被提到的区别是它们的字节码编译方式不同。我认为…
 
 #+begin_src emacs-lisp
   (setq fubar foo)
 #+end_src
 
-results in faster byte-code than
+生成比...更快的字节码
 
 #+begin_src emacs-lisp
   (set 'fubar bar).
 #+end_src
 
-** 14.3 About let in Emacs
+** 14.3 Emacs中的let语句
 
-[Hrvoje Niksic [[mailto:hniksic@srce.hr][hniksic@srce.hr]] 1998-03-13 XE-L]
+[赫沃耶·尼克西奇[[mailto:hniksic@srce.hr][hniksic@srce.hr]] 1998-03-13 XE-L]
 
 #+begin_src emacs-lisp
   (setq global 2)
@@ -1773,97 +1770,97 @@ results in faster byte-code than
   ==> 3
 #+end_src
 
-...`let' sets up an unwind-protect that remembers the old value (2), and places the new value to the symbol value slot (nil in this case). When you assign 4 to global, it's written to its value slot, overriding nil.  When let is left, the internal unwind-protect restores the old value (2).
+...`let` 语句设置了一个 unwind-protect 机制，它会记住旧值（2），并将新值放入符号的值槽位中（在这个例子中是 nil）。当你将 4 赋值给全局变量时，该值会被写入其值槽位，覆盖原有的 nil。当 `let` 语句执行完毕时，内部的 unwind-protect 机制会恢复旧值（2）。
 
-This is one of the reasons why let is extremely slow in Emacs Lisp.
+这是在Emacs Lisp中let非常慢的原因之一。
 
-** 14.4 Make lambda to run code faster
+** 通过 lambda 提升代码运行速度
 
-This all is actually explained well in the Emacs lisp pages, but let's refresh memory a bit. Let's start with the traditional example:
+这一切在Emacs lisp 文档中其实已经解释得很清楚了，但让我们稍微回忆一下。让我们从一个经典例子开始：
 
 #+begin_src emacs-lisp
   (mapcar '(lambda (x) ... )   list)
 #+end_src
 
-The lisp manual page in says that "(elisp, Node: Anonymous Functions) ...Lisp compiler cannot assume this list is a function, even though it looks like one". So, we have to help byte compiler by adding function directive.
+Lisp 手册页中提到：“(elisp, 节点: 匿名函数) ...Lisp 编译器不能假设这个列表是一个函数，即使它看起来像是一个函数。” 因此，我们必须通过添加函数指令来帮助字节编译器。
 
 #+begin_src emacs-lisp
   (mapcar (function (lambda (x) ... )   list)
 #+end_src
 
-Which, when compiled probably speeds the code by factor 2 or more. One compatibility not to this: in Emacs 19.29 and up you can actually write like this, which is exactly the same as the using the function syntax.
+编译后，可能会使代码速度提高两倍或更多。有一个兼容性问题：在Emacs 19.29及以上版本中，你可以这样写，这与使用函数语法的效果完全一致。
 
 #+begin_src emacs-lisp
   (mapcar (lambda (x) ... )   list)
 #+end_src
 
-** 14.5 Deleting and inserting in buffer is slow
+** 14.5 在缓冲区中，删除和插入操作速度很慢
 
-[Jerry Quinn [[mailto:jquinn@nortel.ca][jquinn@nortel.ca]]] ...I used to dump data to buffer and then moving to a column, making various changes with insert and delete-char and moving on to the next change. It would take about 22 seconds on my system
+[杰瑞·奎因[[mailto:jquinn@nortel.ca][jquinn@nortel.ca]]...我过去常常将数据转储到缓冲区，然后移动到某一列，使用插入和删除字符功能进行各种修改，然后继续进行下一个更改。这个过程在我的系统上大约需要22秒。
 
-I now collect the message data into lists with regexps erase the buffer and dump the new results in with format. This is MUCH faster. (3sec compared to previous 22sec)
+我现在将消息数据收集到列表中，使用正则表达式清除缓冲区，并以特定格式进行数据转储。这速度快多了。（之前需要22秒，现在只需3秒）
 
-** 14.6 Byte compiler options
+** 14.6 字节码编译器选项
 
-18 Sep 1996, Andreas Schwab [[mailto:schwab@issan.informatik.uni-dortmund.de][schwab@issan.informatik.uni-dortmund.de]] answered to question below
-
-#+begin_example
-> (defalias 'pair (symbol-function 'cons))
-> (defalias 'pairp (symbol-function 'consp))
->
-> The trouble is that the byte-compiler doesn't optimize a
-> call to e.g. pair as it would do with a call to cons
-> because it doesn't recognize pair as an alias for cons.
->
-> Is there a way to tell the byte-compiler to treat
-> pair the same way as cons?
-
-      (byte-defop-compiler '(pair byte-cons) 2)
-      (byte-defop-compiler '(pairp byte-consp) 1)
-#+end_example
-
-** 14.7 Byte compiler warnings – how to get rid of them
-
-19 Feb 1996, [[mailto:andersl@csd.uu.se][andersl@csd.uu.se]] (Anders Lindgren)
+1996年9月18日，安德烈亚斯·施瓦布[[mailto:schwab@issan.informatik.uni-dortmund.de][schwab@issan.informatik.uni-dortmund.de]] 已回答以下问题。
 
 #+begin_example
-> If you have code that depends on a library that is not
-> always included in a program (be it Emacs Lisp or other
-> Lisp), the correct way to insure that it's compiled
-> properly is to do the require. It's not overkill; after
-> all, a user presumably will only compile it once. And >
-> it may save you from interactions that you cannot predict
-> now, e.g., when at some future time when you change your
-> package or font-lock changes in a future revision of
-> Emacs.
+  > (defalias 'pair (symbol-function 'cons))
+  > (defalias 'pairp (symbol-function 'consp))
+  >
+  > The trouble is that the byte-compiler doesn't optimize a
+  > call to e.g. pair as it would do with a call to cons
+  > because it doesn't recognize pair as an alias for cons.
+  >
+  > Is there a way to tell the byte-compiler to treat
+  > pair the same way as cons?
+
+        (byte-defop-compiler '(pair byte-cons) 2)
+        (byte-defop-compiler '(pairp byte-consp) 1)
 #+end_example
 
-Genrally this is a good idea. Unfortualtely, when it comes to font-lock it's not. It contains a check that it is runed under a window system, and barfs at load-time if it's not. This makes it impossibel to require the package when compiling in batch mode or on a system without a window system.
+** 14.7 字节码编译器警告——如何解决这些警告
 
-I have been using a (very ugly) method where I replace statements by equivalent statements which doesn't raise the anger of the compiler:
+1996年2月19日[[mailto:andersl@csd.uu.se][andersl@csd.uu.se]] (安德斯·林德格伦)
 
 #+begin_example
-      foo              == (symbol-value 'foo)
-      (setq foo ...)   == (set 'foo ...)
-                         == (funcall (symbol-funtion 'set) 'foo ...)
-              (The former fools the Emacs compile but not
-               the XEmacs'. The latter fools both.)
-      (foo ...)        == (funcall (symbol-function 'foo) ...)
+  > If you have code that depends on a library that is not
+  > always included in a program (be it Emacs Lisp or other
+  > Lisp), the correct way to insure that it's compiled
+  > properly is to do the require. It's not overkill; after
+  > all, a user presumably will only compile it once. And >
+  > it may save you from interactions that you cannot predict
+  > now, e.g., when at some future time when you change your
+  > package or font-lock changes in a future revision of
+  > Emacs.
 #+end_example
 
-This type of coding is specially useful when writing programs which should be able to run (and compile) under both under Emacs and XEmacs. – Anders
+一般来说这是个好主意。不幸的是，当涉及到字体锁定时，情况并非如此。它包含一个检查，确保在窗口系统下运行，如果不是，加载时会报错。这使得在批处理模式下编译时，或在不带窗口系统的系统上，无法加载该包。
 
-** 14.8 Inlining and byte compiler
-
-The byte compiler is quite powerfull, but there is only handfull of people who really understand how its features can be exploited in full. Here is couple of suggestions how you could force some function to be inlined and thus save the function call, which in emacs is quite expensive (see the profiling results later and examine eg. mapcar)
-
-Notice that
+我一直在使用一种（非常不优雅的）方法，即用不会引发编译器报错的等效代码语句来替换原有语句。
 
 #+begin_example
-      defsubst --> Byte Compiler inlines the function automatically.
+  foo              == (symbol-value 'foo)
+  (setq foo ...)   == (set 'foo ...)
+                     == (funcall (symbol-funtion 'set) 'foo ...)
+          (The former fools the Emacs compile but not
+           the XEmacs'. The latter fools both.)
+  (foo ...)        == (funcall (symbol-function 'foo) ...)
 #+end_example
 
-But in case of func beeing a regular 'defun' you want to use special form inline to force inlining the code.
+这种编码方式在编写既能在Emacs又能在XEmacs下运行（和编译）的程序时特别有用。——安德斯
+
+** 14.8 内联（代码优化技术）与字节码编译器
+
+字节编译器非常强大，但真正理解如何充分利用其功能的人却只有少数。这里有几条建议，教你如何强制内联某些函数，从而避免函数调用的开销，这在Emacs中代价很高（稍后查看性能分析结果，并检查诸如mapcar等函数）。
+
+注意。
+
+#+begin_example
+  defsubst --> Byte Compiler inlines the function automatically.
+#+end_example
+
+在 `func` 是一个常规的 `defun` 函数的情况下，你需要使用 `inline` 特殊形式来强制内联代码（即将代码直接插入调用处）。
 
 #+begin_src emacs-lisp
   (defun func (arg)
@@ -1873,7 +1870,7 @@ But in case of func beeing a regular 'defun' you want to use special form inline
     (inline (func xx)))
 #+end_src
 
-See what we got:
+来看看我们搞到了什么
 
 #+begin_src emacs-lisp
   ;; You do not need this: (byte-compile 'my)
@@ -1883,22 +1880,22 @@ See what we got:
 #+end_src
 
 #+begin_example
-      byte code for my:
-      args: (x)
-      0       varref    xx
-      1       dup
-      2       varbind   arg
-      3       goto-if-nil 1
-      6       constant  t
-      7       goto      2
-      10:1    constant  nil
-      11:2    unbind    1
-      12      return
+  byte code for my:
+  args: (x)
+  0       varref    xx
+  1       dup
+  2       varbind   arg
+  3       goto-if-nil 1
+  6       constant  t
+  7       goto      2
+  10:1    constant  nil
+  11:2    unbind    1
+  12      return
 #+end_example
 
-As you saw; the func was open coded inside function my. Here is reminder from the byte compiler page:
+正如你所见，func 是在函数 my 中直接编码的。以下是字节码编译器页面的提醒：
 
-You can also open-code one particular call to a function without open-coding all calls. Use the 'inline' form to do this, like so:
+你也可以只对某个特定的函数调用进行内联，而不需要对所有调用都进行内联处理。可以通过 'inline' 形式来做到这一点，如下：
 
 #+begin_src emacs-lisp
   (inline (foo 1 2 3))    ;; `foo' will be open-coded
@@ -1907,42 +1904,42 @@ You can also open-code one particular call to a function without open-coding all
     (baz 0))
 #+end_src
 
-You can make a given function be inline even if it has already been defined with defun by using the proclaim-inline form like so:
+你可以通过使用 `proclaim-inline`（声明内联）形式来使一个函数成为内联函数。即使该函数已经用 `defun`（定义函数）定义，也可以这样做，如下所示的方式。
 
 #+begin_src emacs-lisp
   (proclaim-inline my-function)
 #+end_src
 
-This is, in fact, exactly what defsubst does. To make a function no longer be inline, you must use proclaim-notinline. Beware that if you define a function with defsubst and later redefine it with defun, it will still be open-coded until you use proclaim-notinline.
+事实上，这完全正是 `defsubst` 所做的。要使一个函数不再以内联方式执行，你需要使用 `proclaim-notinline（声明不内联）`。注意，如果你用 `defsubst` 定义了一个函数，之后又用 `defun（定义函数）` 重新定义它，它仍然会直接插入代码，直到你使用 `proclaim-notinline` 为止。
 
-** 14.9 Inlining an interactive function, danger ahead
+** 14.9 内联交互式函数，存在风险
 
-[Moral: do not make interactive functions defsubst] [Sample test file available: test-defsubst.el]
+[建议：不要使用defsubst定义交互式函数] [示例测试文件如下：test-defsubst.el]
 
-When I was converting some very small functions from defun to defsubst, I run in to this observation. I was wondering what inlining would do to functions that had interactive spec. Below the terms IACT refers to functon that has interactive spec; Here is th epseudo code for two functions.
-
-#+begin_example
-      defsubst fun1
-        IACT
-        iact-fun1-body
-
-      defun fun2
-        IACT
-        call fun1
-        body
-      ;; end
-#+end_example
-
-Now, there is conflict, because when I byte compile fun2, we see
+以下是我在转换过程中遇到的一些观察。当我将一些非常小的函数从`defun`（定义函数）转换为`defsubst`（定义内联函数）时，我遇到了这个问题。我很好奇内联会对带有交互式规范的函数产生什么影响。以下术语`IACT`指的是带有交互式规范的函数；这是两个函数的伪代码示例。
 
 #+begin_example
-      defun fun2
-        iact-fun1-body
-        body
-      ;; end
+  defsubst fun1
+    IACT
+    iact-fun1-body
+
+  defun fun2
+    IACT
+    call fun1
+    body
+  ;; end
 #+end_example
 
-Where the iact-fun1-body is copied "as is". And that was what I was afraid of. Because iact-fun1-body had (interactive-p) test, it gets inserted into wrong place and the whole construction isn't what I intended. Here are the results in case you're interested.
+现在出现了问题，因为当我进行fun2的字节编译时，我们观察到
+
+#+begin_example
+  defun fun2
+    iact-fun1-body
+    body
+  ;; end
+#+end_example
+
+其中 `iact-fun1-body` 被原样复制了。这正是我所担心的。因为 `iact-fun1-body` 中有 `(interactive-p)` 测试，它被插入到了错误的位置，整个结构并不符合我的预期。如果你有兴趣的话，可以看看这里的结果。
 
 #+begin_src emacs-lisp
   (defsubst test (&optional arg)
@@ -1959,67 +1956,68 @@ Where the iact-fun1-body is copied "as is". And that was what I was afraid of. B
   --> "Gotchya"        << SUPRISE! That wasn't meant to happen!
 #+end_src
 
-byte code for test2 reveals how the inlining happened.
+test2的字节码，展示了内联的实现方式。
 
 #+begin_example
-        args: (arg)
-       interactive: "P"
-      0       constant  nil
-      1       varbind   arg
-      2       interactive-p
-      3       goto-if-nil-else-pop 1
-      6       constant  message
-      7       constant  "Gotchya"
-      8       call      1
-      9:1     unbind    1
-      10      return
+    args: (arg)
+   interactive: "P"
+  0       constant  nil
+  1       varbind   arg
+  2       interactive-p
+  3       goto-if-nil-else-pop 1
+  6       constant  message
+  7       constant  "Gotchya"
+  8       call      1
+  9:1     unbind    1
+  10      return
 #+end_example
 
---------------------------------------------------------------------------------------------------------------
+-----
 
-* 15.0 Profiling
+* 15.0 性能分析
 
-** 15.1 Test envinronment
+** 15.1 测试环境
 
-Here is collection of tests and results I made out of curiosity which way is better to code.
+这是我出于好奇进行的一系列测试和结果，以探索哪种编码方式更优。
 
-  + All the functions were in NON-COMPILED form, because the compilation optimizes different structures to the same byte code. Due to quota limit reasons as well as for bug tracing, I usually only use non-compiled elisp pacakges.
-  + elp.el v2.39
-  + Emacs 19.28
-  + HP-UX A.09.01 A 9000/715
+- 所有的功能都以未编译的形式存在，因为编译会将不同的结构优化为相同的字节码。由于配额限制和便于错误追踪，我通常只使用未编译的elisp（Emacs Lisp）包。
+- elp.el v2.39
+- Emacs 19.28
+- HP-UX A.09.01 A 9000/715
 
-** 15.2 Elp foreword
+** 15.2 Elp 前言  
+（注：Elp 为专有名词或缩写，具体含义请参考相关说明。）
 
-Note, that if you time the same functions you will get different absolute timings. Nevertheless, you should get same results about the fact that which one feels fastest. The values have been taken from the Elapsed row: IT DOES NOT REPRESENT EXACT TIME SPENT in the function, because time spent depends on of operating system and current load of the Unix machine.
+需要注意的是，如果您对相同的函数进行计时，您将得到不同的绝对时间。然而，您应该会得出相同的结论，即哪个感觉最快。这些值取自**Elapsed时间行**：**它并不代表函数中花费的确切时间**，因为所花费的时间取决于操作系统和Unix系统的当前负载情况。
 
-Strong Note: [From elp.el, Barry Warsaw] Note that there are plenty of factors that could make the times reported unreliable, including the accuracy and granularity of your system clock, and the overhead spent in lisp calculating and recording the intervals. I figure the latter is pretty constant, so while the times may not be entirely accurate, I think they'll give you a good feel for the relative amount of work spent in the various lisp routines you are profiling. Note further that times are calculated using wall-clock time, so other system load will affect accuracy too.
+重要提示：[来自elp.el，Barry Warsaw] 请注意，有许多因素可能导致报告的时间不可靠，包括系统时钟的精确度和时间粒度，以及在Lisp中计算和记录间隔所花费的开销。我认为后者的开销是相对稳定的，因此虽然时间可能不完全准确，但我认为这些时间数据能够为你提供一个较为直观的参考，帮助你了解在分析不同Lisp函数时所花费的相对工作量。此外，时间是基于实际时间计算的，因此其他系统负载同样会影响时间的准确性。
 
-Keep in mind that some of the tests may be very stupid or misleading to experienced lisp programmer or to person who knows Emacs internals very well. My sincere intention has been pure curiosity. Please feel free to send any comments or corrections for the used tests cases if they are not representative enough. It is unfortunate if some test case presented here is totally bogus and someone reads it with good intention.
+请记住，有些测试可能对有经验的Lisp开发者或非常熟悉Emacs内部的人来说非常无意义或误导性。我的初衷纯粹是出于好奇。如果所使用的测试案例不够具有代表性，欢迎随时提出任何意见或建议。如果这里展示的某个测试案例完全是错误的，而有人出于好意阅读了它，那将令人遗憾。
 
-** 15.3 Using elp for timing – repeat test several times
+** 15.3 使用ELP进行计时——多次重复测试
 
-The elp.el is great, but don't trust the first results. Sometimes the timings are totally different if you clear the list and run the tests again. Repeat your test cases at least 3 times before you derive conclusions about the performance.
+elp.el 确实很棒，但别太相信第一次的结果。清空列表后重新运行测试，有时测试结果的时间会完全不同。在得出关于性能的结论前，至少要重复测试三次。
 
-In here, the harness count is mentioned; that means that the test has been repeated N times and that the most representative time values has been selected(usually average). Using elp, say 10 times to repeat the test and record the timing, should give you solid estimate what timings are right.
+在这里提到了测试的重复次数；这意味着测试已经重复了N次，并选择了最具代表性的时间值（通常为平均值）。使用elp，例如重复测试10次并记录时间数据，应该能为你提供一个准确的时间估计，帮助你确定哪些时间是准确的。
 
-You can use the elp very easily via minor mode if you ftp lisp helper module: tinylisp.el. All the tests have been executed with that package in the following manner:
+您可以通过次要模式轻松使用elp（一种调试工具），如果您通过FTP下载了lisp辅助模块，tinylisp.el。所有测试均已按以下方式执行：
 
-  + Draw region over test set, including all functions and the HARNESS case and narrow to it with C-x n n
-  + read all functions with $ - tili-eval-current-buffer
-  + Instrument all functions with $ e I tili-elp-instrument-buffer
-  + Run harness test with $ e h tili-elp-harness
+- 在测试集上划定区域，包括所有函数及HARNESS案例。然后使用C-x n n缩小至该区域。
+- 使用 $ - tili-eval-current-buffer 来读取所有带 $ 的函数
+- $ e I tili-elp-instrument-buffer 对所有功能进行插桩
+- 使用 $ e h tili-elp-harness 运行测试框架
 
-After the tili-elp-harness function (where you can give the prefix how many times to repeat the test set; defualt is 3) has finished the elp results are shown in separate buffer from where the average of the results can determined.
+在tili-elp-harness函数（您可以在其中指定前缀以设置测试集重复的次数；默认重复次数为3）完成后，elp结果将显示在独立的缓冲区中，从中可计算出结果的平均值。
 
-** 15.4 Byte compilation note
+** 15.4 字节码编译说明
 
-If you byte compile files, the generated code is much faster thnt what the non-byte compiled one. During byte compiling, some structures are also optimized so that while they may look different in the code, the byte code is exactly the same. This means that if you should pay attention to tests that show considerable timing differencies that probably are not optimized away.
+如果您对文件进行字节编译，生成的代码比非字节编译的代码要快得多。在字节编译过程中，某些结构会被优化，因此尽管它们在代码中可能看起来不同，但生成的字节码是完全一致的。这意味着您应关注那些显示出显著时间差异的测试，因为这些差异可能无法通过优化消除。
 
-Here are som examples where you see the effect of byte compiling Pay attention to cases 1a and 1d which show you fine example how byte compilation optimizes structs.
+以下是一些字节编译效果的示例。要特别注意案例1a和1d，它们很好地展示了字节编译如何优化结构体。
 
-[_1a_] Using let in function.
+[_1a在函数中运用`let`关键字声明变量。
 
-Here is one long way to read byte code. If you want to byte compile expressions withing functions, you probably want to be aware of this method too.
+这是一种读取字节码的复杂方法。如果你想在函数内部对表达式进行字节编译，你可能也需要熟悉这种方法。
 
 #+begin_src emacs-lisp
   (setq bcode     ;; Simple let with 2 variables
@@ -2028,64 +2026,64 @@ Here is one long way to read byte code. If you want to byte compile expressions 
   (disassemble bcode)
 #+end_src
 
-Here shorter way to read byte code; which produces exactly the same byte code as previous one. The disassemble compiles the sexp automatically.
+这里是读取字节码的较短方法；它生成的字节码与前一个方法完全相同。反汇编器会自动对sexp（符号表达式）进行编译。
 
 #+begin_src emacs-lisp
   (disassemble '(lambda () (let ((a 1) (b 2)) (some-call) )))
 #+end_src
 
 #+begin_example
-      byte code for foo:
-        args: nil
-      0   constant  1
-      1   constant  2
-      2   varbind   b
-      3   varbind   a
-      4   constant  some-call
-      5   call      0
-      6   unbind    2
-      7   return
+  byte code for foo:
+    args: nil
+  0   constant  1
+  1   constant  2
+  2   varbind   b
+  3   varbind   a
+  4   constant  some-call
+  5   call      0
+  6   unbind    2
+  7   return
 #+end_example
 
-[_1b_] Same as previous one, but using the call let*. Notice, that the only difference to previous one is the order how the variables are pushed into stack. In 1a case all the values were pushed there first and then popped in varbind. Internal stack depth is thus bigger in 1a and according to experts, that makes big let statements slightly slower than if one used let* for the same purpose.
+[_1b_] 与上一个相同，但使用 let* 调用。注意，与上一个唯一的区别是变量被推入堆栈的方式。在 1a 的情况下，所有的值首先被推入堆栈，然后在 varbind 中被弹出。所以，1a 的内部堆栈深度更大，据专家称，这使得较大的 let 语句比使用 let* 实现相同目的时稍微慢一些。
 
 #+begin_src emacs-lisp
   (disassemble '(lambda () (let* ((a 1) (b 2)) (some-call) )))
 #+end_src
 
 #+begin_example
-      byte code:
-        args: nil
-      0   constant  1
-      1   varbind   a
-      2   constant  2
-      3   varbind   b
-      4   constant  some-call
-      5   call      0
-      6   unbind    2
-      7   return
+  byte code:
+    args: nil
+  0   constant  1
+  1   varbind   a
+  2   constant  2
+  3   varbind   b
+  4   constant  some-call
+  5   call      0
+  6   unbind    2
+  7   return
 #+end_example
 
-[_1c_] Example, where let* binds previous variables. This has same byte code as 1b.
+[_1摄氏度示例其中 let* 绑定先前的变量。这与 1b 的字节码相同。
 
 #+begin_src emacs-lisp
   (disassemble '(lambda () (let* ((a 1) (b a)) (some-call) )))
 #+end_src
 
 #+begin_example
-      byte code for foo:
-        args: nil
-      0   constant  1
-      1   varbind   a
-      2   constant  1
-      3   varbind   b
-      4   constant  some-call
-      5   call      0
-      6   unbind    2
-      7   return
+  byte code for foo:
+    args: nil
+  0   constant  1
+  1   varbind   a
+  2   constant  1
+  3   varbind   b
+  4   constant  some-call
+  5   call      0
+  6   unbind    2
+  7   return
 #+end_example
 
-[_1d_] In the following we use multiple let stetments and the byte compiling reports that the byte code is equal to 1a. A fine example how byte compiler optimizes statements.
+[_1天_] 在下面我们使用了多个let语句，字节编译报告显示字节码为1a。这很好地展示了字节编译器如何通过优化语句来提高效率。
 
 #+begin_src emacs-lisp
   (disassemble
@@ -2096,19 +2094,19 @@ Here shorter way to read byte code; which produces exactly the same byte code as
 #+end_src
 
 #+begin_example
-      byte code:
-        args: nil
-      0   constant  1
-      1   varbind   a
-      2   constant  2
-      3   varbind   b
-      4   constant  some-call
-      5   call      0
-      6   unbind    2
-      7   return
+  byte code:
+    args: nil
+  0   constant  1
+  1   varbind   a
+  2   constant  2
+  3   varbind   b
+  4   constant  some-call
+  5   call      0
+  6   unbind    2
+  7   return
 #+end_example
 
-[_4_] Things change if there is some call between the let stetments
+[_4_] 如果在let语句之间有一些调用，情况会有所变化
 
 #+begin_src emacs-lisp
   (disassemble
@@ -2120,40 +2118,45 @@ Here shorter way to read byte code; which produces exactly the same byte code as
 #+end_src
 
 #+begin_example
-      byte code:
-        args: nil
-      0   constant  1
-      1   varbind   a
-      2   constant  call1
-      3   call      0
-      4   discard
-      5   constant  2
-      6   varbind   b
-      7   constant  call2
-      8   call      0
-      9   unbind    2
-      10  return
+  byte code:
+    args: nil
+  0   constant  1
+  1   varbind   a
+  2   constant  call1
+  3   call      0
+  4   discard
+  5   constant  2
+  6   varbind   b
+  7   constant  call2
+  8   call      0
+  9   unbind    2
+  10  return
 #+end_example
 
-** 15.5 Byte compiler can optimise smartly
+** 15.5 字节码编译器能够智能地进行优化
 
-Let me start by and example. I was not sure what the impact of callf would be if I used it my code, so I pulled out byte compiler and dissassempled some of test defun.
+让我从一个例子开始吧。我不确定在我的代码中使用`callf`会有什么影响，所以我拿出了字节码编译器并反汇编了几个测试函数。
 
-The call (callf or var 0) expand to statement (let* nil (setq var (or var 0))), so I wrote three function and compared their dissassemble results: They were identical. Generated empty let statement was optimised away.  This is a good sign that you can safely use cl macros.
+调用（callf 或 var 0）展开为语句 (let* nil (setq var (or var 0)))，因此，我编写了三个函数并比较了它们的反汇编结果：结果完全相同。生成的空 let 语句已被优化移除。这是一个良好的迹象，表明你可以安全地使用 cl 宏。
 
-[_1_] The cl way
+[_1_] 经典方式  
+_] 传统方式  
+_] 云方式  
+_] 云端方式  
+
+（注：根据上下文选择合适的翻译，例如“cl”代表“classical”时使用“经典方式”或“传统方式”，代表“cloud”时使用“云方式”或“云端方式”。）
 
 #+begin_src emacs-lisp
   (defun my1 () (callf or var 0))
 #+end_src
 
-[_2_] The regular code writing way
+[_2_] 常规的代码编写方法
 
 #+begin_src emacs-lisp
   (defun my2 () (setq var (or var 0)))
 #+end_src
 
-[_3_] The `callf' like it would macroexpand to
+[_3`callf` 会宏展开成
 
 #+begin_src emacs-lisp
   (defun my3 () (let* nil (setq var (or var 0))))
@@ -2170,19 +2173,19 @@ The call (callf or var 0) expand to statement (let* nil (setq var (or var 0))), 
   7       return
 #+end_example
 
---------------------------------------------------------------------------------------------------------------
+-----
 
-* 16.0 Profiling results
+* 16.0 性能分析结果
 
-** 16.1 Refence functions
+** 16.1 参考函数
 
-The format of the test function was presented by [Vladimir] and from the timing you can see how much the this wrapper affects the timings measured. Because the timing is measured from the Elapsed(accumulted time) row, here are the reference times for different loop-for values: 5 and 10 that are normally used in test.
+测试函数的格式由[Vladimir]提出，通过时间测量可以看出，这个封装器对测量时间的影响有多大。因为时间是从Elapsed（累计时间）行测量的，以下是测试中常用的循环值（5和10）的参考时间。
 
 #+begin_example
-       0.32 (10)
-       |      |
-       |      how many times function is called (loop-for count)
-       Elapsed time
+  0.32 (10)
+  |      |
+  |      how many times function is called (loop-for count)
+  Elapsed time
 #+end_example
 
 #+begin_src emacs-lisp
@@ -2212,9 +2215,9 @@ The format of the test function was presented by [Vladimir] and from the timing 
               (t01) (t02 list) ))
 #+end_src
 
-** 16.2 How to get first element?
+** 16.2 如何获取第一个元素？
 
-As you can see; there is no difference between the element retrieval functions.
+如你所见，元素检索函数并无区别。
 
 #+begin_src emacs-lisp
   (defun t1 (list)                            ;; 0.4, car
@@ -2247,9 +2250,9 @@ As you can see; there is no difference between the element retrieval functions.
               (t1 list) (t2 list) (t3 list)))
 #+end_src
 
-** 16.3 How to access last element?
+** 16.3 如何访问最后一个元素？
 
-The results were quite impressive. Naturally using the reverse command is slower, because it has to access each elemnt, where addressing last element directly is the fastest possible way.
+结果非常出色。自然地，使用反向操作会较慢，因为它必须访问每个元素，而直接访问最后一个元素是最快的方式。
 
 #+begin_src emacs-lisp
   ;;  Reading the last element by counting the position.
@@ -2278,9 +2281,9 @@ The results were quite impressive. Naturally using the reverse command is slower
               (t1 list) (t2 list)  ))
 #+end_src
 
-** 16.4 Which loop method is faster?
+** 16.4 哪种循环方法更快？
 
-There seems to be huge diffrence between while and mapcar. probably due to function call the mapcar does every time when passing element to lambda function.
+while 和 mapcar 之间似乎存在巨大差异，可能是因为 mapcar 在每次将元素传递给 lambda 函数时都会进行函数调用。
 
 #+begin_src emacs-lisp
   (defun t1 (list)                            ;; 28, mapcar
@@ -2305,9 +2308,9 @@ There seems to be huge diffrence between while and mapcar. probably due to funct
               (t1 list) (t2 list) ))
 #+end_src
 
-** 16.5 Adding to list fast
+** 16.5 快速添加至列表
 
-If I want to append things to a list, should I do it with append or with nconc or cons? So that results are comparable to each other, every function must return the list in the same order and that's why you see nreverse calls prior returning the list in some functions.
+如果我想将元素追加到列表中，应该使用append、nconc还是cons？为了确保结果的一致性，每个函数都必须以相同的顺序返回列表，因此，在某些函数中返回列表之前会调用nreverse。
 
 #+begin_src emacs-lisp
   (defun t11 ()                           ;;3.3, nconc 1
@@ -2388,19 +2391,21 @@ If I want to append things to a list, should I do it with append or with nconc o
               (t11) (t12) (t21) (t22) (t3) (t4) (t5) ))
 #+end_src
 
-Wow. using append to add to the end of list is enermously slower than when compared to fastest way cons. You should only use append to add to the beginning of list.
+哇哦，使用 append 在列表末尾添加元素的速度与最快的 cons 方式相比极其慢。你应该只在列表开头使用 append（cons 是一种快速添加元素的方式）。
 
-[Vladimir]
+弗拉基米尔
 
-This is expected. For every call, append traverses to the end of the list, making a copy along the way, then adds a new element at the end, then discards the old list. This may even lead to garbage collection, which can take unpredictably long.
+这是预料之中的。对于每次调用，append 会遍历到列表末尾，创建副本，添加新元素，然后丢弃旧的列表。这甚至可能触发垃圾回收，而垃圾回收的时间可能难以预测。
 
-nconc is better in that it doesn't copy the list ("doesn't cons", which means that doesn't create new conses.  Cons creation is quick when the new cons is taken from the free cons list, but if that is exhausted, memory allocation should be done). However, nconc still traverses the list at every iteration.
+nconc 的优势在于它不会复制整个列表（“不会创建新的 cons 单元”，这意味着不会创建新的 cons 单元。当新的 cons 单元从空闲 cons 列表中获取时，创建速度较快；但如果空闲列表耗尽，则需进行内存分配）。然而，nconc 在每次迭代时仍需遍历列表。
 
-cons just adds a new cell at the beginning. append and nconc take O(n^2/2): when the list length is l they perform O(l) operations to traverse the list. cons has amortized cost O(1) (ie constant). "Amortized" means that it may cause memory allocation and/or garbage collection every once in a while, but most of the time it won't.
+cons 仅在开头添加一个新单元。append 和 nconc 的复杂度为 O(n)（线性复杂度）。^2/2): 当列表长度为 l 时，它们需要执行 O(l) 次操作来遍历列表。cons 操作的平摊成本为 O(1)（即常数）。“平摊”意味着有时会导致内存分配或垃圾回收，但在大多数情况下不会发生。
 
-** 16.6 How to copy a alist fast
+** 16.6 如何快速复制一个列表
 
-Idea by Morten Welinder [[mailto:terra@diku.dk][terra@diku.dk]] (copy-sequence minor-mode-alist) only copies the cdr structure of the list (mapcar 'copy-sequence minor-mode-alist) ought to copy the pairs in the alist `copy-alist copies' list structure and pairs: it does slightly more than we need but it is much faster.
+创意来自莫滕·韦林德[[mailto:terra@diku.dk][terra@diku.dk]] (copy-sequence minor-mode-alist) 只复制列表的 cdr 结构（注：cdr 在 Lisp 中表示列表中除第一个元素外的其余部分）。  
+(mapcar 'copy-sequence minor-mode-alist) 应该复制 alist（关联列表）中的键值对。  
+`copy-alist` 复制列表结构和键值对：它的功能比我们需要的稍微多一些，但速度更快。
 
 #+begin_src emacs-lisp
   (defun t1 (list)                                ;; 3.5
@@ -2426,15 +2431,15 @@ Idea by Morten Welinder [[mailto:terra@diku.dk][terra@diku.dk]] (copy-sequence m
               (t1 list) (t2 list) ))
 #+end_src
 
-** 16.7 Let: is using let* slower than let
+** 16.7 问：使用 let* 是否比 let 更慢？
 
-See explanation in [[http://www.nongnu.org/emacs-tiny-tools/elisp-coding/index-body.html#let_is_using_let_slower][(benchmarks)]] which explains the unexpected result where let* is marginally faster.
+请参阅解释[[http://www.nongnu.org/emacs-tiny-tools/elisp-coding/index-body.html#let_is_using_let_slower][基准指标]] 这解释了为何let*（一种编程结构）会出人意料地稍微快一些。
 
-[Vladimir]
+弗拉基米尔
 
-From common sense, it wouldn't matter how you arrange your lets and how you init the vars, even if your function is called in a long loop. The function call time will still dominate the lets. If fc=100 and let=1, a second let will only add 1% to the overall time. The only time it matters is when the inner let is inside a loop, in which case it will probably pay to take it outside.
+根据常识，无论你如何安排`let`语句和初始化变量，即使你的函数在一个长时间运行的循环中被调用，函数调用的时间仍然会远超过`let`语句的执行时间。如果函数调用时间为100，而`let`语句的执行时间为1，那么第二个`let`语句只会使总时间增加1%。唯一需要注意的是，当内部的`let`语句位于循环内部时，这时最好将其移到循环外部以提高性能。
 
-We'll find that using let inside loop (defining variable j again and again) slightly decreases the performance. Yes, only slightly, because you don't normally use 1000 let statements in your function. This would also suggest that even if you put several let statements into the function, that wouldn't be be very much slower that using just one let statement at the beginning of file.
+我们会注意到，在循环中使用`let`（即反复定义变量`j`）会略微影响性能。确实，影响很小，因为通常情况下，你不会在函数中使用1000个`let`声明。这也意味着，即便在函数中使用多个`let`声明，性能也不会比在文件开头只使用一个`let`声明慢很多。
 
 #+begin_src emacs-lisp
   (t01)                               ;; 0.32, without let
@@ -2460,7 +2465,7 @@ We'll find that using let inside loop (defining variable j again and again) slig
               (t1) (t2)  ))
 #+end_src
 
-It seems that there is not much difference in tested emacs. I wouldn't be that thrilled of the results, but I'd guess that let* would have been definitely slower that let. Let try with variation where let* is used for the purpose is it meant to: binding previous values's content.
+在测试的emacs中似乎没有太大差异。我对这些结果并不怎么兴奋，但我猜let* 绝对会比 let 慢。让我们尝试一种变体，其中 let* 用于其本意：绑定之前值的内容。
 
 #+begin_src emacs-lisp
   (defun t1 ()                        ;; 1.2, let
@@ -2484,11 +2489,11 @@ It seems that there is not much difference in tested emacs. I wouldn't be that t
               (t1) (t2)  ))
 #+end_src
 
-Hm. While the let* binds previous variables values to successive ones, there still doesn't seem to be a big difference. Don't pay attention to marginal 0.1 advantage which let* seems to have gained.
+嗯。尽管 `let*` 将前面的变量值绑定到后续的变量上，但似乎并没有明显的区别。不必在意 `let*` 那微不足道的 0.1 优势。
 
-** 16.8 Let: or function arg list
+** 16.8 let 或函数参数列表
 
-Some times I only need one variable and I have a bad habbit of defining it in the function call argument list to save typing and indentation of let call. Like following.
+有时候我只需要使用一个变量，而我有一个不太理想的习惯，就是将其定义在函数调用的参数列表中，以节省输入和`let`调用的缩进。如下面的例子所示。
 
 #+begin_src emacs-lisp
   (setq xxx-function
@@ -2497,7 +2502,7 @@ Some times I only need one variable and I have a bad habbit of defining it in th
                (symbol-value ignore))))
 #+end_src
 
-Above I only needed one variable, that I named ignore, and used it to record the return status of function.  But does this buy anything for me? lets find out.
+上面我只需要一个变量，命名为ignore，用于记录函数的返回状态。但这对我有什么实际帮助吗？我们来看看吧。
 
 #+begin_src emacs-lisp
   (defun  t1 (&optional a) (setq a (ignore)))     ;; 0.11
@@ -2525,11 +2530,11 @@ Above I only needed one variable, that I named ignore, and used it to record the
               (t11) (t22) ))
 #+end_src
 
-If doesn't seem to matter much. I have just had a bad habbit and I should get rid of it.
+这似乎没多大关系。我有个坏习惯，得改掉它。
 
-** 16.9 Variables: count of them
+** 16.9 变量：数量
 
-The count of variables starts gradually affecting the performance. Decide yourself how big threath using many variables is to your function: usually there are other statements that affect the overall perfomance of the function much more. The function call alone takes considerable amount of time when compared to sole let statement.
+变量数量的增加会逐渐对性能产生影响。请自行判断使用大量变量对函数性能的威胁有多大：通常还有其他语句对函数的整体性能有更大的影响。与单纯的let语句相比，仅函数调用本身就会耗费大量时间。
 
 #+begin_src emacs-lisp
   (defun t1 ()                        ;; 0.5
@@ -2561,9 +2566,9 @@ The count of variables starts gradually affecting the performance. Decide yourse
               (t1) (t2) (t3) ))
 #+end_src
 
-** 16.10 Variables: using let or setq
+** 16.10 变量：使用 let 或 setq
 
-I always question myself, does it make difference shere I set the variables value. Some times If I complex initializations I would like to declare variable (not set it) in let stament and leave the initializing after the let. This seems to indicate that using the let to set the variables is better.
+我经常问自己，变量值设置的位置是否会影响结果。有时候，如果我要进行复杂的初始化，我倾向于在let语句中声明变量（但不赋值），并将初始化放在let之后。这似乎说明用let来设置变量更好。
 
 #+begin_src emacs-lisp
   (defun t1 ()                                    ;; 2.7
@@ -2594,9 +2599,9 @@ I always question myself, does it make difference shere I set the variables valu
               (t1) (t2) ))
 #+end_src
 
-** 16.11 Variables: many *setq* commands
+** 16.11 变量：多个 *setq* 命令
 
-Yes they do. Using one setq command is naturally faster than many of them. For comparision there is t0 function which does the same, but does not use setq at all.
+是的，确实如此。使用一个setq命令自然比使用多个更快。为了进行比较，有一个t0函数可以实现相同的功能，但完全不涉及setq。
 
 #+begin_src emacs-lisp
   ;;  Reference function
@@ -2633,9 +2638,9 @@ Yes they do. Using one setq command is naturally faster than many of them. For c
               (t0) (t1) (t2)  ))
 #+end_src
 
-** 16.12 If and cond, which is faster one?
+** 在编程中，if语句和cond函数，哪一个性能更好？
 
-Neither. Common sense tells you that too: this is actually a stupid test, but I was curious what elp says.  From here you can see that elp.el isn't that bad if you use it for timing.
+两者都不是。常识也会告诉你：这其实是个挺蠢的测试，但我很好奇 elp 会给出什么结果。从这里你就能看出，如果你用它来测量时间，elp.el（一个用于计时的工具）其实还不错。
 
 #+begin_src emacs-lisp
   (defun t1 ()                                    ;; 0.4
@@ -2659,9 +2664,9 @@ Neither. Common sense tells you that too: this is actually a stupid test, but I 
               (t1) (t2) ))
 #+end_src
 
-** 16.13 Concat and format commands
+** 16.13 连接及格式化命令
 
-I have very hard time to determine which elp results would describe the average timing difference. I ran the elp test several times, but the deviation between the results were too big to give any reliable estimate. Be very skeptical.
+我很难确定哪些elp测试结果能够描述平均时间差。我多次执行了elp测试，但结果之间的差异太大，无法提供可靠估计。请保持谨慎。
 
 #+begin_src emacs-lisp
   (defun t1 ()                                    ;; 1.2
@@ -2686,9 +2691,9 @@ I have very hard time to determine which elp results would describe the average 
               (t1) (t2) ))
 #+end_src
 
-** 16.14 Using *if* before running run-hooks
+** 16.14 在运行钩子函数（run-hooks）之前使用 if
 
-I just wonder if it makes sense to test hook contents before running it. Why should I call function run-hooks if there is nothing in a hook? From the results point of view, the there is small time difference: we prevent a function call to run-hooks.
+我只是想知道在运行钩子之前测试其内容是否有意义。如果钩子里没有任何内容，我为什么要调用 run-hooks 函数呢？从结果的角度而言，时间上的差异很小：我们避免了调用 run-hooks 函数。
 
 #+begin_src emacs-lisp
   (defun t1 ()
@@ -2713,11 +2718,11 @@ I just wonder if it makes sense to test hook contents before running it. Why sho
               (t1) (t2) ))
 #+end_src
 
-** 16.15 Returning boolean or *data* from function
+** 16.15 从函数返回布尔值或*数据值*（编程术语）
 
-Supposes you have some data in some variable, but you wonder does ot make a difference to return that data to calling program or just plain boolean t or nil
+假设某个变量中存储了一些数据，但你可能会疑惑，返回这些数据给调用程序，还是直接返回布尔值 true 或 nil，是否有区别。
 
-Consider that we have some string data that we could return to mean True value, or success. The t2 changes the final return value to boolean.
+假设我们有一些字符串数据，可以返回以表示真值或成功。t2 将最终的返回值转换为布尔值。
 
 #+begin_src emacs-lisp
   ;; Remark: this is actually not a very good test set.
@@ -2730,16 +2735,15 @@ Consider that we have some string data that we could return to mean True value, 
     (loop-for 0 500
               (t1)                                     ;; 0.13
               (t2)))                                   ;; 0.13
-
 #+end_src
 
-No, it doesn't seem to make any difference, so we just return anything we have already in the variable.
+不，这似乎没有影响，所以我们直接返回变量中的内容。
 
-[Vladimir] ...There is nothing that could slow down the t1 function, because returning the variable does not make copy of it, it only delays garbage collection of that structure for a while.
+[某人] ...没有什么能减缓t1函数的执行速度，因为返回变量并不会创建它的副本，只会暂时延迟该结构的垃圾回收时间。
 
-** 16.16 Calling length or using len variable
+** 16.16 调用长度函数，或使用 len 变量
 
-If you use the length of list in many places, calculating it every time with length function decreases performance considerably.
+如果您在多个地方使用列表的长度，每次都用len函数计算会大幅降低性能。
 
 #+begin_src emacs-lisp
   (defun t1 ()                                   ;; 2.3
@@ -2765,22 +2769,22 @@ If you use the length of list in many places, calculating it every time with len
               (t1) (t2) ))
 #+end_src
 
---------------------------------------------------------------------------------------------------------------
+-----
 
-* 17.0 Xemacs and Emacs compatibility
+* 17.0 Xemacs 和 Emacs 兼容性
 
-** 17.1 About compatibility
+** 17.1 关于兼容性
 
-During development of my packages I run into many incompatibities not only between Emacs and XEmacs, but also between Emacs version. If you care to write XEmacs and Emacs compatible code without hashless, I'd recommend using fucntions from my main library: they offer transparent interface to certain Emacs and XEmacs specific features. See these libraries and funcktions
+在开发我的包时，我遇到了许多兼容性问题，不仅存在于Emacs和XEmacs之间，还存在于不同版本的Emacs之间。如果你想编写兼容XEmacs和Emacs的代码，并且不想用hashless（无哈希表）的话，我建议你使用我主库（main library）中的函数：它们为某些Emacs和XEmacs的特定功能提供了透明的接口（即无需关心底层实现细节的接口）。请参考这些库和函数。
 
 #+begin_example
-      tinylib.el   -- functions ti::xe-*
-      tinylibxe.el -- XEmacs and Emacs emulation library
+  tinylib.el   -- functions ti::xe-*
+  tinylibxe.el -- XEmacs and Emacs emulation library
 #+end_example
 
-** 17.2 Overlay and extent compatibility
+** 17.2 叠加层与范围兼容性
 
-Good news! XEmacs 19.15 now has package overlay.el which mimics the calls of Emacs overlay functions. This means, that you no longer need to try to accomodate both Emacs(overlay) and XEmacs(extent) commands into your code. Following is enough to make your overlay code work in XEmacs.
+好消息来了！XEmacs 19.15 现在引入了一个名为 overlay.el 的包，它模拟了 Emacs 的 overlay 函数调用方式。这意味着，你不再需要在代码中同时处理 Emacs（overlay）和 XEmacs（extent）的命令。以下内容足以让你的 overlay 代码在 XEmacs 中正常运行。
 
 #+begin_src emacs-lisp
   (eval-and-compile
@@ -2788,11 +2792,11 @@ Good news! XEmacs 19.15 now has package overlay.el which mimics the calls of Ema
         (load "overlay")))
 #+end_src
 
-** 17.3 Portable Menus
+** 17.3 可移植菜单
 
-Don't use Emacs specific menus, but see easymenu.el and compose your menus with it. Below you see a very simple minor mode and it's menu definition. The menu appears when the minor mode is turned on and disappears when the minor mode is turned off (at least in Emacs). Pay attention to the Selection 3 that can be enabled and disabled on the fly.
+不要使用Emacs特有的菜单，而是参考easymenu.el并使用它来编写菜单。下面你将看到一个非常简单的次要模式及其菜单定义。当次要模式开启时，菜单会出现；关闭时，菜单会消失（至少在Emacs中）。请注意Selection 3，它能够动态地启用和禁用。
 
-Note: The easymenu's enable/disable choice is buggy in Emacs 19.28 - 19.34 (in non-windowed mode), so if the progn tests at the end of file fail, don't mind that. Newer Emacs releases have fixed the problems.
+注意：在 Emacs 19.28 - 19.34 版本中（非窗口模式下），easymenu 的启用/禁用选项存在 bug，因此如果文件末尾的 progn 测试失败，不必在意。较新的 Emacs 版本已经修复了这些问题。
 
 #+begin_src emacs-lisp
   ;; test.el -- Just sample .el file
@@ -2860,30 +2864,30 @@ Note: The easymenu's enable/disable choice is buggy in Emacs 19.28 - 19.34 (in n
   ;; end of code
 #+end_src
 
-** 17.4 List of simple incompatibilities.
+** 17.4 简单的，不兼容性列表。
 
-Here is a small list of functions that do not work in both emacs versions.
+以下是两个 Emacs 版本中无法正常使用的一些功能的简短列表。
 
-  + force-mode-line-update, XEmacs, labeled as obsolete
-  + mailabbrev package, XEmacs, calls it mail-abbrevs
-  + transient-mark-mode, does not exist in XEmacs 19.14
-  + mailabbrev package, XEmacs, calls it mail-abbrevs
-  + eval-after-load, XEmacs, function does not exist in 19.14 Use instead:
+- force-mode-line-update, XEmacs，已被标记为废弃
+- mailabbrev 包在 XEmacs 中被称为 mail-abbrevs（邮件缩写功能）。
+- transient-mark-mode，在 XEmacs 19.14 中不存在。
+- XEmacs 中的 mailabbrev 包，称之为：mail-abbrevs。
+- 在 XEmacs 19.14 版本中，eval-after-load 函数不存在，请使用以下替代方法：
 
-  #+begin_src emacs-lisp
-    (defvar XXX-package-load-hook nil "")
-    ..code..
-    (run-hooks 'XXX-package-load-hook)
-    ;; End of package XXX.el
-  #+end_src
+#+begin_src emacs-lisp
+  (defvar XXX-package-load-hook nil "")
+  ..code..
+  (run-hooks 'XXX-package-load-hook)
+  ;; End of package XXX.el
+#+end_src
 
-      XEmacs 19.15 and 20.1 does have this form though.
+XEmacs 19.15，和 20.1 确实具备这种形式。
 
-** 17.5 Hash table compatibility
+** 17.5 哈希表兼容性
 
-Hrvoje Niksic [[mailto:hniksic@srce.hr][hniksic@srce.hr]] 17 May 1997 comp.emacs.xemacs
+赫尔沃耶·尼基希奇[[mailto:hniksic@srce.hr][hniksic@srce.hr]] 1997年5月17日 comp.emacs.xemacs
 
-Use CL package's hash function which are compatible with Common Lisp and GNU Emacs. They use XEmacs hashtables on XEmacs and emulate CL hashtables on GNU Emacs.
+使用CL包中的哈希函数，这些函数与Common Lisp和GNU Emacs兼容。在XEmacs上使用XEmacs的哈希表，而在GNU Emacs上则模拟CL的哈希表。
 
 #+begin_src emacs-lisp
   (let ((foo (make-hash-table :test 'equal)))
@@ -2895,7 +2899,7 @@ Use CL package's hash function which are compatible with Common Lisp and GNU Ema
     => #<hashtable 2/29 0x1ef7>
 #+end_src
 
-Now, if you want to dump the hash-table anywhere, the simplest thing to do is dump it to a list. For example, your program crunches data in and out of hashtable for
+现在，如果你想在任何地方转储哈希表，最简单的办法就是把它转储到一个列表里。比如，你的程序在哈希表中进行数据的输入和输出处理。
 
 #+begin_src emacs-lisp
   (let (alist)
@@ -2906,11 +2910,11 @@ Now, if you want to dump the hash-table anywhere, the simplest thing to do is du
   => (("Hrvoje" . wow) ("David" . cool))
 #+end_src
 
-There you have all your entries in alist, which you can print, save to file etc. All of this is, of course, much faster than if you had used an alist all the time, since the search time would have been O(n) instead of much better hashtable characteristics.
+你将所有条目都存储在一个列表中，可以进行打印、保存到文件等操作。显然，这些操作比一直使用列表要快得多，因为搜索时间是O(n)（线性时间复杂度），而不是哈希表更优的性能。
 
-** 17.6 Character handling changes
+** 17.6：字符处理的变化
 
-If you had any character tests in your code, it will likely break in XEmacs20 and Emacs20, where a single integer does no longer present a charcter code. Beware especially contructs where you read characters directly and test the input:
+如果你的代码中有任何字符测试，它很可能会在XEmacs20和Emacs20中出错，因为单个整数不再代表字符代码。尤其要注意直接读取字符并测试输入的代码结构。
 
 #+begin_src emacs-lisp
   (setq ch (read-char))
@@ -2918,14 +2922,14 @@ If you had any character tests in your code, it will likely break in XEmacs20 an
       ...
 #+end_src
 
-That will no longer work as expected. Also if you have test like this
+那将不再如预期般工作。另外，如果你有类似的测试
 
 #+begin_src emacs-lisp
   (if (eq (following-char) ?.)
       ...
 #+end_src
 
-Those will fail also because you can't use old operators like eq. In my latest 'm' library there is emulation for some of the following functions that are from XEmacs20's documentation. The above example can now be converted into
+那些也会失败，因为不能使用像“eq”这样的旧操作符。在我最新的'm'库中，我模拟了一些函数。这些函数来自XEmacs20的文档。上述示例现在可以被转换。
 
 #+begin_src emacs-lisp
   (require 'tinylibm)
@@ -2934,53 +2938,53 @@ Those will fail also because you can't use old operators like eq. In my latest '
       (if (char= (following-char) ?.)
 #+end_src
 
-And the code will work in every Emacs 19.28+, XEmacs 19.14+.
+代码将兼容所有 Emacs 19.28 及以上版本和 XEmacs 19.14 及以上版本。
 
-*** 17.6.1 Characterp: (object), XEmacs20
+*** 17.6.1 字符p（对象），XEmacs20
 
-t if OBJECT is a character. Unlike in FSF Emacs, a character is its own primitive type. Any character can be converted into an equivalent integer using char-to-int. To convert the other way, use int-to-char; however, only some integers can be converted into characters. Such an integer is called a char-to-int; see char-int-p.
+如果 OBJECT 是一个字符（t if）。与 FSF Emacs 不同，字符是一种独立的原始类型。任何字符都可以通过 char-to-int 函数转换为对应的整数。要进行反向转换，请使用 int-to-char；但请注意，并非所有整数都能转换为字符。这样的整数称为 char-to-int 转换结果；请参阅 char-int-p（字符整数判断函数）。
 
-Some functions that work on integers (e.g. the comparison functions <, <=, =, /=, etc. and the arithmetic functions +, -, *, etc.) accept characters and implicitly convert them into integers. In general, functions that work on characters also accept char-ints and implicitly convert them into characters. WARNING: Neither of these behaviors is very desirable, and they are maintained for backward compatibility with old E-Lisp programs that confounded characters and integers willy-nilly. These behaviors may change in the future; therefore, do not rely on them. Instead, use the character-specific functions such as char=.
+一些适用于整数的函数（例如比较函数：小于 <、小于等于 <=）=, /=算术函数（如 +, -, *, 等）接受字符并隐式地将它们转换为整数。通常，处理字符的函数也接受字符整数并隐式地将它们转换为字符。警告：这些行为都不太理想，它们之所以保留是为了向后兼容那些随意混淆字符和整数的旧版 E-Lisp 程序。这些行为将来可能会改变；因此，不要依赖它们。相反，请使用特定于字符的函数，例如 char=。
 
-*** 17.6.2 Char-int (ch) XEmacs20
+*** 17.6.2 字符-整数 (ch) XEmacs20
 
-– a built-in function. Convert a character into an equivalent integer. The resulting integer will always be non-negative. The integers in the range 0 - 255 map to characters as follows:
-
-#+begin_example
-      0 - 31      Control set 0
-      32 - 127    ASCII
-      128 - 159   Control set 1
-      160 - 255   Right half of ISO-8859-1
-#+end_example
-
-If support for Mule does not exist, these are the only valid character values. When Mule support exists, the values assigned to other characters may vary depending on the particular version of XEmacs, the order in which character sets were loaded, etc., and you should not depend on them.
-
-*** 17.6.3 Char-to-int: (ch) XEmacs20
-
-– a built-in function. Convert a character into an equivalent integer. The resulting integer will always be non-negative. The integers in the range 0 - 255 map to characters as follows:
+– 一个内置函数。将字符转换为其对应的整数。生成的整数始终为非负数。0 到 255 范围内的整数与字符的映射关系如下：
 
 #+begin_example
-      0 - 31          Control set 0
-      32 - 127        ASCII
-      128 - 159       Control set 1
-      160 - 255       Right half of ISO-8859-1
+  0 - 31      Control set 0
+  32 - 127    ASCII
+  128 - 159   Control set 1
+  160 - 255   Right half of ISO-8859-1
 #+end_example
 
-If support for Mule does not exist, these are the only valid character values. When Mule support exists, the values assigned to other characters may vary depending on the particular version of XEmacs, the order in which character sets were loaded, etc., and you should not depend on them.
+如果系统不支持Mule，这些是唯一有效的字符值。当系统支持Mule时，其他字符的赋值可能会因XEmacs的具体版本、字符集载入的顺序等而有所不同，您不应依赖于这些值。
 
-*** 17.6.4 Int-to-char: (integer) XEmacs20
+*** 17.6.3 字符到整数的转换 (ch) XEmacs20
 
-– a built-in function. Convert an integer into the equivalent character. Not all integers correspond to valid characters; use char-int-p to determine whether this is the case. If the integer cannot be converted, nil is returned.
+— 一个内置函数。将字符转换为对应的整数。生成的整数始终为非负数。0 到 255 的整数对应字符如下：
 
-*** 17.6.5 Char-int-p: (object) XEmacs20
+#+begin_example
+  0 - 31          Control set 0
+  32 - 127        ASCII
+  128 - 159       Control set 1
+  160 - 255       Right half of ISO-8859-1
+#+end_example
 
-– a built-in function. t if OBJECT is an integer that can be converted into a character. See char-to-int.
+如果不存在对Mule的支持，这些字符值是唯一有效的。当支持Mule时，分配给其他字符的值可能会因XEmacs的具体版本、字符集加载顺序等因素而有所不同，建议不要依赖这些值，因为它们可能会发生变化。
 
-*** 17.6.6 Char-equal function (c1 c2 &optional buffer) XEmacs20.0
+*** 17.6.4 整数到字符转换 (整数) XEmacs20
 
-– a built-in function. Return t if two characters match, optionally ignoring case. Both arguments must be characters (i.e. NOT integers). Case is ignored if case-fold-search is non-nil in BUFFER. If BUFFER is nil, the current buffer is assumed.
+– 一个内置函数（编程中的一种预定义功能）。将整数转换为对应的字符。并非所有整数都能对应到有效的字符；可以使用 char-int-p（用于判断整数是否对应有效字符的函数）来判断是否属于这种情况。如果整数无法转换，则返回 nil（表示空值）。
 
-*** 17.6.7 Char= (c1 c2 &optional buffer) XEmacs20.1
+*** 17.6.5 字符-整数-p【对象】XEmacs20
 
-– a built-in function. Return t if two characters match, case is significant. Both arguments must be characters (i.e. NOT integers). The optional buffer argument is for symmetry and is ignored.
---------------------------------------------------------------------------------------------------------------
+– 一个内置函数。如果OBJECT是可转换为字符的整数，则返回真。参见char-to-int。
+
+*** 17.6.6 字符相等函数 (c1 c2 &可选 buffer) XEmacs20.0（XEmacs20.0 版本）
+
+– 一个内置函数。如果两个字符匹配，则返回 t，可选择性地忽略大小写。两个参数都必须是字符类型（而非整数）。如果缓冲区中的大小写折叠搜索为非 nil，则忽略大小写。如果缓冲区为 nil，则默认使用当前缓冲区。
+
+*** 17.6.7 字符 = (c1 c2 &可选参数 缓冲区) XEmacs20.1
+
+– 一个内置函数。如果两个字符在区分大小写的情况下匹配，则返回 t。两个参数都必须是字符（即不是整数）。可选的缓冲区参数仅用于对称性，实际被忽略。
+-----
